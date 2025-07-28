@@ -1,0 +1,31 @@
+import React, { useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from './AuthContext';
+
+const ProtectedRoute = ({ children, requiredRole }) => {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading) {
+      if (!user) {
+        navigate('/home'); // Redirect to home page
+      } else if (requiredRole && user.role !== requiredRole) {
+        navigate('/home'); // Redirect to home if role is not allowed
+      }
+    }
+  }, [user, loading, navigate, requiredRole]);
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+        <p>Loading...</p>
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+};
+
+export default ProtectedRoute;
