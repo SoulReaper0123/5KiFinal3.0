@@ -11,6 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
+const DASHBOARD_LINK = 'https://your-official-website.com/admin/dashboard';
 const FACEBOOK_LINK = 'https://www.facebook.com/5KiFS';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
@@ -150,7 +151,7 @@ app.post('/register', async (req, res) => {
                     <p><strong>Email:</strong> ${email}</p>
                     <p><strong>Registration Date:</strong> ${formatDisplayDate(registrationDate)}</p>
                     <p>Please review this application in the admin panel.</p>
-                    <p><a href="${WEBSITE_LINK}/admin/registrations">View Registrations</a></p>
+                    <p><a href="${DASHBOARD_LINK}">View in Dashboard</a></p>
                 </div>
             `
         };
@@ -262,15 +263,36 @@ app.post('/rejectRegistrations', async (req, res) => {
 // ==============================================
 
 app.post('/deposit', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating deposit notification email', req.body);
-    const { email, firstName, amount, referenceNumber, method } = req.body;
+    console.log('[NOTIFICATION] Initiating deposit notification emails', req.body);
+    const { email, firstName, lastName, amount, referenceNumber, method, date } = req.body;
+    const fullName = `${firstName} ${lastName}`;
 
-    if (!email || !firstName || !amount || !referenceNumber || !method) {
+    if (!email || !firstName || !lastName || !amount || !referenceNumber || !method) {
         console.log('[NOTIFICATION ERROR] Missing required fields for deposit notification');
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
     try {
+        console.log('[NOTIFICATION] Sending deposit notification to owner');
+        await transporter.sendMail({
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'Deposit Application Submitted',
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #2D5783;">Deposit Application Submitted</h2>
+                    <p>Hi Admin,</p>
+                    <p>A deposit application has been submitted with the following details:</p>
+                    <p><strong>Member:</strong> ${fullName}</p>
+                    <p><strong>Amount:</strong> ₱${amount}</p>
+                    <p><strong>Date Submitted:</strong> ${formatDisplayDate(date)}</p>
+                    <p><strong>Reference No.:</strong> ${referenceNumber}</p>
+                    <p>Kindly review and process this request via the admin dashboard.</p>
+                    <p><a href="${DASHBOARD_LINK}">Go to Dashboard</a></p>
+                </div>
+            `
+        });
+
         console.log('[NOTIFICATION] Sending deposit confirmation to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -289,24 +311,46 @@ app.post('/deposit', async (req, res) => {
         };
 
         await transporter.sendMail(mailOptions);
-        console.log('[NOTIFICATION SUCCESS] Deposit notification email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
+        console.log('[NOTIFICATION SUCCESS] Deposit notification emails sent successfully');
+        res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending deposit notification email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
+        console.error('[NOTIFICATION ERROR] Error sending deposit notification emails:', error);
+        res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
 });
 
 app.post('/withdraw', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating withdrawal notification email', req.body);
-    const { email, firstName, amount, date } = req.body;
+    console.log('[NOTIFICATION] Initiating withdrawal notification emails', req.body);
+    const { email, firstName, lastName, amount, date, recipientAccount, referenceNumber } = req.body;
+    const fullName = `${firstName} ${lastName}`;
 
-    if (!email || !firstName || !amount || !date) {
+    if (!email || !firstName || !lastName || !amount || !date || !recipientAccount || !referenceNumber) {
         console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal notification');
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
     try {
+        console.log('[NOTIFICATION] Sending withdrawal notification to owner');
+        await transporter.sendMail({
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'Withdrawal Request Received',
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #2D5783;">Withdrawal Request Received</h2>
+                    <p>Dear Admin,</p>
+                    <p>A member has requested a withdrawal:</p>
+                    <p><strong>Member:</strong> ${fullName}</p>
+                    <p><strong>Amount:</strong> ₱${amount}</p>
+                    <p><strong>Date:</strong> ${formatDisplayDate(date)}</p>
+                    <p><strong>Recipient Account:</strong> ${recipientAccount}</p>
+                    <p><strong>Reference No.:</strong> ${referenceNumber}</p>
+                    <p>Please verify and take appropriate action in the dashboard.</p>
+                    <p><a href="${DASHBOARD_LINK}">Go to Dashboard</a></p>
+                </div>
+            `
+        });
+
         console.log('[NOTIFICATION] Sending withdrawal confirmation to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -317,18 +361,18 @@ app.post('/withdraw', async (req, res) => {
                     <h2 style="color: #2D5783;">Withdrawal Successful</h2>
                     <p>Hi ${firstName},</p>
                     <p>Your withdrawal request for <strong>₱${amount}</strong> has been processed on <strong>${formatDisplayDate(date)}</strong>.</p>
-                    <p>The funds were sent to your recipient account. Thank you for using 5Ki Financial Services.</p>
+                    <p>The funds were sent to your recipient account (${recipientAccount}). Thank you for using 5Ki Financial Services.</p>
                     <p>Best regards,<br>5KI Financial Services Team</p>
                 </div>
             `
         };
 
         await transporter.sendMail(mailOptions);
-        console.log('[NOTIFICATION SUCCESS] Withdrawal notification email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
+        console.log('[NOTIFICATION SUCCESS] Withdrawal notification emails sent successfully');
+        res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending withdrawal notification email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
+        console.error('[NOTIFICATION ERROR] Error sending withdrawal notification emails:', error);
+        res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
 });
 
@@ -339,6 +383,7 @@ app.post('/withdraw', async (req, res) => {
 app.post('/applyLoan', async (req, res) => {
     console.log('[NOTIFICATION] Initiating loan application emails', req.body);
     const { email, firstName, lastName, amount, term, date } = req.body;
+    const fullName = `${firstName} ${lastName}`;
 
     if (!email || !firstName || !lastName || !amount || !term || !date) {
         console.log('[NOTIFICATION ERROR] Missing required fields for loan application');
@@ -354,11 +399,12 @@ app.post('/applyLoan', async (req, res) => {
             html: `
                 <div style="font-family: Arial, sans-serif;">
                     <h2 style="color: #2D5783;">New Loan Application</h2>
-                    <p><strong>Applicant:</strong> ${firstName} ${lastName}</p>
+                    <p><strong>Applicant:</strong> ${fullName}</p>
                     <p><strong>Email:</strong> ${email}</p>
                     <p><strong>Amount:</strong> ₱${amount}</p>
                     <p><strong>Term:</strong> ${term} months</p>
                     <p><strong>Application Date:</strong> ${formatDisplayDate(date)}</p>
+                    <p><a href="${DASHBOARD_LINK}">Review Application</a></p>
                 </div>
             `
         });
@@ -471,132 +517,112 @@ app.post('/rejectLoans', async (req, res) => {
 // ==============================================
 
 app.post('/payment', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating payment confirmation email', req.body);
-    const { email, lastName } = req.body;
+    console.log('[NOTIFICATION] Initiating payment confirmation emails', req.body);
+    const { email, firstName, lastName, amount, date, paymentMethod } = req.body;
+    const fullName = `${firstName} ${lastName}`;
 
-    if (!email) {
+    if (!email || !firstName || !lastName || !amount || !date || !paymentMethod) {
         console.log('[NOTIFICATION ERROR] Missing required fields for payment confirmation');
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
     try {
+        console.log('[NOTIFICATION] Sending payment notification to owner');
+        await transporter.sendMail({
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'Loan Payment Received',
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #2D5783;">Loan Payment Received</h2>
+                    <p>Dear Admin,</p>
+                    <p>A loan payment has been recorded:</p>
+                    <p><strong>Member:</strong> ${fullName}</p>
+                    <p><strong>Amount Paid:</strong> ₱${amount}</p>
+                    <p><strong>Date:</strong> ${formatDisplayDate(date)}</p>
+                    <p><strong>Payment Method:</strong> ${paymentMethod}</p>
+                    <p>The system has updated the loan balance accordingly.</p>
+                    <p><a href="${DASHBOARD_LINK}">View in Dashboard</a></p>
+                </div>
+            `
+        });
+
         console.log('[NOTIFICATION] Sending payment confirmation to user');
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Payment Confirmed',
-            text: `Hi Mr./Mrs. ${lastName},\n\nYour payment has been processed.\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #2D5783;">Payment Confirmed</h2>
+                    <p>Hi ${firstName},</p>
+                    <p>We have received your payment of <strong>₱${amount}</strong> on ${formatDisplayDate(date)} via ${paymentMethod}.</p>
+                    <p>Your transaction has been processed successfully. Thank you for your payment.</p>
+                    <p>Best regards,<br>5KI Financial Services Team</p>
+                </div>
+            `
         });
 
-        console.log('[NOTIFICATION SUCCESS] Payment confirmation email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
+        console.log('[NOTIFICATION SUCCESS] Payment confirmation emails sent successfully');
+        res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending payment confirmation email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
+        console.error('[NOTIFICATION ERROR] Error sending payment confirmation emails:', error);
+        res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
 });
 
-app.post('/approvePayments', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating payment approval email', req.body);
-    const { email, lastName } = req.body;
+app.post('/membershipWithdrawal', async (req, res) => {
+    console.log('[NOTIFICATION] Initiating membership withdrawal emails', req.body);
+    const { email, firstName, lastName, date, reason } = req.body;
+    const fullName = `${firstName} ${lastName}`;
 
-    if (!email) {
-        console.log('[NOTIFICATION ERROR] Missing required fields for payment approval');
+    if (!email || !firstName || !lastName || !date) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for membership withdrawal');
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
     try {
-        console.log('[NOTIFICATION] Sending payment approval to user');
+        console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
+        await transporter.sendMail({
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'Membership Withdrawal Request',
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #2D5783;">Membership Withdrawal Request</h2>
+                    <p>Dear Admin,</p>
+                    <p>A new permanent membership withdrawal request has been received:</p>
+                    <p><strong>Member:</strong> ${fullName}</p>
+                    <p><strong>Date Requested:</strong> ${formatDisplayDate(date)}</p>
+                    ${reason ? `<p><strong>Reason:</strong> ${reason}</p>` : ''}
+                    <p>Kindly update the records and confirm in the system.</p>
+                    <p><a href="${DASHBOARD_LINK}">View in Dashboard</a></p>
+                </div>
+            `
+        });
+
+        console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Payment Approved',
-            text: `Hi Mr./Mrs. ${lastName},\n\nYour payment has been approved.\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
+            subject: 'Membership Withdrawal Request Received',
+            html: `
+                <div style="font-family: Arial, sans-serif;">
+                    <h2 style="color: #2D5783;">Membership Withdrawal Request Received</h2>
+                    <p>Hi ${firstName},</p>
+                    <p>We have received your membership withdrawal request on ${formatDisplayDate(date)}.</p>
+                    ${reason ? `<p><strong>Your reason:</strong> ${reason}</p>` : ''}
+                    <p>Our team will process your request and notify you once completed.</p>
+                    <p>Best regards,<br>5KI Financial Services Team</p>
+                </div>
+            `
         });
 
-        console.log('[NOTIFICATION SUCCESS] Payment approval email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
+        console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
+        res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending payment approval email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
-    }
-});
-
-app.post('/rejectPayments', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating payment rejection email', req.body);
-    const { email, lastName } = req.body;
-
-    if (!email) {
-        console.log('[NOTIFICATION ERROR] Missing required fields for payment rejection');
-        return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    try {
-        console.log('[NOTIFICATION] Sending payment rejection to user');
-        await transporter.sendMail({
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Payment Rejected',
-            text: `Hi Mr./Mrs. ${lastName},\n\nYour payment has been rejected.\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
-        });
-
-        console.log('[NOTIFICATION SUCCESS] Payment rejection email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
-    } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending payment rejection email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
-    }
-});
-
-app.post('/approveWithdraws', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating withdrawal approval email', req.body);
-    const { email, lastName } = req.body;
-
-    if (!email) {
-        console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal approval');
-        return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    try {
-        console.log('[NOTIFICATION] Sending withdrawal approval to user');
-        await transporter.sendMail({
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Withdrawal Approved',
-            text: `Hi Mr./Mrs. ${lastName},\n\nYour withdrawal has been approved.\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
-        });
-
-        console.log('[NOTIFICATION SUCCESS] Withdrawal approval email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
-    } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending withdrawal approval email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
-    }
-});
-
-app.post('/rejectWithdraws', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating withdrawal rejection email', req.body);
-    const { email, lastName } = req.body;
-
-    if (!email) {
-        console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal rejection');
-        return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    try {
-        console.log('[NOTIFICATION] Sending withdrawal rejection to user');
-        await transporter.sendMail({
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Withdrawal Rejected',
-            text: `Hi Mr./Mrs. ${lastName},\n\nYour withdrawal has been rejected.\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
-        });
-
-        console.log('[NOTIFICATION SUCCESS] Withdrawal rejection email sent successfully');
-        res.status(200).json({ message: 'Email sent successfully' });
-    } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending withdrawal rejection email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
+        console.error('[NOTIFICATION ERROR] Error sending membership withdrawal emails:', error);
+        res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
 });
 

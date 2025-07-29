@@ -239,13 +239,13 @@ const AdminHome = () => {
       border: '1px solid #ddd',
       boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
       overflow: 'hidden',
-        width: '100%', 
+      width: '100%', 
     },
     dropdownButton: {
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
-     padding: '6px 10px',
+      padding: '6px 10px',
       cursor: 'pointer',
     },
     profileIconContainer: {
@@ -308,6 +308,7 @@ const AdminHome = () => {
       fontWeight: 'bold',
       maxWidth: '500px',
     },
+    // Updated modal styles to match login page
     modalOverlay: {
       position: 'fixed',
       top: 0,
@@ -318,17 +319,32 @@ const AdminHome = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000,
+      zIndex: 1000
     },
     modalCard: {
       backgroundColor: '#fff',
       borderRadius: '10px',
       padding: '30px',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       width: '300px',
-      height: '150px',
+      height: '150px'
+    },
+    spinner: {
+      border: '4px solid rgba(0, 31, 63, 0.1)',
+      borderRadius: '50%',
+      borderTop: '4px solid #001F3F',
+      width: '40px',
+      height: '40px',
+      animation: 'spin 1s linear infinite'
+    },
+    modalText: {
+      marginTop: '15px',
+      fontSize: '16px',
+      textAlign: 'center',
+      color: '#001F3F'
     },
     confirmationText: {
       fontSize: '18px',
@@ -364,14 +380,6 @@ const AdminHome = () => {
       color: '#FFFFFF',
       fontSize: '16px',
       fontWeight: '600',
-    },
-    loadingSpinner: {
-      border: '4px solid rgba(0, 0, 0, 0.1)',
-      width: '36px',
-      height: '36px',
-      borderRadius: '50%',
-      borderLeftColor: '#001F3F',
-      animation: 'spin 1s linear infinite',
     },
     '@keyframes spin': {
       '0%': { transform: 'rotate(0deg)' },
@@ -596,12 +604,12 @@ const AdminHome = () => {
           <div style={styles.modalCard}>
             {loading ? (
               <>
-                <div style={styles.loadingSpinner}></div>
-                <span style={styles.confirmationText}>Logging Out...</span>
+                <div style={styles.spinner}></div>
+                <p style={styles.modalText}>Logging Out...</p>
               </>
             ) : (
               <>
-                <span style={styles.confirmationText}>Are you sure you want to log out?</span>
+                <p style={styles.confirmationText}>Are you sure you want to log out?</p>
                 <div style={styles.modalButtons}>
                   <button
                     style={{...styles.modalButton, ...styles.cancelButton}}

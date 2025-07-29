@@ -9,9 +9,9 @@ const ProtectedRoute = ({ children, requiredRole }) => {
   useEffect(() => {
     if (!loading) {
       if (!user) {
-        navigate('/home'); // Redirect to home page
+        navigate('/'); // Redirect to home page
       } else if (requiredRole && user.role !== requiredRole) {
-        navigate('/home'); // Redirect to home if role is not allowed
+        navigate('/'); // Redirect to home if role is not allowed
       }
     }
   }, [user, loading, navigate, requiredRole]);

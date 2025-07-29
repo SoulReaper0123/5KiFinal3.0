@@ -443,7 +443,7 @@ const ApplyDeposits = ({ deposits, currentPage, totalPages, onPageChange }) => {
         }));
       }
       
-      // await removeFromPendingDeposits(deposit.id, deposit.transactionId);
+      await removeFromPendingDeposits(deposit.id, deposit.transactionId);
       setIsProcessing(false);
     } catch (error) {
       console.error('Error processing action:', error); 

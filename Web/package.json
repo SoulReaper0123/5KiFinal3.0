@@ -12,8 +12,12 @@
   "dependencies": {
     "@fortawesome/fontawesome-free": "^7.0.0",
     "@fortawesome/free-regular-svg-icons": "^7.0.0",
+    "@tensorflow-models/mobilenet": "^2.1.1",
+    "@tensorflow/tfjs": "^4.22.0",
+    "axios": "^1.11.0",
     "chart.js": "^4.5.0",
     "exceljs": "^4.4.0",
+    "face-api.js": "^0.22.2",
     "hugeicons-react": "^0.3.0",
     "react": "^19.1.0",
     "react-calendar": "^6.0.0",

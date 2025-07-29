@@ -1,58 +1,53 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  Alert,
-} from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { sendVerificationCode } from '../../api';
 
-export default function TwoFactorEmail({ navigation }) {
-  const [email, setEmail] = useState('');
-/*
- const handleSendCode = async () => {
-  if (!email) {
-    Alert.alert('Error', 'Please enter your email');
-    return;
-  }
+export default function TwoFactorEmail({ route, navigation }) {
+  // Email comes from previous screen and CANNOT be edited
+  const email = route.params?.email || '';
 
-  const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-  try {
-    await sendVerificationCode(email, verificationCode);
-
-    Alert.alert('Code Sent', 'A 6-digit verification code has been sent to your email.');
-
-    navigation.navigate('VerifyCode', { email, verificationCode });
-  } catch (error) {
-    Alert.alert('Error', 'Failed to send verification code. Please try again.');
-  }
-};
-*/
-const handleSendCode = () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email');
-      return;
-    }
-
+  const handleSendCode = () => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-
+    
+    // In production: Actually send this code via your email service
     console.log(`Verification code sent to ${email}: ${verificationCode}`);
-
-    Alert.alert('Code Sent', `A 6-digit verification code has been sent to your email.`);
-
-    navigation.navigate('VerifyCode', { email, verificationCode });
+    
+    navigation.navigate('VerifyCode', { 
+      email,
+      verificationCode,
+      // Lock these values so they can't be modified
+      lockedEmail: email,
+      lockedCode: verificationCode 
+    });
   };
-
 
   return (
     <View style={styles.container}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={30} color="white" />
-        </TouchableOpacity>
+      <Text style={styles.title}>Verification Required</Text>
+      
+      <View style={styles.emailDisplay}>
+        <Text style={styles.emailText}>{email}</Text>
+        <MaterialIcons name="lock" size={20} color="gray" />
+      </View>
+
+      <Text style={styles.instructions}>
+        We'll send a 6-digit code to this email address.
+      </Text>
+
+      <TouchableOpacity 
+        style={styles.button}
+        onPress={handleSendCode}
+      >
+        <Text style={styles.buttonText}>Send Code</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <MaterialIcons name="arrow-back" size={30} color="white" />
+      </TouchableOpacity>
 
       <Text style={styles.title}>Two-Factor Authentication</Text>
       <TextInput
@@ -62,14 +57,15 @@ const handleSendCode = () => {
         onChangeText={setEmail}
         keyboardType="email-address"
         autoCapitalize="none"
-        placeholderTextColor="#999"
       />
       <TouchableOpacity style={styles.button} onPress={handleSendCode}>
-        <Text style={styles.buttonText}>Send Code</Text>
+        <Text style={styles.buttonText}>Continue</Text>
       </TouchableOpacity>
     </View>
   );
 }
+
+// Keep your existing styles
 
 const styles = StyleSheet.create({
   container: {

@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
-import { Pie, Bar } from 'react-chartjs-2'; // Corrected imports
-import { FaChartPie, FaChartBar, FaPiggyBank, FaInfoCircle } from 'react-icons/fa';
+import { Pie, Bar } from 'react-chartjs-2';
+import { 
+  FaChartPie, 
+  FaChartBar, 
+  FaPiggyBank, 
+  FaInfoCircle, 
+  FaMoneyBillWave,
+  FaHandHoldingUsd,
+  FaCalendarAlt,
+  FaPercentage,
+  FaDollarSign,
+  FaUserTie,
+  FaIdCard,
+  FaSearchDollar
+} from 'react-icons/fa';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
 
 // Register Chart.js components
@@ -16,13 +29,15 @@ const Dashboard = () => {
     totalReceivables: 0,
     memberSavings: 0,
     fiveKISavings: 0,
-    dividends: 0
+    dividends: 0,
+    activeBorrowers: 0
   });
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
   const [selectedChart, setSelectedChart] = useState('loans');
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     fetchDashboardData();
@@ -44,7 +59,9 @@ const Dashboard = () => {
       
       let totalLoans = 0;
       let totalReceivables = 0;
+      let activeBorrowers = 0;
       const loanItems = [];
+      const borrowerSet = new Set();
       
       Object.entries(loansData).forEach(([memberId, loans]) => {
         Object.entries(loans).forEach(([transactionId, loan]) => {
@@ -58,6 +75,7 @@ const Dashboard = () => {
           
           totalLoans += loanAmount;
           totalReceivables += totalTermPayment;
+          borrowerSet.add(memberId);
           
           loanItems.push({
             memberId,
@@ -68,10 +86,13 @@ const Dashboard = () => {
             monthlyPayment,
             totalMonthlyPayment,
             totalTermPayment,
-            dueDate
+            dueDate,
+            status: loan.status || 'Active'
           });
         });
       });
+
+      activeBorrowers = borrowerSet.size;
 
       // Fetch savings data
       const savingsRef = database.ref('Members');
@@ -121,7 +142,8 @@ const Dashboard = () => {
         totalReceivables,
         memberSavings,
         fiveKISavings,
-        dividends: memberSavings * 0.1
+        dividends: memberSavings * 0.1,
+        activeBorrowers
       });
       
       setLoanData(loanItems);
@@ -140,10 +162,10 @@ const Dashboard = () => {
       : 'Needs Attention';
 
   const healthColor = healthStatus === 'Excellent' 
-    ? '#4CAF50' 
+    ? '#10B981' 
     : healthStatus === 'Good' 
-      ? '#FFC107' 
-      : '#F44336';
+      ? '#F59E0B' 
+      : '#EF4444';
 
   const formatCurrency = (amount) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -161,7 +183,7 @@ const Dashboard = () => {
     datasets: [
       {
         data: [fundsData.totalLoans, fundsData.totalReceivables],
-        backgroundColor: ['#2D5783', '#4CAF50'],
+        backgroundColor: ['#3B82F6', '#10B981'],
         borderColor: ['#fff', '#fff'],
         borderWidth: 1,
       },
@@ -173,7 +195,7 @@ const Dashboard = () => {
     datasets: [
       {
         data: [fundsData.memberSavings, fundsData.fiveKISavings],
-        backgroundColor: ['#2D5783', '#4CAF50'],
+        backgroundColor: ['#3B82F6', '#10B981'],
         borderColor: ['#fff', '#fff'],
         borderWidth: 1,
       },
@@ -186,8 +208,8 @@ const Dashboard = () => {
       {
         label: 'Earnings',
         data: earningsData.map(item => item.earnings),
-        backgroundColor: '#2D5783',
-        borderColor: '#2D5783',
+        backgroundColor: '#3B82F6',
+        borderColor: '#3B82F6',
         borderWidth: 1,
       },
     ],
@@ -195,9 +217,16 @@ const Dashboard = () => {
 
   const chartOptions = {
     responsive: true,
+    maintainAspectRatio: false,
     plugins: {
       legend: {
         position: 'bottom',
+        labels: {
+          padding: 20,
+          font: {
+            size: 12
+          }
+        }
       },
       tooltip: {
         callbacks: {
@@ -209,6 +238,11 @@ const Dashboard = () => {
     }
   };
 
+  const filteredLoans = loanData.filter(loan => 
+    loan.memberId.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    loan.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   const renderLoanDetails = (loan) => (
     <div className="modal-content">
       <div className="modal-header">
@@ -218,32 +252,44 @@ const Dashboard = () => {
         </button>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Member ID:</span>
+        <span className="detail-label"><FaUserTie /> Member ID:</span>
         <span className="detail-value">{loan.memberId}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Transaction ID:</span>
+        <span className="detail-label"><FaIdCard /> Transaction ID:</span>
         <span className="detail-value">{loan.transactionId}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Loan Amount:</span>
+        <span className="detail-label"><FaDollarSign /> Loan Amount:</span>
         <span className="detail-value">{formatCurrency(loan.loanAmount)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Term:</span>
+        <span className="detail-label"><FaCalendarAlt /> Term:</span>
         <span className="detail-value">{loan.term} months</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Monthly Payment:</span>
+        <span className="detail-label"><FaPercentage /> Interest:</span>
+        <span className="detail-value">{loan.interest}%</span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-label"><FaMoneyBillWave /> Monthly Payment:</span>
         <span className="detail-value">{formatCurrency(loan.monthlyPayment)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Total Payment:</span>
+        <span className="detail-label"><FaHandHoldingUsd /> Total Payment:</span>
         <span className="detail-value">{formatCurrency(loan.totalTermPayment)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label">Due Date:</span>
+        <span className="detail-label"><FaCalendarAlt /> Due Date:</span>
         <span className="detail-value">{loan.dueDate}</span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-label"><FaInfoCircle /> Status:</span>
+        <span className="detail-value">
+          <span className={`status-badge ${loan.status.toLowerCase()}`}>
+            {loan.status}
+          </span>
+        </span>
       </div>
     </div>
   );
@@ -252,195 +298,244 @@ const Dashboard = () => {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
+        <p>Loading financial data...</p>
       </div>
     );
   }
 
   return (
     <div className="dashboard-container">
-      {/* Funds Card */}
-      <div className="card funds-card">
-        <div className="card-header">
-          <h2 className="card-title">Available Funds</h2>
+      {/* Header */}
+      <div className="dashboard-header">
+        <h1>Business Loan Services Dashboard</h1>
+        <p>Comprehensive overview of your lending operations</p>
+      </div>
+
+      {/* Key Metrics */}
+      <div className="metrics-grid">
+        {/* Available Funds Card */}
+        <div className="metric-card funds-card">
+          <div className="metric-icon">
+            <FaMoneyBillWave />
+          </div>
+          <div className="metric-content">
+            <h3>Available Funds</h3>
+            <div className="metric-value">{formatCurrency(fundsData.availableFunds)}</div>
+            <div className="metric-description">Capital available for new loans</div>
+          </div>
+          <div className="health-indicator" style={{ backgroundColor: healthColor }}>
+            <span>Financial Health: {healthStatus}</span>
+          </div>
         </div>
-        <div className="funds-amount">{formatCurrency(fundsData.availableFunds)}</div>
+
+        {/* Total Loans Card */}
+        <div className="metric-card">
+          <div className="metric-icon">
+            <FaHandHoldingUsd />
+          </div>
+          <div className="metric-content">
+            <h3>Total Loans</h3>
+            <div className="metric-value">{formatCurrency(fundsData.totalLoans)}</div>
+            <div className="metric-description">Active loan principal</div>
+          </div>
+        </div>
+
+        {/* Receivables Card */}
+        <div className="metric-card">
+          <div className="metric-icon">
+            <FaSearchDollar />
+          </div>
+          <div className="metric-content">
+            <h3>Total Receivables</h3>
+            <div className="metric-value">{formatCurrency(fundsData.totalReceivables)}</div>
+            <div className="metric-description">Including principal and interest</div>
+          </div>
+        </div>
+
+        {/* Active Borrowers Card */}
+        <div className="metric-card">
+          <div className="metric-icon">
+            <FaUserTie />
+          </div>
+          <div className="metric-content">
+            <h3>Active Borrowers</h3>
+            <div className="metric-value">{fundsData.activeBorrowers}</div>
+            <div className="metric-description">Current loan recipients</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Charts Section */}
+      <div className="charts-section">
+        <div className="chart-selector">
+          <button 
+            className={`chart-button ${selectedChart === 'loans' ? 'selected' : ''}`}
+            onClick={() => setSelectedChart('loans')}
+          >
+            <FaChartPie className="chart-icon" />
+            Loans Breakdown
+          </button>
+          <button 
+            className={`chart-button ${selectedChart === 'savings' ? 'selected' : ''}`}
+            onClick={() => setSelectedChart('savings')}
+          >
+            <FaPiggyBank className="chart-icon" />
+            Savings
+          </button>
+          <button 
+            className={`chart-button ${selectedChart === 'earnings' ? 'selected' : ''}`}
+            onClick={() => setSelectedChart('earnings')}
+          >
+            <FaChartBar className="chart-icon" />
+            Earnings
+          </button>
+        </div>
+
+        <div className="chart-container">
+          {selectedChart === 'loans' && (
+            <div className="chart-card">
+              <div className="chart-header">
+                <h3>Loans Portfolio</h3>
+                <div className="chart-legend">
+                  <div className="legend-item">
+                    <div className="legend-color" style={{ backgroundColor: '#3B82F6' }}></div>
+                    <span>Active Loans: {formatCurrency(fundsData.totalLoans)}</span>
+                  </div>
+                  <div className="legend-item">
+                    <div className="legend-color" style={{ backgroundColor: '#10B981' }}></div>
+                    <span>Receivables: {formatCurrency(fundsData.totalReceivables)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="chart-wrapper">
+                <Pie data={loansPieData} options={chartOptions} />
+              </div>
+            </div>
+          )}
+
+          {selectedChart === 'savings' && (
+            <div className="chart-card">
+              <div className="chart-header">
+                <h3>Savings Distribution</h3>
+                <div className="chart-legend">
+                  <div className="legend-item">
+                    <div className="legend-color" style={{ backgroundColor: '#3B82F6' }}></div>
+                    <span>Member Savings: {formatCurrency(fundsData.memberSavings)}</span>
+                  </div>
+                  <div className="legend-item">
+                    <div className="legend-color" style={{ backgroundColor: '#10B981' }}></div>
+                    <span>5KI Savings: {formatCurrency(fundsData.fiveKISavings)}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="chart-wrapper">
+                <Pie data={savingsPieData} options={chartOptions} />
+              </div>
+            </div>
+          )}
+
+          {selectedChart === 'earnings' && (
+            <div className="chart-card">
+              <div className="chart-header">
+                <h3>Monthly Earnings ({selectedYear})</h3>
+                <div className="year-selector">
+                  {['2024', '2023', '2022'].map((year) => (
+                    <button
+                      key={year}
+                      className={`year-button ${selectedYear === year ? 'selected' : ''}`}
+                      onClick={() => setSelectedYear(year)}
+                    >
+                      {year}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="chart-wrapper">
+                <Bar 
+                  data={earningsBarData} 
+                  options={{
+                    ...chartOptions,
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          callback: function(value) {
+                            return formatCurrency(value);
+                          }
+                        }
+                      }
+                    }
+                  }} 
+                />
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Loans Table Section */}
+      <div className="loans-section">
+        <div className="section-header">
+          <h2>Active Loans Portfolio</h2>
+          <div className="search-box">
+            <input
+              type="text"
+              placeholder="Search by Member ID or Transaction ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+            <FaSearchDollar className="search-icon" />
+          </div>
+        </div>
         
-        <div className="health-container">
-          <span className="health-label">Financial Health:</span>
-          <span className="health-tag" style={{ backgroundColor: healthColor }}>
-            {healthStatus}
-          </span>
-        </div>
-      </div>
-
-      {/* Quick Stats */}
-      <div className="stats-container">
-        <div className="stat-card">
-          <FaChartPie className="stat-icon" />
-          <div className="stat-value">{formatCurrency(fundsData.totalLoans)}</div>
-          <div className="stat-label">Total Loans</div>
-        </div>
-        <div className="stat-card">
-          <FaChartBar className="stat-icon" />
-          <div className="stat-value">{formatCurrency(fundsData.totalReceivables)}</div>
-          <div className="stat-label">Receivables</div>
-        </div>
-        <div className="stat-card">
-          <FaPiggyBank className="stat-icon" />
-          <div className="stat-value">{formatCurrency(fundsData.memberSavings)}</div>
-          <div className="stat-label">Savings</div>
-        </div>
-      </div>
-
-      {/* Active Loans Table */}
-      <div className="card">
-        <h2 className="section-title">Active Loans</h2>
         <div className="table-container">
           <table className="loans-table">
             <thead>
               <tr>
-                <th>Member ID</th>
-                <th>Transaction ID</th>
-                <th>Amount</th>
-                <th>Term</th>
-                <th>Interest</th>
-                <th>Monthly</th>
-                <th>Total</th>
-                <th>Due Date</th>
+                <th><FaUserTie /> Member ID</th>
+                <th><FaIdCard /> Transaction ID</th>
+                <th><FaDollarSign /> Amount</th>
+                <th><FaCalendarAlt /> Term</th>
+                <th><FaPercentage /> Interest</th>
+                <th><FaMoneyBillWave /> Monthly</th>
+                <th><FaHandHoldingUsd /> Total</th>
+                <th><FaCalendarAlt /> Due Date</th>
+                <th><FaInfoCircle /> Status</th>
               </tr>
             </thead>
             <tbody>
-              {loanData.map((loan, index) => (
-                <tr 
-                  key={index} 
-                  className={index % 2 === 0 ? 'even-row' : 'odd-row'}
-                  onClick={() => {
-                    setSelectedLoan(loan);
-                    setModalVisible(true);
-                  }}
-                >
-                  <td>{loan.memberId}</td>
-                  <td>{loan.transactionId}</td>
-                  <td>{formatCurrency(loan.loanAmount)}</td>
-                  <td>{loan.term}</td>
-                  <td>{formatCurrency(loan.interest)}</td>
-                  <td>{formatCurrency(loan.monthlyPayment)}</td>
-                  <td>{formatCurrency(loan.totalTermPayment)}</td>
-                  <td>{loan.dueDate}</td>
+              {filteredLoans.length > 0 ? (
+                filteredLoans.map((loan, index) => (
+                  <tr 
+                    key={index}
+                    onClick={() => {
+                      setSelectedLoan(loan);
+                      setModalVisible(true);
+                    }}
+                  >
+                    <td>{loan.memberId}</td>
+                    <td>{loan.transactionId}</td>
+                    <td>{formatCurrency(loan.loanAmount)}</td>
+                    <td>{loan.term} mo</td>
+                    <td>{loan.interest}%</td>
+                    <td>{formatCurrency(loan.monthlyPayment)}</td>
+                    <td>{formatCurrency(loan.totalTermPayment)}</td>
+                    <td>{loan.dueDate}</td>
+                    <td>
+                      <span className={`status-badge ${loan.status.toLowerCase()}`}>
+                        {loan.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr className="no-results">
+                  <td colSpan="9">No loans found matching your search criteria</td>
                 </tr>
-              ))}
+              )}
             </tbody>
           </table>
         </div>
-      </div>
-
-      {/* Chart Selector */}
-      <div className="chart-selector">
-        <button 
-          className={`chart-button ${selectedChart === 'loans' ? 'selected' : ''}`}
-          onClick={() => setSelectedChart('loans')}
-        >
-          <FaChartPie className="chart-icon" />
-          Loans Breakdown
-        </button>
-        <button 
-          className={`chart-button ${selectedChart === 'savings' ? 'selected' : ''}`}
-          onClick={() => setSelectedChart('savings')}
-        >
-          <FaPiggyBank className="chart-icon" />
-          Savings
-        </button>
-        <button 
-          className={`chart-button ${selectedChart === 'earnings' ? 'selected' : ''}`}
-          onClick={() => setSelectedChart('earnings')}
-        >
-          <FaChartBar className="chart-icon" />
-          Earnings
-        </button>
-      </div>
-
-      {/* Charts */}
-      <div className="card chart-card">
-        {selectedChart === 'loans' && (
-          <>
-            <h2 className="section-title">Loans Breakdown</h2>
-            <div className="chart-wrapper">
-              <Pie data={loansPieData} options={chartOptions} />
-            </div>
-            <div className="legend-container">
-              <div className="legend-item">
-                <div className="legend-color" style={{ backgroundColor: '#2D5783' }}></div>
-                <span className="legend-text">
-                  Active Loans: {formatCurrency(fundsData.totalLoans)}
-                </span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-color" style={{ backgroundColor: '#4CAF50' }}></div>
-                <span className="legend-text">
-                  Receivables: {formatCurrency(fundsData.totalReceivables)}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {selectedChart === 'savings' && (
-          <>
-            <h2 className="section-title">Savings Distribution</h2>
-            <div className="chart-wrapper">
-              <Pie data={savingsPieData} options={chartOptions} />
-            </div>
-            <div className="legend-container">
-              <div className="legend-item">
-                <div className="legend-color" style={{ backgroundColor: '#2D5783' }}></div>
-                <span className="legend-text">
-                  Member Savings: {formatCurrency(fundsData.memberSavings)}
-                </span>
-              </div>
-              <div className="legend-item">
-                <div className="legend-color" style={{ backgroundColor: '#4CAF50' }}></div>
-                <span className="legend-text">
-                  5KI Savings: {formatCurrency(fundsData.fiveKISavings)}
-                </span>
-              </div>
-            </div>
-          </>
-        )}
-
-        {selectedChart === 'earnings' && (
-          <>
-            <h2 className="section-title">Monthly Earnings ({selectedYear})</h2>
-            <div className="year-selector">
-              {['2024', '2023', '2022'].map((year) => (
-                <button
-                  key={year}
-                  className={`year-button ${selectedYear === year ? 'selected' : ''}`}
-                  onClick={() => setSelectedYear(year)}
-                >
-                  {year}
-                </button>
-              ))}
-            </div>
-            <div className="chart-wrapper">
-              <Bar 
-                data={earningsBarData} 
-                options={{
-                  ...chartOptions,
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        callback: function(value) {
-                          return formatCurrency(value);
-                        }
-                      }
-                    }
-                  }
-                }} 
-              />
-            </div>
-          </>
-        )}
       </div>
 
       {/* Loan Details Modal */}
@@ -453,166 +548,146 @@ const Dashboard = () => {
       )}
 
       <style jsx>{`
+        :root {
+          --primary: #3B82F6;
+          --primary-dark: #2563EB;
+          --secondary: #10B981;
+          --danger: #EF4444;
+          --warning: #F59E0B;
+          --gray: #6B7280;
+          --light-gray: #F3F4F6;
+          --dark-gray: #1F2937;
+        }
+
+        * {
+          box-sizing: border-box;
+          margin: 0;
+          padding: 0;
+          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
         .dashboard-container {
-          padding: 20px;
-          max-width: 1200px;
+          padding: 2rem;
+          max-width: 1400px;
           margin: 0 auto;
+          color: var(--dark-gray);
+          background-color: #f9fafb;
         }
 
-        .loading-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
+        .dashboard-header {
+          margin-bottom: 2rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #e5e7eb;
         }
 
-        .spinner {
-          border: 5px solid #f3f3f3;
-          border-top: 5px solid #2D5783;
-          border-radius: 50%;
-          width: 50px;
-          height: 50px;
-          animation: spin 1s linear infinite;
+        .dashboard-header h1 {
+          font-size: 2rem;
+          font-weight: 700;
+          color: var(--dark-gray);
+          margin-bottom: 0.5rem;
         }
 
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
+        .dashboard-header p {
+          color: var(--gray);
+          font-size: 1rem;
         }
 
-        .card {
+        /* Metrics Grid */
+        .metrics-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+          gap: 1.5rem;
+          margin-bottom: 2rem;
+        }
+
+        .metric-card {
           background: white;
-          border-radius: 10px;
-          padding: 20px;
-          margin-bottom: 20px;
+          border-radius: 0.5rem;
+          padding: 1.5rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          transition: transform 0.2s, box-shadow 0.2s;
+          position: relative;
+          overflow: hidden;
+        }
+
+        .metric-card:hover {
+          transform: translateY(-2px);
           box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
         }
 
         .funds-card {
-          text-align: center;
-          background: linear-gradient(135deg, #2D5783 0%, #1E3A8A 100%);
+          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
           color: white;
+          grid-column: 1 / -1;
         }
 
-        .card-header {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          margin-bottom: 15px;
-        }
-
-        .card-title {
-          font-size: 1.5rem;
-          font-weight: 600;
-          margin: 0;
-        }
-
-        .funds-amount {
+        .funds-card .metric-value {
           font-size: 2.5rem;
-          font-weight: 700;
-          margin: 15px 0;
         }
 
-        .health-container {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 10px;
+        .metric-icon {
+          font-size: 1.5rem;
+          margin-bottom: 1rem;
+          color: var(--primary);
         }
 
-        .health-label {
-          font-size: 0.9rem;
+        .funds-card .metric-icon {
+          color: white;
           opacity: 0.8;
         }
 
-        .health-tag {
-          padding: 5px 15px;
-          border-radius: 20px;
-          font-size: 0.9rem;
+        .metric-content h3 {
+          font-size: 1rem;
           font-weight: 600;
-          color: white;
+          margin-bottom: 0.5rem;
+          color: var(--gray);
         }
 
-        .stats-container {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-          gap: 15px;
-          margin-bottom: 20px;
+        .funds-card .metric-content h3 {
+          color: rgba(255, 255, 255, 0.9);
         }
 
-        .stat-card {
-          background: white;
-          border-radius: 10px;
-          padding: 20px;
-          text-align: center;
-          box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-        }
-
-        .stat-icon {
-          font-size: 1.5rem;
-          margin-bottom: 10px;
-          color: #2D5783;
-        }
-
-        .stat-value {
-          font-size: 1.5rem;
+        .metric-value {
+          font-size: 1.75rem;
           font-weight: 700;
-          color: #2D5783;
-          margin: 5px 0;
+          margin-bottom: 0.25rem;
+          color: var(--dark-gray);
         }
 
-        .stat-label {
-          font-size: 0.9rem;
-          color: #666;
-        }
-
-        .section-title {
-          font-size: 1.3rem;
-          font-weight: 600;
-          color: #2D5783;
-          margin-bottom: 20px;
-        }
-
-        .table-container {
-          overflow-x: auto;
-          margin-top: 15px;
-        }
-
-        .loans-table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-
-        .loans-table th {
-          background-color: #2D5783;
+        .funds-card .metric-value {
           color: white;
-          padding: 12px;
-          text-align: left;
+        }
+
+        .metric-description {
+          font-size: 0.875rem;
+          color: var(--gray);
+        }
+
+        .funds-card .metric-description {
+          color: rgba(255, 255, 255, 0.8);
+        }
+
+        .health-indicator {
+          position: absolute;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          padding: 0.75rem;
+          font-size: 0.75rem;
           font-weight: 600;
+          text-align: center;
+          color: white;
         }
 
-        .loans-table td {
-          padding: 12px;
-          border-bottom: 1px solid #eee;
-        }
-
-        .loans-table tr:hover {
-          background-color: #f5f5f5;
-          cursor: pointer;
-        }
-
-        .even-row {
-          background-color: #f9f9f9;
-        }
-
-        .odd-row {
-          background-color: white;
+        /* Charts Section */
+        .charts-section {
+          margin-bottom: 2rem;
         }
 
         .chart-selector {
           display: flex;
-          gap: 10px;
-          margin-bottom: 20px;
+          gap: 0.75rem;
+          margin-bottom: 1.5rem;
         }
 
         .chart-button {
@@ -620,81 +695,239 @@ const Dashboard = () => {
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 8px;
-          padding: 12px;
-          background: #f0f0f0;
-          border: none;
-          border-radius: 8px;
+          gap: 0.5rem;
+          padding: 0.75rem;
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.5rem;
           font-weight: 600;
-          color: #555;
+          color: var(--gray);
           cursor: pointer;
           transition: all 0.2s;
         }
 
+        .chart-button:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
         .chart-button.selected {
-          background: #2D5783;
+          background: var(--primary);
+          border-color: var(--primary);
           color: white;
         }
 
         .chart-icon {
-          font-size: 1.2rem;
+          font-size: 1rem;
+        }
+
+        .chart-container {
+          background: white;
+          border-radius: 0.5rem;
+          padding: 1.5rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
         .chart-card {
-          padding: 25px;
+          height: 100%;
         }
 
-        .chart-wrapper {
-          height: 300px;
-          margin: 20px 0;
-        }
-
-        .legend-container {
+        .chart-header {
           display: flex;
-          flex-wrap: wrap;
-          gap: 15px;
-          justify-content: center;
-          margin-top: 20px;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+        }
+
+        .chart-header h3 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: var(--dark-gray);
+        }
+
+        .chart-legend {
+          display: flex;
+          gap: 1rem;
         }
 
         .legend-item {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 0.5rem;
+          font-size: 0.875rem;
+          color: var(--gray);
         }
 
         .legend-color {
-          width: 15px;
-          height: 15px;
+          width: 12px;
+          height: 12px;
           border-radius: 3px;
         }
 
-        .legend-text {
-          font-size: 0.9rem;
+        .chart-wrapper {
+          height: 300px;
+          position: relative;
         }
 
         .year-selector {
           display: flex;
-          gap: 10px;
-          justify-content: center;
-          margin-bottom: 20px;
+          gap: 0.5rem;
         }
 
         .year-button {
-          padding: 8px 15px;
-          background: #f0f0f0;
-          border: none;
-          border-radius: 5px;
+          padding: 0.375rem 0.75rem;
+          background: white;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.375rem;
+          font-size: 0.75rem;
           font-weight: 500;
           cursor: pointer;
           transition: all 0.2s;
         }
 
+        .year-button:hover {
+          border-color: var(--primary);
+          color: var(--primary);
+        }
+
         .year-button.selected {
-          background: #2D5783;
+          background: var(--primary);
+          border-color: var(--primary);
           color: white;
         }
 
+        /* Loans Section */
+        .loans-section {
+          background: white;
+          border-radius: 0.5rem;
+          padding: 1.5rem;
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .section-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 1.5rem;
+          flex-wrap: wrap;
+          gap: 1rem;
+        }
+
+        .section-header h2 {
+          font-size: 1.25rem;
+          font-weight: 600;
+          color: var(--dark-gray);
+        }
+
+        .search-box {
+          position: relative;
+          min-width: 300px;
+        }
+
+        .search-box input {
+          width: 100%;
+          padding: 0.5rem 1rem 0.5rem 2.5rem;
+          border: 1px solid #e5e7eb;
+          border-radius: 0.5rem;
+          font-size: 0.875rem;
+          transition: border-color 0.2s;
+        }
+
+        .search-box input:focus {
+          outline: none;
+          border-color: var(--primary);
+        }
+
+        .search-icon {
+          position: absolute;
+          left: 1rem;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--gray);
+          font-size: 0.875rem;
+        }
+
+        .table-container {
+          overflow-x: auto;
+          margin-top: 1rem;
+          border-radius: 0.5rem;
+          border: 1px solid #e5e7eb;
+        }
+
+        .loans-table {
+          width: 100%;
+          border-collapse: collapse;
+          font-size: 0.875rem;
+        }
+
+        .loans-table th {
+          background-color: #f9fafb;
+          color: var(--gray);
+          padding: 0.75rem 1rem;
+          text-align: left;
+          font-weight: 600;
+          border-bottom: 1px solid #e5e7eb;
+          white-space: nowrap;
+        }
+
+        .loans-table th svg {
+          margin-right: 0.5rem;
+          color: var(--primary);
+        }
+
+        .loans-table td {
+          padding: 0.75rem 1rem;
+          border-bottom: 1px solid #e5e7eb;
+          white-space: nowrap;
+        }
+
+        .loans-table tr:last-child td {
+          border-bottom: none;
+        }
+
+        .loans-table tr:hover {
+          background-color: #f9fafb;
+          cursor: pointer;
+        }
+
+        .status-badge {
+          display: inline-block;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          font-size: 0.75rem;
+          font-weight: 600;
+        }
+
+        .status-badge.active {
+          background-color: #D1FAE5;
+          color: #065F46;
+        }
+
+        .status-badge.pending {
+          background-color: #FEF3C7;
+          color: #92400E;
+        }
+
+        .status-badge.overdue {
+          background-color: #FEE2E2;
+          color: #991B1B;
+        }
+
+        .status-badge.completed {
+          background-color: #E0E7FF;
+          color: #3730A3;
+        }
+
+        .no-results {
+          text-align: center;
+          color: var(--gray);
+        }
+
+        .no-results td {
+          padding: 2rem;
+        }
+
+        /* Modal */
         .modal-overlay {
           position: fixed;
           top: 0;
@@ -706,30 +939,44 @@ const Dashboard = () => {
           justify-content: center;
           align-items: center;
           z-index: 1000;
+          backdrop-filter: blur(5px);
         }
 
         .modal {
           background: white;
-          border-radius: 10px;
+          border-radius: 0.5rem;
           width: 90%;
           max-width: 500px;
           max-height: 90vh;
           overflow-y: auto;
-          box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+          animation: modalFadeIn 0.3s ease-out;
+        }
+
+        @keyframes modalFadeIn {
+          from {
+            opacity: 0;
+            transform: translateY(-20px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
         }
 
         .modal-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          padding: 20px;
-          border-bottom: 1px solid #eee;
+          padding: 1.25rem;
+          border-bottom: 1px solid #e5e7eb;
         }
 
         .modal-title {
           margin: 0;
-          color: #2D5783;
-          font-size: 1.3rem;
+          color: var(--dark-gray);
+          font-size: 1.25rem;
+          font-weight: 600;
         }
 
         .close-button {
@@ -737,33 +984,87 @@ const Dashboard = () => {
           border: none;
           font-size: 1.5rem;
           cursor: pointer;
-          color: #666;
+          color: var(--gray);
+          transition: color 0.2s;
+        }
+
+        .close-button:hover {
+          color: var(--danger);
         }
 
         .modal-content {
-          padding: 20px;
+          padding: 1.25rem;
         }
 
         .detail-row {
           display: flex;
           justify-content: space-between;
-          margin-bottom: 15px;
-          padding-bottom: 15px;
-          border-bottom: 1px solid #f5f5f5;
+          margin-bottom: 1rem;
+          padding-bottom: 1rem;
+          border-bottom: 1px solid #f3f4f6;
+        }
+
+        .detail-row:last-child {
+          margin-bottom: 0;
+          padding-bottom: 0;
+          border-bottom: none;
         }
 
         .detail-label {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
           font-weight: 600;
-          color: #555;
+          color: var(--gray);
+          font-size: 0.875rem;
+        }
+
+        .detail-label svg {
+          color: var(--primary);
         }
 
         .detail-value {
-          color: #2D5783;
+          color: var(--dark-gray);
           font-weight: 500;
+          text-align: right;
         }
 
+        /* Loading */
+        .loading-container {
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          height: 100vh;
+          gap: 1rem;
+        }
+
+        .spinner {
+          border: 4px solid rgba(59, 130, 246, 0.1);
+          border-top: 4px solid var(--primary);
+          border-radius: 50%;
+          width: 40px;
+          height: 40px;
+          animation: spin 1s linear infinite;
+        }
+
+        .loading-container p {
+          color: var(--gray);
+          font-size: 0.875rem;
+        }
+
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-          .stats-container {
+          .dashboard-container {
+            padding: 1rem;
+          }
+
+          .metrics-grid {
             grid-template-columns: 1fr;
           }
 
@@ -771,12 +1072,13 @@ const Dashboard = () => {
             flex-direction: column;
           }
 
-          .loans-table {
-            font-size: 0.8rem;
+          .section-header {
+            flex-direction: column;
+            align-items: flex-start;
           }
 
-          .loans-table th, .loans-table td {
-            padding: 8px;
+          .search-box {
+            width: 100%;
           }
         }
       `}</style>
