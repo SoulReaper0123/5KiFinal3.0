@@ -294,15 +294,6 @@ const Dashboard = () => {
     </div>
   );
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-        <p>Loading financial data...</p>
-      </div>
-    );
-  }
-
   return (
     <div className="dashboard-container">
       {/* Header */}

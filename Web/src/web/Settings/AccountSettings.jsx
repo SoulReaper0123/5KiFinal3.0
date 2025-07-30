@@ -11,7 +11,7 @@ const AccountSettings = () => {
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  const [editableData, setEditableData] = useState({ name: '', email: '', contactNumber: '' });
+  const [editableData, setEditableData] = useState({ name: '', contactNumber: '' });
 
   const [changePasswordVisible, setChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -19,8 +19,9 @@ const AccountSettings = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [showPassword, setShowPassword] = useState({
-    current: false, new: false, confirm: false,
+    current: false, new: false, confirm: false
   });
 
   useEffect(() => {
@@ -32,8 +33,12 @@ const AccountSettings = () => {
         const adminRef = ref(db, `Users/Admin/${adminId}`);
         const snapshot = await get(adminRef);
         if (snapshot.exists()) {
-          setAdminData(snapshot.val());
-          setEditableData(snapshot.val());
+          const data = snapshot.val();
+          setAdminData(data);
+          setEditableData({
+            name: data.name || '',
+            contactNumber: data.contactNumber || ''
+          });
         } else throw new Error('Admin data not found.');
       } catch (error) {
         setError(error);
@@ -51,17 +56,20 @@ const AccountSettings = () => {
 
   const handleSaveChanges = async () => {
     try {
-      const { name, email, contactNumber } = editableData;
-      if (!name || !email || !contactNumber) {
+      const { name, contactNumber } = editableData;
+      if (!name || !contactNumber) {
         setFormError('All fields must be filled out.');
         return;
       }
+
       const adminId = localStorage.getItem('adminId');
       const db = getDatabase();
       const adminRef = ref(db, `Users/Admin/${adminId}`);
       await update(adminRef, editableData);
-      setAdminData(editableData);
+      setAdminData(prev => ({ ...prev, ...editableData }));
       setIsEditing(false);
+      setSuccessMessage('Profile updated successfully!');
+      setSuccessModalVisible(true);
     } catch (error) {
       setFormError('Failed to save changes.');
     }
@@ -88,6 +96,7 @@ const AccountSettings = () => {
       await reauthenticateWithCredential(user, credential);
       await updatePassword(user, newPassword);
       setChangePasswordVisible(false);
+      setSuccessMessage('Password updated successfully!');
       setSuccessModalVisible(true);
       setCurrentPassword('');
       setNewPassword('');
@@ -169,26 +178,57 @@ const AccountSettings = () => {
                 <h2 className="section-header">Account Information</h2>
                 {formError !== '' && <p className="form-error">{formError}</p>}
 
-                {['name', 'email', 'contactNumber'].map((field, index) => (
-                  <div className="card" key={index}>
-                    <label className="label">{field.charAt(0).toUpperCase() + field.slice(1)}:</label>
-                    {isEditing ? (
-                      <input
-                        className="input"
-                        value={editableData[field]}
-                        onChange={(e) => handleEditChange(field, e.target.value)}
-                      />
-                    ) : (
-                      <p className="value-text">{adminData[field]}</p>
-                    )}
-                  </div>
-                ))}
+                <div className="card">
+                  <label className="label">Name:</label>
+                  {isEditing ? (
+                    <input
+                      className="input"
+                      value={editableData.name}
+                      onChange={(e) => handleEditChange('name', e.target.value)}
+                    />
+                  ) : (
+                    <p className="value-text">{adminData.name}</p>
+                  )}
+                </div>
+
+                <div className="card">
+                  <label className="label">Email:</label>
+                  <p className="value-text">{adminData.email}</p>
+                </div>
+
+                <div className="card">
+                  <label className="label">Contact Number:</label>
+                  {isEditing ? (
+                    <input
+                      className="input"
+                      value={editableData.contactNumber}
+                      onChange={(e) => handleEditChange('contactNumber', e.target.value)}
+                    />
+                  ) : (
+                    <p className="value-text">{adminData.contactNumber}</p>
+                  )}
+                </div>
 
                 <div className="button-row">
                   {isEditing ? (
-                    <button className="save-btn" onClick={handleSaveChanges}>
-                      <span className="btn-text">Save Changes</span>
-                    </button>
+                    <>
+                      <button 
+                        className="cancel-btn" 
+                        onClick={() => {
+                          setIsEditing(false);
+                          setEditableData({
+                            name: adminData.name || '',
+                            contactNumber: adminData.contactNumber || ''
+                          });
+                          setFormError('');
+                        }}
+                      >
+                        <span className="btn-text">Cancel</span>
+                      </button>
+                      <button className="save-btn" onClick={handleSaveChanges}>
+                        <span className="btn-text">Save Changes</span>
+                      </button>
+                    </>
                   ) : (
                     <button className="edit-btn" onClick={() => setIsEditing(true)}>
                       <span className="btn-text">Edit Information</span>
@@ -218,7 +258,10 @@ const AccountSettings = () => {
         <div className="modal-overlay">
           <div className="modal-container">
             <button 
-              onClick={() => setChangePasswordVisible(false)} 
+              onClick={() => {
+                setChangePasswordVisible(false);
+                setPasswordError('');
+              }} 
               className="close-button"
             >
               <AiOutlineClose />
@@ -234,7 +277,10 @@ const AccountSettings = () => {
             <div className="modal-button-container">
               <button 
                 className="cancel-button" 
-                onClick={() => setChangePasswordVisible(false)}
+                onClick={() => {
+                  setChangePasswordVisible(false);
+                  setPasswordError('');
+                }}
               >
                 <span className="cancel-button-text">Cancel</span>
               </button>
@@ -254,7 +300,7 @@ const AccountSettings = () => {
         <div className="modal-overlay">
           <div className="modal-card-small">
             <FaCheckCircle className="confirm-icon" />
-            <p className="modal-text">Password updated successfully!</p>
+            <p className="modal-text">{successMessage}</p>
             <button
               className="confirm-btn"
               onClick={() => setSuccessModalVisible(false)}
@@ -376,13 +422,19 @@ const styles = `
     box-sizing: border-box;
   }
 
+  .input:disabled {
+    background-color: #f5f5f5;
+    color: #666;
+  }
+
   .button-row {
     display: flex;
     justify-content: flex-end;
     margin-top: 20px;
+    gap: 10px;
   }
 
-  .edit-btn, .save-btn, .change-pass-btn {
+  .edit-btn, .save-btn, .change-pass-btn, .cancel-btn {
     padding: 10px 20px;
     border-radius: 6px;
     border: none;
@@ -396,6 +448,10 @@ const styles = `
 
   .save-btn {
     background-color: #4CAF50;
+  }
+
+  .cancel-btn {
+    background-color: #ccc;
   }
 
   .change-pass-btn {
@@ -473,6 +529,12 @@ const styles = `
     margin-bottom: 20px;
     color: #001F3F;
     text-align: center;
+  }
+
+  .modal-description {
+    margin-bottom: 20px;
+    text-align: center;
+    color: #333;
   }
 
   .modal-button-container {
