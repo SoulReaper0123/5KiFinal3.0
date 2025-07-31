@@ -11,11 +11,15 @@ const DataManagement = () => {
   const [archivedData, setArchivedData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState(null);
 
-  // Fetch settings and archived data on component mount
+  // Fetch settings and archived data
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchData = async () => {
       try {
+        setError(null);
+        setLoading(true);
+        
         const settingsRef = database.ref('Settings/DataArchiving');
         const archiveRef = database.ref('ArchivedData');
         
@@ -34,22 +38,26 @@ const DataManagement = () => {
         if (archiveSnap.exists()) {
           const archiveData = [];
           archiveSnap.forEach(childSnap => {
+            const data = childSnap.val();
             archiveData.push({
               id: childSnap.key,
-              ...childSnap.val()
+              type: data.type || 'Full Archive',
+              date: data.date || '',
+              status: data.status || 'Archived',
+              counts: data.counts || {}
             });
           });
           setArchivedData(archiveData);
         }
-
-        setLoading(false);
-      } catch (error) {
-        console.error('Error fetching data:', error);
+      } catch (err) {
+        setError(err.message);
+        console.error('Error fetching data:', err);
+      } finally {
         setLoading(false);
       }
     };
 
-    fetchSettings();
+    fetchData();
   }, []);
 
   // Check if we need to perform auto-archiving
@@ -221,10 +229,22 @@ const DataManagement = () => {
     }
   };
 
-  const filteredArchives = archivedData.filter(item => 
-    item.type.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    item.date.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredArchives = archivedData.filter(item => {
+    const type = item.type?.toLowerCase() || '';
+    const date = item.date?.toLowerCase() || '';
+    const query = searchQuery.toLowerCase();
+    return type.includes(query) || date.includes(query);
+  });
+
+  if (error) {
+    return (
+      <div className="error-container">
+        <h2>Error loading data</h2>
+        <p>{error}</p>
+        <button onClick={() => window.location.reload()}>Retry</button>
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -405,7 +425,7 @@ const DataManagement = () => {
       </div>
 
       {/* CSS Styles */}
-      <style jsx>{`
+      <style>{`
         .data-management-container {
           display: flex;
           min-height: 100vh;
@@ -654,6 +674,12 @@ const DataManagement = () => {
           padding: 20px;
           color: #666;
           font-size: 14px;
+        }
+
+        .error-container {
+          padding: 20px;
+          text-align: center;
+          color: #ff4444;
         }
 
         .loading-container {
