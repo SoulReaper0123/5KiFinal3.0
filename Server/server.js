@@ -54,73 +54,259 @@ app.get('/', (req, res) => {
 
 app.post('/send-admin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating admin creation emails', req.body);
-    const { email, firstName, middleName, lastName, password } = req.body;
+    const { email, firstName, middleName = '', lastName, password, websiteLink, facebookLink } = req.body;
 
+    // Validate required fields
     if (!email || !firstName || !lastName || !password) {
         console.log('[NOTIFICATION ERROR] Missing required fields for admin creation');
-        return res.status(400).json({ message: 'Missing required fields' });
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, lastName, and password are required'
+        });
     }
 
-    const fullName = `${firstName} ${middleName} ${lastName}`;
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 
     try {
+        // Email to system owner
         console.log('[NOTIFICATION] Sending admin creation notification to owner');
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
-            subject: 'New Admin Created',
-            text: `New admin account:\n\nName: ${fullName}\nEmail: ${email}\n\nWebsite: ${WEBSITE_LINK}`
-        });
+            subject: 'New Admin Account Created',
+            html: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <h2 style="color: #2D5783; border-bottom: 2px solid #2D5783; padding-bottom: 10px;">
+                        New Admin Account Created
+                    </h2>
+                    <p>A new admin account has been successfully created in the system.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="margin-top: 0; color: #2D5783;">Admin Details</h3>
+                        <p><strong>Name:</strong> ${fullName}</p>
+                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Date Created:</strong> ${currentDate}</p>
+                    </div>
+                    
+                    <p>This is an automated notification. No action is required unless this was unauthorized.</p>
+                    <p style="margin-top: 30px; font-size: 0.9em; color: #777;">
+                        <a href="${websiteLink || WEBSITE_LINK}" style="color: #2D5783; text-decoration: none;">Visit Website</a> | 
+                        <a href="${facebookLink || FACEBOOK_LINK}" style="color: #2D5783; text-decoration: none;">Facebook Page</a>
+                    </p>
+                </div>
+            `
+        };
 
+        // Email to new admin
         console.log('[NOTIFICATION] Sending admin credentials to new admin');
-        await transporter.sendMail({
+        const adminMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Your Admin Account Credentials',
-            text: `Hi ${firstName},\n\nYour admin account has been created.\n\nEmail: ${email}\nPassword: ${password}\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
-        });
+            subject: 'Your 5KI Financial Services Admin Account',
+            html: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <h2 style="color: #2D5783; border-bottom: 2px solid #2D5783; padding-bottom: 10px;">
+                        Welcome to 5KI Financial Services
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    <p>Your administrator account has been successfully created. Below are your login credentials:</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="margin-top: 0; color: #2D5783;">Account Information</h3>
+                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Temporary Password:</strong> ${password}</p>
+                        <p><strong>Account Type:</strong> Administrator</p>
+                    </div>
+                    
+                    <div style="background-color: #fff8e1; padding: 15px; border-left: 4px solid #ffc107; margin: 15px 0;">
+                        <h3 style="margin-top: 0; color: #2D5783;">Important Security Notice</h3>
+                        <p>For security reasons:</p>
+                        <ul>
+                            <li>Change your password immediately after first login</li>
+                            <li>Never share your credentials with anyone</li>
+                            <li>Always log out after your session</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="text-align: center; margin: 25px 0;">
+                        <a href="${websiteLink || WEBSITE_LINK}" 
+                           style="background-color: #2D5783; color: white; padding: 10px 20px; 
+                                  text-decoration: none; border-radius: 5px; font-weight: bold;">
+                            Login to Your Account
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; font-size: 0.9em; color: #777;">
+                        <a href="${websiteLink || WEBSITE_LINK}" style="color: #2D5783; text-decoration: none;">Visit Website</a> | 
+                        <a href="${facebookLink || FACEBOOK_LINK}" style="color: #2D5783; text-decoration: none;">Facebook Page</a>
+                    </p>
+                </div>
+            `
+        };
+
+        // Send both emails
+        await transporter.sendMail(ownerMailOptions);
+        await transporter.sendMail(adminMailOptions);
 
         console.log('[NOTIFICATION SUCCESS] Admin creation emails sent successfully');
-        res.status(200).json({ message: 'Emails sent successfully' });
+        res.status(200).json({ 
+            success: true,
+            message: 'Admin creation emails sent successfully',
+            data: {
+                adminEmail: email,
+                dateSent: currentDate
+            }
+        });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending admin creation emails:', error);
-        res.status(500).json({ message: 'Failed to send emails', error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send admin creation emails',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
 app.post('/send-delete-admin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating admin deletion emails', req.body);
-    const { email, firstName, middleName, lastName } = req.body;
+    const { email, firstName, middleName = '', lastName, websiteLink, facebookLink } = req.body;
 
+    // Validate required fields
     if (!email || !firstName || !lastName) {
         console.log('[NOTIFICATION ERROR] Missing required fields for admin deletion');
-        return res.status(400).json({ message: 'Missing required fields' });
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, and lastName are required'
+        });
     }
 
-    const fullName = `${firstName} ${middleName || ''} ${lastName}`.trim();
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 
     try {
+        // Email to system owner
         console.log('[NOTIFICATION] Sending admin deletion notification to owner');
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Admin Account Deleted',
-            text: `Admin account deleted:\n\nName: ${fullName}\nEmail: ${email}\n\nWebsite: ${WEBSITE_LINK}`
-        });
+            html: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <h2 style="color: #2D5783; border-bottom: 2px solid #2D5783; padding-bottom: 10px;">
+                        Admin Account Deletion Notification
+                    </h2>
+                    <p>An administrator account has been permanently removed from the system.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="margin-top: 0; color: #2D5783;">Account Details</h3>
+                        <p><strong>Name:</strong> ${fullName}</p>
+                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Date Deleted:</strong> ${currentDate}</p>
+                    </div>
+                    
+                    <p style="color: #d32f2f; font-weight: bold;">
+                        Note: This action is irreversible. All access privileges have been revoked.
+                    </p>
+                    
+                    <p style="margin-top: 30px; font-size: 0.9em; color: #777;">
+                        <a href="${websiteLink || WEBSITE_LINK}" style="color: #2D5783; text-decoration: none;">Visit Website</a> | 
+                        <a href="${facebookLink || FACEBOOK_LINK}" style="color: #2D5783; text-decoration: none;">Facebook Page</a>
+                    </p>
+                </div>
+            `
+        };
 
+        // Email to deleted admin
         console.log('[NOTIFICATION] Sending admin deletion notification to deleted admin');
-        await transporter.sendMail({
+        const adminMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Your Admin Account Has Been Deleted',
-            text: `Hi ${firstName},\n\nYour admin account has been deleted.\n\nConnect with us: ${FACEBOOK_LINK}\n\nBest regards,\n5KI Financial Services`
-        });
+            subject: 'Your 5KI Financial Services Admin Access Has Been Removed',
+            html: `
+                <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+                    <h2 style="color: #2D5783; border-bottom: 2px solid #2D5783; padding-bottom: 10px;">
+                        Account Access Update
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    <p>We're writing to inform you that your administrator access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
+                    
+                    <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                        <h3 style="margin-top: 0; color: #2D5783;">Details</h3>
+                        <p><strong>Name:</strong> ${fullName}</p>
+                        <p><strong>Email:</strong> ${email}</p>
+                        <p><strong>Effective Date:</strong> ${currentDate}</p>
+                    </div>
+                    
+                    <div style="background-color: #ffebee; padding: 15px; border-left: 4px solid #f44336; margin: 15px 0;">
+                        <h3 style="margin-top: 0; color: #2D5783;">Important Information</h3>
+                        <ul>
+                            <li>You will no longer have access to the admin dashboard</li>
+                            <li>All admin privileges have been revoked</li>
+                            <li>This action is permanent and cannot be undone</li>
+                        </ul>
+                    </div>
+                    
+                    <p>If this action was taken in error or you have any questions, please contact the system administrator immediately at <a href="mailto:${process.env.GMAIL_USER}">${process.env.GMAIL_USER}</a>.</p>
+                    
+                    <p style="margin-top: 30px; font-size: 0.9em; color: #777;">
+                        <a href="${websiteLink || WEBSITE_LINK}" style="color: #2D5783; text-decoration: none;">Visit Website</a> | 
+                        <a href="${facebookLink || FACEBOOK_LINK}" style="color: #2D5783; text-decoration: none;">Facebook Page</a>
+                    </p>
+                </div>
+            `
+        };
+
+        // Send both emails
+        await transporter.sendMail(ownerMailOptions);
+        await transporter.sendMail(adminMailOptions);
 
         console.log('[NOTIFICATION SUCCESS] Admin deletion emails sent successfully');
-        res.status(200).json({ message: 'Emails sent successfully' });
+        res.status(200).json({ 
+            success: true,
+            message: 'Admin deletion emails sent successfully',
+            data: {
+                adminEmail: email,
+                dateSent: currentDate
+            }
+        });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending admin deletion emails:', error);
-        res.status(500).json({ message: 'Failed to send emails', error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send admin deletion emails',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 

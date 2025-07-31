@@ -92,7 +92,7 @@ const styles = {
     zIndex: 1000
   },
   modalCardSmall: {
-    width: '250px',
+    width: '300px',
     backgroundColor: 'white',
     borderRadius: '8px',
     padding: '20px',
@@ -230,7 +230,7 @@ const Admins = () => {
       .search-bar {
         display: flex;
         border: 1px solid #ccc;
-        borderRadius: 25px;
+        border-radius: 25px;
         background-color: #fff;
         padding: 0 10px;
         align-items: center;
@@ -309,7 +309,7 @@ const Admins = () => {
       }
       .disabled-button {
         background-color: #ccc;
-        cursor: 'not-allowed';
+        cursor: not-allowed;
       }
       .data-container {
         flex: 1;
@@ -332,8 +332,8 @@ const Admins = () => {
         height: 100vh;
       }
       .modal-container {
-        width: 35%;
-        max-height: 80vh;
+        width: 500px;
+        height: 650px;
         background-color: #fff;
         border-radius: 10px;
         padding: 20px;
@@ -342,7 +342,10 @@ const Admins = () => {
       }
       @media (max-width: 800px) {
         .modal-container {
-          width: 90%;
+            width: 90%;
+            max-width: 90%;
+            height: auto;
+            max-height: 90vh;
         }
       }
       .modal-title {
@@ -354,22 +357,22 @@ const Admins = () => {
       }
       .modal-content {
         padding-bottom: 20px;
-        overflow-y: auto;
-      }
-      .modal-scroll {
-        max-height: 60vh;
-        overflow-y: auto;
-        overflow-x: hidden;
-        width: 100%;
+        height: calc(100% - 100px);
+        display: flex;
+        flex-direction: column;
       }
       .form-group {
-        margin-bottom: 15px;
+        margin-bottom: 20px;
         width: 100%;
       }
       .form-label {
         font-weight: 600;
         margin-bottom: 5px;
         display: block;
+      }
+      .required-asterisk {
+        color: red;
+        margin-left: 3px;
       }
       .form-input {
         width: 100%;
@@ -386,8 +389,9 @@ const Admins = () => {
       .modal-button-container {
         display: flex;
         justify-content: space-between;
-        margin-top: 20px;
+        margin-top: auto;
         width: 100%;
+        padding-top: 20px;
       }
       .modal-submit-button {
         background-color: #2D5783;
@@ -419,7 +423,7 @@ const Admins = () => {
         display: flex;
         justify-content: center;
         margin-top: 20px;
-        width: '100%';
+        width: 100%;
       }
       .delete-button {
         background-color: #f44336;
@@ -429,9 +433,6 @@ const Admins = () => {
         border-radius: 5px;
         cursor: pointer;
         font-weight: bold;
-      }
-      .required {
-        color: red;
       }
     `;
     document.head.appendChild(styleElement);
@@ -559,12 +560,6 @@ const Admins = () => {
         password
       });
 
-      setFirstName('');
-      setMiddleName('');
-      setLastName('');
-      setEmail('');
-      setContactNumber('');
-
       setSuccessMessage('Admin added successfully!');
       setSuccessVisible(true);
     } catch (error) {
@@ -640,42 +635,69 @@ const Admins = () => {
     }
   };
 
-  const handleSuccessOk = async () => {
-    try {
-      if (pendingAdd) {
-        // Send admin credentials email
-        await sendAdminCredentialsEmail({
-          email: pendingAdd.email,
-          password: generateRandomPassword(),
-          name: `${pendingAdd.firstName} ${pendingAdd.middleName} ${pendingAdd.lastName}`.replace(/\s+/g, ' ').trim()
-        });
-      } else if (pendingDelete) {
-        // Send admin delete notification
-        await sendAdminDeleteData({
-          email: pendingDelete.email,
-          name: pendingDelete.name
-        });
-      }
+  const handleSuccessOk = () => {
+    setSuccessVisible(false);
+    
+    if (pendingAdd) {
+      const nameParts = pendingAdd.name ? 
+        pendingAdd.name.split(' ') : 
+        `${pendingAdd.firstName} ${pendingAdd.middleName} ${pendingAdd.lastName}`.split(' ');
       
-      // Refresh data after API calls
-      const snapshot = await database.ref('Users/Admin').once('value');
-      const data = snapshot.val() || {};
-      const adminList = Object.entries(data).map(([id, admin]) => ({
-        id,
-        ...admin
-      }));
-      setAdmins(adminList);
-      setFilteredData(adminList);
-    } catch (error) {
-      console.error('Error calling API:', error);
-      setErrorMessage('Failed to complete the action. Please try again.');
-      setErrorModalVisible(true);
-      return;
-    } finally {
-      setSuccessVisible(false);
-      setPendingAdd(null);
-      setPendingDelete(null);
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
+      sendAdminCredentialsEmail({
+        email: pendingAdd.email,
+        password: generateRandomPassword(),
+        firstName,
+        middleName,
+        lastName
+      }).catch(error => console.error('Error sending admin credentials email:', error));
+      
+      setFirstName('');
+      setMiddleName('');
+      setLastName('');
+      setEmail('');
+      setContactNumber('');
+      setModalVisible(false);
+    } 
+    else if (pendingDelete) {
+      const nameParts = pendingDelete.name ? 
+        pendingDelete.name.split(' ') : 
+        `${pendingDelete.firstName} ${pendingDelete.middleName} ${pendingDelete.lastName}`.split(' ');
+      
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
+      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+
+      sendAdminDeleteData({
+        email: pendingDelete.email,
+        firstName,
+        middleName,
+        lastName
+      }).catch(error => console.error('Error sending admin delete notification:', error));
     }
+
+    setPendingAdd(null);
+    setPendingDelete(null);
+    
+    const fetchAdmins = async () => {
+      try {
+        const snapshot = await database.ref('Users/Admin').once('value');
+        const data = snapshot.val() || {};
+        const adminList = Object.entries(data).map(([id, admin]) => ({
+          id,
+          ...admin
+        }));
+        setAdmins(adminList);
+        setFilteredData(adminList);
+      } catch (error) {
+        console.error('Error refreshing admin data:', error);
+      }
+    };
+
+    fetchAdmins();
   };
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
@@ -748,9 +770,9 @@ const Admins = () => {
               <table style={styles.table}>
                 <thead>
                   <tr style={styles.tableHeader}>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>ID</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Admin ID</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email Address</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Contact Number</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Added</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Action</th>
@@ -785,20 +807,27 @@ const Admins = () => {
 
         {/* Add Admin Modal */}
         {modalVisible && (
-          <div className="centered-modal">
+          <div style={styles.centeredModal}>
             <div className="modal-container">
               <button 
-                onClick={() => setModalVisible(false)} 
+                onClick={() => {
+                  setModalVisible(false);
+                  setFirstName('');
+                  setMiddleName('');
+                  setLastName('');
+                  setEmail('');
+                  setContactNumber('');
+                }} 
                 style={styles.closeButton}
                 aria-label="Close modal"
               >
                 <AiOutlineClose />
               </button>
               <h3 className="modal-title">New Admin</h3>
-              <div className="modal-scroll">
+              <div className="modal-content">
                 <div className="form-group">
                   <label className="form-label">
-                    First Name<span className="required"> *</span>
+                    First Name<span className="required-asterisk">*</span>
                   </label>
                   <input
                     className="form-input"
@@ -823,7 +852,7 @@ const Admins = () => {
 
                 <div className="form-group">
                   <label className="form-label">
-                    Last Name<span className="required"> *</span>
+                    Last Name<span className="required-asterisk">*</span>
                   </label>
                   <input
                     className="form-input"
@@ -837,7 +866,7 @@ const Admins = () => {
 
                 <div className="form-group">
                   <label className="form-label">
-                    Email<span className="required"> *</span>
+                    Email<span className="required-asterisk">*</span>
                   </label>
                   <input
                     className="form-input"
@@ -852,7 +881,7 @@ const Admins = () => {
 
                 <div className="form-group">
                   <label className="form-label">
-                    Contact Number<span className="required"> *</span>
+                    Contact Number<span className="required-asterisk">*</span>
                   </label>
                   <input
                     className="form-input"
@@ -873,7 +902,14 @@ const Admins = () => {
                   </button>
                   <button
                     className="modal-cancel-button"
-                    onClick={() => setModalVisible(false)}
+                    onClick={() => {
+                      setModalVisible(false);
+                      setFirstName('');
+                      setMiddleName('');
+                      setLastName('');
+                      setEmail('');
+                      setContactNumber('');
+                    }}
                   >
                     Cancel
                   </button>
@@ -885,7 +921,7 @@ const Admins = () => {
 
         {/* Admin Details Modal */}
         {adminModalVisible && (
-          <div className="centered-modal">
+          <div style={styles.centeredModal}>
             <div className="modal-container">
               <button 
                 onClick={() => setAdminModalVisible(false)} 
@@ -897,7 +933,7 @@ const Admins = () => {
               <div className="modal-content">
                 <h3 className="modal-title">Admin Details</h3>
                 <div className="form-group">
-                  <label className="form-label">ID:</label>
+                  <label className="form-label">Admin ID:</label>
                   <p>{selectedAdmin?.id || 'N/A'}</p>
                 </div>
                 <div className="form-group">
@@ -905,7 +941,7 @@ const Admins = () => {
                   <p>{selectedAdmin?.name || 'N/A'}</p>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Email:</label>
+                  <label className="form-label">Email Address:</label>
                   <p>{selectedAdmin?.email || 'N/A'}</p>
                 </div>
                 <div className="form-group">
@@ -1029,6 +1065,7 @@ const Admins = () => {
                   color: '#fff'
                 }} 
                 onClick={() => setErrorModalVisible(false)}
+                autoFocus
               >
                 OK
               </button>

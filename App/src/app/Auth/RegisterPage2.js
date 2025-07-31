@@ -2,16 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
-  Button, 
   StyleSheet, 
   TouchableOpacity, 
   Image, 
   Alert, 
   ScrollView,
-  Modal 
+  Modal,
+  ActivityIndicator
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as FaceDetector from 'expo-face-detector';
 import { MaterialIcons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -26,6 +27,7 @@ const RegisterPage2 = () => {
     const [showIdBackOptions, setShowIdBackOptions] = useState(false);
     const [showSelfieOptions, setShowSelfieOptions] = useState(false);
     const [showSelfieWithIdOptions, setShowSelfieWithIdOptions] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
 
     useEffect(() => {
         if (route.params?.selfieWithId) {
@@ -41,7 +43,22 @@ const RegisterPage2 = () => {
         address, governmentId, age, dateOfBirth,
     } = route.params;
 
-    const handleSelectImage = async (source, setImageFunction) => {
+    // Check if image contains a face (for selfies)
+    const detectFace = async (imageUri) => {
+        try {
+            const faces = await FaceDetector.detectFacesAsync(imageUri, {
+                mode: FaceDetector.FaceDetectorMode.fast,
+                detectLandmarks: FaceDetector.FaceDetectorLandmarks.none,
+                runClassifications: FaceDetector.FaceDetectorClassifications.none,
+            });
+            return faces.faces.length > 0;
+        } catch (error) {
+            console.error('Face detection error:', error);
+            return false;
+        }
+    };
+
+    const handleSelectImage = async (source, setImageFunction, isSelfie = false) => {
         const { status } = source === 'camera' 
             ? await ImagePicker.requestCameraPermissionsAsync()
             : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -52,6 +69,7 @@ const RegisterPage2 = () => {
         }
 
         try {
+            setIsProcessing(true);
             const result = await (source === 'camera' 
                 ? ImagePicker.launchCameraAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -67,11 +85,24 @@ const RegisterPage2 = () => {
                 }));
 
             if (!result.canceled && result.assets && result.assets[0]) {
-                setImageFunction(result.assets[0].uri);
+                const uri = result.assets[0].uri;
+                
+                // Validate selfie (must contain a face)
+                if (isSelfie) {
+                    const hasFace = await detectFace(uri);
+                    if (!hasFace) {
+                        Alert.alert('Invalid Selfie', 'No face detected. Please try again.');
+                        return;
+                    }
+                }
+
+                setImageFunction(uri);
             }
         } catch (error) {
             console.error('Error selecting image:', error);
-            Alert.alert('Error', 'Failed to select image');
+            Alert.alert('Error', 'Failed to process image');
+        } finally {
+            setIsProcessing(false);
         }
     };
 
@@ -138,6 +169,13 @@ const RegisterPage2 = () => {
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
+                {isProcessing && (
+                    <View style={styles.loadingOverlay}>
+                        <ActivityIndicator size="large" color="#2D5783" />
+                        <Text style={styles.loadingText}>Verifying image...</Text>
+                    </View>
+                )}
+
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <MaterialIcons name="arrow-back" size={30} color="white" />
                 </TouchableOpacity>
@@ -244,8 +282,8 @@ const RegisterPage2 = () => {
                 {renderOptionsModal(
                     showSelfieOptions, 
                     setShowSelfieOptions, 
-                    () => handleSelectImage('camera', setSelfie), 
-                    () => handleSelectImage('library', setSelfie),
+                    () => handleSelectImage('camera', setSelfie, true), 
+                    () => handleSelectImage('library', setSelfie, true),
                     'Take Selfie',
                     false
                 )}
@@ -253,8 +291,8 @@ const RegisterPage2 = () => {
                 {renderOptionsModal(
                     showSelfieWithIdOptions, 
                     setShowSelfieWithIdOptions, 
-                    () => handleSelectImage('camera', setSelfieWithId), 
-                    () => handleSelectImage('library', setSelfieWithId),
+                    () => handleSelectImage('camera', setSelfieWithId, true), 
+                    () => handleSelectImage('library', setSelfieWithId, true),
                     'Take Selfie with ID',
                     false
                 )}
@@ -399,6 +437,21 @@ const styles = StyleSheet.create({
     cancelText: {
         fontSize: 16,
         color: 'red',
+    },
+    loadingOverlay: {
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        zIndex: 1000,
+    },
+    loadingText: {
+        color: 'white',
+        marginTop: 10,
     },
 });
 

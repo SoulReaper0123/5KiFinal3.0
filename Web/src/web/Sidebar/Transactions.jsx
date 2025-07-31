@@ -4,30 +4,166 @@ import {
   FaDownload, 
   FaChevronLeft, 
   FaChevronRight,
-  FaExclamationCircle,
   FaCheckCircle,
   FaTimes
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
+import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
 import { database } from '../../../../Database/firebaseConfig';
+
+const styles = {
+  tableContainer: {
+    borderRadius: '8px',
+    overflow: 'auto',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed',
+    minWidth: '800px'
+  },
+  tableHeader: {
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    height: '50px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '16px'
+  },
+  tableHeaderCell: {
+    whiteSpace: 'nowrap'
+  },
+  tableRow: {
+    height: '50px',
+    '&:nth-child(even)': {
+      backgroundColor: '#f5f5f5'
+    },
+    '&:nth-child(odd)': {
+      backgroundColor: '#ddd'
+    }
+  },
+  tableCell: {
+    textAlign: 'center',
+    fontSize: '14px',
+    borderBottom: '1px solid #ddd',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  viewText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    textAlign: 'center'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '16px',
+    textAlign: 'center',
+    color: '#333',
+    lineHeight: '1.4'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    cursor: 'pointer',
+    fontSize: '18px',
+    color: 'grey',
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: '4px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  }
+};
 
 const Transactions = () => {
   const [transactions, setTransactions] = useState({});
   const [members, setMembers] = useState({});
   const [loading, setLoading] = useState(true);
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedMemberId, setSelectedMemberId] = useState(null);
-  const [memberTransactions, setMemberTransactions] = useState([]);
-  const [memberName, setMemberName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(0);
-  const [transactionType, setTransactionType] = useState('All');
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [memberModalVisible, setMemberModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('All');
   const pageSize = 10;
 
   useEffect(() => {
@@ -52,7 +188,7 @@ const Transactions = () => {
       }
       .top-controls {
         display: flex;
-        justify-content: space-between;
+        justify-content: flex-end;
         margin: 0 25px;
         align-items: center;
         flex-wrap: wrap;
@@ -152,180 +288,87 @@ const Transactions = () => {
         align-items: center;
         height: 100vh;
       }
-      .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        border-left-color: #001F3F;
-        animation: spin 1s linear infinite;
-      }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
-      .table-container {
-        width: 100%;
-        overflow-x: auto;
-      }
-      .table {
-        width: 100%;
-        border-collapse: collapse;
-      }
-      .table-header {
-        background-color: #2D5783;
-        color: #fff;
-        height: 50px;
-      }
-      .table-header-cell {
-        padding: 10px;
-        text-align: center;
-        font-weight: bold;
-      }
-      .table-row {
-        height: 50px;
-        cursor: pointer;
-      }
-      .table-row:nth-child(even) {
-        background-color: #f9f9f9;
-      }
-      .table-row:hover {
-        background-color: #f0f0f0;
-      }
-      .table-cell {
-        padding: 10px;
-        text-align: center;
-        vertical-align: middle;
-      }
-      .centered-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-      .modal-card {
+      .modal-container {
+        width: 500px;
+        height: 650px;
         background-color: #fff;
         border-radius: 10px;
         padding: 20px;
-        width: ${windowWidth < 800 ? '90%' : '35%'};
-        height: ${windowWidth < 800 ? '90%' : '80%'};
         position: relative;
+        overflow-x: hidden;
       }
-      .close-button {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 5px;
-      }
-      .modal-header {
-        margin-bottom: 15px;
-        text-align: center;
+      @media (max-width: 800px) {
+        .modal-container {
+            width: 90%;
+            max-width: 90%;
+            height: auto;
+            max-height: 90vh;
+        }
       }
       .modal-title {
-        font-size: 1.25rem;
+        font-size: 20px;
         font-weight: bold;
-        color: #2c3e50;
+        margin-bottom: 16px;
+        color: #2D5783;
+        text-align: center;
       }
-      .tabs-container {
+      .modal-content {
+        padding-bottom: 20px;
+        height: calc(100% - 100px);
+        display: flex;
+        flex-direction: column;
+      }
+      .transaction-type-buttons {
         display: flex;
         justify-content: space-around;
-        margin-bottom: 15px;
+        margin-bottom: 20px;
         flex-wrap: wrap;
-        gap: 5px;
+        gap: 10px;
       }
-      .tab-button {
+      .type-button {
         padding: 8px 16px;
-        border-radius: 30px;
+        border-radius: 20px;
         border: none;
-        background: none;
+        background-color: #f0f0f0;
         cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
       }
-      .active-tab {
+      .active-type {
         background-color: #2D5783;
-        color: #fff;
+        color: white;
       }
-      .scroll-container {
-        height: calc(100% - 100px);
+      .transactions-list {
+        flex: 1;
         overflow-y: auto;
       }
-      .transactions-container {
-        padding-bottom: 20px;
-      }
       .transaction-item {
-        background-color: #fff;
-        padding: 15px;
+        background-color: white;
         border-radius: 8px;
+        padding: 15px;
         margin-bottom: 10px;
-        border: 1px solid #ddd;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .transaction-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
       }
       .transaction-type {
         font-weight: bold;
-        font-size: 16px;
         color: #2D5783;
-        margin-bottom: 5px;
+      }
+      .transaction-date {
+        color: #666;
+        font-size: 12px;
       }
       .transaction-detail {
+        margin-bottom: 5px;
         font-size: 14px;
+      }
+      .transaction-amount {
+        font-weight: bold;
         color: #333;
-        margin-bottom: 3px;
-      }
-      .small-modal-card {
-        width: 300px;
-        height: 200px;
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      }
-      .confirm-icon {
-        align-self: center;
-        margin-bottom: 10px;
-        font-size: 30px;
-      }
-      .modal-text {
-        font-size: 14px;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-      .cancel-btn {
-        background-color: #f44336;
-        width: 100px;
-        height: 40px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border-radius: 5px;
-        margin: 0 10px;
-        border: none;
-        color: white;
-        font-weight: bold;
-        cursor: pointer;
-      }
-      .confirm-btn {
-        background-color: #4CAF50;
-        width: 100px;
-        height: 40px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border-radius: 5px;
-        margin: 0 10px;
-        border: none;
-        color: white;
-        font-weight: bold;
-        cursor: pointer;
       }
     `;
     document.head.appendChild(styleElement);
@@ -333,15 +376,15 @@ const Transactions = () => {
     return () => {
       document.head.removeChild(styleElement);
     };
-  }, [windowWidth]);
+  }, []);
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
         const [
           depositsSnapshot,
-          applyLoansSnapshot,
+          loansSnapshot,
           payLoansSnapshot,
           withdrawalsSnapshot,
           paymentsSnapshot,
@@ -357,35 +400,38 @@ const Transactions = () => {
 
         const allTransactions = {};
 
-        const formatData = (data, type) => {
-          Object.keys(data).forEach((memberId) => {
+        const processTransactions = (data, type) => {
+          if (!data.exists()) return;
+          
+          const transactionsData = data.val();
+          Object.keys(transactionsData).forEach(memberId => {
             if (!allTransactions[memberId]) {
               allTransactions[memberId] = [];
             }
-            Object.keys(data[memberId]).forEach((transactionId) => {
+            
+            Object.keys(transactionsData[memberId]).forEach(transactionId => {
               allTransactions[memberId].push({
+                ...transactionsData[memberId][transactionId],
                 type,
                 transactionId,
-                ...data[memberId][transactionId],
-                dateApproved: data[memberId][transactionId].dateApproved,
               });
             });
           });
         };
 
-        if (depositsSnapshot.exists()) formatData(depositsSnapshot.val(), 'Deposits');
-        if (applyLoansSnapshot.exists()) formatData(applyLoansSnapshot.val(), 'Loans');
-        if (payLoansSnapshot.exists()) formatData(payLoansSnapshot.val(), 'PayLoans');
-        if (withdrawalsSnapshot.exists()) formatData(withdrawalsSnapshot.val(), 'Withdrawals');
-        if (paymentsSnapshot.exists()) formatData(paymentsSnapshot.val(), 'Payments');
+        processTransactions(depositsSnapshot, 'Deposit');
+        processTransactions(loansSnapshot, 'Loan');
+        processTransactions(payLoansSnapshot, 'Loan Payment');
+        processTransactions(withdrawalsSnapshot, 'Withdrawal');
+        processTransactions(paymentsSnapshot, 'Payment');
 
         setTransactions(allTransactions);
 
         if (membersSnapshot.exists()) {
           setMembers(membersSnapshot.val());
         }
-      } catch (err) {
-        console.error('Error fetching transactions:', err);
+      } catch (error) {
+        console.error('Error fetching data:', error);
         setErrorMessage('Failed to fetch transaction data');
         setErrorModalVisible(true);
       } finally {
@@ -393,48 +439,35 @@ const Transactions = () => {
       }
     };
 
-    fetchTransactions();
+    fetchData();
   }, []);
 
-  const handleRowPress = (memberId) => {
-    setSelectedMemberId(memberId);
-    setMemberTransactions(transactions[memberId] || []);
-
-    if (members[memberId]) {
-      const { firstName, middleName, lastName } = members[memberId];
-      setMemberName(`${firstName} ${middleName ? middleName + ' ' : ''}${lastName}`);
-    } else {
-      setMemberName('');
-    }
-
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedMemberId(null);
-    setMemberTransactions([]);
-    setMemberName('');
-  };
-
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    setCurrentPage(0);
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+    }).format(amount || 0);
   };
 
   const handleDownload = async () => {
     try {
+      if (filteredMembers.length === 0) {
+        setErrorMessage('No data to export');
+        setErrorModalVisible(true);
+        return;
+      }
+
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Transactions');
 
-      // Add headers
-      worksheet.addRow(['ID', 'Name']);
+      const headers = ['Member ID', 'Name', 'Transaction Count'];
+      worksheet.addRow(headers);
 
-      // Add data
       filteredMembers.forEach(memberId => {
         const member = members[memberId];
         const name = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
-        worksheet.addRow([memberId, name]);
+        const transactionCount = transactions[memberId]?.length || 0;
+        worksheet.addRow([memberId, name, transactionCount]);
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -451,7 +484,7 @@ const Transactions = () => {
       window.URL.revokeObjectURL(url);
       
       setSuccessMessage('Data exported successfully!');
-      setSuccessModalVisible(true);
+      setSuccessVisible(true);
     } catch (error) {
       console.error('Error downloading data:', error);
       setErrorMessage('Failed to export data');
@@ -459,37 +492,29 @@ const Transactions = () => {
     }
   };
 
-  const filteredMembers = Object.keys(transactions).filter((memberId) => {
+  const filteredMembers = Object.keys(transactions).filter(memberId => {
     const member = members[memberId];
     if (!member) return false;
 
-    const memberFullName = `${member.firstName} ${member.middleName ? member.middleName + ' ' : ''}${member.lastName}`.toLowerCase();
+    const searchLower = searchQuery.toLowerCase();
+    const name = `${member.firstName} ${member.middleName || ''} ${member.lastName}`.toLowerCase();
+    
     return (
-      memberId.includes(searchQuery) ||
-      memberFullName.includes(searchQuery.toLowerCase())
+      memberId.toLowerCase().includes(searchLower) ||
+      name.includes(searchLower)
     );
   });
 
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-    }).format(amount);
+  const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
+  const paginatedData = filteredMembers.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   if (loading) {
     return (
       <div className="loading-container">
-        <div className="spinner"></div>
+        <div style={styles.spinner}></div>
       </div>
     );
   }
-
-  const totalPages = Math.ceil(filteredMembers.length / pageSize);
-  const paginatedData = filteredMembers.slice(
-    currentPage * pageSize,
-    (currentPage + 1) * pageSize
-  );
 
   return (
     <div className="safe-area-view">
@@ -503,7 +528,7 @@ const Transactions = () => {
                 className="search-input"
                 placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
               <button className="search-icon">
                 <FaSearch />
@@ -539,27 +564,42 @@ const Transactions = () => {
           {filteredMembers.length === 0 ? (
             <span className="no-match-text">No Matches Found</span>
           ) : (
-            <div className="table-container">
-              <table className="table">
+            <div style={styles.tableContainer}>
+              <table style={styles.table}>
                 <thead>
-                  <tr className="table-header">
-                    <th className="table-header-cell">ID</th>
-                    <th className="table-header-cell">Name</th>
+                  <tr style={styles.tableHeader}>
+                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Member ID</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '30%' }}>Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Transaction Count</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '30%' }}>Action</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {paginatedData.map((memberId, index) => {
+                  {paginatedData.map((memberId) => {
                     const member = members[memberId];
                     const name = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
-                    
+                    const transactionCount = transactions[memberId]?.length || 0;
+
                     return (
-                      <tr 
-                        key={memberId} 
-                        className="table-row"
-                        onClick={() => handleRowPress(memberId)}
-                      >
-                        <td className="table-cell">{memberId}</td>
-                        <td className="table-cell">{name}</td>
+                      <tr key={memberId} style={styles.tableRow}>
+                        <td style={styles.tableCell}>{memberId}</td>
+                        <td style={styles.tableCell}>{name}</td>
+                        <td style={styles.tableCell}>{transactionCount}</td>
+                        <td style={styles.tableCell}>
+                          <span 
+                            style={styles.viewText} 
+                            onClick={() => {
+                              setSelectedMember({
+                                id: memberId,
+                                name,
+                                transactions: transactions[memberId] || []
+                              });
+                              setMemberModalVisible(true);
+                            }}
+                          >
+                            View
+                          </span>
+                        </td>
                       </tr>
                     );
                   })}
@@ -569,48 +609,68 @@ const Transactions = () => {
           )}
         </div>
 
-        {modalVisible && (
-          <div className="centered-modal">
-            <div className="modal-card">
-              <button onClick={closeModal} className="close-button">
-                <FaTimes />
+        {/* Member Transactions Modal */}
+        {memberModalVisible && selectedMember && (
+          <div style={styles.centeredModal}>
+            <div className="modal-container">
+              <button 
+                onClick={() => setMemberModalVisible(false)} 
+                style={styles.closeButton}
+                aria-label="Close modal"
+              >
+                <AiOutlineClose />
               </button>
+              <h3 className="modal-title">{selectedMember.name}'s Transactions</h3>
               
-              <div className="modal-header">
-                <h2 className="modal-title">Transactions for {memberName} (ID: {selectedMemberId})</h2>
-              </div>
-              
-              <div className="tabs-container">
-                {['All', 'Deposits', 'Loans', 'Withdrawals', 'Payments'].map((type) => (
-                  <button
-                    key={type}
-                    className={`tab-button ${transactionType === type ? 'active-tab' : ''}`}
-                    onClick={() => setTransactionType(type)}
-                  >
-                    <span>{type}</span>
-                  </button>
-                ))}
-              </div>
+              <div className="modal-content">
+                <div className="transaction-type-buttons">
+                  {['All', 'Deposit', 'Loan', 'Loan Payment', 'Withdrawal', 'Payment'].map(type => (
+                    <button
+                      key={type}
+                      className={`type-button ${transactionTypeFilter === type ? 'active-type' : ''}`}
+                      onClick={() => setTransactionTypeFilter(type)}
+                    >
+                      {type}
+                    </button>
+                  ))}
+                </div>
 
-              <div className="scroll-container">
-                <div className="transactions-container">
-                  {memberTransactions
-                    .filter(tx => transactionType === 'All' || tx.type.includes(transactionType))
-                    .map((transaction) => (
-                      <div key={transaction.transactionId} className="transaction-item">
-                        <div className="transaction-type">{transaction.type}</div>
-                        <div className="transaction-detail">
-                          Amount: {formatCurrency(
-                            transaction.amountToBeDeposited ||
-                            transaction.loanAmount ||
-                            transaction.amount ||
-                            transaction.amountWithdrawn ||
-                            transaction.paymentAmount
-                          )}
+                <div className="transactions-list">
+                  {selectedMember.transactions
+                    .filter(tx => transactionTypeFilter === 'All' || tx.type === transactionTypeFilter)
+                    .map((transaction, index) => (
+                      <div key={`${transaction.transactionId}-${index}`} className="transaction-item">
+                        <div className="transaction-header">
+                          <span className="transaction-type">{transaction.type}</span>
+                          <span className="transaction-date">{transaction.dateApproved || 'No date'}</span>
                         </div>
-                        <div className="transaction-detail">Transaction ID: {transaction.transactionId}</div>
-                        {transaction.dateApproved && (
-                          <div className="transaction-detail">Date: {transaction.dateApproved}</div>
+                        <div className="transaction-detail">
+                          <span>Transaction ID: </span>
+                          <span>{transaction.transactionId}</span>
+                        </div>
+                        <div className="transaction-detail">
+                          <span>Amount: </span>
+                          <span className="transaction-amount">
+                            {formatCurrency(
+                              transaction.amountToBeDeposited || 
+                              transaction.loanAmount || 
+                              transaction.amount || 
+                              transaction.amountWithdrawn || 
+                              transaction.paymentAmount
+                            )}
+                          </span>
+                        </div>
+                        {transaction.interestRate && (
+                          <div className="transaction-detail">
+                            <span>Interest Rate: </span>
+                            <span>{transaction.interestRate}%</span>
+                          </div>
+                        )}
+                        {transaction.monthsToPay && (
+                          <div className="transaction-detail">
+                            <span>Term: </span>
+                            <span>{transaction.monthsToPay} months</span>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -621,14 +681,18 @@ const Transactions = () => {
         )}
 
         {/* Success Modal */}
-        {successModalVisible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              <FaCheckCircle className="confirm-icon" style={{ color: '#4CAF50' }} />
-              <p className="modal-text">{successMessage}</p>
+        {successVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+              <p style={styles.modalText}>{successMessage}</p>
               <button 
-                className="confirm-btn" 
-                onClick={() => setSuccessModalVisible(false)}
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={() => setSuccessVisible(false)}
               >
                 OK
               </button>
@@ -638,17 +702,29 @@ const Transactions = () => {
 
         {/* Error Modal */}
         {errorModalVisible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              <FiAlertCircle className="confirm-icon" style={{ color: '#f44336' }} />
-              <p className="modal-text">{errorMessage}</p>
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
+              <p style={styles.modalText}>{errorMessage}</p>
               <button 
-                className="cancel-btn" 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
                 onClick={() => setErrorModalVisible(false)}
+                autoFocus
               >
                 OK
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Processing Spinner */}
+        {isProcessing && (
+          <div style={styles.centeredModal}>
+            <div style={styles.spinner}></div>
           </div>
         )}
       </div>

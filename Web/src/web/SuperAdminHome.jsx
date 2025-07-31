@@ -5,13 +5,13 @@ import {
   FaChevronUp, 
   FaUserCircle, 
   FaSignOutAlt,
-  FaShieldAlt,
   FaFileUpload
 } from 'react-icons/fa';
 import { 
   GoSidebarCollapse,
   GoSidebarExpand
 } from 'react-icons/go';
+import { RiAdminLine } from 'react-icons/ri';
 import Register from './Sidebar/Registrations/Register';
 import Admins from './Sidebar/Admins';
 import DataMigration from './Sidebar/DataMigration';
@@ -281,7 +281,6 @@ const SuperAdminHome = () => {
       fontWeight: 'bold',
       maxWidth: '500px',
     },
-    // Updated modal styles to match login page
     modalOverlay: {
       position: 'fixed',
       top: 0,
@@ -402,7 +401,7 @@ const SuperAdminHome = () => {
                 styles.button}
             >
               <div style={styles.iconContainer}>
-                <FaShieldAlt 
+                <RiAdminLine 
                   style={isActive('admins') ? styles.activeIcon : styles.icon} 
                   size={28}
                 />

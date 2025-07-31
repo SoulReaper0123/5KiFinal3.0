@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { database, auth } from '../../../../../Database/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { ApproveRegistration, RejectRegistration } from '../../../../../Server/api';
@@ -470,6 +470,61 @@ const styles = {
     top: 0,
     left: 0,
     pointerEvents: 'none'
+  },
+  verifyButton: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '10px 20px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    marginTop: '10px',
+    fontWeight: 'bold',
+    '&:disabled': {
+      backgroundColor: '#ccc',
+      cursor: 'not-allowed'
+    }
+  },
+  scanResultsContainer: {
+    marginTop: '20px',
+    width: '100%',
+    maxWidth: '600px',
+    color: 'white',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: '15px',
+    borderRadius: '8px'
+  },
+  scanResultItem: {
+    marginBottom: '10px',
+    padding: '10px',
+    borderRadius: '4px',
+    backgroundColor: 'rgba(255,255,255,0.1)'
+  },
+  scanResultTitle: {
+    fontWeight: 'bold',
+    marginBottom: '5px',
+    fontSize: '16px'
+  },
+  scanResultDetail: {
+    marginBottom: '3px',
+    fontSize: '14px'
+  },
+  idDetectionBox: {
+    position: 'absolute',
+    border: '2px solid red',
+    backgroundColor: 'rgba(255,0,0,0.2)'
+  },
+  verificationControls: {
+    marginTop: '20px',
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  verifyButtonsContainer: {
+    display: 'flex',
+    gap: '10px',
+    marginBottom: '15px'
   }
 };
 
@@ -507,19 +562,31 @@ const Registrations = ({
   const [isVerifying, setIsVerifying] = useState(false);
   const [faceMatchScore, setFaceMatchScore] = useState(null);
   const [availableImages, setAvailableImages] = useState([]);
+  const [scanResults, setScanResults] = useState(null);
+  const [idDetectionBox, setIdDetectionBox] = useState(null);
+  const [modelLoadingError, setModelLoadingError] = useState(null);
+  const [isFaceVerified, setIsFaceVerified] = useState(false);
+  const [isIdVerified, setIsIdVerified] = useState(false);
+  const [isFaceMatchVerified, setIsFaceMatchVerified] = useState(false);
+  const imageRef = useRef(null);
 
   useEffect(() => {
     async function loadModels() {
       try {
+        console.log('Loading face-api.js models...');
         await Promise.all([
           faceapi.nets.tinyFaceDetector.loadFromUri('/models'),
           faceapi.nets.faceLandmark68Net.loadFromUri('/models'),
           faceapi.nets.faceRecognitionNet.loadFromUri('/models'),
           faceapi.nets.ssdMobilenetv1.loadFromUri('/models')
         ]);
+        console.log('Models loaded successfully');
         setModelsLoaded(true);
+        setModelLoadingError(null);
       } catch (error) {
         console.error('Error loading face-api models:', error);
+        setModelLoadingError(error.message);
+        setModelsLoaded(false);
       }
     }
 
@@ -551,6 +618,7 @@ const Registrations = ({
     setModalVisible(true);
     setVerificationResult(null);
     setFaceMatchScore(null);
+    setScanResults(null);
   };
 
   const closeModal = () => {
@@ -787,17 +855,13 @@ const Registrations = ({
 
   const handleSuccessOk = async () => {
     try {
-      // Only call API when OK is clicked
       if (currentAction === 'approve') {
         await callApiApprove(selectedRegistration);
       } else {
         await callApiReject(selectedRegistration);
       }
       
-      // Remove from pending registrations only after API call succeeds
       await removeFromPendingRegistrations(selectedRegistration.id);
-      
-      // Refresh data after everything is done
       refreshData();
     } catch (error) {
       console.error('Error calling API:', error);
@@ -812,7 +876,334 @@ const Registrations = ({
     }
   };
 
-  // ... (keep all other existing functions exactly the same)
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (selectedRegistration?.validIdFront) {
+      images.push({ 
+        url: selectedRegistration.validIdFront, 
+        label: 'Valid ID Front' 
+      });
+    }
+    if (selectedRegistration?.validIdBack) {
+      images.push({ 
+        url: selectedRegistration.validIdBack, 
+        label: 'Valid ID Back' 
+      });
+    }
+    if (selectedRegistration?.selfie) {
+      images.push({ 
+        url: selectedRegistration.selfie, 
+        label: 'Selfie' 
+      });
+    }
+    if (selectedRegistration?.selfieWithId) {
+      images.push({ 
+        url: selectedRegistration.selfieWithId, 
+        label: 'Selfie with ID' 
+      });
+    }
+
+    setAvailableImages(images);
+    setCurrentImage({ url, label });
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
+    setScanResults(null);
+    setIdDetectionBox(null);
+    setIsFaceVerified(false);
+    setIsIdVerified(false);
+    setIsFaceMatchVerified(false);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
+    setVerificationResult(null);
+    setFaceMatchScore(null);
+    setScanResults(null);
+    setIdDetectionBox(null);
+    setIsFaceVerified(false);
+    setIsIdVerified(false);
+    setIsFaceMatchVerified(false);
+  };
+
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
+    setScanResults(null);
+    setIdDetectionBox(null);
+    setIsFaceVerified(false);
+    setIsIdVerified(false);
+    setIsFaceMatchVerified(false);
+  };
+
+  const detectFaces = async (imageUrl) => {
+    try {
+      console.log('Detecting faces in image:', imageUrl);
+      const img = await faceapi.fetchImage(imageUrl);
+      const detections = await faceapi.detectAllFaces(img, 
+        new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+      console.log('Face detections:', detections);
+      return detections;
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return null;
+    }
+  };
+
+  const verifyFace = async () => {
+    if (!modelsLoaded) {
+      setScanResults({
+        error: true,
+        message: modelLoadingError || 'AI models are still loading. Please try again shortly.'
+      });
+      return;
+    }
+
+    if (!currentImage.url) {
+      setScanResults({
+        error: true,
+        message: 'No image available for verification'
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationResult(null);
+    setScanResults(null);
+    setIdDetectionBox(null);
+
+    try {
+      const detections = await detectFaces(currentImage.url);
+      
+      if (!detections || detections.length === 0) {
+        setScanResults({
+          error: true,
+          message: 'No face detected in the image'
+        });
+        setIsFaceVerified(false);
+        return;
+      }
+
+      const confidence = Math.floor(detections[0].detection.score * 100);
+      const isFaceValid = confidence > 70; // Threshold for face validity
+      
+      setIsFaceVerified(isFaceValid);
+      
+      setScanResults({
+        imageType: currentImage.label.toLowerCase(),
+        isFaceDetected: true,
+        faceCount: detections.length,
+        confidence,
+        details: [
+          `Face detected (confidence: ${confidence}%)`,
+          `Landmarks detected: ${detections[0].landmarks.positions.length}`,
+          isFaceValid ? 'Face is valid' : 'Face may not be valid'
+        ]
+      });
+
+      // Draw detection box
+      const imgElement = document.getElementById('viewerImage');
+      if (imgElement) {
+        const { width, height } = imgElement.getBoundingClientRect();
+        const box = detections[0].detection.box;
+        
+        const boxStyle = {
+          left: `${box.x * (width / imgElement.naturalWidth)}px`,
+          top: `${box.y * (height / imgElement.naturalHeight)}px`,
+          width: `${box.width * (width / imgElement.naturalWidth)}px`,
+          height: `${box.height * (height / imgElement.naturalHeight)}px`
+        };
+        
+        setIdDetectionBox(boxStyle);
+      }
+    } catch (error) {
+      console.error('Face verification error:', error);
+      setScanResults({
+        error: true,
+        message: `Error verifying face: ${error.message}`
+      });
+      setIsFaceVerified(false);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const verifyId = async () => {
+    if (!modelsLoaded) {
+      setScanResults({
+        error: true,
+        message: modelLoadingError || 'AI models are still loading. Please try again shortly.'
+      });
+      return;
+    }
+
+    if (!currentImage.url) {
+      setScanResults({
+        error: true,
+        message: 'No image available for verification'
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationResult(null);
+    setScanResults(null);
+    setIdDetectionBox(null);
+
+    try {
+      const detections = await detectFaces(currentImage.url);
+      const isIdValid = detections && detections.length > 0;
+      
+      setIsIdVerified(isIdValid);
+      
+      if (isIdValid) {
+        const confidence = Math.floor(detections[0].detection.score * 100);
+        
+        setScanResults({
+          imageType: currentImage.label.toLowerCase(),
+          isDocument: true,
+          isFrontOfId: true,
+          isFaceDetected: true,
+          faceCount: detections.length,
+          confidence,
+          details: [
+            'ID document detected',
+            detections.length > 0 ? 'Front side of ID detected' : 'Back side of ID detected',
+            detections.length > 0 ? `Face detected (confidence: ${confidence}%)` : 'No face detected - likely back of ID'
+          ]
+        });
+
+        // Draw detection box
+        const imgElement = document.getElementById('viewerImage');
+        if (imgElement) {
+          const { width, height } = imgElement.getBoundingClientRect();
+          const box = detections[0].detection.box;
+          
+          const boxStyle = {
+            left: `${box.x * (width / imgElement.naturalWidth)}px`,
+            top: `${box.y * (height / imgElement.naturalHeight)}px`,
+            width: `${box.width * (width / imgElement.naturalWidth)}px`,
+            height: `${box.height * (height / imgElement.naturalHeight)}px`
+          };
+          
+          setIdDetectionBox(boxStyle);
+        }
+      } else {
+        setScanResults({
+          imageType: currentImage.label.toLowerCase(),
+          isDocument: true,
+          isFrontOfId: false,
+          isFaceDetected: false,
+          details: [
+            'ID document detected',
+            'No face detected - likely back of ID'
+          ]
+        });
+      }
+    } catch (error) {
+      console.error('ID verification error:', error);
+      setScanResults({
+        error: true,
+        message: `Error verifying ID: ${error.message}`
+      });
+      setIsIdVerified(false);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const verifyFaceMatch = async () => {
+    if (!modelsLoaded || !selectedRegistration) {
+      setVerificationResult({
+        isValid: false,
+        message: modelLoadingError || 'AI models are not loaded yet'
+      });
+      return;
+    }
+
+    setIsVerifying(true);
+    setVerificationResult(null);
+    setFaceMatchScore(null);
+    setScanResults(null);
+
+    try {
+      const idFront = selectedRegistration.validIdFront;
+      const selfie = selectedRegistration.selfie;
+
+      if (!idFront || !selfie) {
+        setVerificationResult({
+          isValid: false,
+          message: 'Missing required images for verification'
+        });
+        setIsFaceMatchVerified(false);
+        return;
+      }
+
+      console.log('Starting face verification...');
+      const [idFrontFaces, selfieFaces] = await Promise.all([
+        detectFaces(idFront),
+        detectFaces(selfie)
+      ]);
+
+      if (!idFrontFaces || idFrontFaces.length === 0) {
+        setVerificationResult({
+          isValid: false,
+          message: 'No face detected in ID photo'
+        });
+        setIsFaceMatchVerified(false);
+        return;
+      }
+
+      if (!selfieFaces || selfieFaces.length === 0) {
+        setVerificationResult({
+          isValid: false,
+          message: 'No face detected in selfie'
+        });
+        setIsFaceMatchVerified(false);
+        return;
+      }
+
+      const idFace = idFrontFaces[0].descriptor;
+      const selfieFace = selfieFaces[0].descriptor;
+
+      const score = faceapi.euclideanDistance(idFace, selfieFace);
+      const similarityScore = 1 - score;
+      
+      setFaceMatchScore(similarityScore);
+
+      const threshold = 0.5;
+      const isMatch = similarityScore > threshold;
+      setIsFaceMatchVerified(isMatch);
+
+      setVerificationResult({
+        isValid: isMatch,
+        message: isMatch ? 'Faces match verified' : 'Faces do not match'
+      });
+
+    } catch (error) {
+      console.error('Verification error:', error);
+      setVerificationResult({
+        isValid: false,
+        message: `Error during verification: ${error.message}`
+      });
+      setIsFaceMatchVerified(false);
+    } finally {
+      setIsVerifying(false);
+    }
+  };
 
   if (!registrations.length) return (
     <div style={styles.loadingView}>
@@ -865,7 +1256,6 @@ const Registrations = ({
         </table>
       </div>
 
-      {/* View Details Modal */}
       {modalVisible && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCard}>
@@ -1052,7 +1442,6 @@ const Registrations = ({
         </div>
       )}
 
-      {/* Rejection Reason Modal */}
       {showRejectionModal && (
         <div style={styles.rejectionModal}>
           <div style={styles.rejectionModalContent}>
@@ -1100,7 +1489,6 @@ const Registrations = ({
         </div>
       )}
 
-      {/* Error Modal */}
       {errorModalVisible && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
@@ -1123,14 +1511,12 @@ const Registrations = ({
         </div>
       )}
 
-      {/* Processing Modal */}
       {isProcessing && (
         <div style={styles.centeredModal}>
           <div style={styles.spinner}></div>
         </div>
       )}
 
-      {/* Success Modal */}
       {successMessageModalVisible && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
@@ -1155,7 +1541,6 @@ const Registrations = ({
         </div>
       )}
 
-      {/* Image Viewer Modal */}
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
@@ -1172,7 +1557,11 @@ const Registrations = ({
                 alt={currentImage.label}
                 style={styles.largeImage}
                 id="viewerImage"
+                ref={imageRef}
               />
+              {idDetectionBox && (
+                <div style={{ ...styles.idDetectionBox, ...idDetectionBox }}></div>
+              )}
             </div>
             <button 
               style={{ ...styles.imageViewerNav, ...styles.nextButton }}
@@ -1191,30 +1580,84 @@ const Registrations = ({
             </button>
             <p style={styles.imageViewerLabel}>{currentImage.label}</p>
             
-            {isVerifying && (
-              <div style={{ color: 'white', marginTop: '10px' }}>
-                Verifying image...
+            <div style={styles.verificationControls}>
+              <div style={styles.verifyButtonsContainer}>
+                {currentImage.label.toLowerCase().includes('selfie') && (
+                  <button
+                    style={{
+                      ...styles.verifyButton,
+                      ...(isVerifying || !modelsLoaded ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {}),
+                      ...(isFaceVerified ? { backgroundColor: '#4CAF50' } : {})
+                    }}
+                    onClick={verifyFace}
+                    disabled={isVerifying || !modelsLoaded}
+                    title={!modelsLoaded ? (modelLoadingError || "AI models are still loading") : "Verify face in image"}
+                  >
+                    {isFaceVerified ? '✓ Face Verified' : 'Verify Face'}
+                  </button>
+                )}
+                
+                {currentImage.label.toLowerCase().includes('id') && (
+                  <button
+                    style={{
+                      ...styles.verifyButton,
+                      ...(isVerifying || !modelsLoaded ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {}),
+                      ...(isIdVerified ? { backgroundColor: '#4CAF50' } : {})
+                    }}
+                    onClick={verifyId}
+                    disabled={isVerifying || !modelsLoaded}
+                    title={!modelsLoaded ? (modelLoadingError || "AI models are still loading") : "Verify ID document"}
+                  >
+                    {isIdVerified ? '✓ ID Verified' : 'Verify ID'}
+                  </button>
+                )}
+                
+                {selectedRegistration && (
+                  <button
+                    style={{
+                      ...styles.verifyButton,
+                      ...(isVerifying || !modelsLoaded ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {}),
+                      ...(isFaceMatchVerified ? { backgroundColor: '#4CAF50' } : {})
+                    }}
+                    onClick={verifyFaceMatch}
+                    disabled={isVerifying || !modelsLoaded}
+                    title="Verify if face matches ID photo"
+                  >
+                    {isFaceMatchVerified ? '✓ Face Match Verified' : 'Verify Face Match'}
+                  </button>
+                )}
               </div>
-            )}
-            
-            {verificationResult && !isVerifying && (
-              <div style={{
-                ...styles.verificationResult,
-                ...(verificationResult.isValid ? styles.verificationSuccess : styles.verificationError)
-              }}>
-                {verificationResult.message}
-              </div>
-            )}
-            
-            {faceMatchScore !== null && !isVerifying && (
-              <div style={{
-                ...styles.verificationResult,
-                ...(faceMatchScore > 0.5 ? styles.verificationSuccess : styles.verificationError)
-              }}>
-                Face match score: {(faceMatchScore * 100).toFixed(1)}% 
-                {faceMatchScore > 0.5 ? ' (Match)' : ' (No Match)'}
-              </div>
-            )}
+              
+              {scanResults?.error && (
+                <div style={{
+                  ...styles.verificationResult,
+                  ...styles.verificationError
+                }}>
+                  Error: {scanResults.message}
+                </div>
+              )}
+              
+              {scanResults && !scanResults.error && (
+                <div style={styles.scanResultsContainer}>
+                  <div style={styles.scanResultItem}>
+                    <div style={styles.scanResultTitle}>Verification Results:</div>
+                    {scanResults.details.map((detail, index) => (
+                      <div key={index} style={styles.scanResultDetail}>{detail}</div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {faceMatchScore !== null && (
+                <div style={{
+                  ...styles.verificationResult,
+                  ...(faceMatchScore > 0.5 ? styles.verificationSuccess : styles.verificationError)
+                }}>
+                  Face match score: {(faceMatchScore * 100).toFixed(1)}% 
+                  {faceMatchScore > 0.5 ? ' (Match)' : ' (No Match)'}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

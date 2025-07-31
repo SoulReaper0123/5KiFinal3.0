@@ -2,78 +2,102 @@ import React, { useEffect, useState } from 'react';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { FaTrashAlt } from 'react-icons/fa';
+import { FaTrashAlt, FaPlus, FaMinus, FaExchangeAlt } from 'react-icons/fa';
 
 const styles = {
   container: {
-    backgroundColor: '#f9fafb',
+    backgroundColor: '#f8fafc',
     minHeight: '100vh',
     padding: '20px'
   },
   contentContainer: {
-    maxWidth: '800px',
-    margin: '0 auto'
+    maxWidth: '900px',
+    margin: '0 auto',
+    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
   },
   header: {
-    fontSize: '26px',
-    fontWeight: 'bold',
-    marginBottom: '20px',
+    fontSize: '28px',
+    fontWeight: '600',
+    marginBottom: '25px',
     textAlign: 'center',
-    color: '#1f2937'
+    color: '#1e293b',
+    paddingBottom: '10px',
+    borderBottom: '2px solid #e2e8f0'
   },
   card: {
     backgroundColor: '#ffffff',
-    padding: '16px',
-    borderRadius: '10px',
-    marginBottom: '16px',
-    boxShadow: '0 2px 4px rgba(0, 0, 0, 0.1)'
+    padding: '20px',
+    borderRadius: '12px',
+    marginBottom: '20px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
+    border: '1px solid #e2e8f0'
   },
   sectionTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '10px',
-    color: '#374151'
+    fontSize: '20px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#1e293b',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   },
   inputRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '12px',
-    gap: '10px'
+    marginBottom: '15px',
+    gap: '15px'
   },
   label: {
     flex: 1,
     fontSize: '16px',
-    color: '#111827'
+    color: '#334155',
+    fontWeight: '500'
   },
   input: {
     flex: 1,
-    border: '1px solid #d1d5db',
-    borderRadius: '6px',
-    padding: '8px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '10px 12px',
     fontSize: '16px',
-    backgroundColor: '#fff'
+    backgroundColor: '#fff',
+    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
+  },
+  staticInput: {
+    flex: 1,
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '10px 12px',
+    fontSize: '16px',
+    backgroundColor: '#f8fafc',
+    color: '#64748b'
   },
   miniInput: {
     width: '80px',
-    border: '1px solid #ccc',
-    borderRadius: '6px',
-    padding: '6px',
-    fontSize: '16px'
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '8px',
+    fontSize: '16px',
+    textAlign: 'center'
   },
   staticText: {
     fontSize: '16px',
-    color: '#374151'
+    color: '#334155',
+    padding: '10px 0'
   },
   rateRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '10px'
+    marginBottom: '12px',
+    padding: '10px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px'
   },
   termText: {
     fontSize: '16px',
-    color: '#111827'
+    color: '#334155',
+    fontWeight: '500'
   },
   editRateRow: {
     display: 'flex',
@@ -85,50 +109,71 @@ const styles = {
     border: 'none',
     color: '#ef4444',
     cursor: 'pointer',
-    fontSize: '16px'
+    fontSize: '16px',
+    padding: '5px'
   },
   addTermBtn: {
     backgroundColor: '#10b981',
     color: 'white',
-    padding: '8px 14px',
+    padding: '10px 16px',
     border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer'
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px'
   },
   saveBtn: {
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '12px',
+    padding: '14px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '16px',
-    fontWeight: 'bold',
+    fontWeight: '600',
     width: '100%',
     marginTop: '20px',
-    marginBottom: '30px'
+    marginBottom: '30px',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: '#1d4ed8'
+    }
   },
   saveMode: {
-    backgroundColor: '#3b82f6'
+    backgroundColor: '#1d4ed8'
   },
   dateButton: {
-    color: '#3b82f6',
+    color: '#2563eb',
     marginBottom: '10px',
     background: 'none',
     border: 'none',
     cursor: 'pointer',
     fontSize: '16px',
     textAlign: 'left',
-    padding: 0
+    padding: '10px 0',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   },
   calendarContainer: {
-    marginTop: '10px'
+    marginTop: '10px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    overflow: 'hidden'
   },
   switch: {
     position: 'relative',
     display: 'inline-block',
     width: '60px',
     height: '34px'
+  },
+  switchInput: {
+    opacity: 0,
+    width: 0,
+    height: 0
   },
   slider: {
     position: 'absolute',
@@ -137,8 +182,9 @@ const styles = {
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: '#ccc',
-    transition: '.4s'
+    backgroundColor: '#cbd5e1',
+    transition: '.4s',
+    borderRadius: '34px'
   },
   sliderBefore: {
     position: 'absolute',
@@ -148,13 +194,14 @@ const styles = {
     left: '4px',
     bottom: '4px',
     backgroundColor: 'white',
-    transition: '.4s'
-  },
-  sliderRound: {
-    borderRadius: '34px'
-  },
-  sliderRoundBefore: {
+    transition: '.4s',
     borderRadius: '50%'
+  },
+  switchInputChecked: {
+    backgroundColor: '#10b981'
+  },
+  sliderBeforeChecked: {
+    transform: 'translateX(26px)'
   },
   modalOverlay: {
     position: 'fixed',
@@ -171,15 +218,33 @@ const styles = {
   modalContent: {
     backgroundColor: '#fff',
     padding: '24px',
-    borderRadius: '10px',
-    width: '85%',
+    borderRadius: '12px',
+    width: '90%',
     maxWidth: '400px',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+  },
+  modalTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#1e293b',
     textAlign: 'center'
   },
   modalText: {
-    fontSize: '18px',
+    fontSize: '16px',
     marginBottom: '20px',
-    color: '#111827'
+    color: '#64748b',
+    textAlign: 'center',
+    lineHeight: '1.5'
+  },
+  modalInput: {
+    width: '100%',
+    padding: '12px',
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    fontSize: '16px',
+    marginBottom: '20px',
+    boxSizing: 'border-box'
   },
   modalButtons: {
     display: 'flex',
@@ -187,26 +252,61 @@ const styles = {
     gap: '12px'
   },
   modalBtn: {
-    padding: '10px 20px',
-    borderRadius: '6px',
+    padding: '12px 24px',
+    borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    fontWeight: '600',
+    fontSize: '16px',
+    flex: 1,
+    transition: 'opacity 0.2s'
   },
   cancelBtn: {
-    backgroundColor: '#ef4444',
-    color: 'white'
+    backgroundColor: '#f1f5f9',
+    color: '#64748b'
   },
   confirmBtn: {
+    backgroundColor: '#2563eb',
+    color: 'white'
+  },
+  successBtn: {
     backgroundColor: '#10b981',
+    color: 'white'
+  },
+  errorBtn: {
+    backgroundColor: '#ef4444',
     color: 'white'
   },
   loading: {
     textAlign: 'center',
     marginTop: '50px',
     fontSize: '18px',
-    color: '#6b7280'
+    color: '#64748b'
+  },
+  fundsActions: {
+    display: 'flex',
+    gap: '10px',
+    marginTop: '10px'
+  },
+  actionBtn: {
+    padding: '8px 12px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    transition: 'background-color 0.2s'
+  },
+  addFundsBtn: {
+    backgroundColor: '#10b981',
+    color: 'white'
+  },
+  withdrawFundsBtn: {
+    backgroundColor: '#f97316',
+    color: 'white'
   }
 };
 
@@ -214,6 +314,7 @@ const SystemSettings = () => {
   const [settings, setSettings] = useState({
     LoanPercentage: '',
     Funds: '',
+    Savings: '',
     InterestRate: {},
     AdvancedPayments: false,
     DividendDate: '',
@@ -227,10 +328,15 @@ const SystemSettings = () => {
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  // Modal states
   const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [termToDelete, setTermToDelete] = useState('');
+  const [savingsModalVisible, setSavingsModalVisible] = useState(false);
+  const [fundsActionModal, setFundsActionModal] = useState(null);
+  const [actionAmount, setActionAmount] = useState('');
+  const [messageModal, setMessageModal] = useState({ visible: false, title: '', message: '', isError: false });
 
   const db = getDatabase();
 
@@ -242,6 +348,7 @@ const SystemSettings = () => {
         setSettings({
           LoanPercentage: data.LoanPercentage?.toString() || '',
           Funds: data.Funds?.toString() || '',
+          Savings: data.Savings?.toString() || '',
           InterestRate: Object.fromEntries(
             Object.entries(data.InterestRate || {}).map(([key, val]) => [key, val.toString()])
           ),
@@ -256,6 +363,11 @@ const SystemSettings = () => {
 
     return () => unsubscribe();
   }, []);
+
+  const showMessage = (title, message, isError = false) => {
+    setMessageModal({ visible: true, title, message, isError });
+    setTimeout(() => setMessageModal({ ...messageModal, visible: false }), 3000);
+  };
 
   const handleInputChange = (key, value) => {
     const clean = value.replace(/[^0-9.]/g, '');
@@ -274,11 +386,11 @@ const SystemSettings = () => {
 
   const confirmAddTerm = () => {
     if (!newTerm || !newRate) {
-      alert('Error: Please enter both term and interest rate.');
+      showMessage('Error', 'Please enter both term and interest rate.', true);
       return;
     }
     if (settings.InterestRate[newTerm]) {
-      alert('Error: This term already exists.');
+      showMessage('Error', 'This term already exists.', true);
       return;
     }
 
@@ -289,11 +401,12 @@ const SystemSettings = () => {
     setNewTerm('');
     setNewRate('');
     setAddModalVisible(false);
+    showMessage('Success', 'Interest rate added successfully!');
   };
 
   const requestAddTerm = () => {
     if (!newTerm || !newRate) {
-      alert('Error: Please enter both term and rate.');
+      showMessage('Error', 'Please enter both term and rate.', true);
       return;
     }
     setAddModalVisible(true);
@@ -309,6 +422,7 @@ const SystemSettings = () => {
     delete updatedRates[termToDelete];
     setSettings((prev) => ({ ...prev, InterestRate: updatedRates }));
     setDeleteModalVisible(false);
+    showMessage('Success', 'Interest rate deleted successfully!');
   };
 
   const handleSave = () => setConfirmationModalVisible(true);
@@ -324,6 +438,7 @@ const SystemSettings = () => {
     const updatedData = {
       LoanPercentage: parseFloat(settings.LoanPercentage),
       Funds: parseFloat(settings.Funds),
+      Savings: parseFloat(settings.Savings),
       InterestRate: parsedInterest,
       AdvancedPayments: settings.AdvancedPayments,
       DividendDate: settings.DividendDate,
@@ -333,14 +448,13 @@ const SystemSettings = () => {
 
     update(settingsRef, updatedData)
       .then(() => {
-        alert('Success: Settings updated successfully!');
+        setConfirmationModalVisible(false);
         setEditMode(false);
+        showMessage('Success', 'Settings updated successfully!');
       })
       .catch((error) => {
-        alert('Error: ' + error.message);
+        showMessage('Error', 'Failed to update settings: ' + error.message, true);
       });
-
-    setConfirmationModalVisible(false);
   };
 
   const handleDateChange = (date) => {
@@ -348,27 +462,145 @@ const SystemSettings = () => {
     setShowCalendar(false);
   };
 
+  const handleFundsAction = (action) => {
+    setFundsActionModal(action);
+    setActionAmount('');
+  };
+
+  const confirmFundsAction = () => {
+    const amount = parseFloat(actionAmount);
+    if (isNaN(amount) || amount <= 0) {
+      showMessage('Error', 'Please enter a valid positive amount', true);
+      return;
+    }
+
+    if (fundsActionModal === 'add' && amount > parseFloat(settings.Savings)) {
+      showMessage('Error', 'Not enough savings to transfer', true);
+      return;
+    }
+
+    if (fundsActionModal === 'withdraw' && amount > parseFloat(settings.Funds)) {
+      showMessage('Error', 'Not enough funds to withdraw', true);
+      return;
+    }
+
+    let newFunds = parseFloat(settings.Funds);
+    let newSavings = parseFloat(settings.Savings);
+
+    switch (fundsActionModal) {
+      case 'add':
+        newFunds += amount;
+        newSavings -= amount;
+        break;
+      case 'withdraw':
+        newFunds -= amount;
+        newSavings += amount;
+        break;
+      default:
+        break;
+    }
+
+    setSettings({
+      ...settings,
+      Funds: newFunds.toString(),
+      Savings: newSavings.toString()
+    });
+
+    setFundsActionModal(null);
+    setActionAmount('');
+    showMessage('Success', `Funds ${fundsActionModal === 'add' ? 'added' : 'withdrawn'} successfully!`);
+  };
+
+  const handleAddSavings = () => {
+    setSavingsModalVisible(true);
+    setActionAmount('');
+  };
+
+  const confirmAddSavings = () => {
+    const amount = parseFloat(actionAmount);
+    if (isNaN(amount) || amount <= 0) {
+      showMessage('Error', 'Please enter a valid positive amount', true);
+      return;
+    }
+
+    const newSavings = (parseFloat(settings.Savings) + amount).toString();
+    setSettings({
+      ...settings,
+      Savings: newSavings
+    });
+
+    setSavingsModalVisible(false);
+    setActionAmount('');
+    showMessage('Success', 'Savings added successfully!');
+  };
+
   if (loading) return <div style={styles.loading}>Loading settings...</div>;
 
   return (
     <div style={styles.container}>
       <div style={styles.contentContainer}>
-        <h1 style={styles.header}>System Settings</h1>
+        <h1 style={styles.header}>Loan System Settings</h1>
 
-        {/* Loan Fields */}
+        {/* Financial Settings */}
         <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Financial Settings</h2>
+          
           <InputRow
             label="Loanable Amount Percentage"
             value={settings.LoanPercentage}
             onChange={(text) => handleInputChange('LoanPercentage', text)}
             editable={editMode}
+            suffix="%"
           />
-          <InputRow
-            label="Available Funds (₱)"
-            value={settings.Funds}
-            onChange={(text) => handleInputChange('Funds', text)}
-            editable={editMode}
-          />
+          
+          <div style={styles.inputRow}>
+            <label style={styles.label}>Available Funds (₱)</label>
+            <input 
+              style={styles.staticInput} 
+              value={settings.Funds} 
+              readOnly 
+            />
+          </div>
+
+          <div style={styles.inputRow}>
+            <label style={styles.label}>Savings (₱)</label>
+            {editMode ? (
+              <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <input
+                  style={styles.staticInput}
+                  value={settings.Savings}
+                  readOnly
+                />
+                <button 
+                  style={{ ...styles.actionBtn, ...styles.addFundsBtn }}
+                  onClick={handleAddSavings}
+                >
+                  <FaPlus /> Add
+                </button>
+              </div>
+            ) : (
+              <span style={styles.staticText}>₱{settings.Savings}</span>
+            )}
+          </div>
+
+          {editMode && (
+            <div style={styles.fundsActions}>
+              <button 
+                style={{ ...styles.actionBtn, ...styles.addFundsBtn }}
+                onClick={() => handleFundsAction('add')}
+                disabled={!settings.Savings || parseFloat(settings.Savings) <= 0}
+              >
+                <FaExchangeAlt /> Add to Funds
+              </button>
+              <button 
+                style={{ ...styles.actionBtn, ...styles.withdrawFundsBtn }}
+                onClick={() => handleFundsAction('withdraw')}
+                disabled={!settings.Funds || parseFloat(settings.Funds) <= 0}
+              >
+                <FaExchangeAlt /> Withdraw to Savings
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Interest Rates */}
@@ -385,6 +617,7 @@ const SystemSettings = () => {
                     onChange={(e) => handleInterestChange(term, e.target.value)}
                     type="number"
                   />
+                  <span>%</span>
                   <button 
                     style={styles.deleteTermBtn}
                     onClick={() => requestDeleteTerm(term)}
@@ -414,14 +647,16 @@ const SystemSettings = () => {
                 type="number"
               />
               <button style={styles.addTermBtn} onClick={requestAddTerm}>
-                Add
+                <FaPlus /> Add
               </button>
             </div>
           )}
         </div>
 
-        {/* Advanced Payments & Penalty */}
+        {/* Loan Settings */}
         <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Loan Settings</h2>
+          
           <div style={styles.inputRow}>
             <label style={styles.label}>Advanced Payments</label>
             <label style={styles.switch}>
@@ -430,20 +665,32 @@ const SystemSettings = () => {
                 checked={settings.AdvancedPayments}
                 onChange={(e) => setSettings({ ...settings, AdvancedPayments: e.target.checked })}
                 disabled={!editMode}
+                style={styles.switchInput}
               />
-              <span style={{ ...styles.slider, ...styles.sliderRound }}></span>
+              <span style={{
+                ...styles.slider,
+                ...(settings.AdvancedPayments ? styles.switchInputChecked : {})
+              }}>
+                <span style={{
+                  ...styles.sliderBefore,
+                  ...(settings.AdvancedPayments ? styles.sliderBeforeChecked : {})
+                }}></span>
+              </span>
             </label>
           </div>
+          
           <InputRow
             label="Penalty Value"
             value={settings.PenaltyValue}
             onChange={(text) => handleInputChange('PenaltyValue', text)}
             editable={editMode}
+            suffix={settings.PenaltyType === 'percentage' ? '%' : '₱'}
           />
         </div>
 
         {/* Dividend Date */}
         <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Dividend Settings</h2>
           <label style={styles.label}>Dividend Date</label>
           {editMode ? (
             <>
@@ -476,7 +723,7 @@ const SystemSettings = () => {
                     month: 'long',
                     day: 'numeric',
                   })
-                : ''}
+                : 'Not set'}
             </span>
           )}
         </div>
@@ -493,7 +740,8 @@ const SystemSettings = () => {
         {confirmationModalVisible && (
           <div style={styles.modalOverlay}>
             <div style={styles.modalContent}>
-              <p style={styles.modalText}>Are you sure you want to save changes?</p>
+              <h3 style={styles.modalTitle}>Confirm Changes</h3>
+              <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
               <div style={styles.modalButtons}>
                 <button 
                   style={{ ...styles.modalBtn, ...styles.cancelBtn }}
@@ -505,7 +753,7 @@ const SystemSettings = () => {
                   style={{ ...styles.modalBtn, ...styles.confirmBtn }}
                   onClick={confirmSave}
                 >
-                  Confirm
+                  Save Changes
                 </button>
               </div>
             </div>
@@ -516,6 +764,7 @@ const SystemSettings = () => {
         {addModalVisible && (
           <div style={styles.modalOverlay}>
             <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>Add Interest Rate</h3>
               <p style={styles.modalText}>
                 Add {newTerm} months at {newRate}% interest?
               </p>
@@ -530,7 +779,7 @@ const SystemSettings = () => {
                   style={{ ...styles.modalBtn, ...styles.confirmBtn }}
                   onClick={confirmAddTerm}
                 >
-                  Add
+                  Add Rate
                 </button>
               </div>
             </div>
@@ -541,7 +790,10 @@ const SystemSettings = () => {
         {deleteModalVisible && (
           <div style={styles.modalOverlay}>
             <div style={styles.modalContent}>
-              <p style={styles.modalText}>Delete term "{termToDelete}"?</p>
+              <h3 style={styles.modalTitle}>Delete Interest Rate</h3>
+              <p style={styles.modalText}>
+                Are you sure you want to delete the {termToDelete} month interest rate?
+              </p>
               <div style={styles.modalButtons}>
                 <button 
                   style={{ ...styles.modalBtn, ...styles.cancelBtn }}
@@ -553,7 +805,100 @@ const SystemSettings = () => {
                   style={{ ...styles.modalBtn, ...styles.confirmBtn }}
                   onClick={confirmDeleteTerm}
                 >
-                  Delete
+                  Delete Rate
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Savings Modal */}
+        {savingsModalVisible && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>Add to Savings</h3>
+              <p style={styles.modalText}>Enter amount to add to savings:</p>
+              <input
+                style={styles.modalInput}
+                value={actionAmount}
+                onChange={(e) => setActionAmount(e.target.value)}
+                type="number"
+                placeholder="Amount"
+                min="0"
+                step="0.01"
+              />
+              <div style={styles.modalButtons}>
+                <button 
+                  style={{ ...styles.modalBtn, ...styles.cancelBtn }}
+                  onClick={() => setSavingsModalVisible(false)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  style={{ ...styles.modalBtn, ...styles.confirmBtn }}
+                  onClick={confirmAddSavings}
+                >
+                  Add Savings
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Funds Action Modal */}
+        {fundsActionModal && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>
+                {fundsActionModal === 'add' ? 'Add to Funds' : 'Withdraw to Savings'}
+              </h3>
+              <p style={styles.modalText}>
+                {fundsActionModal === 'add' ? 
+                  `Available Savings: ₱${settings.Savings}` : 
+                  `Available Funds: ₱${settings.Funds}`}
+              </p>
+              <input
+                style={styles.modalInput}
+                value={actionAmount}
+                onChange={(e) => setActionAmount(e.target.value)}
+                type="number"
+                placeholder="Amount"
+                min="0"
+                step="0.01"
+              />
+              <div style={styles.modalButtons}>
+                <button 
+                  style={{ ...styles.modalBtn, ...styles.cancelBtn }}
+                  onClick={() => setFundsActionModal(null)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  style={{ ...styles.modalBtn, ...styles.confirmBtn }}
+                  onClick={confirmFundsAction}
+                >
+                  {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Message Modal */}
+        {messageModal.visible && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>{messageModal.title}</h3>
+              <p style={styles.modalText}>{messageModal.message}</p>
+              <div style={styles.modalButtons}>
+                <button 
+                  style={{ 
+                    ...styles.modalBtn, 
+                    ...(messageModal.isError ? styles.errorBtn : styles.successBtn)
+                  }}
+                  onClick={() => setMessageModal({ ...messageModal, visible: false })}
+                >
+                  OK
                 </button>
               </div>
             </div>
@@ -564,18 +909,24 @@ const SystemSettings = () => {
   );
 };
 
-const InputRow = ({ label, value, onChange, editable }) => (
+const InputRow = ({ label, value, onChange, editable, suffix }) => (
   <div style={styles.inputRow}>
     <label style={styles.label}>{label}</label>
     {editable ? (
-      <input 
-        style={styles.input} 
-        value={value} 
-        onChange={(e) => onChange(e.target.value)} 
-        type="number" 
-      />
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <input 
+          style={styles.input} 
+          value={value} 
+          onChange={(e) => onChange(e.target.value)} 
+          type="number" 
+        />
+        {suffix && <span>{suffix}</span>}
+      </div>
     ) : (
-      <span style={styles.staticText}>{value}</span>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <span style={styles.staticText}>{value}</span>
+        {suffix && <span>{suffix}</span>}
+      </div>
     )}
   </div>
 );
