@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.3.45:3000';
+const API_URL = 'http://10.0.0.39:3000';
 const WEBSITE_URL = 'fiveki.onrender.com';
-const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; // Added Facebook URL
+const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
 // Admin Emails
 export const sendAdminCredentialsEmail = async (adminData) => {

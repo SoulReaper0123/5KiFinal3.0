@@ -1,34 +1,473 @@
 import React, { useState, useEffect } from 'react';
-import { FaSearch, FaDownload, FaTimes } from 'react-icons/fa';
+import { 
+  FaSearch, 
+  FaDownload, 
+  FaChevronLeft, 
+  FaChevronRight,
+  FaCheckCircle,
+  FaTimes
+} from 'react-icons/fa';
+import { FiAlertCircle } from 'react-icons/fi';
+import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
 import { getDatabase, ref, onValue, set } from 'firebase/database';
+
+const styles = {
+  tableContainer: {
+    borderRadius: '8px',
+    overflow: 'auto',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed',
+    minWidth: '800px'
+  },
+  tableHeader: {
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    height: '50px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '16px'
+  },
+  tableHeaderCell: {
+    whiteSpace: 'nowrap'
+  },
+  tableRow: {
+    height: '50px',
+    '&:nth-child(even)': {
+      backgroundColor: '#f5f5f5'
+    },
+    '&:nth-child(odd)': {
+      backgroundColor: '#ddd'
+    }
+  },
+  tableCell: {
+    textAlign: 'center',
+    fontSize: '14px',
+    borderBottom: '1px solid #ddd',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  viewText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    textAlign: 'center'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '16px',
+    textAlign: 'center',
+    color: '#333',
+    lineHeight: '1.4'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    cursor: 'pointer',
+    fontSize: '18px',
+    color: 'grey',
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: '4px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  }
+};
 
 const DataMigration = () => {
   const [members, setMembers] = useState([]);
   const [excelData, setExcelData] = useState([]);
-  const [filteredData, setFilteredData] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [noMatch, setNoMatch] = useState(false);
-  const [fileName, setFileName] = useState('');
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [confirmVisible, setConfirmVisible] = useState(false);
-  const [statusList, setStatusList] = useState([]);
-  const [page, setPage] = useState(0);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [selectedImage, setSelectedImage] = useState('');
-  const PAGE_SIZE = 5;
+  const [confirmMigrateVisible, setConfirmMigrateVisible] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [filteredData, setFilteredData] = useState([]);
+  const [noMatch, setNoMatch] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [memberModalVisible, setMemberModalVisible] = useState(false);
+  const [fileName, setFileName] = useState('');
+  const [statusList, setStatusList] = useState([]);
+  const pageSize = 10;
 
   useEffect(() => {
-    const db = getDatabase();
-    const memRef = ref(db, 'Members');
-    onValue(memRef, (snap) => {
-      const data = snap.val() || {};
-      const arr = Object.keys(data).map((k) => ({ id: k, ...data[k] }));
-      setMembers(arr);
-    });
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      .safe-area-view {
+        flex: 1;
+        background-color: #F5F5F5;
+        height: 100%;
+        width: 100%;
+        overflow: auto;
+      }
+      .main-container {
+        flex: 1;
+      }
+      .header-text {
+        font-weight: bold;
+        font-size: 40px;
+        margin-bottom: 10px;
+        margin-left: 25px;
+        margin-right: 25px;
+      }
+      .top-controls {
+        display: flex;
+        justify-content: space-between;
+        margin: 0 25px;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .search-download-container {
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+      .search-bar {
+        display: flex;
+        border: 1px solid #ccc;
+        border-radius: 25px;
+        background-color: #fff;
+        padding: 0 10px;
+        align-items: center;
+        height: 40px;
+        width: 250px;
+      }
+      .search-input {
+        height: 36px;
+        width: 100%;
+        font-size: 16px;
+        padding-left: 8px;
+        border: none;
+        outline: none;
+        background: transparent;
+      }
+      .search-icon {
+        padding: 4px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #666;
+      }
+      .download-icon {
+        padding: 6px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #2D5783;
+      }
+      .upload-button {
+        background-color: #2D5783;
+        padding: 0 16px;
+        border-radius: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 40px;
+        border: none;
+        cursor: pointer;
+      }
+      .upload-button-text {
+        color: #fff;
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .file-input {
+        display: none;
+      }
+      .pagination-container {
+        display: flex;
+        justify-content: flex-end;
+        margin: 0 25px;
+        margin-top: 10px;
+        align-items: center;
+      }
+      .pagination-info {
+        font-size: 12px;
+        margin-right: 10px;
+        color: #333;
+      }
+      .pagination-button {
+        padding: 0;
+        background-color: #2D5783;
+        border-radius: 5px;
+        margin: 0 3px;
+        color: white;
+        border: none;
+        cursor: pointer;
+        width: 20px;
+        height: 20px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+      .pagination-button svg {
+        font-size: 10px;
+        display: block;
+        margin: 0 auto;
+      }
+      .disabled-button {
+        background-color: #ccc;
+        cursor: not-allowed;
+      }
+      .data-container {
+        flex: 1;
+        margin: 0 25px;
+        margin-top: 10px;
+        background-color: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      }
+      .no-match-text {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 16px;
+        color: #666;
+      }
+      .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .modal-container {
+        width: 500px;
+        height: 650px;
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 20px;
+        position: relative;
+        overflow-x: hidden;
+      }
+      @media (max-width: 800px) {
+        .modal-container {
+            width: 90%;
+            max-width: 90%;
+            height: auto;
+            max-height: 90vh;
+        }
+      }
+      .modal-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 16px;
+        color: #2D5783;
+        text-align: center;
+      }
+      .modal-content {
+        padding-bottom: 20px;
+        height: calc(100% - 100px);
+        display: flex;
+        flex-direction: column;
+      }
+      .form-group {
+        margin-bottom: 20px;
+        width: 100%;
+      }
+      .form-label {
+        font-weight: 600;
+        margin-bottom: 5px;
+        display: block;
+      }
+      .form-input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+      }
+      .error-text {
+        color: red;
+        font-size: 12px;
+        margin-top: 5px;
+      }
+      .modal-button-container {
+        display: flex;
+        justify-content: space-between;
+        margin-top: auto;
+        width: 100%;
+        padding-top: 20px;
+      }
+      .modal-submit-button {
+        background-color: #2D5783;
+        color: white;
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        width: 48%;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .modal-cancel-button {
+        background-color: #ccc;
+        padding: 10px;
+        border: none;
+        border-radius: 5px;
+        width: 48%;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .confirm-modal-card {
+        width: 300px;
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 20px;
+        overflow: hidden;
+      }
+      .action-buttons-container {
+        display: flex;
+        justify-content: center;
+        margin-top: 20px;
+        width: 100%;
+      }
+      .migrate-button {
+        background-color: #28a745;
+        color: white;
+        padding: 8px 16px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+      }
+      .file-name {
+        margin-left: 10px;
+        font-size: 14px;
+        color: #666;
+      }
+      .status-badge {
+        padding: '2px 6px',
+        borderRadius: '10px',
+        fontSize: '12px',
+        fontWeight: 'bold'
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
   }, []);
+
+  useEffect(() => {
+    const fetchMembers = async () => {
+      setLoading(true);
+      try {
+        const db = getDatabase();
+        const memRef = ref(db, 'Members');
+        onValue(memRef, (snap) => {
+          const data = snap.val() || {};
+          const arr = Object.keys(data).map((k) => ({ id: k, ...data[k] }));
+          setMembers(arr);
+          setFilteredData(arr);
+          setLoading(false);
+        });
+      } catch (error) {
+        console.error('Error fetching members:', error);
+        setErrorMessage('Failed to fetch member data');
+        setErrorModalVisible(true);
+        setLoading(false);
+      }
+    };
+
+    fetchMembers();
+  }, []);
+
+  useEffect(() => {
+    const filtered = excelData.filter(item => {
+      const searchLower = searchQuery.toLowerCase();
+      return (
+        item.email.toLowerCase().includes(searchLower) ||
+        item.firstName.toLowerCase().includes(searchLower) ||
+        item.lastName.toLowerCase().includes(searchLower) ||
+        (item.phoneNumber && item.phoneNumber.toLowerCase().includes(searchLower))
+      );
+    });
+    setFilteredData(filtered);
+    setNoMatch(filtered.length === 0);
+    setCurrentPage(0);
+  }, [searchQuery, excelData]);
 
   const handleFilePick = async (e) => {
     try {
@@ -60,593 +499,355 @@ const DataMigration = () => {
       setFilteredData(json);
       setNoMatch(false);
       setStatusList([]);
-      setPage(0);
+      setCurrentPage(0);
     } catch (error) {
       console.error('Error reading file:', error);
-      alert('Failed to read file');
+      setErrorMessage('Failed to read file');
+      setErrorModalVisible(true);
     }
-  };
-
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    const q = text.toLowerCase();
-    const arr = excelData.filter((i) =>
-      i.email.toLowerCase().includes(q) ||
-      i.firstName.toLowerCase().includes(q) ||
-      i.lastName.toLowerCase().includes(q)
-    );
-    setFilteredData(arr);
-    setNoMatch(arr.length === 0);
-    setPage(0);
   };
 
   const migrateData = async () => {
-    setConfirmVisible(false);
-    setIsMigrating(true);
-    const db = getDatabase();
-    const sts = [];
-    
-    for (let i = 0; i < filteredData.length; i++) {
-      const e = filteredData[i];
-      const uid = e.email.replace(/[@.]/g, '_') || `user_${i}`;
-      try {
-        await set(ref(db, `Users/MigratedUsers/${uid}`), {
-          email: e.email,
-          phoneNumber: e.phoneNumber,
-          firstName: e.firstName,
-          middleName: e.middleName,
-          lastName: e.lastName,
-          migratedAt: new Date().toISOString(),
-        });
-        sts.push({ index: i, status: 'Success' });
-      } catch {
-        sts.push({ index: i, status: 'Error' });
+    setConfirmMigrateVisible(false);
+    setIsProcessing(true);
+
+    try {
+      const db = getDatabase();
+      const sts = [];
+      
+      for (let i = 0; i < filteredData.length; i++) {
+        const e = filteredData[i];
+        const uid = e.email.replace(/[@.]/g, '_') || `user_${i}`;
+        try {
+          await set(ref(db, `Users/MigratedUsers/${uid}`), {
+            email: e.email,
+            phoneNumber: e.phoneNumber,
+            firstName: e.firstName,
+            middleName: e.middleName,
+            lastName: e.lastName,
+            migratedAt: new Date().toISOString(),
+          });
+          sts.push({ index: i, status: 'Success' });
+        } catch {
+          sts.push({ index: i, status: 'Error' });
+        }
       }
+      
+      setStatusList(sts);
+      setSuccessMessage(`${filteredData.length} records migrated successfully!`);
+      setSuccessVisible(true);
+    } catch (error) {
+      console.error('Error migrating data:', error);
+      setErrorMessage('Failed to migrate data');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
     }
-    
-    setStatusList(sts);
-    setIsMigrating(false);
-    alert('Migration complete');
   };
 
   const handleDownload = async () => {
-    if (!filteredData.length) return;
-    
     try {
+      if (filteredData.length === 0) {
+        setErrorMessage('No data to export');
+        setErrorModalVisible(true);
+        return;
+      }
+
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Migrated Data');
-      
-      // Add headers
-      worksheet.addRow(['Email', 'Contact', 'First Name', 'Middle Name', 'Last Name']);
-      
-      // Add data
-      filteredData.forEach(item => {
-        worksheet.addRow([
+      const worksheet = workbook.addWorksheet('Migration Data');
+
+      const headers = ['Email', 'Phone Number', 'First Name', 'Middle Name', 'Last Name', 'Status'];
+      worksheet.addRow(headers);
+
+      filteredData.forEach((item, index) => {
+        const status = statusList.find(s => s.index === index)?.status || 'Pending';
+        const row = [
           item.email,
           item.phoneNumber,
           item.firstName,
           item.middleName,
-          item.lastName
-        ]);
+          item.lastName,
+          status
+        ];
+        worksheet.addRow(row);
       });
-      
-      // Generate file
+
       const buffer = await workbook.xlsx.writeBuffer();
-      
-      // Web download
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'MigratedData.xlsx';
-      document.body.appendChild(a);
-      a.click();
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'MigrationData.xlsx';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
-    } catch (err) {
-      console.error('Download error:', err);
-      alert('Error exporting file');
+      
+      setSuccessMessage('Data exported successfully!');
+      setSuccessVisible(true);
+    } catch (error) {
+      console.error('Error downloading data:', error);
+      setErrorMessage('Failed to export data');
+      setErrorModalVisible(true);
     }
   };
 
-  const paged = filteredData.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
-
-  const openMemberModal = (m) => {
-    setSelectedMember(m);
-    setModalVisible(true);
+  const handleSuccessOk = () => {
+    setSuccessVisible(false);
+    setFileName('');
   };
 
-  // Styles
-  const styles = {
-    safeArea: { 
-      minHeight: '100vh', 
-      backgroundColor: '#F5F5F5' 
-    },
-    container: { 
-      padding: '10px' 
-    },
-    headerText: { 
-      fontWeight: 'bold', 
-      fontSize: '36px', 
-      margin: '25px',
-      marginTop: '25px'
-    },
-    topControls: {
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      margin: '0 25px',
-      alignItems: 'center',
-      flexWrap: 'wrap',
-    },
-    uploadBtn: {
-      backgroundColor: '#001F3F',
-      padding: '10px',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      display: 'inline-block',
-    },
-    uploadText: { 
-      color: '#fff', 
-      fontWeight: 'bold' 
-    },
-    searchDownload: { 
-      display: 'flex', 
-      flexDirection: 'row', 
-      alignItems: 'center' 
-    },
-    searchBar: {
-      display: 'flex',
-      flexDirection: 'row',
-      border: '1px solid #ccc',
-      borderRadius: '25px',
-      backgroundColor: '#fff',
-      padding: '0 10px',
-      alignItems: 'center',
-      height: '40px',
-    },
-    searchInput: { 
-      flex: 1, 
-      height: '36px', 
-      fontSize: '14px', 
-      border: 'none',
-      outline: 'none',
-    },
-    downloadBtn: { 
-      padding: '6px', 
-      marginLeft: '10px',
-      cursor: 'pointer',
-    },
-    tableContainer: { 
-      margin: '20px',
-      borderRadius: '10px',
-      overflow: 'hidden',
-      backgroundColor: '#fff',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
-    },
-    table: {
-      width: '100%',
-      borderCollapse: 'collapse',
-    },
-    tableHeader: { 
-      height: '50px', 
-      backgroundColor: '#2D5783',
-      color: '#fff',
-      fontWeight: 'bold',
-      textAlign: 'center',
-    },
-    tableRow: { 
-      height: '50px',
-      borderBottom: '1px solid #eee',
-    },
-    tableCell: {
-      textAlign: 'center',
-      padding: '10px',
-    },
-    moreButton: {
-      backgroundColor: '#5A8DB8',
-      padding: '5px',
-      borderRadius: '10px',
-      color: '#fff',
-      textAlign: 'center',
-      cursor: 'pointer',
-    },
-    centeredModal: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      zIndex: 1000,
-    },
-    modalCard: {
-      width: '90%',
-      maxHeight: '80%',
-      backgroundColor: '#fff',
-      borderRadius: '10px',
-      padding: '15px',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
-    },
-    modalContent: {
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-    },
-    leftColumn: {
-      flex: 1,
-      paddingRight: '10px',
-    },
-    rightColumn: {
-      flex: 1,
-      display: 'flex',
-      alignItems: 'center',
-    },
-    modalTitle: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      marginBottom: '8px',
-    },
-    modalText: {
-      fontSize: '14px',
-      marginBottom: '10px',
-    },
-    imageThumbnail: {
-      width: '80px',
-      height: '80px',
-      margin: '5px',
-      borderRadius: '10px',
-      cursor: 'pointer',
-    },
-    imageModalView: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.9)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1001,
-    },
-    enlargedImage: {
-      width: '90%',
-      height: '70%',
-      objectFit: 'contain',
-    },
-    closeButton: {
-      position: 'absolute',
-      top: '10px',
-      right: '10px',
-      zIndex: 1,
-      cursor: 'pointer',
-      color: '#fff',
-      fontSize: '20px',
-      fontWeight: 'bold',
-    },
-    pagination: {
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'center',
-      alignItems: 'center',
-      padding: '10px',
-    },
-    pageBtn: {
-      padding: '8px',
-      backgroundColor: '#001F3F',
-      borderRadius: '5px',
-      margin: '0 8px',
-      cursor: 'pointer',
-      border: 'none',
-      color: '#fff',
-    },
-    disabledPage: {
-      backgroundColor: '#ccc',
-      cursor: 'not-allowed',
-    },
-    pageInfo: {
-      fontSize: '14px',
-    },
-    confirmBtn: {
-      backgroundColor: '#28a745',
-      padding: '10px',
-      borderRadius: '8px',
-      margin: '20px',
-      width: '50%',
-      cursor: 'pointer',
-      border: 'none',
-      color: '#fff',
-      fontWeight: 'bold',
-      textAlign: 'center',
-      alignSelf: 'center',
-    },
-    loading: {
-      display: 'flex',
-      alignItems: 'center',
-      margin: '20px',
-    },
-    modalBackdrop: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000,
-    },
-    modalBox: {
-      backgroundColor: '#fff',
-      padding: '20px',
-      borderRadius: '10px',
-      width: '80%',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.25)',
-    },
-    modalActions: {
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      marginTop: '20px',
-    },
-    subHeader: {
-      fontSize: '18px',
-      fontWeight: 'bold',
-      marginBottom: '10px',
-      textAlign: 'center',
-      color: '#2D5783',
-    },
-    fileInput: {
-      display: 'none',
-    },
-  };
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div style={styles.spinner}></div>
+      </div>
+    );
+  }
 
   return (
-    <div style={styles.safeArea}>
-      <div style={styles.container}>
-        <h1 style={styles.headerText}>Data Migration</h1>
+    <div className="safe-area-view">
+      <div className="main-container">
+        <h2 className="header-text">Data Migration</h2>
 
-        <div style={styles.topControls}>
-          <label style={styles.uploadBtn}>
+        <div className="top-controls">
+          <label className="upload-button">
             <input 
               type="file" 
-              style={styles.fileInput} 
+              className="file-input" 
               onChange={handleFilePick}
               accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             />
-            <span style={styles.uploadText}>Upload Excel File</span>
+            <span className="upload-button-text">Upload Excel File</span>
           </label>
+          {fileName && <span className="file-name">{fileName}</span>}
 
-          <div style={styles.searchDownload}>
-            <div style={styles.searchBar}>
+          <div className="search-download-container">
+            <div className="search-bar">
               <input
-                style={styles.searchInput}
-                type="text"
+                className="search-input"
                 placeholder="Search..."
                 value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
-              <FaSearch color="#000" />
+              <button className="search-icon">
+                <FaSearch />
+              </button>
             </div>
-            <button onClick={handleDownload} style={styles.downloadBtn}>
-              <FaDownload size={24} color="#001F3F" />
+            <button onClick={handleDownload} className="download-icon">
+              <FaDownload />
             </button>
           </div>
         </div>
 
-        {/* Members Table */}
-        <div style={styles.tableContainer}>
-          <table style={styles.table}>
-            <thead>
-              <tr style={styles.tableHeader}>
-                <th>Email</th>
-                <th>Contact</th>
-                <th>First Name</th>
-                <th>Middle Name</th>
-                <th>Last Name</th>
-                <th>More</th>
-              </tr>
-            </thead>
-            <tbody>
-              {members.map((m, i) => (
-                <tr key={i} style={styles.tableRow}>
-                  <td style={styles.tableCell}>{m.email}</td>
-                  <td style={styles.tableCell}>{m.phoneNumber}</td>
-                  <td style={styles.tableCell}>{m.firstName}</td>
-                  <td style={styles.tableCell}>{m.middleName}</td>
-                  <td style={styles.tableCell}>{m.lastName}</td>
-                  <td style={styles.tableCell}>
-                    <button 
-                      style={styles.moreButton}
-                      onClick={() => openMemberModal(m)}
-                    >
-                      •••
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Excel Preview */}
-        {paged.length > 0 && (
-          <div style={styles.tableContainer}>
-            <h3 style={styles.subHeader}>Preview & Migration</h3>
-            <table style={styles.table}>
-              <thead>
-                <tr style={styles.tableHeader}>
-                  <th>Email</th>
-                  <th>Contact</th>
-                  <th>First Name</th>
-                  <th>Middle Name</th>
-                  <th>Last Name</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paged.map((r, i) => {
-                  const st = statusList.find((s) => s.index === page * PAGE_SIZE + i)?.status || '-';
-                  return (
-                    <tr key={i} style={styles.tableRow}>
-                      <td style={styles.tableCell}>{r.email}</td>
-                      <td style={styles.tableCell}>{r.phoneNumber}</td>
-                      <td style={styles.tableCell}>{r.firstName}</td>
-                      <td style={styles.tableCell}>{r.middleName}</td>
-                      <td style={styles.tableCell}>{r.lastName}</td>
-                      <td style={{
-                        ...styles.tableCell,
-                        color: st === 'Success' ? 'green' : st === 'Error' ? 'red' : 'inherit'
-                      }}>
-                        {st}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-
-            <div style={styles.pagination}>
-              <button
-                onClick={() => setPage(p => Math.max(p - 1, 0))}
-                disabled={page === 0}
-                style={{
-                  ...styles.pageBtn,
-                  ...(page === 0 && styles.disabledPage)
-                }}
-              >
-                Prev
-              </button>
-              <span style={styles.pageInfo}>
-                Page {page + 1} of {Math.ceil(filteredData.length / PAGE_SIZE)}
-              </span>
-              <button
-                onClick={() => setPage(p => Math.min(p + 1, Math.floor((filteredData.length - 1) / PAGE_SIZE)))}
-                disabled={page >= Math.floor((filteredData.length - 1) / PAGE_SIZE)}
-                style={{
-                  ...styles.pageBtn,
-                  ...(page >= Math.floor((filteredData.length - 1) / PAGE_SIZE) && styles.disabledPage)
-                }}
-              >
-                Next
-              </button>
-            </div>
-
-            {!isMigrating && (
-              <button 
-                style={styles.confirmBtn} 
-                onClick={() => setConfirmVisible(true)}
-              >
-                Migrate Now
-              </button>
-            )}
-            {isMigrating && (
-              <div style={styles.loading}>
-                <div className="spinner"></div>
-                <span>Migrating...</span>
-              </div>
-            )}
+        {!noMatch && filteredData.length > 0 && (
+          <div className="pagination-container">
+            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
+              disabled={currentPage === 0}
+              className={`pagination-button ${currentPage === 0 ? 'disabled-button' : ''}`}
+            >
+              <FaChevronLeft />
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
+              disabled={currentPage === totalPages - 1}
+              className={`pagination-button ${currentPage === totalPages - 1 ? 'disabled-button' : ''}`}
+            >
+              <FaChevronRight />
+            </button>
           </div>
         )}
 
-        {/* Modals */}
-        {modalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCard}>
-              <button onClick={() => setModalVisible(false)} style={styles.closeButton}>
-                <FaTimes size={26} color="black" />
-              </button>
-              <div style={styles.modalContent}>
-                {selectedMember && (
-                  <>
-                    <div style={styles.leftColumn}>
-                      <h3 style={styles.modalTitle}>Member Details</h3>
-                      {['email', 'phoneNumber', 'firstName', 'middleName', 'lastName',
-                        'gender', 'age', 'dateOfBirth', 'placeOfBirth',
-                        'address', 'civilStatus', 'balance', 'loans', 'dateApproved'
-                      ].map((f) => (
-                        <p key={f} style={styles.modalText}>
-                          {f.charAt(0).toUpperCase() + f.slice(1)}: {selectedMember[f] || 'N/A'}
-                        </p>
-                      ))}
-                    </div>
-                    <div style={styles.rightColumn}>
-                      <h3 style={styles.modalTitle}>Images</h3>
-                      {['validIdFrontUrl', 'validIdBackUrl', 'selfieUrl'].map((urlField) =>
-                        selectedMember[urlField] ? (
-                          <img
-                            key={urlField}
-                            src={selectedMember[urlField]}
-                            style={styles.imageThumbnail}
-                            onClick={() => { 
-                              setSelectedImage(selectedMember[urlField]); 
-                              setImageModalVisible(true); 
+        <div className="data-container">
+          {noMatch ? (
+            <span className="no-match-text">No Matches Found</span>
+          ) : (
+            <div style={styles.tableContainer}>
+              <table style={styles.table}>
+                <thead>
+                  <tr style={styles.tableHeader}>
+                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Email</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Phone Number</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Middle Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedData.map((item, index) => {
+                    const status = statusList.find(s => s.index === (currentPage * pageSize + index))?.status || 'Pending';
+                    return (
+                      <tr key={index} style={styles.tableRow}>
+                        <td style={styles.tableCell}>{item.email}</td>
+                        <td style={styles.tableCell}>{item.phoneNumber}</td>
+                        <td style={styles.tableCell}>{item.firstName}</td>
+                        <td style={styles.tableCell}>{item.middleName}</td>
+                        <td style={styles.tableCell}>{item.lastName}</td>
+                        <td style={{
+                          ...styles.tableCell,
+                          color: status === 'Success' ? 'green' : status === 'Error' ? 'red' : 'inherit'
+                        }}>
+                          {status}
+                        </td>
+                        <td style={styles.tableCell}>
+                          <span 
+                            style={styles.viewText} 
+                            onClick={() => {
+                              setSelectedMember(item);
+                              setMemberModalVisible(true);
                             }}
-                            alt={urlField}
-                          />
-                        ) : null
-                      )}
-                    </div>
-                  </>
-                )}
+                          >
+                            View
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        {filteredData.length > 0 && (
+          <div className="action-buttons-container">
+            <button
+              className="migrate-button"
+              onClick={() => setConfirmMigrateVisible(true)}
+              disabled={isProcessing}
+            >
+              {isProcessing ? 'Migrating...' : 'Migrate Data'}
+            </button>
+          </div>
+        )}
+
+        {/* Member Details Modal */}
+        {memberModalVisible && (
+          <div style={styles.centeredModal}>
+            <div className="modal-container">
+              <button 
+                onClick={() => setMemberModalVisible(false)} 
+                style={styles.closeButton}
+                aria-label="Close modal"
+              >
+                <AiOutlineClose />
+              </button>
+              <div className="modal-content">
+                <h3 className="modal-title">Member Details</h3>
+                <div className="form-group">
+                  <label className="form-label">Email:</label>
+                  <p>{selectedMember?.email || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Phone Number:</label>
+                  <p>{selectedMember?.phoneNumber || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">First Name:</label>
+                  <p>{selectedMember?.firstName || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Middle Name:</label>
+                  <p>{selectedMember?.middleName || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Last Name:</label>
+                  <p>{selectedMember?.lastName || 'N/A'}</p>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {imageModalVisible && (
-          <div style={styles.imageModalView}>
-            <button onClick={() => setImageModalVisible(false)} style={styles.closeButton}>
-              X
-            </button>
-            <img src={selectedImage} style={styles.enlargedImage} alt="Enlarged" />
-          </div>
-        )}
-
-        {/* Confirm Modal */}
-        {confirmVisible && (
-          <div style={styles.modalBackdrop}>
-            <div style={styles.modalBox}>
-              <h3 style={styles.modalTitle}>Confirm Migration?</h3>
-              <p>Migrate {filteredData.length} entries?</p>
-              <div style={styles.modalActions}>
-                <button style={styles.confirmBtn} onClick={migrateData}>
+        {/* Confirmation Modal */}
+        {confirmMigrateVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+              <p style={styles.modalText}>Are you sure you want to migrate {filteredData.length} records?</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    backgroundColor: '#2D5783',
+                    color: '#fff'
+                  }} 
+                  onClick={migrateData}
+                >
                   Yes
                 </button>
-                <button
-                  style={{ ...styles.confirmBtn, backgroundColor: '#dc3545' }}
-                  onClick={() => setConfirmVisible(false)}
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    backgroundColor: '#f44336',
+                    color: '#fff'
+                  }} 
+                  onClick={() => setConfirmMigrateVisible(false)}
                 >
-                  Cancel
+                  No
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {successVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+              <p style={styles.modalText}>{successMessage}</p>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={handleSuccessOk}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Error Modal */}
+        {errorModalVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
+              <p style={styles.modalText}>{errorMessage}</p>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={() => setErrorModalVisible(false)}
+                autoFocus
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Processing Spinner */}
+        {isProcessing && (
+          <div style={styles.centeredModal}>
+            <div style={styles.spinner}></div>
           </div>
         )}
       </div>
-
-      <style>
-        {`
-          .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            border-left-color: #001F3F;
-            animation: spin 1s linear infinite;
-            margin-right: 10px;
-          }
-          @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-          }
-        `}
-      </style>
     </div>
   );
 };

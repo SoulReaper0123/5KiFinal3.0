@@ -226,7 +226,7 @@ const SuperAdminHome = () => {
       position: 'absolute',
       top: '40px',
       right: '50px',
-      zIndex: 1000,
+      zIndex: 900,
     },
     dropdownContainer: {
       backgroundColor: 'white',
@@ -371,7 +371,7 @@ const SuperAdminHome = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000
+      zIndex: 1100
     },
     splashOverlay: {
       position: 'fixed',
