@@ -10,6 +10,7 @@ import {
   GoSidebarCollapse,
   GoSidebarExpand
 } from 'react-icons/go';
+import { FiAlertCircle } from 'react-icons/fi';
 import Register from './Sidebar/Registrations/Register';
 import Loans from './Sidebar/Loans/Loans';
 import PayLoans from './Sidebar/Payments/PayLoans';
@@ -45,6 +46,21 @@ const AdminHome = () => {
   const navigate = useNavigate();
   const { logout } = useAuth();
   const isSmallScreen = windowWidth < 1024;
+
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
 
   useEffect(() => {
     const handleResize = () => {
@@ -308,8 +324,7 @@ const AdminHome = () => {
       fontWeight: 'bold',
       maxWidth: '500px',
     },
-    // Updated modal styles to match login page
-    modalOverlay: {
+    centeredModal: {
       position: 'fixed',
       top: 0,
       left: 0,
@@ -321,70 +336,64 @@ const AdminHome = () => {
       alignItems: 'center',
       zIndex: 1000
     },
-    modalCard: {
-      backgroundColor: '#fff',
-      borderRadius: '10px',
-      padding: '30px',
+    modalCardSmall: {
+      width: '300px',
+      backgroundColor: 'white',
+      borderRadius: '8px',
+      padding: '20px',
+      position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      width: '300px',
-      height: '150px'
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      textAlign: 'center'
     },
-    spinner: {
-      border: '4px solid rgba(0, 31, 63, 0.1)',
-      borderRadius: '50%',
-      borderTop: '4px solid #001F3F',
-      width: '40px',
-      height: '40px',
-      animation: 'spin 1s linear infinite'
+    confirmIcon: {
+      marginBottom: '12px',
+      fontSize: '32px'
     },
     modalText: {
-      marginTop: '15px',
-      fontSize: '16px',
+      fontSize: '14px',
+      marginBottom: '16px',
       textAlign: 'center',
-      color: '#001F3F'
+      color: '#333',
+      lineHeight: '1.4'
     },
-    confirmationText: {
-      fontSize: '18px',
-      marginBottom: '25px',
-      textAlign: 'center',
-      color: '#001F3F',
-    },
-    modalButtons: {
-      display: 'flex',
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      width: '100%',
-      marginTop: '20px',
-    },
-    modalButton: {
-      padding: '10px 20px',
-      borderRadius: '5px',
+    actionButton: {
+      padding: '8px 16px',
+      borderRadius: '4px',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: 'bold',
+      fontSize: '14px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
+      gap: '6px',
+      transition: 'all 0.2s',
       minWidth: '100px',
-      cursor: 'pointer',
-      border: 'none',
+      outline: 'none',
     },
-    cancelButton: {
-      backgroundColor: '#CCCCCC',
-      marginRight: '10px',
+    spinner: {
+      border: '4px solid rgba(0, 0, 0, 0.1)',
+      borderLeftColor: '#2D5783',
+      borderRadius: '50%',
+      width: '36px',
+      height: '36px',
+      animation: 'spin 1s linear infinite'
     },
-    confirmButton: {
-      backgroundColor: '#001F3F',
-    },
-    modalButtonText: {
-      color: '#FFFFFF',
-      fontSize: '16px',
-      fontWeight: '600',
-    },
-    '@keyframes spin': {
-      '0%': { transform: 'rotate(0deg)' },
-      '100%': { transform: 'rotate(360deg)' },
-    },
+    loadingOverlay: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000
+    }
   };
 
   return (
@@ -599,34 +608,42 @@ const AdminHome = () => {
         </div>
       )}
 
+      {/* Logout Confirmation Modal */}
       {logoutModalVisible && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
-            {loading ? (
-              <>
-                <div style={styles.spinner}></div>
-                <p style={styles.modalText}>Logging Out...</p>
-              </>
-            ) : (
-              <>
-                <p style={styles.confirmationText}>Are you sure you want to log out?</p>
-                <div style={styles.modalButtons}>
-                  <button
-                    style={{...styles.modalButton, ...styles.cancelButton}}
-                    onClick={() => setLogoutModalVisible(false)}
-                  >
-                    <span style={styles.modalButtonText}>Cancel</span>
-                  </button>
-                  <button
-                    style={{...styles.modalButton, ...styles.confirmButton}}
-                    onClick={handleLogout}
-                  >
-                    <span style={styles.modalButtonText}>Log Out</span>
-                  </button>
-                </div>
-              </>
-            )}
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to log out?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={handleLogout}
+              >
+                Yes
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setLogoutModalVisible(false)}
+              >
+                No
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Loading Overlay */}
+      {loading && (
+        <div style={styles.loadingOverlay}>
+          <div style={styles.spinner}></div>
         </div>
       )}
     </div>

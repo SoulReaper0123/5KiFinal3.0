@@ -146,7 +146,7 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'center',
     minWidth: 'auto',
-    width: 'auto',
+    width: '40%',
     cursor: 'pointer',
     border: 'none',
     fontSize: '18px',
@@ -154,7 +154,6 @@ const styles = {
   },
   loginButton: {
     backgroundColor: '#001F3F',
-    width: '40%',
     color: 'white'
   },
   backButton: {
@@ -202,46 +201,25 @@ const styles = {
     fontWeight: 'bold',
     maxWidth: '500px'
   },
-  modalOverlay: {
+  loadingOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000
   },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: '10px',
-    padding: '30px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '300px',
-    height: '150px'
-  },
   spinner: {
-    border: '4px solid rgba(0, 31, 63, 0.1)',
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
     borderRadius: '50%',
-    borderTop: '4px solid #001F3F',
-    width: '40px',
-    height: '40px',
+    width: '36px',
+    height: '36px',
     animation: 'spin 1s linear infinite'
-  },
-  modalText: {
-    marginTop: '15px',
-    fontSize: '16px',
-    textAlign: 'center',
-    color: '#001F3F'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
   }
 };
 
@@ -431,13 +409,10 @@ const AdminLoginPage = () => {
         </button>
       </div>
 
-      {/* Loading Modal */}
+      {/* Loading Overlay */}
       {loading && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
-            <div style={styles.spinner} />
-            <p style={styles.modalText}>Logging In...</p>
-          </div>
+        <div style={styles.loadingOverlay}>
+          <div style={styles.spinner}></div>
         </div>
       )}
     </div>
