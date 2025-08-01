@@ -22,6 +22,7 @@ const ApplyLoan = () => {
   const navigation = useNavigation();
   const route = useRoute();
 
+  // Basic loan information
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [loanAmount, setLoanAmount] = useState('');
@@ -35,6 +36,14 @@ const ApplyLoan = () => {
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Collateral related states
+  const [requiresCollateral, setRequiresCollateral] = useState(false);
+  const [collateralType, setCollateralType] = useState('');
+  const [collateralValue, setCollateralValue] = useState('');
+  const [collateralDescription, setCollateralDescription] = useState('');
+  const [showCollateralModal, setShowCollateralModal] = useState(false);
+
   const accountNumberInput = useRef(null);
 
   const termsOptions = [
@@ -53,6 +62,38 @@ const ApplyLoan = () => {
     { key: 'GCash', label: 'GCash' },
     { key: 'Bank', label: 'Bank' },
   ];
+
+  const collateralOptions = [
+    { key: 'Property', label: 'Property' },
+    { key: 'Vehicle', label: 'Vehicle' },
+    { key: 'Jewelry', label: 'Jewelry' },
+    { key: 'Electronics', label: 'Electronics' },
+    { key: 'Other', label: 'Other' },
+  ];
+
+  // Check if all required fields are filled
+  const isFormValid = () => {
+    const basicFieldsValid = 
+      loanAmount && 
+      term && 
+      disbursement && 
+      accountName && 
+      accountNumber;
+    
+    if (requiresCollateral) {
+      return basicFieldsValid && 
+        collateralType && 
+        collateralValue && 
+        collateralDescription;
+    }
+    
+    return basicFieldsValid;
+  };
+
+  // Check if all collateral fields are filled
+  const isCollateralValid = () => {
+    return collateralType && collateralValue && collateralDescription;
+  };
 
   const handleLoanTypeChange = (option) => {
     setLoanType(option.key);
@@ -124,15 +165,27 @@ const ApplyLoan = () => {
 
   const generateTransactionId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+ // In your ApplyLoan.js, update the storeLoanApplicationInDatabase function:
+
 const storeLoanApplicationInDatabase = async (applicationData) => {
   try {
     const transactionId = generateTransactionId();
     const now = new Date();
+    
+    // Format date exactly as "August 01, 2025 at 20:15"
     const dateApplied = now.toLocaleString('en-US', {
-      year: 'numeric',
       month: 'long',
-      day: 'numeric',
-    });
+      day: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false // Ensures 24-hour format
+    }).replace(',', '').replace(/(\d{1,2}):(\d{2})/, (match, h, m) => {
+      // Ensure 2-digit hour and minute
+      const hours = h.padStart(2, '0');
+      const minutes = m.padStart(2, '0');
+      return `${hours}:${minutes}`;
+    }).replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2');
 
     const applicationDataWithMeta = {
       ...applicationData,
@@ -141,105 +194,164 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       lastName,
       email,
       transactionId,
-      dateApplied,
+      dateApplied, // Now in "August 01, 2025 at 20:15" format
       loanType,
+      status: 'pending' // Explicit status
     };
 
     const applicationRef = dbRef(database, `Loans/LoanApplications/${userId}/${transactionId}`);
     await set(applicationRef, applicationDataWithMeta);
+    return true;
   } catch (error) {
     console.error('Failed to store loan application:', error);
     Alert.alert('Error', 'Failed to submit loan application');
+    return false;
   }
 };
 
+  const submitLoanApplication = async () => {
+    setIsLoading(true);
+    try {
+      const loanAmountNum = parseFloat(loanAmount);
+      const applicationData = {
+        loanAmount: loanAmountNum,
+        term,
+        disbursement,
+        accountName,
+        accountNumber,
+        interestRate,
+        firstName,
+        lastName,
+        email,
+        userId,
+        loanType,
+        requiresCollateral,
+        ...(requiresCollateral && {
+          collateralType,
+          collateralValue,
+          collateralDescription
+        })
+      };
 
-const handleSubmit = async () => {
-  if (!loanAmount || !term || !disbursement || !accountName || !accountNumber) {
-    Alert.alert('Error', 'All fields are required');
-    return;
+      const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
+      if (!storedSuccessfully) return;
+
+      const loanApplication = {
+        email,
+        firstName,
+        lastName,
+        loanType,
+        loanAmount: loanAmountNum,
+        term,
+        interestRate,
+        disbursement,
+        accountName,
+        accountNumber,
+        requiresCollateral,
+        ...(requiresCollateral && {
+          collateralType,
+          collateralValue,
+          collateralDescription
+        })
+      };
+
+ Alert.alert(
+      'Success',
+      'Loan application submitted successfully',
+      [
+        {
+          text: 'OK',
+          onPress: () => {
+            resetForm();
+            navigation.navigate('Home'); // Navigate to Home when OK is pressed
+          }
+        }
+      ],
+      { onDismiss: () => {
+        resetForm();
+        navigation.navigate('Home'); // Also navigate if alert is dismissed
+      }}
+    );
+  } catch (error) {
+    console.error('Error during loan submission:', error);
+    Alert.alert('Error', 'Error recording loan application');
+  } finally {
+    setIsLoading(false);
   }
+};
+ const showConfirmationAlert = () => {
+    let message = `Loan Type: ${loanType}\n` +
+      `Loan Amount: ₱${loanAmount}\n` +
+      `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
+      `Disbursement: ${disbursement}\n` +
+      `Account Name: ${accountName}\n` +
+      `Account Number: ${accountNumber}`;
 
-  // Step 1: Show confirmation modal
-  Alert.alert(
-    'Confirm Loan Application',
-    `Loan Type: ${loanType}\n` +
-    `Loan Amount: ₱${loanAmount}\n` +
-    `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
-    `Disbursement: ${disbursement}\n` +
-    `Account Name: ${accountName}\n` +
-    `Account Number: ${accountNumber}\n\n` +
-    `Are you sure you want to submit this loan application?`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Submit',
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            // Step 2: Store data in database
-            const applicationData = {
-              loanAmount: parseFloat(loanAmount),
-              term,
-              disbursement,
-              accountName,
-              accountNumber,
-              interestRate,
-              firstName,
-              lastName,
-              email,
-              userId,
-              loanType,
-            };
+    // Include collateral details if required
+    if (requiresCollateral) {
+      message += `\n\nCollateral Details\n` +
+        `Type: ${collateralType}\n` +
+        `Value: ₱${collateralValue}\n` +
+        `Description: ${collateralDescription}`;
+    }
 
-            await storeLoanApplicationInDatabase(applicationData);
-
-            // Prepare loan data for API
-            const loanApplication = {
-              email,
-              firstName,
-              lastName,
-              loanType,
-              loanAmount: parseFloat(loanAmount),
-              term,
-              interestRate,
-              disbursement,
-              accountName,
-              accountNumber,
-            };
-
-            // Step 3: Show success modal
-            Alert.alert(
-              'Success',
-              'Loan application submitted successfully',
-              [
-                {
-                  text: 'OK',
-                  onPress: async () => {
-                    try {
-                      // Step 4: Make API call after success modal is dismissed
-                      await MemberLoan(loanApplication);
-                      navigation.goBack();
-                      resetForm();
-                    } catch (apiError) {
-                      console.error('API Error:', apiError);
-                      Alert.alert('Error', 'There was an issue sending the loan notification');
-                    }
-                  }
-                }
-              ]
-            );
-          } catch (error) {
-            console.error('Error during loan submission:', error);
-            Alert.alert('Error', 'Error recording loan application');
-          } finally {
-            setIsLoading(false);
+    Alert.alert(
+      'Confirm Loan Application',
+      message,
+      [
+        { 
+          text: 'Cancel', 
+          style: 'cancel',
+          onPress: () => {
+            if (requiresCollateral) {
+              setShowCollateralModal(true); // Go back to collateral modal
+            }
           }
         },
-      },
-    ]
-  );
-};
+        { 
+          text: 'Submit', 
+          onPress: () => {
+            submitLoanApplication(); 
+          }
+        }
+      ]
+    );
+  };
+
+  const handleSubmit = async () => {
+    if (!isFormValid()) {
+      Alert.alert('Error', 'All required fields must be filled');
+      return;
+    }
+
+    const loanAmountNum = parseFloat(loanAmount);
+    
+    if (loanAmountNum > balance) {
+      Alert.alert(
+        'Collateral Required',
+        'Your loan amount exceeds your current balance. You need to provide collateral to proceed.',
+        [
+          { 
+            text: 'Cancel', 
+            style: 'cancel',
+            onPress: () => {
+              // Just closes the alert
+            }
+          },
+          {
+            text: 'Continue with Collateral',
+            onPress: () => {
+              setShowCollateralModal(true);
+              setRequiresCollateral(true);
+            }
+          }
+        ]
+      );
+      return;
+    }
+
+    showConfirmationAlert();
+  };
 
   const resetForm = () => {
     setLoanAmount('');
@@ -247,11 +359,22 @@ const handleSubmit = async () => {
     setAccountNumber('');
     setAccountName('');
     setDisbursement('');
+    setRequiresCollateral(false);
+    setCollateralType('');
+    setCollateralValue('');
+    setCollateralDescription('');
   };
 
   const formatCurrency = (amount) => {
     return `₱${parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
   };
+
+  const RequiredField = ({ children }) => (
+    <Text style={{flexDirection: 'row'}}>
+      {children}
+      <Text style={{color: 'red'}}>*</Text>
+    </Text>
+  );
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -264,7 +387,7 @@ const handleSubmit = async () => {
         <Text style={styles.label}>Balance</Text>
         <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-        <Text style={styles.label}>Loan Type</Text>
+        <Text style={styles.label}><RequiredField>Loan Type</RequiredField></Text>
         <ModalSelector
           data={loanTypeOptions}
           initValue="Select Loan Type"
@@ -279,7 +402,7 @@ const handleSubmit = async () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}>Loan Amount</Text>
+        <Text style={styles.label}><RequiredField>Loan Amount</RequiredField></Text>
         <TextInput
           placeholder="Enter Loan Amount"
           value={loanAmount}
@@ -288,7 +411,7 @@ const handleSubmit = async () => {
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Term</Text>
+        <Text style={styles.label}><RequiredField>Term</RequiredField></Text>
         <ModalSelector
           data={termsOptions}
           initValue="Select Loan Term"
@@ -306,7 +429,7 @@ const handleSubmit = async () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}>Disbursement</Text>
+        <Text style={styles.label}><RequiredField>Disbursement</RequiredField></Text>
         <ModalSelector
           data={disbursementOptions}
           initValue="Select Disbursement Method"
@@ -323,19 +446,112 @@ const handleSubmit = async () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}>Account Name</Text>
-        <TextInput value={accountName} onChangeText={setAccountName} style={styles.input} />
+        <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
+        <TextInput 
+          value={accountName} 
+          onChangeText={setAccountName} 
+          style={styles.input} 
+          placeholder="Enter account name"
+        />
 
-        <Text style={styles.label}>Account Number</Text>
+        <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
         <TextInput
           value={accountNumber}
           onChangeText={handleAccountNumberChange}
           style={styles.input}
           keyboardType="numeric"
           ref={accountNumberInput}
+          placeholder="Enter account number"
         />
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        {/* Collateral Modal */}
+        <Modal
+          visible={showCollateralModal}
+          animationType="slide"
+          transparent={false}
+          onRequestClose={() => setShowCollateralModal(false)}
+        >
+          <ScrollView style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>Collateral Information</Text>
+              <TouchableOpacity onPress={() => setShowCollateralModal(false)}>
+                <MaterialIcons name="close" size={24} color="black" />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.label}><RequiredField>Collateral Type</RequiredField></Text>
+            <ModalSelector
+              data={collateralOptions}
+              initValue="Select Collateral Type"
+              onChange={(option) => setCollateralType(option.key)}
+              style={styles.picker}
+            >
+              <TouchableOpacity style={styles.pickerContainer}>
+                <Text style={styles.pickerText}>
+                  {collateralType || 'Select Collateral Type'}
+                </Text>
+                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+              </TouchableOpacity>
+            </ModalSelector>
+
+            <Text style={styles.label}><RequiredField>Collateral Value (₱)</RequiredField></Text>
+            <TextInput
+              placeholder="Estimated value of collateral"
+              value={collateralValue}
+              onChangeText={setCollateralValue}
+              style={styles.input}
+              keyboardType="numeric"
+            />
+
+            <Text style={styles.label}><RequiredField>Collateral Description</RequiredField></Text>
+            <Text style={styles.descriptionHint}>
+              Please include the following details if applicable:
+            </Text>
+            <Text style={styles.descriptionBullet}>• Make, model, and serial number</Text>
+            <Text style={styles.descriptionBullet}>• Physical condition</Text>
+            <Text style={styles.descriptionBullet}>• Location</Text>
+            <Text style={styles.descriptionBullet}>• Ownership documents</Text>
+            <Text style={styles.descriptionBullet}>• Any identifying marks</Text>
+            <TextInput
+              placeholder="Describe your collateral in detail..."
+              value={collateralDescription}
+              onChangeText={setCollateralDescription}
+              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
+              multiline
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.continueButton, !isCollateralValid() && styles.disabledButton]}
+                onPress={() => {
+                  if (isCollateralValid()) {
+                    setRequiresCollateral(true);
+                    setShowCollateralModal(false);
+                    showConfirmationAlert();
+                  }
+                }}
+                disabled={!isCollateralValid()}
+              >
+                <Text style={styles.modalButtonText}>Continue</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowCollateralModal(false);
+                  setRequiresCollateral(false);
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </Modal>
+
+        <TouchableOpacity 
+          style={[styles.submitButton, !isFormValid() && styles.disabledButton]} 
+          onPress={handleSubmit}
+          disabled={!isFormValid()}
+        >
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
@@ -375,6 +591,13 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     textAlign: 'center',
     color: 'white',
+  },
+  sectionHeader: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginTop: 20,
+    marginBottom: 10,
+    color: '#2D5783',
   },
   label: {
     fontSize: 16,
@@ -419,6 +642,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
   },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+  },
   submitButtonText: {
     color: 'white',
     fontWeight: 'bold',
@@ -434,6 +660,53 @@ const styles = StyleSheet.create({
     marginTop: 15,
     color: '#ffffff',
     fontSize: 18,
+  },
+  // Collateral Modal Styles
+  modalContent: {
+    flex: 1,
+    padding: 20,
+    backgroundColor: 'white',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D5783',
+  },
+  descriptionHint: {
+    fontSize: 14,
+    color: '#666',
+    marginBottom: 5,
+  },
+  descriptionBullet: {
+    fontSize: 14,
+    color: '#666',
+    marginLeft: 10,
+    marginBottom: 3,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 20,
+  },
+  modalButton: {
+    flex: 1,
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+    minWidth: '48%',
+  },
+  cancelButton: {
+    backgroundColor: '#cccccc',
+  },
+  continueButton: {
+    backgroundColor: '#4FE7AF',
   },
 });
 

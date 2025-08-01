@@ -20,8 +20,9 @@ import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native
 import { getDatabase, ref, get } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 
-import Bot from './HomePage/Bot'; // ✅ Make sure these paths are correct
+import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
+import MarqueeData from './HomePage/MarqueeData';
 
 const Tab = createBottomTabNavigator();
 
@@ -37,8 +38,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const scrollAnim = useRef(new Animated.Value(0)).current;
   const screenWidth = Dimensions.get('window').width;
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
-  const [applyLoanModalVisible, setApplyLoanModalVisible] = useState(false);
-
+  const [marqueeMessages, setMarqueeMessages] = useState([]);
 
 
   useEffect(() => {
@@ -53,6 +53,12 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
       })
     ).start();
   }, []);
+
+  useEffect(() => {
+  const unsubscribe = MarqueeData(setMarqueeMessages);
+  return () => unsubscribe(); // Clean up when component unmounts
+}, []);
+
 
   const formatBalance = (amount) => {
     const validAmount = Number(amount) || 0;
@@ -153,7 +159,9 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
             <View style={styles.marqueeContainer}>
               <Animated.Text style={[styles.reviewText, { transform: [{ translateX: scrollAnim }] }]}>
-                Your application is currently being reviewed.
+                {marqueeMessages.length > 0
+                  ? marqueeMessages.map((m) => m.message).join('   •   ')
+                  : 'No recent application activity.'}
               </Animated.Text>
             </View>
           </View>
@@ -174,14 +182,10 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
                   onPress={() => {
                     if (label === 'Withdraw') {
                       setWithdrawModalVisible(true);
-                    } else if (label === 'Apply Loan') {
-                      setApplyLoanModalVisible(true);
                     } else {
                       navigation.navigate(route, { email });
                     }
                   }}
-
-
                 >
                   <IconPack name={name} size={40} color="#2D5783" />
                   <Text style={styles.iconText}>{label}</Text>
@@ -192,92 +196,59 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         </ScrollView>
       )}
       {withdrawModalVisible && (
-  <View style={styles.modalContainer}>
-    <View style={styles.modalBox}>
-      <Text style={styles.modalTitle}>Choose Withdrawal Type</Text>
-      <TouchableOpacity
-        style={styles.modalButton}
-        onPress={() => {
-          setWithdrawModalVisible(false);
-          navigation.navigate('Withdraw', { email });
-        }}
-      >
-        <Text style={styles.modalButtonText}>Withdraw Money</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.modalButton}
-        onPress={() => {
-          setWithdrawModalVisible(false);
-          navigation.navigate('WithdrawMembership', { email });
-        }}
-      >
-        <Text style={styles.modalButtonText}>Withdraw Membership</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => setWithdrawModalVisible(false)}
-      >
-        <Text style={{ color: 'gray', marginTop: 10, textAlign: 'center' }}>Cancel</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-)}
-
-    {applyLoanModalVisible && (
-  <View style={styles.modalContainer}>
-    <View style={styles.modalBox}>
-      <Text style={styles.modalTitle}>Choose Loan Application Type</Text>
-      <TouchableOpacity
-        style={styles.modalButton}
-        onPress={() => {
-          setApplyLoanModalVisible(false);
-          navigation.navigate('ApplyLoan', { email });
-        }}
-      >
-        <Text style={styles.modalButtonText}>Apply as a Member</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={styles.modalButton}
-        onPress={() => {
-          setApplyLoanModalVisible(false);
-          navigation.navigate('ApplyLoanCoMaker', { email });
-        }}
-      >
-        <Text style={styles.modalButtonText}>Apply as a Member with CO Maker</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        onPress={() => setApplyLoanModalVisible(false)}
-      >
-        <Text style={{ color: 'gray', marginTop: 10, textAlign: 'center' }}>Cancel</Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-)}
-
-
+        <View style={styles.modalContainer}>
+          <View style={styles.modalBox}>
+            <Text style={styles.modalTitle}>Choose Withdrawal Type</Text>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setWithdrawModalVisible(false);
+                navigation.navigate('Withdraw', { email });
+              }}
+            >
+              <Text style={styles.modalButtonText}>Withdraw Money</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.modalButton}
+              onPress={() => {
+                setWithdrawModalVisible(false);
+                navigation.navigate('WithdrawMembership', { email });
+              }}
+            >
+              <Text style={styles.modalButtonText}>Withdraw Membership</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={() => setWithdrawModalVisible(false)}
+            >
+              <Text style={{ color: 'gray', marginTop: 10, textAlign: 'center' }}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
 
 export default function AppHome() {
-  const [memberId, setMemberId] = useState(null); // ⬅️ Moved up
+  const [memberId, setMemberId] = useState(null);
   const [email, setEmail] = useState(null);
 
   return (
-  <Tab.Navigator
-  screenOptions={({ route }) => ({
-    tabBarIcon: ({ color, size }) => {
-      let iconName;
-      if (route.name === 'HomeTab') iconName = 'home';
-      else if (route.name === 'BotTab') iconName = 'smart-toy';
-      else if (route.name === 'InboxTab') iconName = 'email';
-      return <MaterialIcons name={iconName} size={size} color={color} />;
-    },
-    headerShown: false,
-    tabBarActiveTintColor: '#2D5783',
-    tabBarInactiveTintColor: 'gray',
-  })}
->
- <Tab.Screen
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ color, size }) => {
+          let iconName;
+          if (route.name === 'HomeTab') iconName = 'home';
+          else if (route.name === 'BotTab') iconName = 'smart-toy';
+          else if (route.name === 'InboxTab') iconName = 'email';
+          return <MaterialIcons name={iconName} size={size} color={color} />;
+        },
+        headerShown: false,
+        tabBarActiveTintColor: '#2D5783',
+        tabBarInactiveTintColor: 'gray',
+      })}
+    >
+      <Tab.Screen
         name="HomeTab"
         options={{ tabBarLabel: 'Home' }}
         children={() => (
@@ -296,9 +267,7 @@ export default function AppHome() {
       >
         {() => <Inbox memberId={memberId} email={email} />}
       </Tab.Screen>
-
-</Tab.Navigator>
-
+    </Tab.Navigator>
   );
 }
 
@@ -404,39 +373,38 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   modalContainer: {
-  position: 'absolute',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(0,0,0,0.5)',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 999,
-},
-modalBox: {
-  width: '80%',
-  backgroundColor: 'white',
-  borderRadius: 10,
-  padding: 20,
-  elevation: 10,
-},
-modalTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  marginBottom: 15,
-  textAlign: 'center',
-},
-modalButton: {
-  backgroundColor: '#2D5783',
-  paddingVertical: 10,
-  borderRadius: 5,
-  marginTop: 10,
-},
-modalButtonText: {
-  color: 'white',
-  textAlign: 'center',
-  fontSize: 16,
-},
-
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  modalBox: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    elevation: 10,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  modalButton: {
+    backgroundColor: '#2D5783',
+    paddingVertical: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  modalButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontSize: 16,
+  },
 });

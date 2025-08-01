@@ -882,40 +882,26 @@ const ApplyDeposits = ({ deposits, currentPage, totalPages, onPageChange, refres
       )}
 
       {/* Image Viewer Modal */}
-      {imageViewerVisible && (
-        <div style={styles.imageViewerModal}>
-          <div style={styles.imageViewerContent}>
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
-              onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronLeft />
-            </button>
-            <img
-              src={currentImage.url}
-              alt={currentImage.label}
-              style={styles.largeImage}
-            />
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
-              onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronRight />
-            </button>
-            <button 
-              style={styles.imageViewerClose} 
-              onClick={closeImageViewer}
-              aria-label="Close image viewer"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
-            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
-          </div>
-        </div>
-      )}
+{imageViewerVisible && (
+  <div style={styles.imageViewerModal}>
+    <div style={styles.imageViewerContent}>
+      <img
+        src={currentImage.url}
+        alt={currentImage.label}
+        style={styles.largeImage}
+      />
+      <button 
+        style={styles.imageViewerClose} 
+        onClick={closeImageViewer}
+        aria-label="Close image viewer"
+        onFocus={(e) => e.target.style.outline = 'none'}
+      >
+        <FaTimes />
+      </button>
+      <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+    </div>
+  </div>
+)}
     </div>
   );
 };

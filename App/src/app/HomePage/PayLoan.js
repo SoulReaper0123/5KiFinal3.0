@@ -136,34 +136,42 @@ const PayLoan = () => {
     }
   };
 
-  const storePaymentDataInDatabase = async (proofOfPaymentUrl) => {
-    const transactionId = generateTransactionId();
-    try {
-      const paymentRef = dbRef(database, `Payments/PaymentApplications/${memberId}/${transactionId}`);
-      await set(paymentRef, {
-        transactionId,
-        id: memberId,
-        email,
-        firstName,  // Add firstName
-        lastName,   // Add lastName
-        paymentOption,
-        interest,
-        accountName,
-        accountNumber,
-        amountToBePaid: parseFloat(amountToBePaid),
-        proofOfPaymentUrl,
-        dateApplied: new Date().toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
-      });
-    } catch (error) {
-      console.error('Failed to store payment data in Realtime Database:', error);
-      Alert.alert('Error', 'Failed to store payment data');
-      throw error;
-    }
-  };
+ const storePaymentDataInDatabase = async (proofOfPaymentUrl) => {
+  const transactionId = generateTransactionId();
+  try {
+    const paymentRef = dbRef(database, `Payments/PaymentApplications/${memberId}/${transactionId}`);
+
+    await set(paymentRef, {
+      transactionId,
+      id: memberId,
+      email,
+      firstName,
+      lastName,
+      paymentOption,
+      interest,
+      accountName,
+      accountNumber,
+      amountToBePaid: parseFloat(amountToBePaid),
+      proofOfPaymentUrl,
+      dateApplied: new Date().toLocaleString('en-US', {
+        month: 'long',
+        day: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      })
+      .replace(',', '')
+      .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+      .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+      status: 'Pending',
+    });
+  } catch (error) {
+    console.error('Failed to store payment data in Realtime Database:', error);
+    Alert.alert('Error', 'Failed to store payment data');
+    throw error;
+  }
+};
 
   const generateTransactionId = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();

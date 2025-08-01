@@ -25,6 +25,19 @@ const generateRandomPassword = () => {
   return pwd;
 };
 
+// Helper function to format date as "Month Day, Year"
+const formatDate = (date) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Helper function to format time as "HH:MM:SS"
+const formatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
 const styles = {
   tableContainer: {
     borderRadius: '8px',
@@ -450,7 +463,10 @@ const Admins = () => {
         const data = snapshot.val() || {};
         const adminList = Object.entries(data).map(([id, admin]) => ({
           id,
-          ...admin
+          ...admin,
+          name: admin.firstName 
+            ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
+            : admin.name || ''
         }));
         setAdmins(adminList);
         setFilteredData(adminList);
@@ -471,7 +487,10 @@ const Admins = () => {
       const searchLower = searchQuery.toLowerCase();
       return (
         admin.id.toString().includes(searchLower) ||
-        admin.name.toLowerCase().includes(searchLower) ||
+        (admin.firstName && admin.firstName.toLowerCase().includes(searchLower)) ||
+        (admin.lastName && admin.lastName.toLowerCase().includes(searchLower)) ||
+        (admin.middleName && admin.middleName.toLowerCase().includes(searchLower)) ||
+        (admin.name && admin.name.toLowerCase().includes(searchLower)) ||
         admin.email.toLowerCase().includes(searchLower) ||
         (admin.contactNumber && admin.contactNumber.toLowerCase().includes(searchLower))
       );
@@ -481,38 +500,34 @@ const Admins = () => {
     setCurrentPage(0);
   }, [searchQuery, admins]);
 
-const getNextId = async () => {
-  try {
-    const adminsSnapshot = await database.ref('Users/Admin').once('value');
-    const membersSnapshot = await database.ref('Members').once('value');
-    
-    const adminsData = adminsSnapshot.val() || {};
-    const membersData = membersSnapshot.val() || {};
-    
-    // Get all existing IDs from both Admin and Member
-    const adminIds = Object.keys(adminsData).map(id => parseInt(id));
-    const memberIds = Object.keys(membersData).map(id => parseInt(id));
-    const allIds = [...adminIds, ...memberIds];
-    
-    // If no IDs exist, start with 5001
-    if (allIds.length === 0) {
+  const getNextId = async () => {
+    try {
+      const adminsSnapshot = await database.ref('Users/Admin').once('value');
+      const membersSnapshot = await database.ref('Members').once('value');
+      
+      const adminsData = adminsSnapshot.val() || {};
+      const membersData = membersSnapshot.val() || {};
+      
+      const adminIds = Object.keys(adminsData).map(id => parseInt(id));
+      const memberIds = Object.keys(membersData).map(id => parseInt(id));
+      const allIds = [...adminIds, ...memberIds];
+      
+      if (allIds.length === 0) {
+        return 5001;
+      }
+      
+      for (let i = 5001; i <= 9999; i++) {
+        if (!allIds.includes(i)) {
+          return i;
+        }
+      }
+      
+      return 5001;
+    } catch (error) {
+      console.error('Error getting next ID:', error);
       return 5001;
     }
-    
-    // Find the first available ID starting from 5001
-    for (let i = 5001; i <= 9999; i++) {
-      if (!allIds.includes(i)) {
-        return i;
-      }
-    }
-    
-    // If all IDs up to 9999 are taken (unlikely), start from 5001 again
-    return 5001;
-  } catch (error) {
-    console.error('Error getting next ID:', error);
-    return 5001; // Fallback to 5001 if error
-  }
-};
+  };
 
   const validateFields = () => {
     let isValid = true;
@@ -553,7 +568,6 @@ const getNextId = async () => {
   const onPressAdd = async () => {
     if (!validateFields()) return;
     
-    // Check if email already exists in our admins list
     const emailExists = admins.some(admin => admin.email.toLowerCase() === email.toLowerCase());
     if (emailExists) {
       setEmailError('Email address is already in use');
@@ -570,64 +584,62 @@ const getNextId = async () => {
     setConfirmAddVisible(true);
   };
 
- const handleAddAdmin = async () => {
+  const handleAddAdmin = async () => {
     setConfirmAddVisible(false);
     setIsProcessing(true);
 
     try {
       const password = generateRandomPassword();
       const newId = await getNextId();
-      const dateAdded = new Date().toLocaleString();
-      const name = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+      const now = new Date();
+      const dateAdded = formatDate(now);
+      const timeAdded = formatTime(now);
 
-      // Create user in Firebase Authentication with the generated password
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       
-      // Update the user's display name
+      const displayName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim();
       await userCredential.user.updateProfile({
-        displayName: name
+        displayName
       });
 
-      // Set the password explicitly (though createUserWithEmailAndPassword already sets it)
-      // This ensures the password is set correctly
       await auth.currentUser.updatePassword(password);
-      
-      // Send email verification
       await auth.currentUser.sendEmailVerification();
 
-      // Add admin data with numeric ID
       await database.ref(`Users/Admin/${newId}`).set({
         id: newId,
-        name,
+        firstName,
+        middleName: middleName || '',
+        lastName,
         email,
         contactNumber,
         dateAdded,
+        timeAdded,
         role: 'admin',
         uid: userCredential.user.uid,
-        // Store the initial password (optional, only if needed for reference)
         initialPassword: password
       });
 
-      // Add corresponding member data with same numeric ID
       await database.ref(`Members/${newId}`).set({
         id: newId,
-        name,
+        firstName,
+        middleName: middleName || '',
+        lastName,
         email,
         contactNumber,
         dateAdded,
+        timeAdded,
         role: 'admin',
         status: 'active',
         uid: userCredential.user.uid
       });
 
-      // Store the pending admin data with the password for the success handler
       setPendingAdd({
         firstName,
         middleName,
         lastName,
         email,
         contactNumber,
-        password // Include the password here
+        password
       });
 
       setSuccessMessage(`Admin account created successfully!`);
@@ -641,29 +653,26 @@ const getNextId = async () => {
     }
   };
 
-const handleDeleteAdmin = async () => {
-  setConfirmDeleteVisible(false);
-  setIsProcessing(true);
+  const handleDeleteAdmin = async () => {
+    setConfirmDeleteVisible(false);
+    setIsProcessing(true);
 
-  try {
-    const idToDelete = pendingDelete.id;
+    try {
+      const idToDelete = pendingDelete.id;
 
-    // First delete the admin record
-    await database.ref(`Users/Admin/${idToDelete}`).remove();
-    
-    // Then delete the corresponding member record if it exists
-    await database.ref(`Members/${idToDelete}`).remove();
+      await database.ref(`Users/Admin/${idToDelete}`).remove();
+      await database.ref(`Members/${idToDelete}`).remove();
 
-    setSuccessMessage(`Admin account deleted successfully!`);
-    setSuccessVisible(true);
-  } catch (error) {
-    console.error('Error deleting admin:', error);
-    setErrorMessage(error.message || 'Failed to delete admin');
-    setErrorModalVisible(true);
-  } finally {
-    setIsProcessing(false);
-  }
-};
+      setSuccessMessage(`Admin account deleted successfully!`);
+      setSuccessVisible(true);
+    } catch (error) {
+      console.error('Error deleting admin:', error);
+      setErrorMessage(error.message || 'Failed to delete admin');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleDownload = async () => {
     try {
@@ -676,23 +685,26 @@ const handleDeleteAdmin = async () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Admins');
 
-      const headers = ['ID', 'Name', 'Email', 'Contact Number', 'Date Added'];
+      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added', 'Time Added'];
       worksheet.addRow(headers);
 
       filteredData.forEach(admin => {
         const row = [
           admin.id,
-          admin.name,
+          admin.firstName || '',
+          admin.middleName || '',
+          admin.lastName || '',
           admin.email,
           admin.contactNumber,
-          admin.dateAdded
+          admin.dateAdded,
+          admin.timeAdded || ''
         ];
         worksheet.addRow(row);
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheet.sheet' 
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -712,25 +724,16 @@ const handleDeleteAdmin = async () => {
     }
   };
 
-const handleSuccessOk = () => {
+  const handleSuccessOk = () => {
     setSuccessVisible(false);
   
     if (pendingAdd) {
-      const nameParts = pendingAdd.name ? 
-        pendingAdd.name.split(' ') : 
-        `${pendingAdd.firstName} ${pendingAdd.middleName} ${pendingAdd.lastName}`.split(' ');
-      
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-
-      // Send the actual password that was set in Firebase Auth
       sendAdminCredentialsEmail({
         email: pendingAdd.email,
-        password: pendingAdd.password, // Use the actual password that was set
-        firstName,
-        middleName,
-        lastName
+        password: pendingAdd.password,
+        firstName: pendingAdd.firstName,
+        middleName: pendingAdd.middleName,
+        lastName: pendingAdd.lastName
       }).catch(error => console.error('Error sending admin credentials email:', error));
       
       setFirstName('');
@@ -741,19 +744,11 @@ const handleSuccessOk = () => {
       setModalVisible(false);
     } 
     else if (pendingDelete) {
-      const nameParts = pendingDelete.name ? 
-        pendingDelete.name.split(' ') : 
-        `${pendingDelete.firstName || ''} ${pendingDelete.middleName || ''} ${pendingDelete.lastName || ''}`.split(' ');
-      
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-
       sendAdminDeleteData({
         email: pendingDelete.email,
-        firstName,
-        middleName,
-        lastName
+        firstName: pendingDelete.firstName || '',
+        middleName: pendingDelete.middleName || '',
+        lastName: pendingDelete.lastName || ''
       }).catch(error => console.error('Error sending admin delete notification:', error));
     }
 
@@ -766,7 +761,10 @@ const handleSuccessOk = () => {
         const data = snapshot.val() || {};
         const adminList = Object.entries(data).map(([id, admin]) => ({
           id,
-          ...admin
+          ...admin,
+          name: admin.firstName 
+            ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
+            : admin.name || ''
         }));
         setAdmins(adminList);
         setFilteredData(adminList);
@@ -849,7 +847,9 @@ const handleSuccessOk = () => {
                 <thead>
                   <tr style={styles.tableHeader}>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>ID</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Middle Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email Address</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Contact Number</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Added</th>
@@ -860,10 +860,12 @@ const handleSuccessOk = () => {
                   {paginatedData.map((admin) => (
                     <tr key={admin.id} style={styles.tableRow}>
                       <td style={styles.tableCell}>{admin.id}</td>
-                      <td style={styles.tableCell}>{admin.name}</td>
+                      <td style={styles.tableCell}>{admin.firstName || 'N/A'}</td>
+                      <td style={styles.tableCell}>{admin.middleName || 'N/A'}</td>
+                      <td style={styles.tableCell}>{admin.lastName || 'N/A'}</td>
                       <td style={styles.tableCell}>{admin.email}</td>
                       <td style={styles.tableCell}>{admin.contactNumber || 'N/A'}</td>
-                      <td style={styles.tableCell}>{admin.dateAdded}</td>
+                      <td style={styles.tableCell}>{admin.dateAdded || 'N/A'}</td>
                       <td style={styles.tableCell}>
                         <span 
                           style={styles.viewText} 
@@ -1015,8 +1017,16 @@ const handleSuccessOk = () => {
                   <p>{selectedAdmin?.id || 'N/A'}</p>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Name:</label>
-                  <p>{selectedAdmin?.name || 'N/A'}</p>
+                  <label className="form-label">First Name:</label>
+                  <p>{selectedAdmin?.firstName || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Middle Name:</label>
+                  <p>{selectedAdmin?.middleName || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Last Name:</label>
+                  <p>{selectedAdmin?.lastName || 'N/A'}</p>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Email Address:</label>
@@ -1029,6 +1039,10 @@ const handleSuccessOk = () => {
                 <div className="form-group">
                   <label className="form-label">Date Added:</label>
                   <p>{selectedAdmin?.dateAdded || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Time Added:</label>
+                  <p>{selectedAdmin?.timeAdded || 'N/A'}</p>
                 </div>
                 <div className="action-buttons-container">
                   <button

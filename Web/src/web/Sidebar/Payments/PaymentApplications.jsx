@@ -233,6 +233,81 @@ const styles = {
   nextButton: { 
     right: '50px'
   },
+  rejectionModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1001
+  },
+  rejectionModalContent: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    width: '400px',
+    maxWidth: '90%',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+  },
+  rejectionTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  reasonOption: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '10px',
+    padding: '8px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#f5f5f5'
+    }
+  },
+  reasonRadio: {
+    marginRight: '10px'
+  },
+  reasonText: {
+    flex: 1
+  },
+  customReasonInput: {
+    width: '100%',
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    marginTop: '8px'
+  },
+  rejectionButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: '20px',
+    gap: '10px'
+  },
+  cancelButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    backgroundColor: 'white',
+    cursor: 'pointer'
+  },
+  confirmRejectButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: '#f44336',
+    color: 'white',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
   actionText: {
     color: '#2D5783',
     fontSize: '14px',
@@ -252,15 +327,16 @@ const styles = {
   },
   rejectText: {
     color: '#f44336'
-  },
-  thumbnailImage: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    objectFit: 'cover'
   }
 };
+
+const rejectionReasons = [
+  "Invalid proof of payment",
+  "Incorrect amount",
+  "Unclear image",
+  "Suspicious activity",
+  "Other (please specify)"
+];
 
 const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, refreshData }) => {
   const [currentAction, setCurrentAction] = useState(null);
@@ -273,6 +349,10 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [availableImages, setAvailableImages] = useState([]);
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
@@ -311,7 +391,7 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
 
   const handleRejectClick = (payment) => {
     setSelectedPayment(payment);
-    setShowRejectConfirmation(true);
+    setShowRejectionModal(true);
   };
 
   const confirmApprove = async () => {
@@ -319,12 +399,36 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
     await processAction(selectedPayment, 'approve');
   };
 
-  const confirmReject = async () => {
-    setShowRejectConfirmation(false);
-    await processAction(selectedPayment, 'reject');
+  const handleReasonSelect = (reason) => {
+    setSelectedReason(reason);
+    if (reason !== "Other (please specify)") {
+      setCustomReason('');
+    }
   };
 
-  const processAction = async (payment, action) => {
+  const confirmRejection = () => {
+    if (!selectedReason) {
+      setErrorMessage('Please select a rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    if (selectedReason === "Other (please specify)" && !customReason.trim()) {
+      setErrorMessage('Please specify the rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    setShowRejectionModal(false);
+    setShowRejectConfirmation(true);
+  };
+
+  const confirmRejectFinal = async () => {
+    setShowRejectConfirmation(false);
+    await processAction(selectedPayment, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
+  };
+
+  const processAction = async (payment, action, rejectionReason = '') => {
     setActionInProgress(true);
     setIsProcessing(true);
     setCurrentAction(action);
@@ -334,7 +438,7 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
         await processDatabaseApprove(payment);
         setSuccessMessage('Payment approved successfully!');
       } else {
-        await processDatabaseReject(payment);
+        await processDatabaseReject(payment, rejectionReason);
         setSuccessMessage('Payment rejected successfully!');
       }
 
@@ -350,7 +454,8 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
         } : {
           dateRejected: formatDate(now),
           timeRejected: formatTime(now),
-          status: 'failed'
+          status: 'failed',
+          rejectionReason
         })
       }));
 
@@ -368,8 +473,8 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
     try {
       const { id, transactionId, amountToBePaid } = payment;
       
-      const paymentRef = database.ref(`Payments/Pending/${id}/${transactionId}`);
-      const approvedRef = database.ref(`Payments/Completed/${id}/${transactionId}`);
+      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
+      const approvedRef = database.ref(`Payments/ApprovedApplications/${id}/${transactionId}`);
       const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
       const fundsRef = database.ref('Settings/Funds');
       const savingsRef = database.ref('Settings/Savings');
@@ -435,7 +540,7 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
       }
       
       // Update member balance (add full payment amount)
-      await memberRef.set(memberBalance + paymentAmount);
+      await memberRef.set(memberBalance + principalAmount);
 
       // Create approved record
       const now = new Date();
@@ -454,7 +559,7 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
       // Execute all database operations
       await approvedRef.set(approvedData);
       await transactionRef.set(approvedData);
-      await paymentRef.remove();
+      // await paymentRef.remove();
 
     } catch (err) {
       console.error('Approval DB error:', err);
@@ -462,15 +567,15 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
     }
   };
 
-  const processDatabaseReject = async (payment) => {
+  const processDatabaseReject = async (payment, rejectionReason) => {
     try {
       const { id, transactionId } = payment;
       const now = new Date();
       const rejectionDate = formatDate(now);
       const rejectionTime = formatTime(now);
 
-      const paymentRef = database.ref(`Payments/Pending/${id}/${transactionId}`);
-      const rejectedRef = database.ref(`Payments/Failed/${id}/${transactionId}`);
+      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
+      const rejectedRef = database.ref(`Payments/RejectedApplications/${id}/${transactionId}`);
       const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
 
       const paymentSnap = await paymentRef.once('value');
@@ -482,12 +587,13 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
         ...paymentSnap.val(), 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
-        status: 'failed'
+        status: 'failed',
+        rejectionReason: rejectionReason || 'Rejected by admin'
       };
 
       await rejectedRef.set(rejectedPayment);
       await transactionRef.set(rejectedPayment);
-      await paymentRef.remove();
+      // await paymentRef.remove();
 
     } catch (err) {
       console.error('Rejection DB error:', err);
@@ -553,7 +659,8 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
         email: payment.email,
         firstName: memberData.firstName,
         lastName: memberData.lastName,
-        status: 'failed'
+        status: 'failed',
+        rejectionReason: payment.rejectionReason || 'Rejected by admin'
       });
       
       if (!response.ok) {
@@ -632,14 +739,13 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
                 <td style={styles.tableCell}>{item.paymentOption}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>
                 <td style={styles.tableCell}>
-                  {item.proofOfPaymentUrl ? (
-                    <img
-                      src={item.proofOfPaymentUrl}
-                      alt="Proof of payment"
-                      style={styles.thumbnailImage}
-                      onClick={() => openImageViewer(item.proofOfPaymentUrl, 'Proof of Payment', index)}
-                    />
-                  ) : 'N/A'}
+                  <span 
+                    style={styles.viewText}
+                    onClick={() => openImageViewer(item.proofOfPaymentUrl, 'Proof of Payment', 0)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    <FaImage /> View
+                  </span>
                 </td>
                 <td style={styles.tableCell}>
                   <span 
@@ -711,7 +817,7 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
                   backgroundColor: '#2D5783',
                   color: '#fff'
                 }} 
-                onClick={confirmReject}
+                onClick={confirmRejectFinal}
                 disabled={actionInProgress}
               >
                 {actionInProgress ? 'Processing...' : 'Yes'}
@@ -726,6 +832,53 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
                 disabled={actionInProgress}
               >
                 No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRejectionModal && (
+        <div style={styles.rejectionModal}>
+          <div style={styles.rejectionModalContent}>
+            <h2 style={styles.rejectionTitle}>Select Rejection Reason</h2>
+            {rejectionReasons.map((reason) => (
+              <div 
+                key={reason} 
+                style={styles.reasonOption}
+                onClick={() => handleReasonSelect(reason)}
+              >
+                <input
+                  type="radio"
+                  name="rejectionReason"
+                  checked={selectedReason === reason}
+                  onChange={() => handleReasonSelect(reason)}
+                  style={styles.reasonRadio}
+                />
+                <span style={styles.reasonText}>{reason}</span>
+                {reason === "Other (please specify)" && selectedReason === reason && (
+                  <input
+                    type="text"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Please specify reason"
+                    style={styles.customReasonInput}
+                  />
+                )}
+              </div>
+            ))}
+            <div style={styles.rejectionButtons}>
+              <button 
+                style={styles.cancelButton}
+                onClick={() => setShowRejectionModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.confirmRejectButton}
+                onClick={confirmRejection}
+              >
+                Confirm Rejection
               </button>
             </div>
           </div>
@@ -788,40 +941,27 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
       )}
 
       {/* Image Viewer Modal */}
-      {imageViewerVisible && (
-        <div style={styles.imageViewerModal}>
-          <div style={styles.imageViewerContent}>
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
-              onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronLeft />
-            </button>
-            <img
-              src={currentImage.url}
-              alt={currentImage.label}
-              style={styles.largeImage}
-            />
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
-              onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronRight />
-            </button>
-            <button 
-              style={styles.imageViewerClose} 
-              onClick={closeImageViewer}
-              aria-label="Close image viewer"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
-            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
-          </div>
-        </div>
-      )}
+{/* Image Viewer Modal */}
+{imageViewerVisible && (
+  <div style={styles.imageViewerModal}>
+    <div style={styles.imageViewerContent}>
+      <img
+        src={currentImage.url}
+        alt={currentImage.label}
+        style={styles.largeImage}
+      />
+      <button 
+        style={styles.imageViewerClose} 
+        onClick={closeImageViewer}
+        aria-label="Close image viewer"
+        onFocus={(e) => e.target.style.outline = 'none'}
+      >
+        <FaTimes />
+      </button>
+      <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+    </div>
+  </div>
+)}
     </div>
   );
 };

@@ -6,15 +6,15 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  TouchableOpacity, // ✅ added
+  TouchableOpacity,
 } from 'react-native';
 import { ref, get } from 'firebase/database';
 import { database } from '../../firebaseConfig';
-import { MaterialIcons } from '@expo/vector-icons'; // ✅ added
-import { useNavigation } from '@react-navigation/native'; // ✅ added
+import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 
 const Transactions = ({ route }) => {
-  const navigation = useNavigation(); // ✅ added
+  const navigation = useNavigation();
   const [transactions, setTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -62,6 +62,7 @@ const Transactions = ({ route }) => {
             dateApplied: details.dateApplied,
             dateApproved: details.dateApproved,
             amount: 0,
+            label: '',
           };
 
           switch (type) {
@@ -104,38 +105,40 @@ const Transactions = ({ route }) => {
   };
 
   const renderTransaction = (transaction) => (
-    <View key={transaction.transactionId} style={styles.transactionCard}>
-      <View style={styles.transactionHeader}>
-        <Text style={styles.transactionLabel}>{transaction.label}</Text>
-        <Text style={styles.transactionAmount}>
-          {transaction.amount >= 0
-            ? `+ ₱${parseFloat(transaction.amount).toFixed(2)}`
-            : `- ₱${Math.abs(parseFloat(transaction.amount)).toFixed(2)}`}
-        </Text>
-      </View>
-      <View style={styles.transactionDetails}>
-        <Text style={styles.transactionText}>Transaction ID: {transaction.transactionId}</Text>
-        <Text style={styles.transactionText}>Date Applied: {transaction.dateApplied}</Text>
-        <Text style={styles.transactionText}>Date Approved: {transaction.dateApproved}</Text>
-        {transaction.disbursement && <Text style={styles.transactionText}>Disbursement: {transaction.disbursement}</Text>}
-        {transaction.depositOption && <Text style={styles.transactionText}>Deposit Option: {transaction.depositOption}</Text>}
-        {transaction.paymentOption && <Text style={styles.transactionText}>Payment Option: {transaction.paymentOption}</Text>}
-        {transaction.withdrawOption && <Text style={styles.transactionText}>Withdraw Option: {transaction.withdrawOption}</Text>}
+    <View key={transaction.transactionId} style={styles.card}>
+      <View style={styles.textContainer}>
+        <View style={styles.transactionHeader}>
+          <Text style={styles.title}>{transaction.label}</Text>
+          <Text style={[
+            styles.amount,
+            { color: transaction.amount >= 0 ? '#4CAF50' : '#E53935' }
+          ]}>
+            {transaction.amount >= 0
+              ? `+ ₱${parseFloat(transaction.amount).toFixed(2)}`
+              : `- ₱${Math.abs(parseFloat(transaction.amount)).toFixed(2)}`}
+          </Text>
+        </View>
+        <Text style={styles.detail}>Transaction ID: {transaction.transactionId}</Text>
+        <Text style={styles.detail}>Date Applied: {transaction.dateApplied}</Text>
+        <Text style={styles.detail}>Date Approved: {transaction.dateApproved}</Text>
+        {transaction.disbursement && <Text style={styles.detail}>Disbursement: {transaction.disbursement}</Text>}
+        {transaction.depositOption && <Text style={styles.detail}>Deposit Option: {transaction.depositOption}</Text>}
+        {transaction.paymentOption && <Text style={styles.detail}>Payment Option: {transaction.paymentOption}</Text>}
+        {transaction.withdrawOption && <Text style={styles.detail}>Withdraw Option: {transaction.withdrawOption}</Text>}
       </View>
     </View>
   );
 
   return (
     <View style={styles.container}>
-      {/* ✅ Back button only */}
-      <TouchableOpacity onPress={() => navigation.goBack()} style={{ position: 'absolute', top: 50, left: 20, zIndex: 1 }}>
-        <MaterialIcons name="arrow-back" size={28} color="#fff" />
+      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+        <MaterialIcons name="arrow-back" size={30} color="#2D5783" />
       </TouchableOpacity>
 
-      <Text style={styles.title}>Transactions</Text>
+      <Text style={styles.headerTitle}>Transactions</Text>
 
       {loading ? (
-        <ActivityIndicator size="large" color="#007bff" style={styles.loading} />
+        <ActivityIndicator size="large" color="#234E70" style={{ marginTop: 30 }} />
       ) : (
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
@@ -155,66 +158,59 @@ const Transactions = ({ route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#ffffffff',
+    paddingTop: 50,
   },
-  title: {
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 10,
+  },
+  headerTitle: {
     fontSize: 30,
     fontWeight: 'bold',
+    color: '#2D5783',
     textAlign: 'center',
     marginBottom: 20,
-    marginTop: 40,
-    color: 'white',
   },
   scrollContainer: {
-    flexGrow: 1,
+    paddingHorizontal: 20,
     paddingBottom: 20,
-    marginTop: 5,
   },
-  transactionCard: {
-    padding: 20,
+  card: {
+    backgroundColor: '#d3e8fdff',
     borderRadius: 12,
-    marginBottom: 15,
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    padding: 15,
+    marginBottom: 10,
+    elevation: 2,
+  },
+  textContainer: {
+    flexShrink: 1,
   },
   transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  transactionLabel: {
-    fontWeight: '600',
-    fontSize: 18,
-    color: 'black',
-  },
-  transactionAmount: {
-    fontSize: 18,
+  title: {
+    fontSize: 16,
     fontWeight: 'bold',
-    color: 'green',
   },
-  transactionDetails: {
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    paddingTop: 10,
+  amount: {
+    fontSize: 16,
+    fontWeight: 'bold',
   },
-  transactionText: {
+  detail: {
     fontSize: 14,
-    color: '#555',
-    marginBottom: 5,
-  },
-  loading: {
-    marginTop: 50,
+    color: '#333',
+    marginVertical: 2,
   },
   noTransactionsText: {
+    marginTop: 30,
     textAlign: 'center',
     fontSize: 16,
-    color: '#999',
-    marginTop: 20,
+    color: '#666',
   },
 });
 

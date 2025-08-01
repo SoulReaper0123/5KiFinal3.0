@@ -263,9 +263,9 @@ const PayLoans = () => {
       setLoading(true);
       try {
         const [pendingSnap, completedSnap, failedSnap] = await Promise.all([
-          database.ref('Payments/Pending').once('value'),
-          database.ref('Payments/Completed').once('value'),
-          database.ref('Payments/Failed').once('value'),
+          database.ref('Payments/PaymentApplications').once('value'),
+          database.ref('Payments/ApprovePayments').once('value'),
+          database.ref('Payments/RejectedPayments').once('value'),
         ]);
 
         const flatten = (val) => {

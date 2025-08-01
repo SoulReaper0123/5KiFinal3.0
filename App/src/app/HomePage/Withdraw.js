@@ -94,7 +94,6 @@ const Withdraw = () => {
     return;
   }
 
-  // Step 1: Show confirmation modal
   Alert.alert(
     'Confirm Withdrawal',
     `Balance: ₱${balance}\nWithdraw Option: ${withdrawOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Withdrawn: ₱${parseFloat(withdrawAmount).toFixed(2)}`,
@@ -105,7 +104,6 @@ const Withdraw = () => {
         onPress: async () => {
           setIsLoading(true);
           try {
-            // Step 2: Store data in database
             const transactionId = generateTransactionId();
             const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
 
@@ -118,26 +116,21 @@ const Withdraw = () => {
               withdrawOption,
               accountName,
               accountNumber,
-              amountWithdrawn: parseFloat(parseFloat(withdrawAmount).toFixed(2)),
+              amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
               dateApplied: new Date().toLocaleString('en-US', {
-                year: 'numeric',
                 month: 'long',
-                day: 'numeric',
-              }),
+                day: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+              })
+              .replace(',', '')
+              .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+              .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+              status: 'Pending',
             });
 
-            // Prepare withdrawal data for API
-            const withdrawApplication = {
-              email,
-              firstName,
-              lastName,
-              withdrawOption,
-              accountName,
-              accountNumber,
-              amountWithdrawn: parseFloat(withdrawAmount),
-            };
-
-            // Step 3: Show success modal
             Alert.alert(
               'Success',
               'Withdrawal recorded successfully',
@@ -146,14 +139,16 @@ const Withdraw = () => {
                   text: 'OK',
                   onPress: async () => {
                     try {
-                      // Step 4: Make API call after success modal is dismissed
-                      await MemberWithdraw(withdrawApplication);
+                      await MemberWithdraw({
+                        email,
+                        firstName,
+                        lastName,
+                        withdrawOption,
+                        accountName,
+                        accountNumber,
+                        amountWithdrawn: parseFloat(withdrawAmount),
+                      });
                       navigation.goBack();
-                      // Reset form fields
-                      setWithdrawOption('');
-                      setAccountName('');
-                      setAccountNumber('');
-                      setWithdrawAmount('');
                     } catch (apiError) {
                       console.error('API Error:', apiError);
                       Alert.alert('Error', 'There was an issue sending the withdrawal notification');

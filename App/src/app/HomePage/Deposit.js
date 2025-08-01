@@ -124,7 +124,7 @@ const Deposit = () => {
       // Ensure the amountToBeDeposited is stored as a number (float)
       const depositAmount = parseFloat(amountToBeDeposited);
   
-      await set(newDepositRef, {
+     await set(newDepositRef, {
         transactionId,
         id: memberId,
         email,
@@ -133,14 +133,19 @@ const Deposit = () => {
         accountName: '5KI',
         depositOption,
         accountNumber,
-        amountToBeDeposited: depositAmount, // Use the float amount, properly formatted
+        amountToBeDeposited: depositAmount,
         proofOfDepositUrl,
-        dateApplied: new Date().toLocaleString('en-US', {
+        dateApplied: new Date().toLocaleString('en-GB', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false,
         }),
+        status: 'Pending',
       });
+
     } catch (error) {
       console.error('Failed to store deposit data in Realtime Database:', error);
       Alert.alert('Error', 'Failed to store deposit data');

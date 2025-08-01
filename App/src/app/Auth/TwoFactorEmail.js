@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  ActivityIndicator, 
+  Alert,
+  TouchableWithoutFeedback 
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { sendVerificationCode } from '../../api'; // Update path as needed
 
@@ -17,12 +25,18 @@ export default function TwoFactorEmail({ route, navigation }) {
     setIsLoading(true);
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
+    // Log the verification code to terminal for debugging
+    console.log(`[DEBUG] Generated verification code: ${verificationCode}`);
+    console.log(`[DEBUG] Attempting to send to email: ${email}`);
+    
     try {
       await sendVerificationCode({
         email,
         firstName,
         verificationCode
       });
+      
+      console.log(`[DEBUG] Verification code sent successfully to ${email}`);
       
       navigation.navigate('VerifyCode', { 
         email,
@@ -32,6 +46,7 @@ export default function TwoFactorEmail({ route, navigation }) {
       });
     } catch (error) {
       console.error('Failed to send verification code:', error);
+      console.log(`[DEBUG] Verification code that would have been sent: ${verificationCode}`);
       Alert.alert(
         'Error',
         error.message || 'Failed to send verification code. Please try again.',
@@ -43,46 +58,53 @@ export default function TwoFactorEmail({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Back Button - Disabled during loading */}
-      <TouchableOpacity 
-        style={styles.backButton} 
-        onPress={() => !isLoading && navigation.goBack()}
-        activeOpacity={0.7}
-        disabled={isLoading}
-      >
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
-
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>Two-Factor Authentication</Text>
-        
-        <View style={styles.emailContainer}>
-          <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
-            {email}
-          </Text>
-          <MaterialIcons name="lock" size={20} color="#666" />
-        </View>
-
-        <Text style={styles.instructions}>
-          For your security, we'll send a 6-digit verification code to this email address.
-          The code will expire in 10 minutes.
-        </Text>
-        
+    <TouchableWithoutFeedback>
+      <View style={styles.container}>
+        {/* Back Button - Disabled during loading */}
         <TouchableOpacity 
-          style={[styles.button, isLoading && styles.disabledButton]} 
-          onPress={handleSendCode}
-          activeOpacity={0.8}
+          style={styles.backButton} 
+          onPress={() => !isLoading && navigation.goBack()}
+          activeOpacity={0.7}
           disabled={isLoading}
         >
-          {isLoading ? (
-            <ActivityIndicator color="#1A1A1A" />
-          ) : (
-            <Text style={styles.buttonText}>Send Code</Text>
-          )}
+          <MaterialIcons name="arrow-back" size={30} color="white" />
         </TouchableOpacity>
+
+        <View style={styles.contentContainer}>
+          <Text style={styles.title}>Two-Factor Authentication</Text>
+          
+          <View style={styles.emailContainer}>
+            <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
+              {email}
+            </Text>
+            <MaterialIcons name="lock" size={20} color="#666" />
+          </View>
+
+          <Text style={styles.instructions}>
+            For your security, we'll send a 6-digit verification code to this email address.
+            The code will expire in 10 minutes.
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.button} 
+            onPress={handleSendCode}
+            activeOpacity={0.8}
+            disabled={isLoading}
+          >
+            <Text style={styles.buttonText}>Send Code</Text>
+          </TouchableOpacity>
+
+          {/* Overlay to disable interaction while loading */}
+          {isLoading && (
+            <TouchableWithoutFeedback>
+              <View style={styles.loadingOverlay}>
+                <ActivityIndicator size="large" color="white" />
+              </View>
+            </TouchableWithoutFeedback>
+          )}
+        </View>
       </View>
-    </View>
+    </TouchableWithoutFeedback>
   );
 }
 
@@ -157,12 +179,16 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  disabledButton: {
-    backgroundColor: '#A8D5BA90', // Slightly transparent version of the button color
-  },
   buttonText: {
     color: '#1A1A1A',
     fontSize: 18,
     fontWeight: '600',
+  },
+  loadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    zIndex: 100,
   },
 });

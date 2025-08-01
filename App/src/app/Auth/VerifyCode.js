@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,16 +18,9 @@ export function TwoFactorEmail({ navigation }) {
       return;
     }
 
-    // Generate a 6-digit verification code
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Simulate sending the code via email
     console.log(`Verification code sent to ${email}: ${verificationCode}`);
-
-    // Show an alert to the user
     Alert.alert('Code Sent', `A 6-digit verification code has been sent to your email.`);
-
-    // Navigate to the VerifyCode screen and pass the code as a parameter
     navigation.navigate('VerifyCode', { email, verificationCode });
   };
 
@@ -52,38 +45,57 @@ export function TwoFactorEmail({ navigation }) {
 
 export default function VerifyCode({ route, navigation }) {
   const { email, verificationCode } = route.params;
-  const [inputCode, setInputCode] = useState('');
-  const inputRefs = useRef([...Array(6)].map(() => React.createRef()));
+  const [digits, setDigits] = useState(['', '', '', '', '', '']);
+  const inputRefs = useRef([]);
+
+  useEffect(() => {
+    // Initialize refs array
+    inputRefs.current = inputRefs.current.slice(0, 6);
+    // Focus first input on mount
+    inputRefs.current[0]?.focus();
+  }, []);
 
   const handleChange = (text, index) => {
-    if (!/^\d*$/.test(text)) return; // Only allow digits
+    // Only allow single digit input
+    if (!/^\d?$/.test(text)) return;
 
-    let newCode = inputCode.split('');
-    newCode[index] = text[text.length - 1] || '';
-    newCode = newCode.join('').slice(0, 6);
+    const newDigits = [...digits];
+    newDigits[index] = text;
+    setDigits(newDigits);
 
-    setInputCode(newCode);
-
+    // Auto-focus next input if digit was entered
     if (text && index < 5) {
-      inputRefs.current[index + 1].current.focus();
+      inputRefs.current[index + 1]?.focus();
     }
-    if (!text && index > 0) {
-      inputRefs.current[index - 1].current.focus();
+
+    // Auto-submit if last digit was entered
+    if (index === 5 && text) {
+      handleVerify();
     }
   };
 
-  const handleKeyPress = (e, index) => {
-    if (e.nativeEvent.key === 'Backspace' && !inputCode[index] && index > 0) {
-      inputRefs.current[index - 1].current.focus();
+  const handleKeyPress = ({ nativeEvent: { key } }, index) => {
+    // Handle backspace to move to previous input
+    if (key === 'Backspace' && !digits[index] && index > 0) {
+      const newDigits = [...digits];
+      newDigits[index - 1] = '';
+      setDigits(newDigits);
+      inputRefs.current[index - 1]?.focus();
     }
   };
 
-  const handleVerifyCode = () => {
-    if (inputCode === verificationCode) {
+  const handleVerify = () => {
+    const code = digits.join('');
+    if (code.length < 6) return;
+
+    if (code === verificationCode) {
       Alert.alert('Success', 'Verification successful!');
-      navigation.navigate('DrawerNav', { email }); // Navigate to the main app screen
+      navigation.navigate('DrawerNav', { email });
     } else {
       Alert.alert('Error', 'Invalid verification code. Please try again.');
+      // Reset all inputs and focus first one
+      setDigits(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
     }
   };
 
@@ -96,31 +108,28 @@ export default function VerifyCode({ route, navigation }) {
       <Text style={styles.infoText}>
         A 6-digit verification code has been sent to your email. Please enter the code to continue.
       </Text>
+      
       <View style={styles.codeInputContainer}>
-        {Array(6)
-          .fill()
-          .map((_, index) => (
-            <TextInput
-              key={index}
-              ref={inputRefs.current[index]}
-              style={styles.codeInput}
-              maxLength={1}
-              keyboardType="numeric"
-              onChangeText={text => handleChange(text, index)}
-              onKeyPress={e => handleKeyPress(e, index)}
-              value={inputCode[index] || ''}
-              returnKeyType="next"
-              blurOnSubmit={false}
-            />
-          ))}
+        {digits.map((digit, index) => (
+          <TextInput
+            key={index}
+            ref={el => inputRefs.current[index] = el}
+            style={styles.codeInput}
+            maxLength={1}
+            keyboardType="number-pad"
+            value={digit}
+            onChangeText={(text) => handleChange(text, index)}
+            onKeyPress={(e) => handleKeyPress(e, index)}
+            autoFocus={index === 0}
+            selectTextOnFocus
+          />
+        ))}
       </View>
+
       <TouchableOpacity
-        style={[
-          styles.button,
-          inputCode.length < 6 && { opacity: 0.5 },
-        ]}
-        onPress={handleVerifyCode}
-        disabled={inputCode.length < 6}
+        style={[styles.button, digits.join('').length < 6 && styles.disabledButton]}
+        onPress={handleVerify}
+        disabled={digits.join('').length < 6}
       >
         <Text style={styles.buttonText}>Continue</Text>
       </TouchableOpacity>
@@ -187,6 +196,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
     alignItems: 'center',
+    width: '50%',
+  },
+  disabledButton: {
+    opacity: 0.5,
   },
   buttonText: {
     color: 'black',
