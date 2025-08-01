@@ -308,27 +308,26 @@ Please review this application in the admin panel: ${DASHBOARD_LINK}
         await transporter.sendMail(ownerMailOptions);
 
         console.log('[NOTIFICATION] Sending registration confirmation to user');
-        const userMailOptions = {
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Registration Received - 5Ki Financial Services',
-            text: `
-Thank You for Registering!
+// Updated registration confirmation email
+const userMailOptions = {
+  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+  to: email,
+  subject: 'Registration Successfully Received - Thank You for Signing Up!',
+  text: `
+Hi ${firstName},
 
-Dear ${firstName},
+Thank you for registering with 5KI Financial Services!
 
-We have received your registration application on ${formatDisplayDate(registrationDate)}.
+We are pleased to inform you that we have successfully received your registration application on ${formatDisplayDate(registrationDate)}. Our team is currently reviewing your information and you will receive a confirmation once your application is approved.
 
-Our team will review your information and notify you once your application is processed.
-
-For any questions, please contact us at ${GMAIL_OWNER}.
+In the meantime, if you have any questions or would like to know more about our services, feel free to contact us at ${GMAIL_OWNER}.
 
 Connect with us on Facebook: ${FACEBOOK_LINK}
 
 Best regards,
 5KI Financial Services Team
-            `
-        };
+  `
+};
 
         await transporter.sendMail(userMailOptions);
         console.log('[NOTIFICATION SUCCESS] Registration emails sent successfully');
@@ -350,27 +349,25 @@ app.post('/approveRegistrations', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending registration approval to user');
-        const mailOptions = {
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Registration Approved - Welcome to 5Ki Financial Services',
-            text: `
-Welcome to 5Ki Financial Services!
+const mailOptions = {
+  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+  to: email,
+  subject: 'Welcome to 5Ki Financial Services - Your Account is Ready!',
+  text: `
+Hi ${firstName},
 
-Dear ${firstName},
-
-We are pleased to inform you that your registration has been approved on ${dateApproved} at ${approvedTime}.
+Thank you for registering with 5Ki Financial Services on ${dateApproved} at ${approvedTime}. Your account has been successfully created and you now have access to our range of services including loan applications, transactions tracking, and account management.
 
 Your Member ID: ${memberId}
 
-You now have full access to our services. Please log in to your account to get started.
+Welcome aboard! Please log in to your account to get started.
 
 Connect with us on Facebook: ${FACEBOOK_LINK}
 
 Best regards,
 5KI Financial Services Team
-            `
-        };
+  `
+};
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Registration approval email sent successfully');
@@ -392,24 +389,26 @@ app.post('/rejectRegistrations', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending registration rejection to user');
-        const mailOptions = {
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Registration Application Status',
-            text: `
-Registration Application Update
+const mailOptions = {
+  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+  to: email,
+  subject: 'Registration Application Status',
+  text: `
+Hi ${firstName},
 
-Dear ${firstName},
-
-After careful review, we regret to inform you that your registration application submitted on ${dateRejected} at ${rejectedTime} has not been approved.
+Thank you for your interest in becoming a member of 5KI Financial Services. After careful review, we regret to inform you that your registration application has not been approved at this time due to not meeting the eligibility criteria required for membership.
 
 ${rejectionReason ? `Reason: ${rejectionReason}\n` : ''}
-You may reapply after addressing any issues. For questions, contact us at ${GMAIL_OWNER}.
+Should you wish to reapply, we recommend reviewing the application guidelines thoroughly and ensuring that all required information is complete and accurate. 
+
+For questions or clarifications, please contact us at ${GMAIL_OWNER}.
+
+We appreciate your interest and hope to serve you in the future.
 
 Best regards,
 5KI Financial Services Team
-            `
-        };
+  `
+};
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Registration rejection email sent successfully');
@@ -417,6 +416,74 @@ Best regards,
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending registration rejection email:', error);
         res.status(500).json({ message: 'Failed to send email', error: error.message });
+    }
+});
+// ==============================================
+// TWO-FACTOR AUTHENTICATION
+// ==============================================
+
+app.post('/send-verification-code', async (req, res) => {
+    console.log('[NOTIFICATION] Initiating 2FA verification email', req.body);
+    const { email, firstName, verificationCode } = req.body;
+
+    // Validate required fields
+    if (!email || !verificationCode) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for 2FA email');
+        return res.status(400).json({ 
+            success: false,
+            message: 'Email and verification code are required'
+        });
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    try {
+        console.log('[NOTIFICATION] Sending 2FA verification email');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Your 5KI Financial Services Verification Code',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <h2 style="color: #2D5783;">Security Verification</h2>
+                    <p>Hi ${firstName || 'Customer'},</p>
+                    <p>Your verification code is:</p>
+                    <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
+                        ${verificationCode}
+                    </div>
+                    <p>This code will expire in 10 minutes. Please enter it in the verification page to complete your login process.</p>
+                    <p style="color: #ff0000; font-weight: bold;">For your security, never share this code with anyone. 5KI Financial Services will never ask you for this code.</p>
+                    <p>If you didn't request this code, please contact our support team immediately at <a href="mailto:${GMAIL_OWNER}">${GMAIL_OWNER}</a>.</p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p>Best regards,<br>5KI Financial Services Team</p>
+                    <div style="margin-top: 20px; font-size: 12px; color: #777;">
+                        Connect with us:<br>
+                        <a href="${WEBSITE_LINK}">Website</a> | 
+                        <a href="${FACEBOOK_LINK}">Facebook</a>
+                    </div>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] 2FA verification email sent successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Verification code sent successfully'
+        });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending 2FA verification email:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send verification code',
+            error: error.message
+        });
     }
 });
 
@@ -486,6 +553,89 @@ Best regards,
     }
 });
 
+// Add these endpoints to your server code
+app.post('/approveDeposits', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating deposit approval email', req.body);
+  const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
+
+  if (!email || !firstName || !lastName || !amount || !dateApproved || !timeApproved) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for deposit approval');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending deposit approval to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Deposit Approved - 5Ki Financial Services',
+      text: `
+Deposit Approved
+
+Dear ${firstName},
+
+We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved} at ${timeApproved}.
+
+Your account balance has been updated accordingly.
+
+Thank you for using 5Ki Financial Services.
+
+Best regards,
+5KI Financial Services Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Deposit approval email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending deposit approval email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
+});
+
+app.post('/rejectDeposits', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating deposit rejection email', req.body);
+  const { email, firstName, lastName, amount, dateRejected, timeRejected, rejectionReason } = req.body;
+
+  if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for deposit rejection');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending deposit rejection to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Deposit Application Status',
+      text: `
+Deposit Application Update
+
+Dear ${firstName},
+
+After careful review, we regret to inform you that your deposit application submitted on ${dateRejected} at ${timeRejected} has not been approved.
+
+Amount: ₱${amount}
+${rejectionReason ? `Reason: ${rejectionReason}\n` : ''}
+You may submit a new deposit application after addressing any issues. 
+
+For questions, contact us at ${GMAIL_OWNER}.
+
+Best regards,
+5KI Financial Services Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending deposit rejection email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
+});
+
 app.post('/withdraw', async (req, res) => {
     console.log('[NOTIFICATION] Initiating withdrawal notification emails', req.body);
     const { email, firstName, lastName, amount, date, recipientAccount, referenceNumber } = req.body;
@@ -520,23 +670,22 @@ Please verify and take appropriate action in the dashboard: ${DASHBOARD_LINK}
         });
 
         console.log('[NOTIFICATION] Sending withdrawal confirmation to user');
-        const mailOptions = {
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Withdrawal Successful',
-            text: `
-Withdrawal Successful
-
+// Updated withdrawal confirmation email
+const mailOptions = {
+  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+  to: email,
+  subject: 'Withdrawal Successful',
+  text: `
 Hi ${firstName},
 
-Your withdrawal request for ₱${amount} has been processed on ${formatDisplayDate(date)}.
+Your withdrawal request for ₱${amount} has been processed on ${formatDisplayDate(date)}. The funds were sent to your recipient account (${recipientAccount}).
 
-The funds were sent to your recipient account (${recipientAccount}). Thank you for using 5Ki Financial Services.
+Thank you for using 5Ki Financial Services.
 
 Best regards,
 5KI Financial Services Team
-            `
-        };
+  `
+};
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Withdrawal notification emails sent successfully');
@@ -581,30 +730,26 @@ Review Application: ${DASHBOARD_LINK}
         });
 
         console.log('[NOTIFICATION] Sending loan application confirmation to user');
-        const userMailOptions = {
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Loan Application Received',
-            text: `
-Loan Application Received
-
+const userMailOptions = {
+  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+  to: email,
+  subject: 'Loan Application Received',
+  text: `
 Hi ${firstName},
 
-We have received your loan application on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days.
-
-You'll be notified once your application has been successfully processed.
+We have received your loan application on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.
 
 Loan Details:
 - Amount: ₱${amount}
 - Term: ${term} months
 - Status: Under Review
 
-Thank you for choosing 5Ki Financial Services.
+For any questions, please contact us at ${GMAIL_OWNER}.
 
 Best regards,
 5KI Financial Services Team
-            `
-        };
+  `
+};
 
         await transporter.sendMail(userMailOptions);
         console.log('[NOTIFICATION SUCCESS] Loan application emails sent successfully');
@@ -617,9 +762,25 @@ Best regards,
 
 app.post('/approveLoans', async (req, res) => {
     console.log('[NOTIFICATION] Initiating loan approval email', req.body);
-    const { email, firstName, lastName, amount, term, date } = req.body;
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        amount, 
+        term, 
+        dateApproved, 
+        timeApproved,
+        interestRate,
+        interest,
+        monthlyPayment,
+        totalMonthlyPayment,
+        totalTermPayment,
+        releaseAmount,
+        processingFee,
+        dueDate
+    } = req.body;
 
-    if (!email || !firstName || !lastName || !amount || !term || !date) {
+    if (!email || !firstName || !lastName || !amount || !term || !dateApproved || !timeApproved) {
         console.log('[NOTIFICATION ERROR] Missing required fields for loan approval');
         return res.status(400).json({ message: 'Missing required fields' });
     }
@@ -631,17 +792,28 @@ app.post('/approveLoans', async (req, res) => {
             to: email,
             subject: 'Congratulations! Your Loan is Approved',
             text: `
-Congratulations! Your Loan is Approved
-
 Hi ${firstName},
 
-We're pleased to inform you that your loan application has been approved on ${formatDisplayDate(date)}.
+We're pleased to inform you that your loan application has been approved on ${dateApproved} at ${timeApproved}.
 
 Loan Details:
 - Approved Amount: ₱${amount}
+- Release Amount: ₱${releaseAmount} (after processing fee)
+- Processing Fee: ₱${processingFee}
 - Repayment Term: ${term} months
+- Interest Rate: ${interestRate}
+- Monthly Interest: ₱${interest}
+- Principal Payment: ₱${monthlyPayment}
+- Total Monthly Payment: ₱${totalMonthlyPayment}
+- Total Term Payment: ₱${totalTermPayment}
+- Due Date: ${dueDate}
 
-Please log in to your account to view the full details and next steps.
+Payment Instructions:
+1. Payments are due on the ${new Date(dueDate).getDate()}th of each month
+2. Late payments will incur additional charges
+3. You may pay through our online portal or at any authorized payment center
+
+Please log in to your account to view the full payment schedule and details.
 
 Congratulations and thank you for trusting 5Ki Financial Services.
 
@@ -655,13 +827,25 @@ Best regards,
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending loan approval email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
+        res.status(500).json({ 
+            message: 'Failed to send email', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 
 app.post('/rejectLoans', async (req, res) => {
     console.log('[NOTIFICATION] Initiating loan rejection email', req.body);
-    const { email, firstName, lastName } = req.body;
+    const { 
+        email, 
+        firstName, 
+        lastName,
+        rejectionReason,
+        rejectionMessage,
+        dateRejected,
+        timeRejected
+    } = req.body;
 
     if (!email || !firstName || !lastName) {
         console.log('[NOTIFICATION ERROR] Missing required fields for loan rejection');
@@ -670,29 +854,37 @@ app.post('/rejectLoans', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending loan rejection to user');
-        await transporter.sendMail({
+        const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Loan Rejected',
+            subject: 'Loan Application Update',
             text: `
-Loan Rejected
+Hi ${firstName},
 
-Hi Mr./Mrs. ${lastName},
+${rejectionMessage || `We regret to inform you that your loan application has been rejected.${rejectionReason ? `\n\nReason: ${rejectionReason}` : ''}`}
 
-Your loan has been rejected.
+Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}
+${timeRejected ? `Time: ${timeRejected}` : ''}
 
-Connect with us: ${FACEBOOK_LINK}
+If you have any questions or need clarification, please don't hesitate to contact us at ${GMAIL_OWNER}.
+
+Connect with us on Facebook: ${FACEBOOK_LINK}
 
 Best regards,
-5KI Financial Services
+5KI Financial Services Team
             `
-        });
+        };
 
+        await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Loan rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending loan rejection email:', error);
-        res.status(500).json({ message: 'Failed to send email', error: error.message });
+        res.status(500).json({ 
+            message: 'Failed to send email', 
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
     }
 });
 

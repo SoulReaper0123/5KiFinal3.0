@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApproveLoans, RejectLoans } from '../../../../../Server/api';
-import { FaCheckCircle, FaTimes, FaExclamationCircle } from 'react-icons/fa';
+import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const styles = {
   container: {
@@ -76,19 +76,6 @@ const styles = {
     alignItems: 'center',
     zIndex: 1000
   },
-  modalCard: {
-    width: '40%',
-    maxWidth: '800px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
-    height: '80vh',
-    display: 'flex',
-    flexDirection: 'column'
-  },
   modalCardSmall: {
     width: '250px',
     backgroundColor: 'white',
@@ -101,64 +88,31 @@ const styles = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     textAlign: 'center'
   },
-  modalContent: {
-    paddingBottom: '12px',
-    overflowY: 'auto',
-    flex: 1
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
   },
-  columns: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '30px'
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
   },
-  leftColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  rightColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
+  viewText: {
     color: '#2D5783',
-    textAlign: 'center'
-  },
-  modalDetailText: {
-    fontSize: '13px',
-    marginBottom: '6px',
-    color: '#333',
-    wordBreak: 'break-word',
-    lineHeight: '1.3'
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
+    fontSize: '14px',
+    textDecoration: 'underline',
     cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
     outline: 'none',
     '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
+      outline: 'none'
     }
-  },
-  bottomButtons: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: '16px',
-    gap: '12px',
-    paddingTop: '12px',
-    borderTop: '1px solid #eee'
   },
   actionButton: {
     padding: '8px 16px',
@@ -193,10 +147,14 @@ const styles = {
       backgroundColor: '#d32f2f'
     }
   },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+    opacity: '0.7'
+  },
   modalText: {
     fontSize: '14px',
     marginBottom: '16px',
-    textAlign: 'center',
     color: '#333',
     lineHeight: '1.4'
   },
@@ -204,71 +162,151 @@ const styles = {
     marginBottom: '12px',
     fontSize: '32px'
   },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
+  imageViewerModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000
   },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
+  imageViewerContent: {
+    position: 'relative',
+    width: '90%',
+    maxWidth: '800px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
   },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
+  largeImage: {
+    maxWidth: '100%',
+    maxHeight: '70vh',
+    objectFit: 'contain',
+    borderRadius: '4px'
+  },
+  imageViewerLabel: {
+    color: 'white',
+    fontSize: '18px',
+    marginTop: '16px',
+    textAlign: 'center'
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: '-40px',
+    right: '0',
+    color: 'white',
+    fontSize: '24px',
     cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
+    padding: '8px',
+    backgroundColor: 'transparent',
+    border: 'none',
     outline: 'none',
     '&:focus': {
       outline: 'none'
     }
   },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-    opacity: '0.7'
+  imageViewerNav: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    '&:hover': {
+      color: '#2D5783'
+    },
+    '&:focus': {
+      outline: 'none'
+    }
   },
-  modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-    marginBottom: '12px'
+  prevButton: {
+    left: '50px'
   },
-  compactField: {
+  nextButton: { 
+    right: '50px'
+  },
+  rejectionModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '6px',
-    gap: '8px'
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1001
   },
-  fieldLabel: {
+  rejectionModalContent: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    width: '400px',
+    maxWidth: '90%',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+  },
+  rejectionTitle: {
+    fontSize: '18px',
     fontWeight: 'bold',
-    color: '#555',
-    fontSize: '13px',
-    minWidth: '100px'
-  },
-  fieldValue: {
-    textAlign: 'right',
-    flex: 1,
-    wordBreak: 'break-word',
-    color: '#333',
-    fontSize: '13px'
-  },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
+    marginBottom: '16px',
     color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'left',
-    width: '100%'
+    textAlign: 'center'
+  },
+  reasonOption: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '10px',
+    padding: '8px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#f5f5f5'
+    }
+  },
+  reasonRadio: {
+    marginRight: '10px'
+  },
+  reasonText: {
+    flex: 1
+  },
+  customReasonInput: {
+    width: '100%',
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    marginTop: '8px'
+  },
+  rejectionButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: '20px',
+    gap: '10px'
+  },
+  cancelButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    backgroundColor: 'white',
+    cursor: 'pointer'
+  },
+  confirmRejectButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: '#f44336',
+    color: 'white',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
   },
   actionText: {
     color: '#2D5783',
@@ -292,15 +330,32 @@ const styles = {
   }
 };
 
-const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
-  const [selectedLoan, setSelectedLoan] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
+const rejectionReasons = [
+  "No deposit transactions made on account",
+  "Insufficient funds (below ₱5,000 threshold)",
+  "Existing unpaid loan balance",
+  "Suspicious activity",
+  "Other (please specify)"
+];
+
+const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange, refreshData }) => {
   const [currentAction, setCurrentAction] = useState(null);
+  const [selectedLoan, setSelectedLoan] = useState(null);
   const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [availableImages, setAvailableImages] = useState([]);
+  const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
+  const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -329,58 +384,96 @@ const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
     });
   };
 
-  const removeFromPendingLoans = async (memberId, transactionId) => {
-    try {
-      await database.ref(`Loans/LoanApplications/${memberId}/${transactionId}`).remove();
-    } catch (error) {
-      console.error('Error removing from pending loans:', error);
-      throw error;
+  const handleApproveClick = (loan) => {
+    setSelectedLoan(loan);
+    setShowApproveConfirmation(true);
+  };
+
+  const handleRejectClick = (loan) => {
+    setSelectedLoan(loan);
+    setShowRejectionModal(true);
+  };
+
+  const confirmApprove = async () => {
+    setShowApproveConfirmation(false);
+    await processAction(selectedLoan, 'approve');
+  };
+
+  const handleReasonSelect = (reason) => {
+    setSelectedReason(reason);
+    if (reason !== "Other (please specify)") {
+      setCustomReason('');
     }
   };
 
-  const processAction = async (loan, action) => {
+  const confirmRejection = () => {
+    if (!selectedReason) {
+      setErrorMessage('Please select a rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    if (selectedReason === "Other (please specify)" && !customReason.trim()) {
+      setErrorMessage('Please specify the rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    setShowRejectionModal(false);
+    setShowRejectConfirmation(true);
+  };
+
+  const confirmRejectFinal = async () => {
+    setShowRejectConfirmation(false);
+    await processAction(selectedLoan, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
+  };
+
+  const processAction = async (loan, action, rejectionReason = '') => {
+    setActionInProgress(true);
     setIsProcessing(true);
     setCurrentAction(action);
 
     try {
+      // First perform database operations
       if (action === 'approve') {
-        const success = await handleApprove(loan);
-        if (!success) return;
-        
+        await processDatabaseApprove(loan);
         setSuccessMessage('Loan approved successfully!');
-        setSuccessMessageModalVisible(true);
-        
-        setSelectedLoan(prev => ({
-          ...prev,
-          dateApproved: formatDate(new Date()),
-          approvedTime: formatTime(new Date()),
-          status: 'approved'
-        }));
       } else {
-        await handleReject(loan);
+        await processDatabaseReject(loan, rejectionReason);
         setSuccessMessage('Loan rejected successfully!');
-        setSuccessMessageModalVisible(true);
-        
-        setSelectedLoan(prev => ({
-          ...prev,
-          dateRejected: formatDate(new Date()),
-          rejectedTime: formatTime(new Date()),
-          status: 'rejected'
-        }));
       }
+
+      // Show success message
+      setSuccessMessageModalVisible(true);
       
-      // Remove the loan application from pending loans
-      await removeFromPendingLoans(loan.id, loan.transactionId);
-      setIsProcessing(false);
+      // Update local state to reflect changes
+      const now = new Date();
+      setSelectedLoan(prev => ({
+        ...prev,
+        ...(action === 'approve' ? {
+          dateApproved: formatDate(now),
+          timeApproved: formatTime(now),
+          status: 'approved'
+        } : {
+          dateRejected: formatDate(now),
+          timeRejected: formatTime(now),
+          status: 'rejected',
+          rejectionReason
+        })
+      }));
+
     } catch (error) {
-      console.error('Error processing action:', error); 
+      console.error('Error processing action:', error);
       setErrorMessage(error.message || 'An error occurred. Please try again.');
       setErrorModalVisible(true);
+    } finally {
       setIsProcessing(false);
+      setActionInProgress(false);
     }
   };
 
-  const handleApprove = async (loan) => {
+const processDatabaseApprove = async (loan) => {
+  try {
     const { id, transactionId, term, loanAmount } = loan;
 
     const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
@@ -388,199 +481,294 @@ const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
     const settingsRef = database.ref('Settings/LoanPercentage');
     
     // First check if member has sufficient balance based on loan percentage
-    try {
-      const [loanSnap, memberSnap, settingsSnap] = await Promise.all([
-        loanRef.once('value'),
-        memberRef.once('value'),
-        settingsRef.once('value')
-      ]);
+    const [loanSnap, memberSnap, settingsSnap] = await Promise.all([
+      loanRef.once('value'),
+      memberRef.once('value'),
+      settingsRef.once('value')
+    ]);
 
-      if (!loanSnap.exists()) {
-        setErrorMessage('Loan data not found.');
-        setErrorModalVisible(true);
-        setIsProcessing(false);
-        return false;
-      }
-
-      const memberBalance = parseFloat(memberSnap.val()) || 0;
-      const loanPercentage = parseFloat(settingsSnap.val());
-      let maxLoanAmount;
-      
-      // If loan percentage is 0, allow 100% of balance
-      if (loanPercentage === 0) {
-        maxLoanAmount = memberBalance;
-      } else {
-        // Use the set percentage (default to 80% if not set)
-        const percentage = loanPercentage || 80;
-        maxLoanAmount = memberBalance * (percentage / 100);
-      }
-
-      const requestedAmount = parseFloat(loanAmount);
-
-      if (requestedAmount > maxLoanAmount) {
-        const percentageUsed = loanPercentage === 0 ? 100 : (loanPercentage || 80);
-        setErrorMessage(`Loan amount exceeds ${percentageUsed}% of member's balance. Maximum allowed: ${formatCurrency(maxLoanAmount)}`);
-        setErrorModalVisible(true);
-        setIsProcessing(false);
-        return false;
-      }
-
-      // Continue with the rest of the approval process
-      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Loans/${id}/${transactionId}`);
-      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${transactionId}`);
-      const memberLoanRef = database.ref(`Members/${id}/loans/${transactionId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      const interestRateRef = database.ref(`Settings/InterestRate/${term}`);
-      const processingFeeRef = database.ref('Settings/ProcessingFee');
-
-      const [fundsSnap, interestSnap, feeSnap] = await Promise.all([
-        fundsRef.once('value'),
-        interestRateRef.once('value'),
-        processingFeeRef.once('value'),
-      ]);
-
-      const loanData = loanSnap.val();
-      const interestRate = parseFloat(interestSnap.val()) / 100;
-      const amount = parseFloat(loanData.loanAmount);
-      const termMonths = parseInt(loanData.term);
-      const currentFunds = parseFloat(fundsSnap.val());
-      const processingFee = parseFloat(feeSnap.val());
-
-      if (amount > currentFunds) {
-        setErrorMessage('Insufficient funds to approve this loan.');
-        setErrorModalVisible(true);
-        setIsProcessing(false);
-        return false;
-      }
-
-      const monthlyPayment = amount / termMonths;
-      const interest = amount * interestRate;
-      const totalMonthlyPayment = monthlyPayment + interest;
-      const totalTermPayment = totalMonthlyPayment * term;
-      const releaseAmount = amount - processingFee;
-
-      const now = new Date();
-      const dueDate = new Date(now);
-      dueDate.setDate(now.getDate() + 30);
-
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const formattedDueDate = formatDate(dueDate);
-
-      const approvedData = {
-        ...loanData,
-        interestRate: (interestRate * 100).toFixed(2) + '%',
-        interest: interest.toFixed(2),
-        monthlyPayment: monthlyPayment.toFixed(2),
-        totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
-        totalTermPayment: totalTermPayment.toFixed(2),
-        releaseAmount: releaseAmount.toFixed(2),
-        processingFee: processingFee.toFixed(2),
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        dueDate: formattedDueDate,
-        status: 'approved',
-      };
-
-      await approvedRef.set(approvedData);
-      await transactionRef.set(approvedData);
-      await currentLoanRef.set(approvedData);
-      await memberLoanRef.set(approvedData);
-      await fundsRef.set(currentFunds - amount);
-      await memberRef.set(memberBalance - amount);
-
-      return true;
-    } catch (err) {
-      console.error('Approval error:', err);
-      setErrorMessage('An unexpected error occurred during approval.');
-      setErrorModalVisible(true);
-      setIsProcessing(false);
-      return false;
+    if (!loanSnap.exists()) {
+      throw new Error('Loan data not found.');
     }
-  };
 
-  const handleReject = async (loan) => {
+    const memberBalance = parseFloat(memberSnap.val()) || 0;
+    const loanPercentage = parseFloat(settingsSnap.val());
+    let maxLoanAmount;
+    
+    // If loan percentage is 0, allow 100% of balance
+    if (loanPercentage === 0) {
+      maxLoanAmount = memberBalance;
+    } else {
+      // Use the set percentage (default to 80% if not set)
+      const percentage = loanPercentage || 80;
+      maxLoanAmount = memberBalance * (percentage / 100);
+    }
+
+    const requestedAmount = parseFloat(loanAmount);
+
+    if (requestedAmount > maxLoanAmount) {
+      const percentageUsed = loanPercentage === 0 ? 100 : (loanPercentage || 80);
+      throw new Error(`Loan amount exceeds ${percentageUsed}% of member's balance. Maximum allowed: ${formatCurrency(maxLoanAmount)}`);
+    }
+
+    // Continue with approval process
+    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${transactionId}`);
+    const transactionRef = database.ref(`Transactions/Loans/${id}/${transactionId}`);
+    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${transactionId}`);
+    const memberLoanRef = database.ref(`Members/${id}/loans/${transactionId}`);
+    const fundsRef = database.ref('Settings/Funds');
+    const interestRateRef = database.ref(`Settings/InterestRate/${term}`);
+    const processingFeeRef = database.ref('Settings/ProcessingFee');
+
+    const [fundsSnap, interestSnap, feeSnap] = await Promise.all([
+      fundsRef.once('value'),
+      interestRateRef.once('value'),
+      processingFeeRef.once('value'),
+    ]);
+
+    const loanData = loanSnap.val();
+    const interestRate = parseFloat(interestSnap.val()) / 100;
+    const amount = parseFloat(loanData.loanAmount);
+    const termMonths = parseInt(loanData.term);
+    const currentFunds = parseFloat(fundsSnap.val());
+    const processingFee = parseFloat(feeSnap.val());
+
+    if (amount > currentFunds) {
+      throw new Error('Insufficient funds to approve this loan.');
+    }
+
+    const monthlyPayment = amount / termMonths;
+    const interest = amount * interestRate;
+    const totalMonthlyPayment = monthlyPayment + interest;
+    const totalTermPayment = totalMonthlyPayment * term;
+    const releaseAmount = amount - processingFee;
+
+    const now = new Date();
+    const dueDate = new Date(now);
+    dueDate.setDate(now.getDate() + 30);
+
+    const approvalDate = formatDate(now);
+    const approvalTime = formatTime(now);
+    const formattedDueDate = formatDate(dueDate);
+
+    const approvedData = {
+      ...loanData,
+      interestRate: (interestRate * 100).toFixed(2) + '%',
+      interest: interest.toFixed(2),
+      monthlyPayment: monthlyPayment.toFixed(2),
+      totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
+      totalTermPayment: totalTermPayment.toFixed(2),
+      releaseAmount: releaseAmount.toFixed(2),
+      processingFee: processingFee.toFixed(2),
+      dateApproved: approvalDate,
+      timeApproved: approvalTime,
+      dueDate: formattedDueDate,
+      status: 'approved',
+    };
+
+    // Execute all database operations in sequence
+    await approvedRef.set(approvedData);
+    await transactionRef.set(approvedData);
+    await currentLoanRef.set(approvedData);
+    await memberLoanRef.set(approvedData);
+    await fundsRef.set(currentFunds - amount);
+    await memberRef.set(memberBalance - amount);
+
+    // Remove from pending loans AFTER all other operations succeed
+    // await loanRef.remove();
+
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve loan');
+  }
+};
+
+const processDatabaseReject = async (loan, rejectionReason) => {
+  try {
+    const now = new Date();
+    const rejectionDate = formatDate(now);
+    const rejectionTime = formatTime(now);
+    const status = 'rejected';
+
     const loanRef = database.ref(`Loans/LoanApplications/${loan.id}/${loan.transactionId}`);
     const rejectedRef = database.ref(`Loans/RejectedLoans/${loan.id}/${loan.transactionId}`);
     const transactionRef = database.ref(`Transactions/Loans/${loan.id}/${loan.transactionId}`);
-    const snapshot = await loanRef.once('value');
 
-    const rejectionDate = formatDate(new Date());
-    const rejectionTime = formatTime(new Date());
+    // First create a copy of the loan data with rejection info
+    const rejectedLoan = { 
+      ...loan, 
+      dateRejected: rejectionDate,
+      timeRejected: rejectionTime,
+      status,
+      rejectionReason: rejectionReason || 'Rejected by admin'
+    };
 
-    if (snapshot.exists()) {
-      const data = snapshot.val();
+    // Execute all database operations in sequence
+    await rejectedRef.set(rejectedLoan);
+    await transactionRef.set(rejectedLoan);
 
-      const rejectedData = {
-        ...data,
-        dateRejected: rejectionDate,
-        timeRejected: rejectionTime,
-        status: 'rejected',
-      };
+    // Remove from pending loans AFTER saving to rejected
+    // await loanRef.remove();
 
-      await rejectedRef.set(rejectedData);
-      await transactionRef.set(rejectedData);
-    }
-  };
+  } catch (err) {
+    console.error('Rejection DB error:', err);
+    throw new Error(err.message || 'Failed to reject loan');
+  }
+};
 
   const handleSuccessOk = () => {
     setSuccessMessageModalVisible(false);
-    
-    if (currentAction === 'approve') {
-      callApiApprove(selectedLoan).catch(err => console.error('Background API error:', err));
-    } else {
-      callApiReject(selectedLoan).catch(err => console.error('Background API error:', err));
-    }
-    
     setSelectedLoan(null);
     setCurrentAction(null);
-  };
-
-  const callApiApprove = async (loan) => {
-    try {
-      await ApproveLoans({
-        memberId: loan.id,
-        transactionId: loan.transactionId,
-        amount: loan.loanAmount,
-        term: loan.term,
-        dateApproved: formatDate(new Date()),
-        timeApproved: formatTime(new Date()),
-        email: loan.email,
-        firstName: loan.firstName,
-        lastName: loan.lastName,
-      });
-    } catch (err) {
-      console.error('API approve error:', err);
+    
+    // Call API in background after user clicks OK
+    if (currentAction === 'approve') {
+      callApiApprove(selectedLoan).catch(console.error);
+    } else {
+      callApiReject(selectedLoan).catch(console.error);
     }
+    
+    refreshData();
   };
 
-  const callApiReject = async (loan) => {
-    try {
-      await RejectLoans({
-        memberId: loan.id,
-        transactionId: loan.transactionId,
-        amount: loan.loanAmount,
-        term: loan.term,
-        dateRejected: formatDate(new Date()),
-        timeRejected: formatTime(new Date()),
-        email: loan.email,
-        firstName: loan.firstName,
-        lastName: loan.lastName,
-      });
-    } catch (err) {
-      console.error('API reject error:', err);
+const callApiApprove = async (loan) => {
+  try {
+    const now = new Date();
+    
+    // Get the necessary settings from Firebase
+    const interestRateRef = database.ref(`Settings/InterestRate/${loan.term}`);
+    const processingFeeRef = database.ref('Settings/ProcessingFee');
+    
+    const [interestSnap, feeSnap] = await Promise.all([
+      interestRateRef.once('value'),
+      processingFeeRef.once('value'),
+    ]);
+
+    const interestRate = parseFloat(interestSnap.val()) / 100;
+    const amount = parseFloat(loan.loanAmount);
+    const termMonths = parseInt(loan.term);
+    const processingFee = parseFloat(feeSnap.val());
+
+    // Calculate all loan details
+    const monthlyPayment = amount / termMonths;
+    const interest = amount * interestRate;
+    const totalMonthlyPayment = monthlyPayment + interest;
+    const totalTermPayment = totalMonthlyPayment * termMonths;
+    const releaseAmount = amount - processingFee;
+
+    const dueDate = new Date(now);
+    dueDate.setDate(now.getDate() + 30);
+
+    const response = await ApproveLoans({
+      memberId: loan.id,
+      transactionId: loan.transactionId,
+      amount: amount.toFixed(2),
+      term: termMonths,
+      dateApproved: loan.dateApproved || formatDate(now),
+      timeApproved: loan.timeApproved || formatTime(now),
+      email: loan.email,
+      firstName: loan.firstName,
+      lastName: loan.lastName,
+      status: 'approved',
+      interestRate: (interestRate * 100).toFixed(2) + '%',
+      interest: interest.toFixed(2),
+      monthlyPayment: monthlyPayment.toFixed(2),
+      totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
+      totalTermPayment: totalTermPayment.toFixed(2),
+      releaseAmount: releaseAmount.toFixed(2),
+      processingFee: processingFee.toFixed(2),
+      dueDate: formatDate(dueDate)
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to send approval email');
     }
+  } catch (err) {
+    console.error('API approve error:', err);
+  }
+};
+
+const callApiReject = async (loan) => {
+  try {
+    const now = new Date();
+    
+    let rejectionMessage = '';
+    if (loan.rejectionReason.includes('No deposit transactions')) {
+      rejectionMessage = `We appreciate your interest in applying for a loan with us. After careful review, we regret to inform you that your loan application was not approved due to our records showing that no deposit transactions have been made on your account since you joined our platform. Maintaining an active deposit history is one of the key requirements for loan eligibility. 
+
+We encourage you to begin transacting with your account so you may be eligible for future loan applications. Thank you.`;
+    } 
+    else if (loan.rejectionReason.includes('Insufficient funds')) {
+      rejectionMessage = `We appreciate your interest in applying for a loan with us. After careful review, we regret to inform you that your loan application was not approved due to your account's current maintaining balance falling below the required threshold of ₱5,000. As part of our eligibility criteria, a minimum maintaining balance is necessary to ensure financial stability and responsible borrowing.
+
+We highly encourage you to review your account status and consider making a deposit to maintain eligibility in the future. You may reapply once your account meets the required balance and we'll be happy to reassess your application.`;
+    }
+    else if (loan.rejectionReason.includes('Existing unpaid loan')) {
+      rejectionMessage = `We appreciate your interest in applying for a loan with us. After careful review, we regret to inform you that your loan application was not approved due to existing unpaid loans and balances on your account.
+
+We recommend settling outstanding balances first before reapplying. Once cleared, you may submit a new application and we'll be happy to reassess it.`;
+    }
+    else {
+      rejectionMessage = `After careful review, we regret to inform you that your loan application has not been approved.${loan.rejectionReason ? `\n\nReason: ${loan.rejectionReason}` : ''}`;
+    }
+
+    const response = await RejectLoans({
+      memberId: loan.id,
+      transactionId: loan.transactionId,
+      amount: loan.loanAmount,
+      term: loan.term,
+      dateRejected: loan.dateRejected || formatDate(now),
+      timeRejected: loan.timeRejected || formatTime(now),
+      email: loan.email,
+      firstName: loan.firstName,
+      lastName: loan.lastName,
+      status: 'rejected',
+      rejectionReason: loan.rejectionReason || 'Rejected by admin',
+      rejectionMessage: rejectionMessage
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to send rejection email');
+    }
+  } catch (err) {
+    console.error('API reject error:', err);
+  }
+};
+
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (url) {
+      images.push({ 
+        url, 
+        label 
+      });
+    }
+
+    setAvailableImages(images);
+    setCurrentImage({ url, label });
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
   };
 
-  const openModal = (loan) => {
-    setSelectedLoan(loan);
-    setModalVisible(true);
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
   };
 
-  const closeModal = () => {
-    setModalVisible(false);
-    setErrorModalVisible(false);
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
   };
 
   if (!loans.length) {
@@ -618,7 +806,7 @@ const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                 <td style={styles.tableCell}>
                   <span 
                     style={{...styles.actionText, ...styles.approveText}}
-                    onClick={() => processAction(item, 'approve')}
+                    onClick={() => handleApproveClick(item)}
                     onFocus={(e) => e.target.style.outline = 'none'}
                   >
                     Approve
@@ -626,7 +814,7 @@ const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                   <span style={{color: '#aaa', margin: '0 10px'}}> | </span>
                   <span 
                     style={{...styles.actionText, ...styles.rejectText}}
-                    onClick={() => processAction(item, 'reject')}
+                    onClick={() => handleRejectClick(item)}
                     onFocus={(e) => e.target.style.outline = 'none'}
                   >
                     Reject
@@ -638,137 +826,117 @@ const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
         </table>
       </div>
 
-      {/* View Details Modal */}
-      {modalVisible && (
+      {/* Approve Confirmation Modal */}
+      {showApproveConfirmation && (
         <div style={styles.centeredModal}>
-          <div style={styles.modalCard}>
-            <button 
-              style={styles.closeButton} 
-              onClick={closeModal}
-              aria-label="Close modal"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
-            <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Loan Details</h2>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to approve this loan?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmApprove}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowApproveConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
             </div>
-            <div style={styles.modalContent}>
-              <div style={styles.columns}>
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Loan Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.id || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Transaction ID:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.transactionId || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Amount:</span>
-                    <span style={styles.fieldValue}>{formatCurrency(selectedLoan?.loanAmount) || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Term:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.term ? `${selectedLoan.term} months` : 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Disbursement:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.disbursement || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Applied:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.dateApplied || 'N/A'}</span>
-                  </div>
+          </div>
+        </div>
+      )}
 
-                  {selectedLoan?.dateApproved && (
-                    <>
-                      <div style={styles.sectionTitle}>Approval Information</div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Date Approved:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Time Approved:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.approvedTime}</span>
-                      </div>
-                    </>
-                  )}
-
-                  {selectedLoan?.dateRejected && (
-                    <>
-                      <div style={styles.sectionTitle}>Rejection Information</div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Date Rejected:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Time Rejected:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.rejectedTime}</span>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div style={styles.rightColumn}>
-                  <div style={styles.sectionTitle}>Member Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Name:</span>
-                    <span style={styles.fieldValue}>{`${selectedLoan?.firstName || ''} ${selectedLoan?.lastName || ''}`}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.phoneNumber || 'N/A'}</span>
-                  </div>
-
-                  <div style={styles.sectionTitle}>Bank Details</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.accountName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.accountNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Bank Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.bankName || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
+      {/* Reject Confirmation Modal */}
+      {showRejectConfirmation && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to reject this loan?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmRejectFinal}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowRejectConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
             </div>
-            {selectedLoan?.status !== 'approved' && selectedLoan?.status !== 'rejected' && (
-              <div style={styles.bottomButtons}>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.approveButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={() => processAction(selectedLoan, 'approve')}
-                  disabled={isProcessing}
-                  onFocus={(e) => e.target.style.outline = 'none'}
-                >
-                  Approve
-                </button>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.rejectButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={() => processAction(selectedLoan, 'reject')}
-                  disabled={isProcessing}
-                  onFocus={(e) => e.target.style.outline = 'none'}
-                >
-                  Reject
-                </button>
+          </div>
+        </div>
+      )}
+
+      {showRejectionModal && (
+        <div style={styles.rejectionModal}>
+          <div style={styles.rejectionModalContent}>
+            <h2 style={styles.rejectionTitle}>Select Rejection Reason</h2>
+            {rejectionReasons.map((reason) => (
+              <div 
+                key={reason} 
+                style={styles.reasonOption}
+                onClick={() => handleReasonSelect(reason)}
+              >
+                <input
+                  type="radio"
+                  name="rejectionReason"
+                  checked={selectedReason === reason}
+                  onChange={() => handleReasonSelect(reason)}
+                  style={styles.reasonRadio}
+                />
+                <span style={styles.reasonText}>{reason}</span>
+                {reason === "Other (please specify)" && selectedReason === reason && (
+                  <input
+                    type="text"
+                    value={customReason}
+                    onChange={(e) => setCustomReason(e.target.value)}
+                    placeholder="Please specify reason"
+                    style={styles.customReasonInput}
+                  />
+                )}
               </div>
-            )}
+            ))}
+            <div style={styles.rejectionButtons}>
+              <button 
+                style={styles.cancelButton}
+                onClick={() => setShowRejectionModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.confirmRejectButton}
+                onClick={confirmRejection}
+              >
+                Confirm Rejection
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -824,6 +992,42 @@ const ApplyLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
             >
               OK
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {imageViewerVisible && (
+        <div style={styles.imageViewerModal}>
+          <div style={styles.imageViewerContent}>
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+              onClick={() => navigateImages('prev')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronLeft />
+            </button>
+            <img
+              src={currentImage.url}
+              alt={currentImage.label}
+              style={styles.largeImage}
+            />
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+              onClick={() => navigateImages('next')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronRight />
+            </button>
+            <button 
+              style={styles.imageViewerClose} 
+              onClick={closeImageViewer}
+              aria-label="Close image viewer"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
           </div>
         </div>
       )}

@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.3.45:3000';
+const API_URL = 'http://192.168.108.45:3000';
 const WEBSITE_URL = 'fiveki.onrender.com';
-const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; // Added Facebook URL
+const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
 // Admin Emails
 export const sendAdminCredentialsEmail = async (adminData) => {
@@ -30,6 +30,29 @@ export const sendAdminDeleteData = async (adminData) => {
   } catch (error) {
     console.error('Error sending admin delete email:', error);
     throw error;
+  }
+};
+
+// Two-Factor Authentication
+export const sendVerificationCode = async (emailData) => {
+  try {
+    const response = await axios.post(`${API_URL}/send-verification-code`, {
+      email: emailData.email,
+      firstName: emailData.firstName || '',
+      verificationCode: emailData.verificationCode,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    }, {
+      timeout: 10000 // 10 second timeout
+    });
+    
+    if (!response.data.success) {
+      throw new Error(response.data.message || 'Failed to send verification code');
+    }
+    return response.data;
+  } catch (error) {
+    console.error('Error sending verification code:', error);
+    throw new Error(error.response?.data?.message || 'Network error. Please try again.');
   }
 };
 

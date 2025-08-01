@@ -1,28 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { FaCheckCircle, FaTimesCircle, FaExclamationCircle, FaSpinner, FaImage } from 'react-icons/fa';
+import React, { useState } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApprovePayments, RejectPayments } from '../../../../../Server/api';
+import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const styles = {
   container: {
     flex: 1,
-    padding: '20px'
   },
   loadingView: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100vh'
+    height: '100%'
   },
   tableContainer: {
-    borderRadius: '10px',
+    borderRadius: '8px',
     overflow: 'auto',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginTop: '10px'
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
   },
   table: {
     width: '100%',
-    borderCollapse: 'collapse'
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed',
+    minWidth: '800px'
   },
   tableHeader: {
     backgroundColor: '#2D5783',
@@ -33,103 +33,36 @@ const styles = {
     fontSize: '16px'
   },
   tableHeaderCell: {
-    padding: '12px',
     whiteSpace: 'nowrap'
   },
   tableRow: {
-    height: '60px',
+    height: '50px',
     '&:nth-child(even)': {
       backgroundColor: '#f5f5f5'
     },
     '&:nth-child(odd)': {
-      backgroundColor: '#fff'
-    },
-    '&:hover': {
-      backgroundColor: '#f0f0f0'
+      backgroundColor: '#ddd'
     }
   },
   tableCell: {
-    padding: '12px',
     textAlign: 'center',
     fontSize: '14px',
-    borderBottom: '1px solid #ddd'
+    borderBottom: '1px solid #ddd',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
   },
-  thumbnailImage: {
-    width: '40px',
-    height: '40px',
-    borderRadius: '8px',
-    cursor: 'pointer'
+  statusApproved: {
+    color: 'green'
   },
-  actionsCell: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '10px'
+  statusRejected: {
+    color: 'red'
   },
-  actionButton: {
-    padding: '8px 12px',
-    borderRadius: '5px',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#fff',
-    fontSize: '14px',
-    transition: 'background-color 0.3s'
-  },
-  approveButton: {
-    backgroundColor: '#4CAF50',
-    '&:hover': {
-      backgroundColor: '#3e8e41'
-    }
-  },
-  rejectButton: {
-    backgroundColor: '#f44336',
-    '&:hover': {
-      backgroundColor: '#d32f2f'
-    }
-  },
-  imageModalContainer: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    zIndex: 1000,
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  imageModalHeader: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '15px',
-    paddingTop: '20px',
-    backgroundColor: 'rgba(0,0,0,0.7)'
-  },
-  imageModalTitle: {
-    color: '#fff',
-    fontSize: '18px',
-    fontWeight: 'bold'
-  },
-  closeButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    borderRadius: '20px',
-    padding: '5px',
-    cursor: 'pointer',
-    border: 'none',
-    color: '#fff',
-    fontSize: '20px'
-  },
-  imageContent: {
-    flex: 1,
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: '10px'
-  },
-  enlargedImage: {
-    maxWidth: '90%',
-    maxHeight: '90%',
-    borderRadius: '8px'
+  noDataMessage: {
+    textAlign: 'center',
+    marginTop: '50px',
+    fontSize: '16px',
+    color: 'gray'
   },
   centeredModal: {
     position: 'fixed',
@@ -144,81 +77,205 @@ const styles = {
     zIndex: 1000
   },
   modalCardSmall: {
-    width: '300px',
-    height: '200px',
-    backgroundColor: '#D9D9D9',
-    borderRadius: '10px',
+    width: '250px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
     padding: '20px',
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  modalIcon: {
-    fontSize: '30px',
-    marginBottom: '10px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '20px',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     textAlign: 'center'
   },
-  modalButtons: {
-    display: 'flex',
-    gap: '20px'
-  },
-  modalButton: {
-    width: '100px',
-    height: '40px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: '5px',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#fff',
-    fontSize: '16px'
-  },
-  confirmButton: {
-    backgroundColor: '#4CAF50',
-    '&:hover': {
-      backgroundColor: '#3e8e41'
-    }
-  },
-  cancelButton: {
-    backgroundColor: '#f44336',
-    '&:hover': {
-      backgroundColor: '#d32f2f'
-    }
-  },
-  noDataMessage: {
-    textAlign: 'center',
-    marginTop: '20px',
-    fontSize: '16px',
-    color: '#666'
-  },
   spinner: {
-    animation: 'spin 1s linear infinite',
-    fontSize: '40px',
-    color: '#001F3F'
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
   },
   '@keyframes spin': {
     '0%': { transform: 'rotate(0deg)' },
     '100%': { transform: 'rotate(360deg)' }
+  },
+  viewText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  approveButton: {
+    backgroundColor: '#4CAF50',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#3e8e41'
+    }
+  },
+  rejectButton: {
+    backgroundColor: '#f44336',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+    opacity: '0.7'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '16px',
+    color: '#333',
+    lineHeight: '1.4'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  imageViewerModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000
+  },
+  imageViewerContent: {
+    position: 'relative',
+    width: '90%',
+    maxWidth: '800px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  largeImage: {
+    maxWidth: '100%',
+    maxHeight: '70vh',
+    objectFit: 'contain',
+    borderRadius: '4px'
+  },
+  imageViewerLabel: {
+    color: 'white',
+    fontSize: '18px',
+    marginTop: '16px',
+    textAlign: 'center'
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: '-40px',
+    right: '0',
+    color: 'white',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '8px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  imageViewerNav: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    '&:hover': {
+      color: '#2D5783'
+    },
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  prevButton: {
+    left: '50px'
+  },
+  nextButton: { 
+    right: '50px'
+  },
+  actionText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  approveText: {
+    color: '#4CAF50'
+  },
+  rejectText: {
+    color: '#f44336'
+  },
+  thumbnailImage: {
+    width: '40px',
+    height: '40px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    objectFit: 'cover'
   }
 };
 
-const PaymentApplications = ({ payments }) => {
-  const [imageModalVisible, setImageModalVisible] = useState(false);
-  const [selectedImageUrl, setSelectedImageUrl] = useState('');
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, refreshData }) => {
   const [currentAction, setCurrentAction] = useState(null);
   const [selectedPayment, setSelectedPayment] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
+  const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -227,200 +284,326 @@ const PaymentApplications = ({ payments }) => {
       minimumFractionDigits: 2,
     }).format(amount);
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'N/A';
-    const options = { month: 'long', day: 'numeric', year: 'numeric' };
-    return new Date(dateString).toLocaleDateString('en-US', options);
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    
+    return `${hours}:${minutes}:${seconds} ${ampm}`;
   };
 
-  const openImageModal = (uri) => {
-    setSelectedImageUrl(uri);
-    setImageModalVisible(true);
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
   };
 
-  const handleAction = (payment, action) => {
+  const handleApproveClick = (payment) => {
     setSelectedPayment(payment);
-    setCurrentAction(action);
-    setConfirmModalVisible(true);
+    setShowApproveConfirmation(true);
   };
 
-  const confirmAction = async () => {
-    setConfirmModalVisible(false);
+  const handleRejectClick = (payment) => {
+    setSelectedPayment(payment);
+    setShowRejectConfirmation(true);
+  };
+
+  const confirmApprove = async () => {
+    setShowApproveConfirmation(false);
+    await processAction(selectedPayment, 'approve');
+  };
+
+  const confirmReject = async () => {
+    setShowRejectConfirmation(false);
+    await processAction(selectedPayment, 'reject');
+  };
+
+  const processAction = async (payment, action) => {
+    setActionInProgress(true);
     setIsProcessing(true);
+    setCurrentAction(action);
 
     try {
-      if (currentAction === 'approve') {
-        const success = await handleApprove(selectedPayment);
-        if (!success) return;
-        setSuccessMessage('Payment approved successfully.');
+      if (action === 'approve') {
+        await processDatabaseApprove(payment);
+        setSuccessMessage('Payment approved successfully!');
       } else {
-        await handleReject(selectedPayment);
-        setSuccessMessage('Payment rejected successfully.');
+        await processDatabaseReject(payment);
+        setSuccessMessage('Payment rejected successfully!');
       }
 
-      setSuccessModalVisible(true);
-    } catch (err) {
-      console.error(`${currentAction} error:`, err);
-      setErrorMessage(`An error occurred during ${currentAction}. Please try again.`);
-      setErrorModalVisible(true);
-    }
+      setSuccessMessageModalVisible(true);
+      
+      const now = new Date();
+      setSelectedPayment(prev => ({
+        ...prev,
+        ...(action === 'approve' ? {
+          dateApproved: formatDate(now),
+          timeApproved: formatTime(now),
+          status: 'completed'
+        } : {
+          dateRejected: formatDate(now),
+          timeRejected: formatTime(now),
+          status: 'failed'
+        })
+      }));
 
-    setIsProcessing(false);
+    } catch (error) {
+      console.error('Error processing action:', error);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+      setActionInProgress(false);
+    }
   };
 
-  const handleApprove = async (item) => {
-    const { id, transactionId, amountToBePaid, paymentOption } = item;
-    
-    const paymentRef = database.ref(`Payments/Pending/${id}/${transactionId}`);
-    const approvedRef = database.ref(`Payments/Completed/${id}/${transactionId}`);
-    const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
-    const fundsRef = database.ref('Settings/Funds');
-    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${transactionId}`);
-
+  const processDatabaseApprove = async (payment) => {
     try {
-      const [paymentSnap, fundsSnap, loanSnap] = await Promise.all([
+      const { id, transactionId, amountToBePaid } = payment;
+      
+      const paymentRef = database.ref(`Payments/Pending/${id}/${transactionId}`);
+      const approvedRef = database.ref(`Payments/Completed/${id}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
+      const fundsRef = database.ref('Settings/Funds');
+      const savingsRef = database.ref('Settings/Savings');
+      const memberRef = database.ref(`Members/${id}/balance`);
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${transactionId}`);
+
+      const [paymentSnap, fundsSnap, savingsSnap, memberSnap, loanSnap] = await Promise.all([
         paymentRef.once('value'),
         fundsRef.once('value'),
-        currentLoanRef.once('value'),
+        savingsRef.once('value'),
+        memberRef.once('value'),
+        currentLoanRef.once('value')
       ]);
 
       if (!paymentSnap.exists()) {
-        setErrorMessage('Payment data not found.');
-        setErrorModalVisible(true);
-        return false;
+        throw new Error('Payment data not found.');
       }
 
       const paymentData = paymentSnap.val();
-      const currentFunds = parseFloat(fundsSnap.val()) || 0;
       const paymentAmount = parseFloat(amountToBePaid);
-      const approvalDate = new Date().toLocaleDateString('en-US', {
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-      });
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+      const currentSavings = parseFloat(savingsSnap.val()) || 0;
+      const memberBalance = parseFloat(memberSnap.val()) || 0;
 
-      // Update funds
-      await fundsRef.set(currentFunds + paymentAmount);
+      // Calculate interest and principal if this is a loan payment
+      let interestAmount = 0;
+      let principalAmount = paymentAmount;
+      let newDueDate = null;
 
-      // Update loan if exists
       if (loanSnap.exists()) {
         const loanData = loanSnap.val();
-        const remainingAmount = parseFloat(loanData.loanAmount) - paymentAmount;
+        interestAmount = parseFloat(loanData.interest) || 0;
         
-        if (remainingAmount <= 0) {
+        // Calculate how much goes to principal (payment minus interest)
+        principalAmount = paymentAmount - interestAmount;
+        
+        // Update loan amount (reduce principal)
+        const remainingLoan = parseFloat(loanData.loanAmount) - principalAmount;
+        
+        if (remainingLoan <= 0) {
+          // Loan fully paid
           await currentLoanRef.remove();
         } else {
+          // Update loan with remaining amount and extend due date by 30 days
+          const now = new Date();
+          const dueDate = new Date(now);
+          dueDate.setDate(now.getDate() + 30);
+          newDueDate = formatDate(dueDate);
+          
           await currentLoanRef.update({
-            loanAmount: remainingAmount.toFixed(2)
+            loanAmount: remainingLoan.toFixed(2),
+            dueDate: newDueDate
           });
         }
       }
 
+      // Update funds (add principal amount)
+      await fundsRef.set(currentFunds + principalAmount);
+      
+      // Update savings (add interest amount if any)
+      if (interestAmount > 0) {
+        await savingsRef.set(currentSavings + interestAmount);
+      }
+      
+      // Update member balance (add full payment amount)
+      await memberRef.set(memberBalance + paymentAmount);
+
       // Create approved record
+      const now = new Date();
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+
       const approvedData = {
         ...paymentData,
         dateApproved: approvalDate,
+        timeApproved: approvalTime,
         status: 'completed',
+        interestPaid: interestAmount.toFixed(2),
+        principalPaid: principalAmount.toFixed(2)
       };
 
+      // Execute all database operations
       await approvedRef.set(approvedData);
       await transactionRef.set(approvedData);
       await paymentRef.remove();
 
-      return true;
     } catch (err) {
-      console.error('Approval error:', err);
-      setErrorMessage('An unexpected error occurred during approval.');
-      setErrorModalVisible(true);
-      return false;
+      console.error('Approval DB error:', err);
+      throw new Error(err.message || 'Failed to approve payment');
     }
   };
 
-  const handleReject = async (item) => {
-    const paymentRef = database.ref(`Payments/Pending/${item.id}/${item.transactionId}`);
-    const rejectedRef = database.ref(`Payments/Failed/${item.id}/${item.transactionId}`);
-    const transactionRef = database.ref(`Transactions/Payments/${item.id}/${item.transactionId}`);
-    const snapshot = await paymentRef.once('value');
+  const processDatabaseReject = async (payment) => {
+    try {
+      const { id, transactionId } = payment;
+      const now = new Date();
+      const rejectionDate = formatDate(now);
+      const rejectionTime = formatTime(now);
 
-    const rejectionDate = new Date().toLocaleDateString('en-US', {
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric',
-    });
+      const paymentRef = database.ref(`Payments/Pending/${id}/${transactionId}`);
+      const rejectedRef = database.ref(`Payments/Failed/${id}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
 
-    if (snapshot.exists()) {
-      const data = snapshot.val();
+      const paymentSnap = await paymentRef.once('value');
+      if (!paymentSnap.exists()) {
+        throw new Error('Payment data not found.');
+      }
 
-      const rejectedData = {
-        ...data,
+      const rejectedPayment = { 
+        ...paymentSnap.val(), 
         dateRejected: rejectionDate,
-        status: 'failed',
+        timeRejected: rejectionTime,
+        status: 'failed'
       };
 
-      await rejectedRef.set(rejectedData);
-      await transactionRef.set(rejectedData);
+      await rejectedRef.set(rejectedPayment);
+      await transactionRef.set(rejectedPayment);
       await paymentRef.remove();
+
+    } catch (err) {
+      console.error('Rejection DB error:', err);
+      throw new Error(err.message || 'Failed to reject payment');
     }
   };
 
-  const callApiApprove = async (item) => {
+  const handleSuccessOk = () => {
+    setSuccessMessageModalVisible(false);
+    setSelectedPayment(null);
+    setCurrentAction(null);
+    
+    // Call API in background after user clicks OK
+    if (currentAction === 'approve') {
+      callApiApprove(selectedPayment).catch(console.error);
+    } else {
+      callApiReject(selectedPayment).catch(console.error);
+    }
+    
+    refreshData();
+  };
+
+  const callApiApprove = async (payment) => {
     try {
-      const memberSnap = await database.ref(`Members/${item.id}`).once('value');
+      const now = new Date();
+      const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
       const memberData = memberSnap.val();
 
-      await ApprovePayments({
-        memberId: item.id,
-        transactionId: item.transactionId,
-        amount: item.amountToBePaid,
-        paymentMethod: item.paymentOption,
-        dateApproved: new Date().toLocaleDateString('en-US'),
-        email: item.email,
+      const response = await ApprovePayments({
+        memberId: payment.id,
+        transactionId: payment.transactionId,
+        amount: payment.amountToBePaid,
+        paymentMethod: payment.paymentOption,
+        dateApproved: payment.dateApproved || formatDate(now),
+        timeApproved: payment.timeApproved || formatTime(now),
+        email: payment.email,
         firstName: memberData.firstName,
         lastName: memberData.lastName,
+        status: 'completed'
       });
+      
+      if (!response.ok) {
+        console.error('Failed to send approval email');
+      }
     } catch (err) {
       console.error('API approve error:', err);
     }
   };
 
-  const callApiReject = async (item) => {
+  const callApiReject = async (payment) => {
     try {
-      const memberSnap = await database.ref(`Members/${item.id}`).once('value');
+      const now = new Date();
+      const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
       const memberData = memberSnap.val();
 
-      await RejectPayments({
-        memberId: item.id,
-        transactionId: item.transactionId,
-        amount: item.amountToBePaid,
-        paymentMethod: item.paymentOption,
-        dateRejected: new Date().toLocaleDateString('en-US'),
-        email: item.email,
+      const response = await RejectPayments({
+        memberId: payment.id,
+        transactionId: payment.transactionId,
+        amount: payment.amountToBePaid,
+        paymentMethod: payment.paymentOption,
+        dateRejected: payment.dateRejected || formatDate(now),
+        timeRejected: payment.timeRejected || formatTime(now),
+        email: payment.email,
         firstName: memberData.firstName,
         lastName: memberData.lastName,
+        status: 'failed'
       });
+      
+      if (!response.ok) {
+        console.error('Failed to send rejection email');
+      }
     } catch (err) {
       console.error('API reject error:', err);
     }
   };
 
-  const handleSuccessOk = () => {
-    setSuccessModalVisible(false);
-    if (currentAction === 'approve') callApiApprove(selectedPayment);
-    else callApiReject(selectedPayment);
-    setSelectedPayment(null);
-    setCurrentAction(null);
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (url) {
+      images.push({ 
+        url, 
+        label: 'Proof of Payment' 
+      });
+    }
+
+    setAvailableImages(images);
+    setCurrentImage({ url, label: 'Proof of Payment' });
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
   };
 
-  const handleErrorOk = () => {
-    setErrorModalVisible(false);
-    setSelectedPayment(null);
-    setCurrentAction(null);
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
   };
 
-  if (!payments || payments.length === 0) {
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
+  };
+
+  if (!payments.length) {
     return (
       <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No pending payments available.</p>
+        <p style={styles.noDataMessage}>No payment applications available.</p>
       </div>
     );
   }
@@ -431,13 +614,13 @@ const PaymentApplications = ({ payments }) => {
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={styles.tableHeaderCell}>ID</th>
-              <th style={styles.tableHeaderCell}>Transaction ID</th>
-              <th style={styles.tableHeaderCell}>Amount</th>
-              <th style={styles.tableHeaderCell}>Payment Option</th>
-              <th style={styles.tableHeaderCell}>Date Applied</th>
-              <th style={styles.tableHeaderCell}>Proof</th>
-              <th style={styles.tableHeaderCell}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Payment Method</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Applied</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Proof</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -447,32 +630,33 @@ const PaymentApplications = ({ payments }) => {
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid)}</td>
                 <td style={styles.tableCell}>{item.paymentOption}</td>
-                <td style={styles.tableCell}>{formatDate(item.dateApplied)}</td>
+                <td style={styles.tableCell}>{item.dateApplied}</td>
                 <td style={styles.tableCell}>
                   {item.proofOfPaymentUrl ? (
                     <img
                       src={item.proofOfPaymentUrl}
                       alt="Proof of payment"
                       style={styles.thumbnailImage}
-                      onClick={() => openImageModal(item.proofOfPaymentUrl)}
+                      onClick={() => openImageViewer(item.proofOfPaymentUrl, 'Proof of Payment', index)}
                     />
-                  ) : (
-                    'N/A'
-                  )}
+                  ) : 'N/A'}
                 </td>
-                <td style={styles.actionsCell}>
-                  <button
-                    style={{...styles.actionButton, ...styles.approveButton}}
-                    onClick={() => handleAction(item, 'approve')}
+                <td style={styles.tableCell}>
+                  <span 
+                    style={{...styles.actionText, ...styles.approveText}}
+                    onClick={() => handleApproveClick(item)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
                   >
                     Approve
-                  </button>
-                  <button
-                    style={{...styles.actionButton, ...styles.rejectButton}}
-                    onClick={() => handleAction(item, 'reject')}
+                  </span>
+                  <span style={{color: '#aaa', margin: '0 10px'}}> | </span>
+                  <span 
+                    style={{...styles.actionText, ...styles.rejectText}}
+                    onClick={() => handleRejectClick(item)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
                   >
                     Reject
-                  </button>
+                  </span>
                 </td>
               </tr>
             ))}
@@ -480,46 +664,32 @@ const PaymentApplications = ({ payments }) => {
         </table>
       </div>
 
-      {/* Image Modal */}
-      {imageModalVisible && (
-        <div style={styles.imageModalContainer}>
-          <div style={styles.imageModalHeader}>
-            <h2 style={styles.imageModalTitle}>Proof of Payment</h2>
-            <button 
-              onClick={() => setImageModalVisible(false)} 
-              style={styles.closeButton}
-            >
-              ×
-            </button>
-          </div>
-          <div style={styles.imageContent}>
-            <img 
-              src={selectedImageUrl} 
-              alt="Enlarged proof of payment" 
-              style={styles.enlargedImage} 
-            />
-          </div>
-        </div>
-      )}
-
-      {/* Confirm Modal */}
-      {confirmModalVisible && (
+      {/* Approve Confirmation Modal */}
+      {showApproveConfirmation && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{...styles.modalIcon, color: '#faad14'}} />
-            <p style={styles.modalText}>
-              Are you sure you want to <strong>{currentAction?.toUpperCase()}</strong> this payment?
-            </p>
-            <div style={styles.modalButtons}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to approve this payment?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
               <button 
-                style={{...styles.modalButton, ...styles.confirmButton}}
-                onClick={confirmAction}
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmApprove}
+                disabled={actionInProgress}
               >
-                Yes
+                {actionInProgress ? 'Processing...' : 'Yes'}
               </button>
               <button 
-                style={{...styles.modalButton, ...styles.cancelButton}}
-                onClick={() => setConfirmModalVisible(false)}
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowApproveConfirmation(false)}
+                disabled={actionInProgress}
               >
                 No
               </button>
@@ -528,22 +698,36 @@ const PaymentApplications = ({ payments }) => {
         </div>
       )}
 
-      {/* Success Modal */}
-      {successModalVisible && (
+      {/* Reject Confirmation Modal */}
+      {showRejectConfirmation && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
-            {currentAction === 'approve' ? (
-              <FaCheckCircle style={{...styles.modalIcon, color: '#4CAF50'}} />
-            ) : (
-              <FaTimesCircle style={{...styles.modalIcon, color: '#f44336'}} />
-            )}
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{...styles.modalButton, ...styles.confirmButton}}
-              onClick={handleSuccessOk}
-            >
-              OK
-            </button>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to reject this payment?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmReject}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowRejectConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -552,11 +736,18 @@ const PaymentApplications = ({ payments }) => {
       {errorModalVisible && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
-            <FaTimesCircle style={{...styles.modalIcon, color: '#f44336'}} />
+            <FaExclamationCircle 
+              style={{ ...styles.confirmIcon, color: '#f44336' }} 
+            />
             <p style={styles.modalText}>{errorMessage}</p>
             <button 
-              style={{...styles.modalButton, ...styles.cancelButton}}
-              onClick={handleErrorOk}
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setErrorModalVisible(false)}
+              onFocus={(e) => e.target.style.outline = 'none'}
             >
               OK
             </button>
@@ -564,10 +755,71 @@ const PaymentApplications = ({ payments }) => {
         </div>
       )}
 
-      {/* Processing Spinner */}
+      {/* Processing Modal */}
       {isProcessing && (
         <div style={styles.centeredModal}>
-          <FaSpinner style={styles.spinner} />
+          <div style={styles.spinner}></div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {successMessageModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            {currentAction === 'approve' ? (
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+            ) : (
+              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
+            )}
+            <p style={styles.modalText}>{successMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={handleSuccessOk}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {imageViewerVisible && (
+        <div style={styles.imageViewerModal}>
+          <div style={styles.imageViewerContent}>
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+              onClick={() => navigateImages('prev')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronLeft />
+            </button>
+            <img
+              src={currentImage.url}
+              alt={currentImage.label}
+              style={styles.largeImage}
+            />
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+              onClick={() => navigateImages('next')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronRight />
+            </button>
+            <button 
+              style={styles.imageViewerClose} 
+              onClick={closeImageViewer}
+              aria-label="Close image viewer"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+          </div>
         </div>
       )}
     </div>

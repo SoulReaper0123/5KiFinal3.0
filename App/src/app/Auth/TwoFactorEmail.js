@@ -1,43 +1,62 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { sendVerificationCode } from '../../api'; // Update path as needed
 
 export default function TwoFactorEmail({ route, navigation }) {
-  // Email comes from previous screen and CANNOT be edited
   const email = route.params?.email || '';
+  const firstName = route.params?.firstName || '';
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendCode = () => {
+  const handleSendCode = async () => {
+    if (!email) {
+      Alert.alert('Error', 'Email address is required');
+      return;
+    }
+
+    setIsLoading(true);
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // In production: Actually send this code via your email service
-    console.log(`Verification code sent to ${email}: ${verificationCode}`);
-    
-    navigation.navigate('VerifyCode', { 
-      email,
-      verificationCode,
-      // Lock these values so they can't be modified
-      lockedEmail: email,
-      lockedCode: verificationCode 
-    });
+    try {
+      await sendVerificationCode({
+        email,
+        firstName,
+        verificationCode
+      });
+      
+      navigation.navigate('VerifyCode', { 
+        email,
+        verificationCode,
+        lockedEmail: email,
+        lockedCode: verificationCode 
+      });
+    } catch (error) {
+      console.error('Failed to send verification code:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to send verification code. Please try again.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
     <View style={styles.container}>
-      {/* Back Button */}
+      {/* Back Button - Disabled during loading */}
       <TouchableOpacity 
         style={styles.backButton} 
-        onPress={() => navigation.goBack()}
+        onPress={() => !isLoading && navigation.goBack()}
         activeOpacity={0.7}
+        disabled={isLoading}
       >
         <MaterialIcons name="arrow-back" size={30} color="white" />
       </TouchableOpacity>
 
-      {/* Main Content */}
       <View style={styles.contentContainer}>
-        {/* Title */}
         <Text style={styles.title}>Two-Factor Authentication</Text>
         
-        {/* Email Display */}
         <View style={styles.emailContainer}>
           <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
             {email}
@@ -45,18 +64,22 @@ export default function TwoFactorEmail({ route, navigation }) {
           <MaterialIcons name="lock" size={20} color="#666" />
         </View>
 
-        {/* Instructions */}
         <Text style={styles.instructions}>
           For your security, we'll send a 6-digit verification code to this email address.
+          The code will expire in 10 minutes.
         </Text>
         
-        {/* Send Code Button */}
         <TouchableOpacity 
-          style={styles.button} 
+          style={[styles.button, isLoading && styles.disabledButton]} 
           onPress={handleSendCode}
           activeOpacity={0.8}
+          disabled={isLoading}
         >
-          <Text style={styles.buttonText}>Send Code</Text>
+          {isLoading ? (
+            <ActivityIndicator color="#1A1A1A" />
+          ) : (
+            <Text style={styles.buttonText}>Send Code</Text>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -133,6 +156,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
+  },
+  disabledButton: {
+    backgroundColor: '#A8D5BA90', // Slightly transparent version of the button color
   },
   buttonText: {
     color: '#1A1A1A',
