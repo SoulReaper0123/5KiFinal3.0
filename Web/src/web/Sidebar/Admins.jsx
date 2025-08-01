@@ -10,7 +10,7 @@ import {
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
-import { database } from '../../../../Database/firebaseConfig';
+import { database, auth } from '../../../../Database/firebaseConfig';
 import { sendAdminCredentialsEmail, sendAdminDeleteData } from '../../../../Server/api';
 
 const generateRandomPassword = () => {
@@ -470,7 +470,7 @@ const Admins = () => {
     const filtered = admins.filter(admin => {
       const searchLower = searchQuery.toLowerCase();
       return (
-        admin.id.toLowerCase().includes(searchLower) ||
+        admin.id.toString().includes(searchLower) ||
         admin.name.toLowerCase().includes(searchLower) ||
         admin.email.toLowerCase().includes(searchLower) ||
         (admin.contactNumber && admin.contactNumber.toLowerCase().includes(searchLower))
@@ -480,6 +480,39 @@ const Admins = () => {
     setNoMatch(filtered.length === 0);
     setCurrentPage(0);
   }, [searchQuery, admins]);
+
+const getNextId = async () => {
+  try {
+    const adminsSnapshot = await database.ref('Users/Admin').once('value');
+    const membersSnapshot = await database.ref('Members').once('value');
+    
+    const adminsData = adminsSnapshot.val() || {};
+    const membersData = membersSnapshot.val() || {};
+    
+    // Get all existing IDs from both Admin and Member
+    const adminIds = Object.keys(adminsData).map(id => parseInt(id));
+    const memberIds = Object.keys(membersData).map(id => parseInt(id));
+    const allIds = [...adminIds, ...memberIds];
+    
+    // If no IDs exist, start with 5001
+    if (allIds.length === 0) {
+      return 5001;
+    }
+    
+    // Find the first available ID starting from 5001
+    for (let i = 5001; i <= 9999; i++) {
+      if (!allIds.includes(i)) {
+        return i;
+      }
+    }
+    
+    // If all IDs up to 9999 are taken (unlikely), start from 5001 again
+    return 5001;
+  } catch (error) {
+    console.error('Error getting next ID:', error);
+    return 5001; // Fallback to 5001 if error
+  }
+};
 
   const validateFields = () => {
     let isValid = true;
@@ -509,8 +542,8 @@ const Admins = () => {
     if (!contactNumber.trim()) {
       setContactNumberError('Contact number is required');
       isValid = false;
-    } else if (!/^\d+$/.test(contactNumber)) {
-      setContactNumberError('Contact number must contain only digits');
+    } else if (!/^\d{11}$/.test(contactNumber)) {
+      setContactNumberError('Contact number must be exactly 11 digits');
       isValid = false;
     }
 
@@ -519,10 +552,11 @@ const Admins = () => {
 
   const onPressAdd = async () => {
     if (!validateFields()) return;
-
-    const emailExists = admins.some(admin => admin.email === email);
+    
+    // Check if email already exists in our admins list
+    const emailExists = admins.some(admin => admin.email.toLowerCase() === email.toLowerCase());
     if (emailExists) {
-      setEmailError('Email already in use');
+      setEmailError('Email address is already in use');
       return;
     }
 
@@ -536,20 +570,32 @@ const Admins = () => {
     setConfirmAddVisible(true);
   };
 
-  const handleAddAdmin = async () => {
+ const handleAddAdmin = async () => {
     setConfirmAddVisible(false);
     setIsProcessing(true);
 
     try {
       const password = generateRandomPassword();
-      const highestId = admins.reduce((max, admin) => {
-        const num = parseInt(admin.id.replace('admin', ''));
-        return num > max ? num : max;
-      }, 0);
-      const newId = `admin${highestId + 1}`;
+      const newId = await getNextId();
       const dateAdded = new Date().toLocaleString();
       const name = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
 
+      // Create user in Firebase Authentication with the generated password
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      
+      // Update the user's display name
+      await userCredential.user.updateProfile({
+        displayName: name
+      });
+
+      // Set the password explicitly (though createUserWithEmailAndPassword already sets it)
+      // This ensures the password is set correctly
+      await auth.currentUser.updatePassword(password);
+      
+      // Send email verification
+      await auth.currentUser.sendEmailVerification();
+
+      // Add admin data with numeric ID
       await database.ref(`Users/Admin/${newId}`).set({
         id: newId,
         name,
@@ -557,36 +603,67 @@ const Admins = () => {
         contactNumber,
         dateAdded,
         role: 'admin',
-        password
+        uid: userCredential.user.uid,
+        // Store the initial password (optional, only if needed for reference)
+        initialPassword: password
       });
 
-      setSuccessMessage('Admin added successfully!');
+      // Add corresponding member data with same numeric ID
+      await database.ref(`Members/${newId}`).set({
+        id: newId,
+        name,
+        email,
+        contactNumber,
+        dateAdded,
+        role: 'admin',
+        status: 'active',
+        uid: userCredential.user.uid
+      });
+
+      // Store the pending admin data with the password for the success handler
+      setPendingAdd({
+        firstName,
+        middleName,
+        lastName,
+        email,
+        contactNumber,
+        password // Include the password here
+      });
+
+      setSuccessMessage(`Admin account created successfully!`);
       setSuccessVisible(true);
     } catch (error) {
       console.error('Error adding admin:', error);
-      setErrorMessage('Failed to add admin');
+      setErrorMessage(error.message || 'Failed to add admin');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
     }
   };
 
-  const handleDeleteAdmin = async () => {
-    setConfirmDeleteVisible(false);
-    setIsProcessing(true);
+const handleDeleteAdmin = async () => {
+  setConfirmDeleteVisible(false);
+  setIsProcessing(true);
 
-    try {
-      await database.ref(`Users/Admin/${pendingDelete.id}`).remove();
-      setSuccessMessage('Admin deleted successfully!');
-      setSuccessVisible(true);
-    } catch (error) {
-      console.error('Error deleting admin:', error);
-      setErrorMessage('Failed to delete admin');
-      setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  try {
+    const idToDelete = pendingDelete.id;
+
+    // First delete the admin record
+    await database.ref(`Users/Admin/${idToDelete}`).remove();
+    
+    // Then delete the corresponding member record if it exists
+    await database.ref(`Members/${idToDelete}`).remove();
+
+    setSuccessMessage(`Admin account deleted successfully!`);
+    setSuccessVisible(true);
+  } catch (error) {
+    console.error('Error deleting admin:', error);
+    setErrorMessage(error.message || 'Failed to delete admin');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   const handleDownload = async () => {
     try {
@@ -635,9 +712,9 @@ const Admins = () => {
     }
   };
 
-  const handleSuccessOk = () => {
+const handleSuccessOk = () => {
     setSuccessVisible(false);
-    
+  
     if (pendingAdd) {
       const nameParts = pendingAdd.name ? 
         pendingAdd.name.split(' ') : 
@@ -647,9 +724,10 @@ const Admins = () => {
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
       const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
 
+      // Send the actual password that was set in Firebase Auth
       sendAdminCredentialsEmail({
         email: pendingAdd.email,
-        password: generateRandomPassword(),
+        password: pendingAdd.password, // Use the actual password that was set
         firstName,
         middleName,
         lastName
@@ -665,7 +743,7 @@ const Admins = () => {
     else if (pendingDelete) {
       const nameParts = pendingDelete.name ? 
         pendingDelete.name.split(' ') : 
-        `${pendingDelete.firstName} ${pendingDelete.middleName} ${pendingDelete.lastName}`.split(' ');
+        `${pendingDelete.firstName || ''} ${pendingDelete.middleName || ''} ${pendingDelete.lastName || ''}`.split(' ');
       
       const firstName = nameParts[0] || '';
       const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
@@ -770,7 +848,7 @@ const Admins = () => {
               <table style={styles.table}>
                 <thead>
                   <tr style={styles.tableHeader}>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Admin ID</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>ID</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email Address</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Contact Number</th>
@@ -885,7 +963,7 @@ const Admins = () => {
                   </label>
                   <input
                     className="form-input"
-                    placeholder="Contact Number"
+                    placeholder="Contact Number (11 digits)"
                     value={contactNumber}
                     onChange={(e) => {
                       const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
@@ -933,7 +1011,7 @@ const Admins = () => {
               <div className="modal-content">
                 <h3 className="modal-title">Admin Details</h3>
                 <div className="form-group">
-                  <label className="form-label">Admin ID:</label>
+                  <label className="form-label">ID:</label>
                   <p>{selectedAdmin?.id || 'N/A'}</p>
                 </div>
                 <div className="form-group">

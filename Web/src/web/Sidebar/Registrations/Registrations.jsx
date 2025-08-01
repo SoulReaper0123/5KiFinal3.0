@@ -515,17 +515,6 @@ const Registrations = ({
     setErrorModalVisible(false);
   };
 
-  const checkIfEmailExistsInDatabase = async (email) => {
-    try {
-      const snap = await database.ref('Members').once('value');
-      const data = snap.val() || {};
-      return Object.values(data).some(u => u.email?.toLowerCase() === email.toLowerCase());
-    } catch (err) {
-      console.error('DB email check error:', err);
-      return false;
-    }
-  };
-
   const removeFromPendingRegistrations = async (id) => {
     try {
       await database.ref(`Registrations/RegistrationApplications/${id}`).remove();
@@ -604,7 +593,7 @@ const Registrations = ({
         setSelectedRegistration(prev => ({
           ...prev,
           memberId,
-          dateApproved: formatDate(new Date()),
+          dateApproved: formatDate(new Date()), 
           approvedTime: formatTime(new Date()),
           status: 'approved'
         }));
@@ -662,11 +651,118 @@ const Registrations = ({
     }
   };
 
-  const processDatabaseApprove = async (reg) => {
-    try {
-      const { id, email, password, ...rest } = reg;
-      let userId = null;
+const checkIfEmailExistsInDatabase = async (email) => {
+  try {
+    // Check in Members
+    const membersSnap = await database.ref('Members').once('value');
+    const membersData = membersSnap.val() || {};
+    const memberExists = Object.values(membersData).some(u => u.email?.toLowerCase() === email.toLowerCase());
+    
+    if (memberExists) return true;
+
+    // Check in Admin
+    const adminsSnap = await database.ref('Users/Admin').once('value');
+    const adminsData = adminsSnap.val() || {};
+    const adminExists = Object.values(adminsData).some(u => u.email?.toLowerCase() === email.toLowerCase());
+    
+    return adminExists;
+  } catch (err) {
+    console.error('DB email check error:', err);
+    return false;
+  }
+};
+
+const processDatabaseApprove = async (reg) => {
+  try {
+    const { id, email, password, ...rest } = reg;
+    let userId = null;
+    
+    // First check if email exists in Members
+    const membersSnap = await database.ref('Members').once('value');
+    const membersData = membersSnap.val() || {};
+    const memberEntry = Object.entries(membersData).find(([_, member]) => 
+      member.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (memberEntry) {
+      // Email exists in Members - check if it's the same person
+      const [memberId, memberData] = memberEntry;
       
+      // Compare key identifying information (first name, last name, etc.)
+      const isSamePerson = 
+        memberData.firstName?.toLowerCase() === rest.firstName?.toLowerCase() &&
+        memberData.lastName?.toLowerCase() === rest.lastName?.toLowerCase();
+      
+      if (isSamePerson) {
+        // It's the same person - update their record with new registration data
+        const now = new Date();
+        const approvedDate = formatDate(now);
+        const approvedTime = formatTime(now);
+        
+        await database.ref(`Members/${memberId}`).update({
+          ...rest,
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          status: 'active'
+        });
+        
+        await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
+          ...rest,
+          email,
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          memberId: parseInt(memberId),
+          status: 'approved'
+        });
+        
+        return parseInt(memberId);
+      } else {
+        // Different person with same email - not allowed
+        throw new Error('This email is already registered to a different member.');
+      }
+    }
+
+    // Check in Admin
+    const adminsSnap = await database.ref('Users/Admin').once('value');
+    const adminsData = adminsSnap.val() || {};
+    const adminEntry = Object.entries(adminsData).find(([_, admin]) => 
+      admin.email?.toLowerCase() === email.toLowerCase()
+    );
+
+    if (adminEntry) {
+      // Email exists in Admin - use existing admin data
+      const [adminId, adminData] = adminEntry;
+      
+      // Add to Members with admin's data
+      const now = new Date();
+      const approvedDate = formatDate(now);
+      const approvedTime = formatTime(now);
+      
+      await database.ref(`Members/${adminId}`).set({
+        id: parseInt(adminId),
+        authUid: adminData.uid,
+        ...adminData,
+        ...rest, // Include registration data that might not be in admin
+        email,
+        dateApproved: approvedDate,
+        approvedTime: approvedTime,
+        balance: 0.0,
+        loans: 0.0,
+        status: 'active'
+      });
+      
+      await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
+        ...rest,
+        email,
+        dateApproved: approvedDate,
+        approvedTime: approvedTime,
+        memberId: parseInt(adminId),
+        status: 'approved'
+      });
+      
+      return parseInt(adminId);
+    } else {
+      // Normal flow for new emails
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         userId = userCredential.user.uid;
@@ -713,11 +809,12 @@ const Registrations = ({
       });
       
       return newId;
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve registration');
     }
-  };
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve registration');
+  }
+};
 
   const processDatabaseReject = async (reg, rejectionReason) => {
     try {

@@ -317,7 +317,7 @@ const AdminLoginPage = () => {
         <div style={styles.leftSectionWrapper}>
           <div style={styles.titleBlock}>
             <h1 style={styles.title}>Sign in</h1>
-            <p style={styles.subtitle}>Input your credentials</p>
+            <p style={styles.subtitle}>Input your own credentials</p>
           </div>
 
           <div style={styles.formBlock}>
