@@ -4,7 +4,6 @@ import {
   FaDownload, 
   FaChevronLeft, 
   FaChevronRight,
-  FaExclamationCircle,
   FaCheckCircle
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
@@ -160,7 +159,7 @@ const PayLoans = () => {
       .data-container {
         flex: 1;
         margin: 0 25px;
-        marginTop: 10px;
+        margin-top: 10px;
         background-color: #fff;
         border-radius: 8px;
         box-shadow: 0 1px 3px rgba(0,0,0,0.1);
@@ -264,15 +263,25 @@ const PayLoans = () => {
       try {
         const [pendingSnap, completedSnap, failedSnap] = await Promise.all([
           database.ref('Payments/PaymentApplications').once('value'),
-          database.ref('Payments/ApprovePayments').once('value'),
+          database.ref('Payments/ApprovedPayments').once('value'),
           database.ref('Payments/RejectedPayments').once('value'),
         ]);
 
         const flatten = (val) => {
+          if (!val) return [];
           const arr = [];
-          Object.entries(val || {}).forEach(([uid, userData]) => {
-            Object.entries(userData).forEach(([txId, record]) => {
-              arr.push({ id: uid, transactionId: txId, ...record });
+          Object.entries(val).forEach(([uid, userData]) => {
+            Object.entries(userData || {}).forEach(([txId, record]) => {
+              arr.push({ 
+                id: uid, 
+                transactionId: txId, 
+                ...record,
+                firstName: record.firstName || '',
+                lastName: record.lastName || '',
+                amountToBePaid: record.amountToBePaid || 0,
+                paymentOption: record.paymentOption || 'Unknown',
+                dateApplied: record.dateApplied || new Date().toLocaleDateString()
+              });
             });
           });
           return arr;
@@ -288,7 +297,7 @@ const PayLoans = () => {
         setFilteredData(pending);
       } catch (error) {
         console.error('Fetch error:', error);
-        setErrorMessage('Failed to fetch payment data');
+        setErrorMessage('Failed to fetch payment data: ' + error.message);
         setErrorModalVisible(true);
       } finally {
         setLoading(false);
@@ -310,12 +319,17 @@ const PayLoans = () => {
         : failedPayments;
 
     const filtered = base.filter(item => {
-      const fullName = `${item.firstName ?? ''} ${item.lastName ?? ''}`.toLowerCase();
-      return fullName.includes(text.toLowerCase());
+      const fullName = `${item.firstName || ''} ${item.lastName || ''}`.toLowerCase();
+      const searchLower = text.toLowerCase();
+      return (
+        fullName.includes(searchLower) ||
+        (item.id && item.id.toLowerCase().includes(searchLower)) ||
+        (item.transactionId && item.transactionId.toLowerCase().includes(searchLower)
+      ));
     });
 
     setFilteredData(filtered);
-    setNoMatch(filtered.length === 0);
+    setNoMatch(filtered.length === 0 && text !== '');
   };
 
   const handleDownload = async () => {
@@ -343,12 +357,40 @@ const PayLoans = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Payments');
 
-      const headers = Object.keys(dataToExport[0]);
+      // Add headers
+      const headers = [
+        'Member ID',
+        'Transaction ID',
+        'Name',
+        'Amount',
+        'Payment Method',
+        'Date Applied',
+        'Status',
+        ...(activeSection === 'completedPayments' ? ['Date Approved'] : []),
+        ...(activeSection === 'failedPayments' ? ['Date Rejected', 'Rejection Reason'] : [])
+      ];
       worksheet.addRow(headers);
 
+      // Add data rows
       dataToExport.forEach(item => {
-        const row = headers.map(header => item[header]);
+        const row = [
+          item.id,
+          item.transactionId,
+          `${item.firstName} ${item.lastName}`,
+          item.amountToBePaid,
+          item.paymentOption,
+          item.dateApplied,
+          activeSection === 'pendingPayments' ? 'Pending' : 
+          activeSection === 'completedPayments' ? 'Approved' : 'Rejected',
+          ...(activeSection === 'completedPayments' ? [item.dateApproved] : []),
+          ...(activeSection === 'failedPayments' ? [item.dateRejected, item.rejectionReason] : [])
+        ];
         worksheet.addRow(row);
+      });
+
+      // Format columns
+      worksheet.columns.forEach(column => {
+        column.width = 20;
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -358,7 +400,7 @@ const PayLoans = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${fileName}.xlsx`;
+      link.download = `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -368,7 +410,7 @@ const PayLoans = () => {
       setSuccessModalVisible(true);
     } catch (err) {
       console.error('Download error:', err);
-      setErrorMessage('Failed to export data');
+      setErrorMessage('Failed to export data: ' + err.message);
       setErrorModalVisible(true);
     }
   };
@@ -389,10 +431,59 @@ const PayLoans = () => {
     setNoMatch(false);
   };
 
+  const refreshData = async () => {
+    setLoading(true);
+    try {
+      const [pendingSnap, completedSnap, failedSnap] = await Promise.all([
+        database.ref('Payments/PaymentApplications').once('value'),
+        database.ref('Payments/ApprovedPayments').once('value'),
+        database.ref('Payments/RejectedPayments').once('value'),
+      ]);
+
+      const flatten = (val) => {
+        if (!val) return [];
+        const arr = [];
+        Object.entries(val).forEach(([uid, userData]) => {
+          Object.entries(userData || {}).forEach(([txId, record]) => {
+            arr.push({ 
+              id: uid, 
+              transactionId: txId, 
+              ...record,
+              firstName: record.firstName || '',
+              lastName: record.lastName || '',
+              amountToBePaid: record.amountToBePaid || 0,
+              paymentOption: record.paymentOption || 'Unknown',
+              dateApplied: record.dateApplied || new Date().toLocaleDateString()
+            });
+          });
+        });
+        return arr;
+      };
+
+      const pending = flatten(pendingSnap.val());
+      const completed = flatten(completedSnap.val());
+      const failed = flatten(failedSnap.val());
+
+      setPendingPayments(pending);
+      setCompletedPayments(completed);
+      setFailedPayments(failed);
+      setFilteredData(
+        activeSection === 'pendingPayments' ? pending :
+        activeSection === 'completedPayments' ? completed : failed
+      );
+    } catch (error) {
+      console.error('Refresh error:', error);
+      setErrorMessage('Failed to refresh data: ' + error.message);
+      setErrorModalVisible(true);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
-  if (loading) {
+  if (loading && pendingPayments.length === 0 && completedPayments.length === 0 && failedPayments.length === 0) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
@@ -408,9 +499,9 @@ const PayLoans = () => {
         <div className="top-controls">
           <div className="circle-tab-wrapper">
             {[
-              { key: 'pendingPayments', label: 'Payment Applications', color: '#2D5783' },
-              { key: 'completedPayments', label: 'Approved Payments', color: '#008000' },
-              { key: 'failedPayments', label: 'Rejected Payments', color: '#FF0000' },
+              { key: 'pendingPayments', label: 'Pending', color: '#2D5783' },
+              { key: 'completedPayments', label: 'Approved', color: '#008000' },
+              { key: 'failedPayments', label: 'Rejected', color: '#FF0000' },
             ].map((tab) => {
               const isActive = activeSection === tab.key;
               return (
@@ -438,7 +529,7 @@ const PayLoans = () => {
             <div className="search-bar">
               <input
                 className="search-input"
-                placeholder="Search..."
+                placeholder="Search by name, ID or transaction"
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
               />
@@ -454,7 +545,9 @@ const PayLoans = () => {
 
         {!noMatch && filteredData.length > 0 && (
           <div className="pagination-container">
-            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
+            <span className="pagination-info">
+              Showing {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length}
+            </span>
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
               disabled={currentPage === 0}
@@ -473,13 +566,29 @@ const PayLoans = () => {
         )}
 
         <div className="data-container">
-          {noMatch ? (
-            <span className="no-match-text">No Matches Found</span>
+          {loading ? (
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
+              <div className="spinner"></div>
+            </div>
+          ) : noMatch ? (
+            <span className="no-match-text">No payments match your search criteria</span>
           ) : (
             <>
-              {activeSection === 'pendingPayments' && <PendingPayments payments={paginatedData} />}
-              {activeSection === 'completedPayments' && <CompletedPayments payments={paginatedData} />}
-              {activeSection === 'failedPayments' && <FailedPayments payments={paginatedData} />}
+              {activeSection === 'pendingPayments' && (
+                <PendingPayments 
+                  payments={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={refreshData}
+                />
+              )}
+              {activeSection === 'completedPayments' && (
+                <CompletedPayments payments={paginatedData} />
+              )}
+              {activeSection === 'failedPayments' && (
+                <FailedPayments payments={paginatedData} />
+              )}
             </>
           )}
         </div>

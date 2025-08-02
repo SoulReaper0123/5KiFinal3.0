@@ -379,67 +379,79 @@ const Transactions = () => {
   }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [
-          depositsSnapshot,
-          loansSnapshot,
-          payLoansSnapshot,
-          withdrawalsSnapshot,
-          paymentsSnapshot,
-          membersSnapshot,
-        ] = await Promise.all([
-          database.ref('Transactions/Deposits').once('value'),
-          database.ref('Transactions/Loans').once('value'),
-          database.ref('Transactions/PayLoans').once('value'),
-          database.ref('Transactions/Withdrawals').once('value'),
-          database.ref('Transactions/Payments').once('value'),
-          database.ref('Members').once('value'),
-        ]);
+    // Set up real-time listeners for all transaction types
+    const depositsRef = database.ref('Transactions/Deposits');
+    const loansRef = database.ref('Transactions/Loans');
+    const withdrawalsRef = database.ref('Transactions/Withdrawals');
+    const paymentsRef = database.ref('Transactions/Payments');
+    const membersRef = database.ref('Members');
 
-        const allTransactions = {};
-
-        const processTransactions = (data, type) => {
-          if (!data.exists()) return;
+    const processTransactions = (data, type) => {
+      if (!data.exists()) return;
+      
+      const transactionsData = data.val();
+      setTransactions(prev => {
+        const newTransactions = {...prev};
+        
+        Object.keys(transactionsData).forEach(memberId => {
+          if (!newTransactions[memberId]) {
+            newTransactions[memberId] = [];
+          }
           
-          const transactionsData = data.val();
-          Object.keys(transactionsData).forEach(memberId => {
-            if (!allTransactions[memberId]) {
-              allTransactions[memberId] = [];
-            }
+          Object.keys(transactionsData[memberId]).forEach(transactionId => {
+            // Check if transaction already exists
+            const exists = newTransactions[memberId].some(
+              t => t.transactionId === transactionId && t.type === type
+            );
             
-            Object.keys(transactionsData[memberId]).forEach(transactionId => {
-              allTransactions[memberId].push({
+            if (!exists) {
+              newTransactions[memberId].push({
                 ...transactionsData[memberId][transactionId],
                 type,
                 transactionId,
               });
-            });
+            }
           });
-        };
-
-        processTransactions(depositsSnapshot, 'Deposit');
-        processTransactions(loansSnapshot, 'Loan');
-        processTransactions(payLoansSnapshot, 'Loan Payment');
-        processTransactions(withdrawalsSnapshot, 'Withdrawal');
-        processTransactions(paymentsSnapshot, 'Payment');
-
-        setTransactions(allTransactions);
-
-        if (membersSnapshot.exists()) {
-          setMembers(membersSnapshot.val());
-        }
-      } catch (error) {
-        console.error('Error fetching data:', error);
-        setErrorMessage('Failed to fetch transaction data');
-        setErrorModalVisible(true);
-      } finally {
-        setLoading(false);
-      }
+        });
+        
+        return newTransactions;
+      });
     };
 
-    fetchData();
+    const depositsListener = depositsRef.on('value', (snapshot) => {
+      processTransactions(snapshot, 'Deposits');
+      setLoading(false);
+    });
+
+    const loansListener = loansRef.on('value', (snapshot) => {
+      processTransactions(snapshot, 'Loans');
+      setLoading(false);
+    });
+
+    const withdrawalsListener = withdrawalsRef.on('value', (snapshot) => {
+      processTransactions(snapshot, 'Withdrawals');
+      setLoading(false);
+    });
+
+    const paymentsListener = paymentsRef.on('value', (snapshot) => {
+      processTransactions(snapshot, 'Payments');
+      setLoading(false);
+    });
+
+    const membersListener = membersRef.on('value', (snapshot) => {
+      if (snapshot.exists()) {
+        setMembers(snapshot.val());
+      }
+    });
+
+    return () => {
+      // Clean up listeners
+      depositsRef.off('value', depositsListener);
+      loansRef.off('value', loansListener);
+      withdrawalsRef.off('value', withdrawalsListener);
+      paymentsRef.off('value', paymentsListener);
+      membersRef.off('value', membersListener);
+    };
   }, []);
 
   const formatCurrency = (amount) => {
@@ -624,7 +636,7 @@ const Transactions = () => {
               
               <div className="modal-content">
                 <div className="transaction-type-buttons">
-                  {['All', 'Deposit', 'Loan', 'Loan Payment', 'Withdrawal', 'Payment'].map(type => (
+                  {['All', 'Deposits', 'Loans', 'Payments', 'Withdrawals'].map(type => (
                     <button
                       key={type}
                       className={`type-button ${transactionTypeFilter === type ? 'active-type' : ''}`}
@@ -638,15 +650,34 @@ const Transactions = () => {
                 <div className="transactions-list">
                   {selectedMember.transactions
                     .filter(tx => transactionTypeFilter === 'All' || tx.type === transactionTypeFilter)
+                    .sort((a, b) => {
+                      // Sort by dateApproved or dateApplied in descending order
+                      const dateA = a.dateApproved || a.dateApplied || '';
+                      const dateB = b.dateApproved || b.dateApplied || '';
+                      return dateB.localeCompare(dateA);
+                    })
                     .map((transaction, index) => (
                       <div key={`${transaction.transactionId}-${index}`} className="transaction-item">
                         <div className="transaction-header">
                           <span className="transaction-type">{transaction.type}</span>
-                          <span className="transaction-date">{transaction.dateApproved || 'No date'}</span>
+                          <span className="transaction-date">
+                            {transaction.dateApproved || transaction.dateApplied || 'No date'}
+                            {transaction.timeApproved && ` at ${transaction.timeApproved}`}
+                          </span>
                         </div>
                         <div className="transaction-detail">
                           <span>Transaction ID: </span>
                           <span>{transaction.transactionId}</span>
+                        </div>
+                        <div className="transaction-detail">
+                          <span>Status: </span>
+                          <span style={{
+                            color: transaction.status === 'approved' || transaction.status === 'completed' ? 'green' : 
+                                  transaction.status === 'rejected' || transaction.status === 'failed' ? 'red' : 
+                                  '#666'
+                          }}>
+                            {transaction.status || 'Pending'}
+                          </span>
                         </div>
                         <div className="transaction-detail">
                           <span>Amount: </span>
@@ -666,10 +697,16 @@ const Transactions = () => {
                             <span>{transaction.interestRate}%</span>
                           </div>
                         )}
-                        {transaction.monthsToPay && (
+                        {transaction.term && (
                           <div className="transaction-detail">
                             <span>Term: </span>
-                            <span>{transaction.monthsToPay} months</span>
+                            <span>{transaction.term} months</span>
+                          </div>
+                        )}
+                        {transaction.rejectionReason && (
+                          <div className="transaction-detail">
+                            <span>Reason: </span>
+                            <span style={{color: 'red'}}>{transaction.rejectionReason}</span>
                           </div>
                         )}
                       </div>

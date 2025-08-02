@@ -786,13 +786,15 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Txn ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Term</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Disbursement</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Applied</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Disb.</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Acc Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Acc No.</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>App. Date</th>
+              <th style={{ ...styles.tableHeaderCell, width: '25%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -803,6 +805,8 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                 <td style={styles.tableCell}>{formatCurrency(item.loanAmount)}</td>
                 <td style={styles.tableCell}>{item.term} months</td>
                 <td style={styles.tableCell}>{item.disbursement}</td>
+                <td style={styles.tableCell}>{item.accountName}</td>
+                <td style={styles.tableCell}>{item.accountNumber}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>
                 <td style={styles.tableCell}>
                   <span 

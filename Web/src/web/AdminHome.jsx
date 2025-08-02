@@ -511,7 +511,7 @@ const AdminHome = () => {
                 />
               </div>
               <span style={isActive('withdraws') ? styles.activeButtonText : styles.buttonText}>
-                Withdraws
+                Withdrawals
               </span>
             </button>
 

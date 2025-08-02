@@ -472,83 +472,87 @@ const ApplyDeposits = ({ deposits, currentPage, totalPages, onPageChange, refres
     }
   };
 
-  const processDatabaseApprove = async (deposit) => {
-    try {
-      const now = new Date();
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const status = 'approved';
+const processDatabaseApprove = async (deposit) => {
+  try {
+    const now = new Date();
+    const approvalDate = formatDate(now);
+    const approvalTime = formatTime(now);
+    const status = 'approved';
 
-      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${deposit.id}/${deposit.transactionId}`);
-      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${deposit.transactionId}`);
-      const memberRef = database.ref(`Members/${deposit.id}`);
-      const fundsRef = database.ref('Settings/Funds');
+    // Get references to all needed paths
+    const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${deposit.transactionId}`);
+    const approvedRef = database.ref(`Deposits/ApprovedDeposits/${deposit.id}/${deposit.transactionId}`);
+    const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${deposit.transactionId}`);
+    const memberRef = database.ref(`Members/${deposit.id}`);
+    const fundsRef = database.ref('Settings/Funds');
 
-      const memberSnap = await memberRef.once('value');
+    const memberSnap = await memberRef.once('value');
 
-      if (memberSnap.exists()) {
-        const member = memberSnap.val();
+    if (memberSnap.exists()) {
+      const member = memberSnap.val();
 
-        // First create a copy of the deposit data with approval info
-        const approvedDeposit = { 
-          ...deposit, 
-          dateApproved: approvalDate,
-          timeApproved: approvalTime,
-          status
-        };
-
-        // Save to approved deposits
-        await approvedRef.set(approvedDeposit);
-        
-        // Save to transactions
-        await transactionRef.set(approvedDeposit);
-
-        // Update member balance
-        const newBalance = parseFloat(member.balance || 0) + parseFloat(deposit.amountToBeDeposited);
-        await memberRef.update({ balance: newBalance });
-
-        // Update funds
-        const fundSnap = await fundsRef.once('value');
-        const updatedFund = (parseFloat(fundSnap.val()) || 0) + parseFloat(deposit.amountToBeDeposited);
-        await fundsRef.set(updatedFund);
-
-        // Remove from pending (do this last after everything succeeds)
-        // await database.ref(`Deposits/DepositApplications/${deposit.id}/${deposit.transactionId}`).remove();
-      }
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve deposit');
-    }
-  };
-
-  const processDatabaseReject = async (deposit, rejectionReason) => {
-    try {
-      const now = new Date();
-      const rejectionDate = formatDate(now);
-      const rejectionTime = formatTime(now);
-      const status = 'rejected';
-
-      const rejectedRef = database.ref(`Deposits/RejectedDeposits/${deposit.id}/${deposit.transactionId}`);
-
-      // First create a copy of the deposit data with rejection info
-      const rejectedDeposit = { 
+      // First create a copy of the deposit data with approval info
+      const approvedDeposit = { 
         ...deposit, 
-        dateRejected: rejectionDate,
-        timeRejected: rejectionTime,
-        status,
-        rejectionReason: rejectionReason || 'Rejected by admin'
+        dateApproved: approvalDate,
+        timeApproved: approvalTime,
+        status
       };
 
-      // Save to rejected deposits
-      await rejectedRef.set(rejectedDeposit);
+      // Execute all operations in sequence
+      await approvedRef.set(approvedDeposit);
+      await transactionRef.set(approvedDeposit);
 
-      // Remove from pending (do this last after everything succeeds)
-      // await database.ref(`Deposits/DepositApplications/${deposit.id}/${deposit.transactionId}`).remove();
-    } catch (err) {
-      console.error('Rejection DB error:', err);
-      throw new Error(err.message || 'Failed to reject deposit');
+      // Update member balance
+      const newBalance = parseFloat(member.balance || 0) + parseFloat(deposit.amountToBeDeposited);
+      await memberRef.update({ balance: newBalance });
+
+      // Update funds
+      const fundSnap = await fundsRef.once('value');
+      const updatedFund = (parseFloat(fundSnap.val()) || 0) + parseFloat(deposit.amountToBeDeposited);
+      await fundsRef.set(updatedFund);
+
+      // Remove from pending AFTER all other operations succeed
+      // await pendingRef.remove();
     }
-  };
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve deposit');
+  }
+};
+
+const processDatabaseReject = async (deposit, rejectionReason) => {
+  try {
+    const now = new Date();
+    const rejectionDate = formatDate(now);
+    const rejectionTime = formatTime(now);
+    const status = 'rejected';
+
+    // Get references to all needed paths
+    const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${deposit.transactionId}`);
+    const rejectedRef = database.ref(`Deposits/RejectedDeposits/${deposit.id}/${deposit.transactionId}`);
+    const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${deposit.transactionId}`);
+
+    // First create a copy of the deposit data with rejection info
+    const rejectedDeposit = { 
+      ...deposit, 
+      dateRejected: rejectionDate,
+      timeRejected: rejectionTime,
+      status,
+      rejectionReason: rejectionReason || 'Rejected by admin'
+    };
+
+    // Execute all operations in sequence
+    await rejectedRef.set(rejectedDeposit);
+    await transactionRef.set(rejectedDeposit);
+    
+    // Remove from pending AFTER saving to rejected
+    // await pendingRef.remove();
+  } catch (err) {
+    console.error('Rejection DB error:', err);
+    throw new Error(err.message || 'Failed to reject deposit');
+  }
+};
 
   const handleSuccessOk = () => {
     setSuccessMessageModalVisible(false);

@@ -410,6 +410,7 @@ const Withdraws = () => {
               { key: 'withdrawApplications', label: 'Pending', color: '#2D5783' },
               { key: 'approvedWithdraws', label: 'Approved', color: '#008000' },
               { key: 'rejectedWithdraws', label: 'Rejected', color: '#FF0000' },
+              { key: 'rejectedWithdraws', label: 'Permanent', color: '#2D5783' },
             ].map((tab) => {
               const isActive = activeSection === tab.key;
               return (

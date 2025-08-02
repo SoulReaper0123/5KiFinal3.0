@@ -450,11 +450,11 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
         ...(action === 'approve' ? {
           dateApproved: formatDate(now),
           timeApproved: formatTime(now),
-          status: 'completed'
+          status: 'approved'
         } : {
           dateRejected: formatDate(now),
           timeRejected: formatTime(now),
-          status: 'failed',
+          status: 'rejected',
           rejectionReason
         })
       }));
@@ -575,7 +575,7 @@ const processDatabaseApprove = async (payment) => {
       ...paymentData,
       dateApproved: formatDate(now),
       timeApproved: formatTime(now),
-      status: 'completed',
+      status: 'approved',
       interestPaid: interestAmount,
       principalPaid: principalAmount,
       excessPayment: excessPayment,
@@ -621,7 +621,7 @@ const processDatabaseApprove = async (payment) => {
         ...paymentSnap.val(), 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
-        status: 'failed',
+        status: 'rejected',
         rejectionReason: rejectionReason || 'Rejected by admin'
       };
 

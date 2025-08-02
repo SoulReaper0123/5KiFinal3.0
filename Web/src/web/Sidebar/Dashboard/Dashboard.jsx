@@ -1,36 +1,32 @@
 import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
-import { Pie, Bar } from 'react-chartjs-2';
-import { 
-  FaChartPie, 
-  FaChartBar, 
-  FaPiggyBank, 
-  FaInfoCircle, 
-  FaMoneyBillWave,
-  FaHandHoldingUsd,
-  FaCalendarAlt,
-  FaPercentage,
-  FaDollarSign,
-  FaUserTie,
-  FaIdCard,
-  FaSearchDollar
-} from 'react-icons/fa';
-import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend } from 'chart.js';
+import { Pie, Bar, Line } from 'react-chartjs-2';
+import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 
 // Register Chart.js components
-Chart.register(ArcElement, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend);
+Chart.register(
+  ArcElement, 
+  CategoryScale, 
+  LinearScale, 
+  BarElement, 
+  LineElement,
+  PointElement,
+  Title, 
+  Tooltip, 
+  Legend
+);
 
 const Dashboard = () => {
-  const [selectedYear, setSelectedYear] = useState('2024');
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear.toString());
   const [loading, setLoading] = useState(true);
   const [fundsData, setFundsData] = useState({
     availableFunds: 0,
     totalLoans: 0,
     totalReceivables: 0,
-    memberSavings: 0,
     fiveKISavings: 0,
-    dividends: 0,
-    activeBorrowers: 0
+    activeBorrowers: 0,
+    savingsHistory: []
   });
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
@@ -43,6 +39,19 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [selectedYear]);
 
+  const parseCustomDate = (dateString) => {
+    if (!dateString) return null;
+    
+    // Try parsing as "Month Day, Year" format first
+    const parsedDate = new Date(dateString);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+    
+    // If that fails, try other formats or return current date
+    return new Date();
+  };
+
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
@@ -52,8 +61,22 @@ const Dashboard = () => {
       const fundsSnapshot = await fundsRef.once('value');
       const availableFunds = fundsSnapshot.val() || 0;
 
+      // Fetch 5KI Savings data and history
+      const fiveKIRef = database.ref('Settings/Savings');
+      const fiveKISnapshot = await fiveKIRef.once('value');
+      const fiveKISavings = fiveKISnapshot.val() || 0;
+
+      // Fetch savings history
+      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+      const savingsHistorySnapshot = await savingsHistoryRef.once('value');
+      const savingsHistoryData = savingsHistorySnapshot.val() || {};
+      const savingsHistory = Object.entries(savingsHistoryData).map(([date, amount]) => ({
+        date,
+        amount: parseFloat(amount) || 0
+      }));
+
       // Fetch loans data
-      const loansRef = database.ref('Loans/CurrentLoans');
+      const loansRef = database.ref('Loans/ApprovedLoans');
       const loansSnapshot = await loansRef.once('value');
       const loansData = loansSnapshot.val() || {};
       
@@ -72,6 +95,8 @@ const Dashboard = () => {
           const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
           const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
           const dueDate = loan.dueDate || 'N/A';
+          const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
+          const isOverdue = dueDateObj && new Date() > dueDateObj;
           
           totalLoans += loanAmount;
           totalReceivables += totalTermPayment;
@@ -87,40 +112,31 @@ const Dashboard = () => {
             totalMonthlyPayment,
             totalTermPayment,
             dueDate,
-            status: loan.status || 'Active'
+            isOverdue
           });
         });
       });
 
       activeBorrowers = borrowerSet.size;
 
-      // Fetch savings data
-      const savingsRef = database.ref('Members');
-      const savingsSnapshot = await savingsRef.once('value');
-      const membersData = savingsSnapshot.val() || {};
-      
-      let memberSavings = 0;
-      let fiveKISavings = 0;
-      
-      Object.values(membersData).forEach(member => {
-        memberSavings += parseFloat(member.savings || 0);
-        fiveKISavings += parseFloat(member.fiveKISavings || 0);
-      });
-
-      // Fetch earnings data
-      const earningsRef = database.ref('Transactions/Earnings');
-      const earningsSnapshot = await earningsRef.once('value');
-      const earningsData = earningsSnapshot.val() || {};
+      // Fetch payments data for earnings
+      const paymentsRef = database.ref('Payments/ApprovedPayments');
+      const paymentsSnapshot = await paymentsRef.once('value');
+      const paymentsData = paymentsSnapshot.val() || {};
       
       const monthlyEarnings = Array(12).fill(0);
-      Object.values(earningsData).forEach(earning => {
-        const date = new Date(earning.date);
-        if (date.getFullYear() === parseInt(selectedYear)) {
-          const month = date.getMonth();
-          monthlyEarnings[month] += parseFloat(earning.amount || 0);
+      
+      Object.values(paymentsData).forEach(payment => {
+        if (payment.dateApproved) {
+          const date = parseCustomDate(payment.dateApproved);
+          if (date && date.getFullYear() === parseInt(selectedYear)) {
+            const month = date.getMonth();
+            monthlyEarnings[month] += parseFloat(payment.interestPaid || 0);
+          }
         }
       });
 
+      // Format earnings data
       const formattedEarnings = [
         { month: 'Jan', earnings: monthlyEarnings[0] },
         { month: 'Feb', earnings: monthlyEarnings[1] },
@@ -140,10 +156,9 @@ const Dashboard = () => {
         availableFunds,
         totalLoans,
         totalReceivables,
-        memberSavings,
         fiveKISavings,
-        dividends: memberSavings * 0.1,
-        activeBorrowers
+        activeBorrowers,
+        savingsHistory
       });
       
       setLoanData(loanItems);
@@ -169,33 +184,29 @@ const Dashboard = () => {
 
   const formatCurrency = (amount) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    if (Number.isInteger(num)) {
-      return `₱${num.toLocaleString()}.00`;
-    }
-    return `₱${num.toLocaleString(undefined, {
+    const formattedNum = num.toLocaleString(undefined, {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
-    })}`;
+    });
+    return `${formattedNum}`;
   };
 
+  // Generate years from current year back to 2020
+  const generateYears = () => {
+    const years = [];
+    for (let year = currentYear; year >= 2020; year--) {
+      years.push(year.toString());
+    }
+    return years;
+  };
+
+  // Chart data configurations
   const loansPieData = {
     labels: ['Total Loans', 'Total Receivables'],
     datasets: [
       {
-        data: [fundsData.totalLoans, fundsData.totalReceivables],
-        backgroundColor: ['#3B82F6', '#10B981'],
-        borderColor: ['#fff', '#fff'],
-        borderWidth: 1,
-      },
-    ],
-  };
-
-  const savingsPieData = {
-    labels: ['Member Savings', '5KI Savings'],
-    datasets: [
-      {
-        data: [fundsData.memberSavings, fundsData.fiveKISavings],
-        backgroundColor: ['#3B82F6', '#10B981'],
+        data: [fundsData.totalLoans, fundsData.totalReceivables - fundsData.totalLoans],
+        backgroundColor: ['#2D5783', '#3B82F6'],
         borderColor: ['#fff', '#fff'],
         borderWidth: 1,
       },
@@ -206,12 +217,28 @@ const Dashboard = () => {
     labels: earningsData.map(item => item.month),
     datasets: [
       {
-        label: 'Earnings',
+        label: 'Interest Earnings',
         data: earningsData.map(item => item.earnings),
-        backgroundColor: '#3B82F6',
-        borderColor: '#3B82F6',
+        backgroundColor: '#2D5783',
+        borderColor: '#2D5783',
         borderWidth: 1,
       },
+      {
+        label: 'Savings',
+        data: earningsData.map((_, index) => {
+          const monthSavings = fundsData.savingsHistory.filter(item => {
+            const date = new Date(item.date);
+            return date.getFullYear() === parseInt(selectedYear) && date.getMonth() === index;
+          });
+          return monthSavings.reduce((sum, item) => sum + item.amount, 0);
+        }),
+        backgroundColor: '#10B981',
+        borderColor: '#10B981',
+        borderWidth: 1,
+        type: 'line',
+        pointRadius: 6,
+        pointHoverRadius: 8,
+      }
     ],
   };
 
@@ -231,8 +258,52 @@ const Dashboard = () => {
       tooltip: {
         callbacks: {
           label: function(context) {
-            return `${context.label}: ${formatCurrency(context.raw)}`;
+            const label = context.dataset.label || '';
+            const value = context.raw || 0;
+            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+            
+            if (context.datasetIndex === 0 && context.chart.data.labels) {
+              const percentage = Math.round((value / total) * 100);
+              return `${label}: ₱${formatCurrency(value)} (${percentage}%)`;
+            }
+            return `${label}: ₱${formatCurrency(value)}`;
           }
+        }
+      }
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        ticks: {
+          callback: function(value) {
+            return `₱${formatCurrency(value)}`;
+          }
+        }
+      }
+    }
+  };
+
+  const loansChartOptions = {
+    ...chartOptions,
+    scales: {
+      y: {
+        ...chartOptions.scales.y,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          stepSize: 500
+        }
+      }
+    }
+  };
+
+  const earningsChartOptions = {
+    ...chartOptions,
+    scales: {
+      y: {
+        ...chartOptions.scales.y,
+        ticks: {
+          ...chartOptions.scales.y.ticks,
+          stepSize: 50
         }
       }
     }
@@ -252,42 +323,49 @@ const Dashboard = () => {
         </button>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaUserTie /> Member ID:</span>
+        <span className="detail-label">Member ID:</span>
         <span className="detail-value">{loan.memberId}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaIdCard /> Transaction ID:</span>
+        <span className="detail-label">Transaction ID:</span>
         <span className="detail-value">{loan.transactionId}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaDollarSign /> Loan Amount:</span>
-        <span className="detail-value">{formatCurrency(loan.loanAmount)}</span>
+        <span className="detail-label">Loan Amount:</span>
+        <span className="detail-value">₱{formatCurrency(loan.loanAmount)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaCalendarAlt /> Term:</span>
+        <span className="detail-label">Term:</span>
         <span className="detail-value">{loan.term} months</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaPercentage /> Interest:</span>
+        <span className="detail-label">Interest:</span>
         <span className="detail-value">{loan.interest}%</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaMoneyBillWave /> Monthly Payment:</span>
-        <span className="detail-value">{formatCurrency(loan.monthlyPayment)}</span>
+        <span className="detail-label">Monthly Payment:</span>
+        <span className="detail-value">₱{formatCurrency(loan.monthlyPayment)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaHandHoldingUsd /> Total Payment:</span>
-        <span className="detail-value">{formatCurrency(loan.totalTermPayment)}</span>
+        <span className="detail-label">Total Monthly Payment:</span>
+        <span className="detail-value">₱{formatCurrency(loan.totalMonthlyPayment)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaCalendarAlt /> Due Date:</span>
-        <span className="detail-value">{loan.dueDate}</span>
+        <span className="detail-label">Total Payment:</span>
+        <span className="detail-value">₱{formatCurrency(loan.totalTermPayment)}</span>
       </div>
       <div className="detail-row">
-        <span className="detail-label"><FaInfoCircle /> Status:</span>
+        <span className="detail-label">Due Date:</span>
+        <span className={`detail-value ${loan.isOverdue ? 'overdue' : ''}`}>
+          {loan.dueDate}
+          {loan.isOverdue && <span className="overdue-badge">Overdue</span>}
+        </span>
+      </div>
+      <div className="detail-row">
+        <span className="detail-label">Status:</span>
         <span className="detail-value">
-          <span className={`status-badge ${loan.status.toLowerCase()}`}>
-            {loan.status}
+          <span className={`status-badge ${loan.isOverdue ? 'overdue' : 'active'}`}>
+            {loan.isOverdue ? 'Overdue' : 'Active'}
           </span>
         </span>
       </div>
@@ -299,19 +377,16 @@ const Dashboard = () => {
       {/* Header */}
       <div className="dashboard-header">
         <h1>Business Loan Services Dashboard</h1>
-        <p>Comprehensive overview of your lending operations</p>
+        <div className="header-controls">
+        </div>
       </div>
 
       {/* Key Metrics */}
       <div className="metrics-grid">
-        {/* Available Funds Card */}
         <div className="metric-card funds-card">
-          <div className="metric-icon">
-            <FaMoneyBillWave />
-          </div>
           <div className="metric-content">
             <h3>Available Funds</h3>
-            <div className="metric-value">{formatCurrency(fundsData.availableFunds)}</div>
+            <div className="metric-value">₱{formatCurrency(fundsData.availableFunds)}</div>
             <div className="metric-description">Capital available for new loans</div>
           </div>
           <div className="health-indicator" style={{ backgroundColor: healthColor }}>
@@ -319,39 +394,27 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Total Loans Card */}
         <div className="metric-card">
-          <div className="metric-icon">
-            <FaHandHoldingUsd />
-          </div>
           <div className="metric-content">
             <h3>Total Loans</h3>
-            <div className="metric-value">{formatCurrency(fundsData.totalLoans)}</div>
+            <div className="metric-value">₱{formatCurrency(fundsData.totalLoans)}</div>
             <div className="metric-description">Active loan principal</div>
           </div>
         </div>
 
-        {/* Receivables Card */}
         <div className="metric-card">
-          <div className="metric-icon">
-            <FaSearchDollar />
-          </div>
           <div className="metric-content">
             <h3>Total Receivables</h3>
-            <div className="metric-value">{formatCurrency(fundsData.totalReceivables)}</div>
+            <div className="metric-value">₱{formatCurrency(fundsData.totalReceivables)}</div>
             <div className="metric-description">Including principal and interest</div>
           </div>
         </div>
 
-        {/* Active Borrowers Card */}
         <div className="metric-card">
-          <div className="metric-icon">
-            <FaUserTie />
-          </div>
           <div className="metric-content">
-            <h3>Active Borrowers</h3>
-            <div className="metric-value">{fundsData.activeBorrowers}</div>
-            <div className="metric-description">Current loan recipients</div>
+            <h3>5KI Savings</h3>
+            <div className="metric-value">₱{formatCurrency(fundsData.fiveKISavings)}</div>
+            <div className="metric-description">Organization savings</div>
           </div>
         </div>
       </div>
@@ -363,21 +426,12 @@ const Dashboard = () => {
             className={`chart-button ${selectedChart === 'loans' ? 'selected' : ''}`}
             onClick={() => setSelectedChart('loans')}
           >
-            <FaChartPie className="chart-icon" />
             Loans Breakdown
-          </button>
-          <button 
-            className={`chart-button ${selectedChart === 'savings' ? 'selected' : ''}`}
-            onClick={() => setSelectedChart('savings')}
-          >
-            <FaPiggyBank className="chart-icon" />
-            Savings
           </button>
           <button 
             className={`chart-button ${selectedChart === 'earnings' ? 'selected' : ''}`}
             onClick={() => setSelectedChart('earnings')}
           >
-            <FaChartBar className="chart-icon" />
             Earnings
           </button>
         </div>
@@ -387,40 +441,12 @@ const Dashboard = () => {
             <div className="chart-card">
               <div className="chart-header">
                 <h3>Loans Portfolio</h3>
-                <div className="chart-legend">
-                  <div className="legend-item">
-                    <div className="legend-color" style={{ backgroundColor: '#3B82F6' }}></div>
-                    <span>Active Loans: {formatCurrency(fundsData.totalLoans)}</span>
-                  </div>
-                  <div className="legend-item">
-                    <div className="legend-color" style={{ backgroundColor: '#10B981' }}></div>
-                    <span>Receivables: {formatCurrency(fundsData.totalReceivables)}</span>
-                  </div>
-                </div>
               </div>
               <div className="chart-wrapper">
-                <Pie data={loansPieData} options={chartOptions} />
-              </div>
-            </div>
-          )}
-
-          {selectedChart === 'savings' && (
-            <div className="chart-card">
-              <div className="chart-header">
-                <h3>Savings Distribution</h3>
-                <div className="chart-legend">
-                  <div className="legend-item">
-                    <div className="legend-color" style={{ backgroundColor: '#3B82F6' }}></div>
-                    <span>Member Savings: {formatCurrency(fundsData.memberSavings)}</span>
-                  </div>
-                  <div className="legend-item">
-                    <div className="legend-color" style={{ backgroundColor: '#10B981' }}></div>
-                    <span>5KI Savings: {formatCurrency(fundsData.fiveKISavings)}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="chart-wrapper">
-                <Pie data={savingsPieData} options={chartOptions} />
+                <Pie 
+                  data={loansPieData} 
+                  options={loansChartOptions}
+                />
               </div>
             </div>
           )}
@@ -429,34 +455,20 @@ const Dashboard = () => {
             <div className="chart-card">
               <div className="chart-header">
                 <h3>Monthly Earnings ({selectedYear})</h3>
-                <div className="year-selector">
-                  {['2024', '2023', '2022'].map((year) => (
-                    <button
-                      key={year}
-                      className={`year-button ${selectedYear === year ? 'selected' : ''}`}
-                      onClick={() => setSelectedYear(year)}
-                    >
-                      {year}
-                    </button>
+                <select 
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  className="year-select"
+                >
+                  {generateYears().map(year => (
+                    <option key={year} value={year}>{year}</option>
                   ))}
-                </div>
+                </select>
               </div>
               <div className="chart-wrapper">
                 <Bar 
                   data={earningsBarData} 
-                  options={{
-                    ...chartOptions,
-                    scales: {
-                      y: {
-                        beginAtZero: true,
-                        ticks: {
-                          callback: function(value) {
-                            return formatCurrency(value);
-                          }
-                        }
-                      }
-                    }
-                  }} 
+                  options={earningsChartOptions}
                 />
               </div>
             </div>
@@ -475,7 +487,6 @@ const Dashboard = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
             />
-            <FaSearchDollar className="search-icon" />
           </div>
         </div>
         
@@ -483,15 +494,15 @@ const Dashboard = () => {
           <table className="loans-table">
             <thead>
               <tr>
-                <th><FaUserTie /> Member ID</th>
-                <th><FaIdCard /> Transaction ID</th>
-                <th><FaDollarSign /> Amount</th>
-                <th><FaCalendarAlt /> Term</th>
-                <th><FaPercentage /> Interest</th>
-                <th><FaMoneyBillWave /> Monthly</th>
-                <th><FaHandHoldingUsd /> Total</th>
-                <th><FaCalendarAlt /> Due Date</th>
-                <th><FaInfoCircle /> Status</th>
+                <th className="text-center">Member ID</th>
+                <th className="text-center">Transaction ID</th>
+                <th className="text-center">Amount</th>
+                <th className="text-center">Term</th>
+                <th className="text-center">Interest</th>
+                <th className="text-center">Monthly</th>
+                <th className="text-center">Total Monthly</th>
+                <th className="text-center">Total</th>
+                <th className="text-center">Due Date</th>
               </tr>
             </thead>
             <tbody>
@@ -504,24 +515,23 @@ const Dashboard = () => {
                       setModalVisible(true);
                     }}
                   >
-                    <td>{loan.memberId}</td>
-                    <td>{loan.transactionId}</td>
-                    <td>{formatCurrency(loan.loanAmount)}</td>
-                    <td>{loan.term} mo</td>
-                    <td>{loan.interest}%</td>
-                    <td>{formatCurrency(loan.monthlyPayment)}</td>
-                    <td>{formatCurrency(loan.totalTermPayment)}</td>
-                    <td>{loan.dueDate}</td>
-                    <td>
-                      <span className={`status-badge ${loan.status.toLowerCase()}`}>
-                        {loan.status}
-                      </span>
+                    <td className="text-center">{loan.memberId}</td>
+                    <td className="text-center">{loan.transactionId}</td>
+                    <td className="text-center">₱{formatCurrency(loan.loanAmount)}</td>
+                    <td className="text-center">{loan.term}</td>
+                    <td className="text-center">{loan.interest}</td>
+                    <td className="text-center">₱{formatCurrency(loan.monthlyPayment)}</td>
+                    <td className="text-center">₱{formatCurrency(loan.totalMonthlyPayment)}</td>
+                    <td className="text-center">₱{formatCurrency(loan.totalTermPayment)}</td>
+                    <td className={`text-center ${loan.isOverdue ? 'overdue' : ''}`}>
+                      {loan.dueDate}
+                      {loan.isOverdue && <span className="overdue-badge">Overdue</span>}
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr className="no-results">
-                  <td colSpan="9">No loans found matching your search criteria</td>
+                  <td colSpan="10" className="text-center">No loans found matching your search criteria</td>
                 </tr>
               )}
             </tbody>
@@ -540,21 +550,23 @@ const Dashboard = () => {
 
       <style jsx>{`
         :root {
-          --primary: #3B82F6;
-          --primary-dark: #2563EB;
+          --primary: #2D5783;
+          --primary-light: #3B82F6;
           --secondary: #10B981;
           --danger: #EF4444;
           --warning: #F59E0B;
           --gray: #6B7280;
           --light-gray: #F3F4F6;
           --dark-gray: #1F2937;
+          --white: #FFFFFF;
+          --bg-color: #F9FAFB;
         }
 
         * {
           box-sizing: border-box;
           margin: 0;
           padding: 0;
-          font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
         }
 
         .dashboard-container {
@@ -562,25 +574,37 @@ const Dashboard = () => {
           max-width: 1400px;
           margin: 0 auto;
           color: var(--dark-gray);
-          background-color: #f9fafb;
+          background-color: var(--bg-color);
         }
 
         .dashboard-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
           margin-bottom: 2rem;
           padding-bottom: 1rem;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid #E5E7EB;
         }
 
         .dashboard-header h1 {
-          font-size: 2rem;
+          font-size: 1.75rem;
           font-weight: 700;
           color: var(--dark-gray);
           margin-bottom: 0.5rem;
         }
 
-        .dashboard-header p {
-          color: var(--gray);
-          font-size: 1rem;
+        .header-controls {
+          display: flex;
+          gap: 1rem;
+        }
+
+        .year-select {
+          padding: 0.5rem 1rem;
+          border-radius: 0.5rem;
+          border: 1px solid #E5E7EB;
+          background-color: var(--white);
+          font-size: 0.875rem;
+          color: var(--dark-gray);
         }
 
         /* Metrics Grid */
@@ -592,13 +616,14 @@ const Dashboard = () => {
         }
 
         .metric-card {
-          background: white;
-          border-radius: 0.5rem;
+          background: var(--white);
+          border-radius: 0.75rem;
           padding: 1.5rem;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
           transition: transform 0.2s, box-shadow 0.2s;
           position: relative;
           overflow: hidden;
+          border: 1px solid #E5E7EB;
         }
 
         .metric-card:hover {
@@ -607,24 +632,13 @@ const Dashboard = () => {
         }
 
         .funds-card {
-          background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
-          color: white;
+          background: linear-gradient(135deg, var(--primary) 0%, #1E3A8A 100%);
+          color: var(--white);
           grid-column: 1 / -1;
         }
 
         .funds-card .metric-value {
-          font-size: 2.5rem;
-        }
-
-        .metric-icon {
-          font-size: 1.5rem;
-          margin-bottom: 1rem;
-          color: var(--primary);
-        }
-
-        .funds-card .metric-icon {
-          color: white;
-          opacity: 0.8;
+          font-size: 2.25rem;
         }
 
         .metric-content h3 {
@@ -646,7 +660,7 @@ const Dashboard = () => {
         }
 
         .funds-card .metric-value {
-          color: white;
+          color: var(--white);
         }
 
         .metric-description {
@@ -667,7 +681,7 @@ const Dashboard = () => {
           font-size: 0.75rem;
           font-weight: 600;
           text-align: center;
-          color: white;
+          color: var(--white);
         }
 
         /* Charts Section */
@@ -679,22 +693,19 @@ const Dashboard = () => {
           display: flex;
           gap: 0.75rem;
           margin-bottom: 1.5rem;
+          flex-wrap: wrap;
         }
 
         .chart-button {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 0.5rem;
-          padding: 0.75rem;
-          background: white;
-          border: 1px solid #e5e7eb;
+          padding: 0.75rem 1.25rem;
+          background: var(--white);
+          border: 1px solid #E5E7EB;
           border-radius: 0.5rem;
           font-weight: 600;
           color: var(--gray);
           cursor: pointer;
           transition: all 0.2s;
+          font-size: 0.875rem;
         }
 
         .chart-button:hover {
@@ -705,18 +716,15 @@ const Dashboard = () => {
         .chart-button.selected {
           background: var(--primary);
           border-color: var(--primary);
-          color: white;
-        }
-
-        .chart-icon {
-          font-size: 1rem;
+          color: var(--white);
         }
 
         .chart-container {
-          background: white;
-          border-radius: 0.5rem;
+          background: var(--white);
+          border-radius: 0.75rem;
           padding: 1.5rem;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          border: 1px solid #E5E7EB;
         }
 
         .chart-card {
@@ -731,7 +739,7 @@ const Dashboard = () => {
         }
 
         .chart-header h3 {
-          font-size: 1.25rem;
+          font-size: 1.125rem;
           font-weight: 600;
           color: var(--dark-gray);
         }
@@ -760,39 +768,13 @@ const Dashboard = () => {
           position: relative;
         }
 
-        .year-selector {
-          display: flex;
-          gap: 0.5rem;
-        }
-
-        .year-button {
-          padding: 0.375rem 0.75rem;
-          background: white;
-          border: 1px solid #e5e7eb;
-          border-radius: 0.375rem;
-          font-size: 0.75rem;
-          font-weight: 500;
-          cursor: pointer;
-          transition: all 0.2s;
-        }
-
-        .year-button:hover {
-          border-color: var(--primary);
-          color: var(--primary);
-        }
-
-        .year-button.selected {
-          background: var(--primary);
-          border-color: var(--primary);
-          color: white;
-        }
-
         /* Loans Section */
         .loans-section {
-          background: white;
-          border-radius: 0.5rem;
+          background: var(--white);
+          border-radius: 0.75rem;
           padding: 1.5rem;
-          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+          box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+          border: 1px solid #E5E7EB;
         }
 
         .section-header {
@@ -805,7 +787,7 @@ const Dashboard = () => {
         }
 
         .section-header h2 {
-          font-size: 1.25rem;
+          font-size: 1.125rem;
           font-weight: 600;
           color: var(--dark-gray);
         }
@@ -817,32 +799,25 @@ const Dashboard = () => {
 
         .search-box input {
           width: 100%;
-          padding: 0.5rem 1rem 0.5rem 2.5rem;
-          border: 1px solid #e5e7eb;
+          padding: 0.75rem 1rem;
+          border: 1px solid #E5E7EB;
           border-radius: 0.5rem;
           font-size: 0.875rem;
           transition: border-color 0.2s;
+          background-color: var(--white);
         }
 
         .search-box input:focus {
           outline: none;
           border-color: var(--primary);
-        }
-
-        .search-icon {
-          position: absolute;
-          left: 1rem;
-          top: 50%;
-          transform: translateY(-50%);
-          color: var(--gray);
-          font-size: 0.875rem;
+          box-shadow: 0 0 0 2px rgba(45, 87, 131, 0.1);
         }
 
         .table-container {
           overflow-x: auto;
           margin-top: 1rem;
           border-radius: 0.5rem;
-          border: 1px solid #e5e7eb;
+          border: 1px solid #E5E7EB;
         }
 
         .loans-table {
@@ -852,24 +827,20 @@ const Dashboard = () => {
         }
 
         .loans-table th {
-          background-color: #f9fafb;
+          background-color: #F9FAFB;
           color: var(--gray);
           padding: 0.75rem 1rem;
-          text-align: left;
+          text-align: center;
           font-weight: 600;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid #E5E7EB;
           white-space: nowrap;
-        }
-
-        .loans-table th svg {
-          margin-right: 0.5rem;
-          color: var(--primary);
         }
 
         .loans-table td {
           padding: 0.75rem 1rem;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid #E5E7EB;
           white-space: nowrap;
+          text-align: center;
         }
 
         .loans-table tr:last-child td {
@@ -877,8 +848,24 @@ const Dashboard = () => {
         }
 
         .loans-table tr:hover {
-          background-color: #f9fafb;
+          background-color: #F9FAFB;
           cursor: pointer;
+        }
+
+        .overdue {
+          color: var(--danger);
+          font-weight: 600;
+        }
+
+        .overdue-badge {
+          display: inline-block;
+          margin-left: 0.5rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 0.25rem;
+          background-color: #FEE2E2;
+          color: var(--danger);
+          font-size: 0.75rem;
+          font-weight: 600;
         }
 
         .status-badge {
@@ -890,23 +877,13 @@ const Dashboard = () => {
         }
 
         .status-badge.active {
-          background-color: #D1FAE5;
-          color: #065F46;
-        }
-
-        .status-badge.pending {
-          background-color: #FEF3C7;
-          color: #92400E;
+          background-color: #E0E7FF;
+          color: #4338CA;
         }
 
         .status-badge.overdue {
           background-color: #FEE2E2;
           color: #991B1B;
-        }
-
-        .status-badge.completed {
-          background-color: #E0E7FF;
-          color: #3730A3;
         }
 
         .no-results {
@@ -916,6 +893,11 @@ const Dashboard = () => {
 
         .no-results td {
           padding: 2rem;
+        }
+
+        /* Text Alignment Helpers */
+        .text-center {
+          text-align: center;
         }
 
         /* Modal */
@@ -934,8 +916,8 @@ const Dashboard = () => {
         }
 
         .modal {
-          background: white;
-          border-radius: 0.5rem;
+          background: var(--white);
+          border-radius: 0.75rem;
           width: 90%;
           max-width: 500px;
           max-height: 90vh;
@@ -960,13 +942,13 @@ const Dashboard = () => {
           justify-content: space-between;
           align-items: center;
           padding: 1.25rem;
-          border-bottom: 1px solid #e5e7eb;
+          border-bottom: 1px solid #E5E7EB;
         }
 
         .modal-title {
           margin: 0;
           color: var(--dark-gray);
-          font-size: 1.25rem;
+          font-size: 1.125rem;
           font-weight: 600;
         }
 
@@ -992,7 +974,7 @@ const Dashboard = () => {
           justify-content: space-between;
           margin-bottom: 1rem;
           padding-bottom: 1rem;
-          border-bottom: 1px solid #f3f4f6;
+          border-bottom: 1px solid #F3F4F6;
         }
 
         .detail-row:last-child {
@@ -1002,16 +984,9 @@ const Dashboard = () => {
         }
 
         .detail-label {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
           font-weight: 600;
           color: var(--gray);
           font-size: 0.875rem;
-        }
-
-        .detail-label svg {
-          color: var(--primary);
         }
 
         .detail-value {
@@ -1020,39 +995,16 @@ const Dashboard = () => {
           text-align: right;
         }
 
-        /* Loading */
-        .loading-container {
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-          gap: 1rem;
-        }
-
-        .spinner {
-          border: 4px solid rgba(59, 130, 246, 0.1);
-          border-top: 4px solid var(--primary);
-          border-radius: 50%;
-          width: 40px;
-          height: 40px;
-          animation: spin 1s linear infinite;
-        }
-
-        .loading-container p {
-          color: var(--gray);
-          font-size: 0.875rem;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
         /* Responsive */
         @media (max-width: 768px) {
           .dashboard-container {
             padding: 1rem;
+          }
+
+          .dashboard-header {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 1rem;
           }
 
           .metrics-grid {
@@ -1070,6 +1022,19 @@ const Dashboard = () => {
 
           .search-box {
             width: 100%;
+          }
+
+          .loans-table th, .loans-table td {
+            padding: 0.5rem;
+            font-size: 0.75rem;
+          }
+        }
+
+        @media (max-width: 480px) {
+          .loans-table {
+            display: block;
+            overflow-x: auto;
+            white-space: nowrap;
           }
         }
       `}</style>

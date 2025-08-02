@@ -11,7 +11,7 @@ const PORT = process.env.PORT || 3000;
 
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
-const DASHBOARD_LINK = 'https://your-official-website.com/admin/dashboard';
+const DASHBOARD_LINK = 'https://fiveki.onrender.com';
 const FACEBOOK_LINK = 'https://www.facebook.com/5KiFS';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
@@ -694,6 +694,87 @@ Best regards,
         console.error('[NOTIFICATION ERROR] Error sending withdrawal notification emails:', error);
         res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
+});
+
+app.post('/approveWithdraws', async (req, res) => {
+  const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
+
+  try {
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Withdrawal Approved - 5Ki Financial Services',
+      text: `
+Withdrawal Approved
+
+Dear ${firstName},
+
+Your withdrawal of ₱${amount} has been approved on ${dateApproved} at ${timeApproved}.
+
+Thank you for using 5Ki Financial Services.
+
+Best regards,
+5KI Financial Services Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    res.status(200).json({ success: true, message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('Error sending approval email:', error);
+    res.status(500).json({ success: false, message: 'Failed to send email' });
+  }
+});
+
+app.post('/rejectWithdraws', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating withdrawal rejection email', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    amount, 
+    dateRejected, 
+    timeRejected, 
+    rejectionReason 
+  } = req.body;
+
+  if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal rejection');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending withdrawal rejection to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Withdrawal Application Status',
+      text: `
+Withdrawal Application Update
+
+Dear ${firstName},
+
+After careful review, we regret to inform you that your withdrawal application submitted on ${dateRejected} at ${timeRejected} has not been approved.
+
+Amount Requested: ₱${amount}
+${rejectionReason ? `Reason: ${rejectionReason}\n` : ''}
+
+You may submit a new withdrawal application after addressing any issues. 
+
+For questions, contact us at ${GMAIL_OWNER}.
+
+Best regards,
+5KI Financial Services Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Withdrawal rejection email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending withdrawal rejection email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
 });
 
 // ==============================================

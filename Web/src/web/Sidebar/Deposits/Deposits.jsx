@@ -447,13 +447,13 @@ const Deposits = () => {
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-  if (loading) {
-    return (
-      <div className="loading-container">
-        <div className="spinner"></div>
-      </div>
-    );
-  }
+if (loading) {
+  return (
+    <div className="loading-container">
+      <div className="spinner"></div>
+    </div>
+  );
+}
 
   return (
     <div className="safe-area-view">
