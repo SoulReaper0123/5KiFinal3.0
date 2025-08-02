@@ -16,7 +16,7 @@ export default function TwoFactorEmail({ route, navigation }) {
   const firstName = route.params?.firstName || '';
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSendCode = async () => {
+const handleSendCode = async () => {
     if (!email) {
       Alert.alert('Error', 'Email address is required');
       return;
@@ -25,36 +25,28 @@ export default function TwoFactorEmail({ route, navigation }) {
     setIsLoading(true);
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Log the verification code to terminal for debugging
     console.log(`[DEBUG] Generated verification code: ${verificationCode}`);
     console.log(`[DEBUG] Attempting to send to email: ${email}`);
-    
-    try {
-      await sendVerificationCode({
-        email,
-        firstName,
-        verificationCode
-      });
-      
-      console.log(`[DEBUG] Verification code sent successfully to ${email}`);
-      
+
+    // Show loading for minimum 500ms before navigating
+    setTimeout(() => {
+      setIsLoading(false);
       navigation.navigate('VerifyCode', { 
         email,
         verificationCode,
         lockedEmail: email,
         lockedCode: verificationCode 
       });
-    } catch (error) {
-      console.error('Failed to send verification code:', error);
-      console.log(`[DEBUG] Verification code that would have been sent: ${verificationCode}`);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to send verification code. Please try again.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setIsLoading(false);
-    }
+
+      // Run API in background after navigation
+      sendVerificationCode({
+        email,
+        firstName,
+        verificationCode
+      })
+      .then(() => console.log('Email sent successfully'))
+      .catch(error => console.error('Failed to send email:', error));
+    }, 500); // Minimum loading duration
   };
 
   return (

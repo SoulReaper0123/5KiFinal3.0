@@ -553,17 +553,18 @@ const processDatabaseApprove = async (loan) => {
 
     const approvedData = {
       ...loanData,
-      interestRate: (interestRate * 100).toFixed(2) + '%',
-      interest: interest.toFixed(2),
-      monthlyPayment: monthlyPayment.toFixed(2),
-      totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
-      totalTermPayment: totalTermPayment.toFixed(2),
-      releaseAmount: releaseAmount.toFixed(2),
-      processingFee: processingFee.toFixed(2),
+      interestRate: (interestRate * 100),
+      interest: interest,
+      monthlyPayment: monthlyPayment,
+      totalMonthlyPayment: totalMonthlyPayment,
+      totalTermPayment: totalTermPayment,
+      releaseAmount: releaseAmount,
+      processingFee: processingFee,
       dateApproved: approvalDate,
       timeApproved: approvalTime,
       dueDate: formattedDueDate,
       status: 'approved',
+      paymentsMade: 0 
     };
 
     // Execute all database operations in sequence

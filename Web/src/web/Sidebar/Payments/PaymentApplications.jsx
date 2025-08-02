@@ -469,103 +469,137 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
     }
   };
 
-  const processDatabaseApprove = async (payment) => {
-    try {
-      const { id, transactionId, amountToBePaid } = payment;
-      
-      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
-      const approvedRef = database.ref(`Payments/ApprovedApplications/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      const savingsRef = database.ref('Settings/Savings');
-      const memberRef = database.ref(`Members/${id}/balance`);
-      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${transactionId}`);
+const processDatabaseApprove = async (payment) => {
+  try {
+    const { id, transactionId, amountToBePaid } = payment;
+    
+    // 1. Verify member details
+    const memberRef = database.ref(`Members/${id}`);
+    const memberSnap = await memberRef.once('value');
+    const memberData = memberSnap.val();
 
-      const [paymentSnap, fundsSnap, savingsSnap, memberSnap, loanSnap] = await Promise.all([
-        paymentRef.once('value'),
-        fundsRef.once('value'),
-        savingsRef.once('value'),
-        memberRef.once('value'),
-        currentLoanRef.once('value')
-      ]);
-
-      if (!paymentSnap.exists()) {
-        throw new Error('Payment data not found.');
-      }
-
-      const paymentData = paymentSnap.val();
-      const paymentAmount = parseFloat(amountToBePaid);
-      const currentFunds = parseFloat(fundsSnap.val()) || 0;
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const memberBalance = parseFloat(memberSnap.val()) || 0;
-
-      // Calculate interest and principal if this is a loan payment
-      let interestAmount = 0;
-      let principalAmount = paymentAmount;
-      let newDueDate = null;
-
-      if (loanSnap.exists()) {
-        const loanData = loanSnap.val();
-        interestAmount = parseFloat(loanData.interest) || 0;
-        
-        // Calculate how much goes to principal (payment minus interest)
-        principalAmount = paymentAmount - interestAmount;
-        
-        // Update loan amount (reduce principal)
-        const remainingLoan = parseFloat(loanData.loanAmount) - principalAmount;
-        
-        if (remainingLoan <= 0) {
-          // Loan fully paid
-          await currentLoanRef.remove();
-        } else {
-          // Update loan with remaining amount and extend due date by 30 days
-          const now = new Date();
-          const dueDate = new Date(now);
-          dueDate.setDate(now.getDate() + 30);
-          newDueDate = formatDate(dueDate);
-          
-          await currentLoanRef.update({
-            loanAmount: remainingLoan.toFixed(2),
-            dueDate: newDueDate
-          });
-        }
-      }
-
-      // Update funds (add principal amount)
-      await fundsRef.set(currentFunds + principalAmount);
-      
-      // Update savings (add interest amount if any)
-      if (interestAmount > 0) {
-        await savingsRef.set(currentSavings + interestAmount);
-      }
-      
-      // Update member balance (add full payment amount)
-      await memberRef.set(memberBalance + principalAmount);
-
-      // Create approved record
-      const now = new Date();
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-
-      const approvedData = {
-        ...paymentData,
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        status: 'completed',
-        interestPaid: interestAmount.toFixed(2),
-        principalPaid: principalAmount.toFixed(2)
-      };
-
-      // Execute all database operations
-      await approvedRef.set(approvedData);
-      await transactionRef.set(approvedData);
-      // await paymentRef.remove();
-
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve payment');
+    if (!memberData || 
+        memberData.email !== payment.email ||
+        memberData.firstName !== payment.firstName || 
+        memberData.lastName !== payment.lastName) {
+      throw new Error('Member details do not match our records');
     }
-  };
+
+    // 2. Find current loans
+    const memberLoansRef = database.ref(`Loans/CurrentLoans/${id}`);
+    const memberLoansSnap = await memberLoansRef.once('value');
+    
+    let currentLoanData = null;
+    let currentLoanKey = null;
+    let isLoanPayment = false;
+    
+    if (memberLoansSnap.exists()) {
+      memberLoansSnap.forEach((loanSnap) => {
+        if (!currentLoanData) {
+          currentLoanData = loanSnap.val();
+          currentLoanKey = loanSnap.key;
+          isLoanPayment = true;
+        }
+      });
+    }
+
+    // Database references
+    const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
+    const approvedRef = database.ref(`Payments/ApprovedPayments/${id}/${transactionId}`);
+    const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
+    const fundsRef = database.ref('Settings/Funds');
+    const savingsRef = database.ref('Settings/Savings');
+    
+    // Fetch data
+    const [paymentSnap, fundsSnap, savingsSnap] = await Promise.all([
+      paymentRef.once('value'),
+      fundsRef.once('value'),
+      savingsRef.once('value')
+    ]);
+
+    if (!paymentSnap.exists()) throw new Error('Payment data not found');
+
+    const paymentData = paymentSnap.val();
+    const paymentAmount = parseFloat(amountToBePaid);
+    const currentFunds = parseFloat(fundsSnap.val()) || 0;
+    const currentSavings = parseFloat(savingsSnap.val()) || 0;
+    const memberBalance = parseFloat(memberData.balance || 0);
+
+    // Payment calculations
+    let interestAmount = 0;
+    let principalAmount = paymentAmount;
+    let excessPayment = 0;
+    let newMemberBalance = memberBalance;
+
+    if (isLoanPayment && currentLoanData) {
+      interestAmount = parseFloat(currentLoanData.interest) || 0;
+      principalAmount = Math.max(0, paymentAmount - interestAmount);
+      
+      const remainingLoan = parseFloat(currentLoanData.loanAmount) - principalAmount;
+      
+      // Handle overpayment
+      if (remainingLoan < 0) {
+        excessPayment = Math.abs(remainingLoan);
+        principalAmount = parseFloat(currentLoanData.loanAmount);
+      }
+
+      // Update member balance (principal + excess)
+      newMemberBalance = memberBalance + principalAmount + excessPayment;
+
+      // Update loan or close if fully paid
+      if (remainingLoan <= 0) {
+        await memberLoansRef.child(currentLoanKey).remove();
+      } else {
+        const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
+        const remainingTerm = currentLoanData.term - paymentsMade;
+        const newMonthlyPayment = remainingLoan / remainingTerm;
+        
+        await memberLoansRef.child(currentLoanKey).update({
+          loanAmount: remainingLoan,
+          monthlyPayment: newMonthlyPayment,
+          totalMonthlyPayment: newMonthlyPayment + interestAmount,
+          dueDate: formatDate(new Date(new Date().setDate(new Date().getDate() + 30))),
+          paymentsMade: paymentsMade
+        });
+      }
+    }
+
+    // Update all databases
+    await fundsRef.set(currentFunds + principalAmount);
+    if (interestAmount > 0) await savingsRef.set(currentSavings + interestAmount);
+    await memberRef.update({ balance: newMemberBalance });
+
+    // Create payment record
+    const now = new Date();
+    const approvedData = {
+      ...paymentData,
+      dateApproved: formatDate(now),
+      timeApproved: formatTime(now),
+      status: 'completed',
+      interestPaid: interestAmount,
+      principalPaid: principalAmount,
+      excessPayment: excessPayment,
+      isLoanPayment: isLoanPayment,
+      appliedToLoan: currentLoanKey
+    };
+
+    // Finalize operations
+    await approvedRef.set(approvedData);
+    await transactionRef.set(approvedData);
+    // await paymentRef.remove();
+
+    return { 
+      success: true,
+      principalPaid: principalAmount,
+      interestPaid: interestAmount,
+      excessPayment: excessPayment 
+    };
+
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve payment');
+  }
+};
 
   const processDatabaseReject = async (payment, rejectionReason) => {
     try {
@@ -575,7 +609,7 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
       const rejectionTime = formatTime(now);
 
       const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
-      const rejectedRef = database.ref(`Payments/RejectedApplications/${id}/${transactionId}`);
+      const rejectedRef = database.ref(`Payments/RejectedPayments/${id}/${transactionId}`);
       const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
 
       const paymentSnap = await paymentRef.once('value');
@@ -601,75 +635,129 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
     }
   };
 
-  const handleSuccessOk = () => {
-    setSuccessMessageModalVisible(false);
-    setSelectedPayment(null);
-    setCurrentAction(null);
-    
-    // Call API in background after user clicks OK
+const handleSuccessOk = async () => {
+  setSuccessMessageModalVisible(false);
+  setSelectedPayment(null);
+  setCurrentAction(null);
+  
+  try {
+    // Call API after user clicks OK
     if (currentAction === 'approve') {
-      callApiApprove(selectedPayment).catch(console.error);
+      await callApiApprove(selectedPayment);
     } else {
-      callApiReject(selectedPayment).catch(console.error);
+      await callApiReject(selectedPayment);
     }
+  } catch (error) {
+    console.error('Error sending email:', error);
+  }
+  
+  refreshData();
+};
+
+const callApiApprove = async (payment) => {
+  try {
+    const now = new Date();
+    const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
+    const memberData = memberSnap.val();
+
+    // Calculate interest and principal if this is a loan payment
+    let interestAmount = 0;
+    let principalAmount = parseFloat(payment.amountToBePaid);
+    let excessPayment = 0;
+    let isLoanPayment = false;
+
+    // Check if this is a loan payment
+    const loanRef = database.ref(`Loans/CurrentLoans/${payment.id}/${payment.transactionId}`);
+    const loanSnap = await loanRef.once('value');
     
-    refreshData();
-  };
-
-  const callApiApprove = async (payment) => {
-    try {
-      const now = new Date();
-      const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
-      const memberData = memberSnap.val();
-
-      const response = await ApprovePayments({
-        memberId: payment.id,
-        transactionId: payment.transactionId,
-        amount: payment.amountToBePaid,
-        paymentMethod: payment.paymentOption,
-        dateApproved: payment.dateApproved || formatDate(now),
-        timeApproved: payment.timeApproved || formatTime(now),
-        email: payment.email,
-        firstName: memberData.firstName,
-        lastName: memberData.lastName,
-        status: 'completed'
-      });
+    if (loanSnap.exists()) {
+      isLoanPayment = true;
+      const loanData = loanSnap.val();
+      interestAmount = parseFloat(loanData.interest) || 0;
+      principalAmount = parseFloat(payment.amountToBePaid) - interestAmount;
       
-      if (!response.ok) {
-        console.error('Failed to send approval email');
+      // Handle overpayment
+      const remainingLoan = parseFloat(loanData.loanAmount) - principalAmount;
+      if (remainingLoan < 0) {
+        excessPayment = Math.abs(remainingLoan);
+        principalAmount = parseFloat(loanData.loanAmount);
       }
-    } catch (err) {
-      console.error('API approve error:', err);
     }
-  };
 
-  const callApiReject = async (payment) => {
-    try {
-      const now = new Date();
-      const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
-      const memberData = memberSnap.val();
-
-      const response = await RejectPayments({
-        memberId: payment.id,
-        transactionId: payment.transactionId,
-        amount: payment.amountToBePaid,
-        paymentMethod: payment.paymentOption,
-        dateRejected: payment.dateRejected || formatDate(now),
-        timeRejected: payment.timeRejected || formatTime(now),
-        email: payment.email,
-        firstName: memberData.firstName,
-        lastName: memberData.lastName,
-        status: 'failed',
-        rejectionReason: payment.rejectionReason || 'Rejected by admin'
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to send rejection email');
-      }
-    } catch (err) {
-      console.error('API reject error:', err);
+    const response = await ApprovePayments({
+      memberId: payment.id,
+      transactionId: payment.transactionId,
+      amount: payment.amountToBePaid,
+      paymentMethod: payment.paymentOption,
+      dateApproved: payment.dateApproved || formatDate(now),
+      timeApproved: payment.timeApproved || formatTime(now),
+      email: payment.email,
+      firstName: memberData.firstName,
+      lastName: memberData.lastName,
+      status: 'approved',
+      interestPaid: interestAmount.toFixed(2),
+      principalPaid: principalAmount.toFixed(2),
+      excessPayment: excessPayment.toFixed(2),
+      isLoanPayment: isLoanPayment
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to send approval email');
+      // You might want to show a warning to the admin that email failed
     }
-  };
+    return response;
+  } catch (err) {
+    console.error('API approve error:', err);
+    throw err;
+  }
+};
+
+const callApiReject = async (payment) => {
+  try {
+    const now = new Date();
+    const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
+    const memberData = memberSnap.val();
+
+    let rejectionMessage = '';
+    
+    // Custom rejection messages based on reason
+    if (payment.rejectionReason.includes('Invalid proof')) {
+      rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed because the proof of payment you provided could not be validated. Please ensure you upload a clear, valid proof of payment document when resubmitting.`;
+    } 
+    else if (payment.rejectionReason.includes('Incorrect amount')) {
+      rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed because the amount does not match our records. Please verify the correct payment amount and resubmit your payment.`;
+    }
+    else if (payment.rejectionReason.includes('Unclear image')) {
+      rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed because the image of your proof of payment was unclear or unreadable. Please ensure your proof of payment is clearly visible when resubmitting.`;
+    }
+    else {
+      rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed.${payment.rejectionReason ? `\n\nReason: ${payment.rejectionReason}` : ''}`;
+    }
+
+    const response = await RejectPayments({
+      memberId: payment.id,
+      transactionId: payment.transactionId,
+      amount: payment.amountToBePaid,
+      paymentMethod: payment.paymentOption,
+      dateRejected: payment.dateRejected || formatDate(now),
+      timeRejected: payment.timeRejected || formatTime(now),
+      email: payment.email,
+      firstName: memberData.firstName,
+      lastName: memberData.lastName,
+      status: 'rejected',
+      rejectionReason: payment.rejectionReason || 'Rejected by admin',
+      rejectionMessage: rejectionMessage
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to send rejection email');
+    }
+    return response;
+  } catch (err) {
+    console.error('API reject error:', err);
+    throw err;
+  }
+};
 
   const openImageViewer = (url, label, index) => {
     const images = [];

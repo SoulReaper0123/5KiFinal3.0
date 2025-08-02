@@ -953,6 +953,120 @@ Best regards,
     }
 });
 
+// Add these endpoints to your server code
+app.post('/approvePayments', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating payment approval email', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    amount, 
+    paymentMethod,
+    dateApproved, 
+    timeApproved,
+    interestPaid,
+    principalPaid,
+    excessPayment,
+    isLoanPayment
+  } = req.body;
+
+  if (!email || !firstName || !lastName || !amount || !dateApproved || !timeApproved) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for payment approval');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending payment approval to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Payment Approved - 5Ki Financial Services',
+      text: `
+Payment Approved
+
+Dear ${firstName},
+
+We are pleased to inform you that your payment has been successfully processed.
+
+Payment Details:
+- Amount: ₱${amount}
+- Payment Method: ${paymentMethod}
+- Date Approved: ${dateApproved} at ${timeApproved}
+${isLoanPayment ? `
+Loan Payment Breakdown:
+- Principal Paid: ₱${principalPaid}
+- Interest Paid: ₱${interestPaid}
+${excessPayment > 0 ? `- Excess Payment: ₱${excessPayment}` : ''}
+` : ''}
+
+Your transaction has been completed successfully. Thank you for your payment.
+
+Best regards,
+5KI Financial Services Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Payment approval email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending payment approval email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
+});
+
+app.post('/rejectPayments', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating payment rejection email', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    amount, 
+    paymentMethod,
+    dateRejected, 
+    timeRejected, 
+    rejectionReason,
+    rejectionMessage
+  } = req.body;
+
+  if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for payment rejection');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending payment rejection to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Payment Application Status',
+      text: `
+Payment Application Update
+
+Dear ${firstName},
+
+After careful review, we regret to inform you that your payment application submitted on ${dateRejected} at ${timeRejected} has not been approved.
+
+${rejectionMessage || `Reason: ${rejectionReason || 'Payment rejected by admin'}`}
+
+You may submit a new payment application after addressing any issues. 
+
+For questions, contact us at ${GMAIL_OWNER}.
+
+Best regards,
+5KI Financial Services Team
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Payment rejection email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending payment rejection email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
+});
+
 app.post('/membershipWithdrawal', async (req, res) => {
     console.log('[NOTIFICATION] Initiating membership withdrawal emails', req.body);
     const { email, firstName, lastName, date, reason } = req.body;
