@@ -10,7 +10,7 @@ import {
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
-import { database } from '../../../../Database/firebaseConfig';
+import { database, auth } from '../../../../Database/firebaseConfig';
 import { sendAdminCredentialsEmail, sendAdminDeleteData } from '../../../../Server/api';
 
 const generateRandomPassword = () => {
@@ -23,6 +23,19 @@ const generateRandomPassword = () => {
     return generateRandomPassword();
   }
   return pwd;
+};
+
+// Helper function to format date as "Month Day, Year"
+const formatDate = (date) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+// Helper function to format time as "HH:MM:SS"
+const formatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 };
 
 const styles = {
@@ -446,11 +459,14 @@ const CoAdmins = () => {
     const fetchAdmins = async () => {
       setLoading(true);
       try {
-        const snapshot = await database.ref('Users/Admin').once('value');
+        const snapshot = await database.ref('Users/CoAdmin').once('value');
         const data = snapshot.val() || {};
         const adminList = Object.entries(data).map(([id, admin]) => ({
           id,
-          ...admin
+          ...admin,
+          name: admin.firstName 
+            ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
+            : admin.name || ''
         }));
         setAdmins(adminList);
         setFilteredData(adminList);
@@ -470,8 +486,11 @@ const CoAdmins = () => {
     const filtered = admins.filter(admin => {
       const searchLower = searchQuery.toLowerCase();
       return (
-        admin.id.toLowerCase().includes(searchLower) ||
-        admin.name.toLowerCase().includes(searchLower) ||
+        admin.id.toString().includes(searchLower) ||
+        (admin.firstName && admin.firstName.toLowerCase().includes(searchLower)) ||
+        (admin.lastName && admin.lastName.toLowerCase().includes(searchLower)) ||
+        (admin.middleName && admin.middleName.toLowerCase().includes(searchLower)) ||
+        (admin.name && admin.name.toLowerCase().includes(searchLower)) ||
         admin.email.toLowerCase().includes(searchLower) ||
         (admin.contactNumber && admin.contactNumber.toLowerCase().includes(searchLower))
       );
@@ -480,6 +499,35 @@ const CoAdmins = () => {
     setNoMatch(filtered.length === 0);
     setCurrentPage(0);
   }, [searchQuery, admins]);
+
+  const getNextId = async () => {
+    try {
+      const adminsSnapshot = await database.ref('Users/CoAdmin').once('value');
+      const membersSnapshot = await database.ref('Members').once('value');
+      
+      const adminsData = adminsSnapshot.val() || {};
+      const membersData = membersSnapshot.val() || {};
+      
+      const adminIds = Object.keys(adminsData).map(id => parseInt(id));
+      const memberIds = Object.keys(membersData).map(id => parseInt(id));
+      const allIds = [...adminIds, ...memberIds];
+      
+      if (allIds.length === 0) {
+        return 5001;
+      }
+      
+      for (let i = 5001; i <= 9999; i++) {
+        if (!allIds.includes(i)) {
+          return i;
+        }
+      }
+      
+      return 5001;
+    } catch (error) {
+      console.error('Error getting next ID:', error);
+      return 5001;
+    }
+  };
 
   const validateFields = () => {
     let isValid = true;
@@ -509,8 +557,8 @@ const CoAdmins = () => {
     if (!contactNumber.trim()) {
       setContactNumberError('Contact number is required');
       isValid = false;
-    } else if (!/^\d+$/.test(contactNumber)) {
-      setContactNumberError('Contact number must contain only digits');
+    } else if (!/^\d{11}$/.test(contactNumber)) {
+      setContactNumberError('Contact number must be exactly 11 digits');
       isValid = false;
     }
 
@@ -519,10 +567,10 @@ const CoAdmins = () => {
 
   const onPressAdd = async () => {
     if (!validateFields()) return;
-
-    const emailExists = admins.some(admin => admin.email === email);
+    
+    const emailExists = admins.some(admin => admin.email.toLowerCase() === email.toLowerCase());
     if (emailExists) {
-      setEmailError('Email already in use');
+      setEmailError('Email address is already in use');
       return;
     }
 
@@ -542,29 +590,63 @@ const CoAdmins = () => {
 
     try {
       const password = generateRandomPassword();
-      const highestId = admins.reduce((max, admin) => {
-        const num = parseInt(admin.id.replace('admin', ''));
-        return num > max ? num : max;
-      }, 0);
-      const newId = `admin${highestId + 1}`;
-      const dateAdded = new Date().toLocaleString();
-      const name = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+      const newId = await getNextId();
+      const now = new Date();
+      const dateAdded = formatDate(now);
+      const timeAdded = formatTime(now);
+
+      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+      
+      const displayName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim();
+      await userCredential.user.updateProfile({
+        displayName
+      });
+
+      await auth.currentUser.updatePassword(password);
+      await auth.currentUser.sendEmailVerification();
 
       await database.ref(`Users/CoAdmin/${newId}`).set({
         id: newId,
-        name,
+        firstName,
+        middleName: middleName || '',
+        lastName,
         email,
         contactNumber,
         dateAdded,
-        role: 'admin',
+        timeAdded,
+        role: 'coadmin',
+        uid: userCredential.user.uid,
+        initialPassword: password
+      });
+
+      await database.ref(`Members/${newId}`).set({
+        id: newId,
+        firstName,
+        middleName: middleName || '',
+        lastName,
+        email,
+        contactNumber,
+        dateAdded,
+        timeAdded,
+        role: 'coadmin',
+        status: 'active',
+        uid: userCredential.user.uid
+      });
+
+      setPendingAdd({
+        firstName,
+        middleName,
+        lastName,
+        email,
+        contactNumber,
         password
       });
 
-      setSuccessMessage('Admin added successfully!');
+      setSuccessMessage(`Co Admin account created successfully!`);
       setSuccessVisible(true);
     } catch (error) {
       console.error('Error adding admin:', error);
-      setErrorMessage('Failed to add admin');
+      setErrorMessage(error.message || 'Failed to add admin');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
@@ -576,12 +658,16 @@ const CoAdmins = () => {
     setIsProcessing(true);
 
     try {
-      await database.ref(`Users/Admin/${pendingDelete.id}`).remove();
-      setSuccessMessage('Admin deleted successfully!');
+      const idToDelete = pendingDelete.id;
+
+      await database.ref(`Users/CoAdmin/${idToDelete}`).remove();
+      await database.ref(`Members/${idToDelete}`).remove();
+
+      setSuccessMessage(`Admin account deleted successfully!`);
       setSuccessVisible(true);
     } catch (error) {
       console.error('Error deleting admin:', error);
-      setErrorMessage('Failed to delete admin');
+      setErrorMessage(error.message || 'Failed to delete admin');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
@@ -597,30 +683,33 @@ const CoAdmins = () => {
       }
 
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Admins');
+      const worksheet = workbook.addWorksheet('CoAdmins');
 
-      const headers = ['ID', 'Name', 'Email', 'Contact Number', 'Date Added'];
+      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added', 'Time Added'];
       worksheet.addRow(headers);
 
       filteredData.forEach(admin => {
         const row = [
           admin.id,
-          admin.name,
+          admin.firstName || '',
+          admin.middleName || '',
+          admin.lastName || '',
           admin.email,
           admin.contactNumber,
-          admin.dateAdded
+          admin.dateAdded,
+          admin.timeAdded || ''
         ];
         worksheet.addRow(row);
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
       const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheet.sheet' 
       });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'Admins.xlsx';
+      link.download = 'CoAdmins.xlsx';
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -637,22 +726,14 @@ const CoAdmins = () => {
 
   const handleSuccessOk = () => {
     setSuccessVisible(false);
-    
+  
     if (pendingAdd) {
-      const nameParts = pendingAdd.name ? 
-        pendingAdd.name.split(' ') : 
-        `${pendingAdd.firstName} ${pendingAdd.middleName} ${pendingAdd.lastName}`.split(' ');
-      
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-
       sendAdminCredentialsEmail({
         email: pendingAdd.email,
-        password: generateRandomPassword(),
-        firstName,
-        middleName,
-        lastName
+        password: pendingAdd.password,
+        firstName: pendingAdd.firstName,
+        middleName: pendingAdd.middleName,
+        lastName: pendingAdd.lastName
       }).catch(error => console.error('Error sending admin credentials email:', error));
       
       setFirstName('');
@@ -663,19 +744,11 @@ const CoAdmins = () => {
       setModalVisible(false);
     } 
     else if (pendingDelete) {
-      const nameParts = pendingDelete.name ? 
-        pendingDelete.name.split(' ') : 
-        `${pendingDelete.firstName} ${pendingDelete.middleName} ${pendingDelete.lastName}`.split(' ');
-      
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
-      const middleName = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-
       sendAdminDeleteData({
         email: pendingDelete.email,
-        firstName,
-        middleName,
-        lastName
+        firstName: pendingDelete.firstName || '',
+        middleName: pendingDelete.middleName || '',
+        lastName: pendingDelete.lastName || ''
       }).catch(error => console.error('Error sending admin delete notification:', error));
     }
 
@@ -684,11 +757,14 @@ const CoAdmins = () => {
     
     const fetchAdmins = async () => {
       try {
-        const snapshot = await database.ref('Users/Admin').once('value');
+        const snapshot = await database.ref('Users/CoAdmin').once('value');
         const data = snapshot.val() || {};
         const adminList = Object.entries(data).map(([id, admin]) => ({
           id,
-          ...admin
+          ...admin,
+          name: admin.firstName 
+            ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
+            : admin.name || ''
         }));
         setAdmins(adminList);
         setFilteredData(adminList);
@@ -714,14 +790,14 @@ const CoAdmins = () => {
   return (
     <div className="safe-area-view">
       <div className="main-container">
-        <h2 className="header-text">Admins</h2>
+        <h2 className="header-text">Co-Admins</h2>
 
         <div className="top-controls">
           <button
             onClick={() => setModalVisible(true)}
             className="create-button"
           >
-            <span className="create-button-text">Create New Admin</span>
+            <span className="create-button-text">Create New Co-Admin</span>
           </button>
 
           <div className="search-download-container">
@@ -770,8 +846,10 @@ const CoAdmins = () => {
               <table style={styles.table}>
                 <thead>
                   <tr style={styles.tableHeader}>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Admin ID</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>ID</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Middle Name</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email Address</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Contact Number</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Added</th>
@@ -782,10 +860,12 @@ const CoAdmins = () => {
                   {paginatedData.map((admin) => (
                     <tr key={admin.id} style={styles.tableRow}>
                       <td style={styles.tableCell}>{admin.id}</td>
-                      <td style={styles.tableCell}>{admin.name}</td>
+                      <td style={styles.tableCell}>{admin.firstName || 'N/A'}</td>
+                      <td style={styles.tableCell}>{admin.middleName || 'N/A'}</td>
+                      <td style={styles.tableCell}>{admin.lastName || 'N/A'}</td>
                       <td style={styles.tableCell}>{admin.email}</td>
                       <td style={styles.tableCell}>{admin.contactNumber || 'N/A'}</td>
-                      <td style={styles.tableCell}>{admin.dateAdded}</td>
+                      <td style={styles.tableCell}>{admin.dateAdded || 'N/A'}</td>
                       <td style={styles.tableCell}>
                         <span 
                           style={styles.viewText} 
@@ -823,7 +903,7 @@ const CoAdmins = () => {
               >
                 <AiOutlineClose />
               </button>
-              <h3 className="modal-title">New Admin</h3>
+              <h3 className="modal-title">New Co-Admin</h3>
               <div className="modal-content">
                 <div className="form-group">
                   <label className="form-label">
@@ -885,7 +965,7 @@ const CoAdmins = () => {
                   </label>
                   <input
                     className="form-input"
-                    placeholder="Contact Number"
+                    placeholder="Contact Number (11 digits)"
                     value={contactNumber}
                     onChange={(e) => {
                       const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
@@ -898,7 +978,7 @@ const CoAdmins = () => {
 
                 <div className="modal-button-container">
                   <button className="modal-submit-button" onClick={onPressAdd}>
-                    Add Admin
+                    Add Co-Admin
                   </button>
                   <button
                     className="modal-cancel-button"
@@ -933,12 +1013,20 @@ const CoAdmins = () => {
               <div className="modal-content">
                 <h3 className="modal-title">Admin Details</h3>
                 <div className="form-group">
-                  <label className="form-label">Admin ID:</label>
+                  <label className="form-label">ID:</label>
                   <p>{selectedAdmin?.id || 'N/A'}</p>
                 </div>
                 <div className="form-group">
-                  <label className="form-label">Name:</label>
-                  <p>{selectedAdmin?.name || 'N/A'}</p>
+                  <label className="form-label">First Name:</label>
+                  <p>{selectedAdmin?.firstName || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Middle Name:</label>
+                  <p>{selectedAdmin?.middleName || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Last Name:</label>
+                  <p>{selectedAdmin?.lastName || 'N/A'}</p>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Email Address:</label>
@@ -951,6 +1039,10 @@ const CoAdmins = () => {
                 <div className="form-group">
                   <label className="form-label">Date Added:</label>
                   <p>{selectedAdmin?.dateAdded || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Time Added:</label>
+                  <p>{selectedAdmin?.timeAdded || 'N/A'}</p>
                 </div>
                 <div className="action-buttons-container">
                   <button
