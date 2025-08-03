@@ -1,8 +1,99 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { database, auth } from '../../../../../Database/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { ApproveRegistration, RejectRegistration } from '../../../../../Server/api';
 import { FaTimes, FaCheckCircle, FaExclamationCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import * as faceapi from 'face-api.js';
+import { createWorker } from 'tesseract.js';
+
+// Initialize the image verification module
+const ImageVerification = {
+  worker: null,
+  modelsLoaded: false,
+
+  async init() {
+    try {
+      // Load face detection models
+      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+      
+      // Initialize OCR worker
+      this.worker = await createWorker();
+      await this.worker.loadLanguage('eng');
+      await this.worker.initialize('eng');
+      
+      this.modelsLoaded = true;
+      return true;
+    } catch (error) {
+      console.error('Failed to initialize verification models:', error);
+      return false;
+    }
+  },
+
+  async verifyFace(imageElement) {
+    if (!this.modelsLoaded) return { isFace: false, error: 'Models not loaded' };
+    
+    try {
+      const detections = await faceapi.detectAllFaces(
+        imageElement, 
+        new faceapi.TinyFaceDetectorOptions()
+      ).withFaceLandmarks();
+      
+      return {
+        isFace: detections.length > 0,
+        faceCount: detections.length,
+        landmarks: detections.length > 0 ? detections[0].landmarks : null,
+        confidence: detections.length > 0 ? 0.9 : 0.1
+      };
+    } catch (error) {
+      console.error('Face detection error:', error);
+      return { isFace: false, error: error.message };
+    }
+  },
+
+  async verifyID(imageElement) {
+    if (!this.modelsLoaded) return { isID: false, error: 'Models not loaded' };
+    
+    try {
+      const { data: { text } } = await this.worker.recognize(imageElement);
+      
+      // Enhanced ID verification checks
+      const hasIDText = text.length > 20;
+      const hasDates = /\d{2}[\/\-]\d{2}[\/\-]\d{4}/.test(text);
+      const hasIDNumber = /[A-Za-z0-9]{6,}/.test(text);
+      const commonPhrases = ['REPUBLIC', 'GOVERNMENT', 'LICENSE', 'IDENTIFICATION', 'PASSPORT'];
+      const hasCommonPhrase = commonPhrases.some(phrase => text.toUpperCase().includes(phrase));
+      
+      const confidence = [
+        hasIDText ? 0.3 : 0,
+        hasDates ? 0.2 : 0,
+        hasIDNumber ? 0.2 : 0,
+        hasCommonPhrase ? 0.3 : 0
+      ].reduce((a, b) => a + b, 0);
+      
+      return {
+        isID: confidence > 0.6,
+        textFound: text,
+        confidence,
+        details: {
+          hasDates,
+          hasIDNumber,
+          hasCommonPhrase
+        }
+      };
+    } catch (error) {
+      console.error('ID verification error:', error);
+      return { isID: false, error: error.message };
+    }
+  },
+
+  async cleanup() {
+    if (this.worker) {
+      await this.worker.terminate();
+    }
+  }
+};
 
 const styles = {
   container: {
@@ -145,7 +236,8 @@ const styles = {
   imageBlock: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start'
+    alignItems: 'flex-start',
+    position: 'relative'
   },
   imageLabel: {
     fontSize: '13px',
@@ -448,6 +540,41 @@ const styles = {
     '&:hover': {
       backgroundColor: '#d32f2f'
     }
+  },
+  verificationBadge: {
+    position: 'absolute',
+    bottom: '10px',
+    right: '10px',
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    color: 'white',
+    borderRadius: '4px',
+    padding: '2px 5px',
+    fontSize: '10px',
+    fontWeight: 'bold'
+  },
+  verificationGood: {
+    backgroundColor: '#4CAF50'
+  },
+  verificationBad: {
+    backgroundColor: '#f44336'
+  },
+  verificationDetails: {
+    marginTop: '10px',
+    fontSize: '12px',
+    color: '#666',
+    textAlign: 'left',
+    padding: '5px',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '4px'
+  },
+  verificationResult: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    padding: '10px',
+    borderRadius: '4px',
+    marginTop: '10px',
+    color: 'white',
+    maxWidth: '80%',
+    textAlign: 'center'
   }
 };
 
@@ -484,6 +611,26 @@ const Registrations = ({
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [verificationResults, setVerificationResults] = useState({});
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+
+  // Initialize verification models
+  useEffect(() => {
+    const initializeVerification = async () => {
+      try {
+        const loaded = await ImageVerification.init();
+        setModelsLoaded(loaded);
+      } catch (error) {
+        console.error('Failed to initialize verification:', error);
+      }
+    };
+
+    initializeVerification();
+
+    return () => {
+      ImageVerification.cleanup();
+    };
+  }, []);
 
   const formatTime = (date) => {
     let hours = date.getHours();
@@ -508,6 +655,7 @@ const Registrations = ({
   const openModal = (registration) => {
     setSelectedRegistration(registration);
     setModalVisible(true);
+    setVerificationResults({});
   };
 
   const closeModal = () => {
@@ -525,6 +673,24 @@ const Registrations = ({
   };
 
   const handleApproveClick = () => {
+    // Check verification results before showing confirmation
+    const faceResults = verificationResults['Selfie'] || verificationResults['Selfie with ID'];
+    const idResults = verificationResults['Valid ID Front'] || verificationResults['Valid ID Back'];
+
+    if (modelsLoaded) {
+      if (!faceResults?.isFace) {
+        setErrorMessage('Face verification failed. Cannot approve without valid face detection.');
+        setErrorModalVisible(true);
+        return;
+      }
+
+      if (!idResults?.isID) {
+        setErrorMessage('ID verification failed. Cannot approve without valid ID detection.');
+        setErrorModalVisible(true);
+        return;
+      }
+    }
+
     setShowApproveConfirmation(true);
   };
 
@@ -557,10 +723,6 @@ const Registrations = ({
       return;
     }
 
-    const rejectionReason = selectedReason === "Other (please specify)" 
-      ? customReason 
-      : selectedReason;
-
     setShowRejectionModal(false);
     setShowRejectConfirmation(true);
   };
@@ -570,82 +732,82 @@ const Registrations = ({
     await processAction(selectedRegistration, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
   };
 
-const processAction = async (registration, action, rejectionReason = '') => {
-  setActionInProgress(true);
-  setIsProcessing(true);
-  setCurrentAction(action);
+  const processAction = async (registration, action, rejectionReason = '') => {
+    setActionInProgress(true);
+    setIsProcessing(true);
+    setCurrentAction(action);
 
-  try {
-    if (action === 'approve') {
-      // First check if same person exists (matching email, firstName, lastName)
-      const samePersonCheck = await checkIfSamePersonExists(
-        registration.email, 
-        registration.firstName, 
-        registration.lastName
-      );
+    try {
+      if (action === 'approve') {
+        // First check if same person exists (matching email, firstName, lastName)
+        const samePersonCheck = await checkIfSamePersonExists(
+          registration.email, 
+          registration.firstName, 
+          registration.lastName
+        );
 
-      // Only check for email existence if it's not the same person
-      if (!samePersonCheck.exists) {
-        const onDB = await checkIfEmailExistsInDatabase(registration.email);
-        if (onDB) {
-          setErrorMessage('This email is already registered to a different member.');
-          setErrorModalVisible(true);
-          setIsProcessing(false);
-          setActionInProgress(false);
-          return;
+        // Only check for email existence if it's not the same person
+        if (!samePersonCheck.exists) {
+          const onDB = await checkIfEmailExistsInDatabase(registration.email);
+          if (onDB) {
+            setErrorMessage('This email is already registered to a different member.');
+            setErrorModalVisible(true);
+            setIsProcessing(false);
+            setActionInProgress(false);
+            return;
+          }
         }
+        
+        const memberId = await processDatabaseApprove(registration);
+        setSuccessMessage('Registration approved successfully!');
+        setSuccessMessageModalVisible(true);
+        
+        setSelectedRegistration(prev => ({
+          ...prev,
+          memberId,
+          dateApproved: formatDate(new Date()), 
+          approvedTime: formatTime(new Date()),
+          status: 'approved'
+        }));
+
+        // Call API in background
+        callApiApprove({
+          ...registration,
+          memberId,
+          dateApproved: formatDate(new Date()),
+          approvedTime: formatTime(new Date())
+        }).catch(console.error);
+
+      } else {
+        await processDatabaseReject(registration, rejectionReason);
+        setSuccessMessage('Registration rejected successfully!');
+        setSuccessMessageModalVisible(true);
+        
+        setSelectedRegistration(prev => ({
+          ...prev,
+          dateRejected: formatDate(new Date()),
+          rejectedTime: formatTime(new Date()),
+          rejectionReason,
+          status: 'rejected'
+        }));
+
+        // Call API in background
+        callApiReject({
+          ...registration,
+          dateRejected: formatDate(new Date()),
+          rejectedTime: formatTime(new Date()),
+          rejectionReason
+        }).catch(console.error);
       }
-      
-      const memberId = await processDatabaseApprove(registration);
-      setSuccessMessage('Registration approved successfully!');
-      setSuccessMessageModalVisible(true);
-      
-      setSelectedRegistration(prev => ({
-        ...prev,
-        memberId,
-        dateApproved: formatDate(new Date()), 
-        approvedTime: formatTime(new Date()),
-        status: 'approved'
-      }));
-
-      // Call API in background
-      callApiApprove({
-        ...registration,
-        memberId,
-        dateApproved: formatDate(new Date()),
-        approvedTime: formatTime(new Date())
-      }).catch(console.error);
-
-    } else {
-      await processDatabaseReject(registration, rejectionReason);
-      setSuccessMessage('Registration rejected successfully!');
-      setSuccessMessageModalVisible(true);
-      
-      setSelectedRegistration(prev => ({
-        ...prev,
-        dateRejected: formatDate(new Date()),
-        rejectedTime: formatTime(new Date()),
-        rejectionReason,
-        status: 'rejected'
-      }));
-
-      // Call API in background
-      callApiReject({
-        ...registration,
-        dateRejected: formatDate(new Date()),
-        rejectedTime: formatTime(new Date()),
-        rejectionReason
-      }).catch(console.error);
+    } catch (error) {
+      console.error('Error processing action:', error);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+      setActionInProgress(false);
     }
-  } catch (error) {
-    console.error('Error processing action:', error);
-    setErrorMessage(error.message || 'An error occurred. Please try again.');
-    setErrorModalVisible(true);
-  } finally {
-    setIsProcessing(false);
-    setActionInProgress(false);
-  }
-};
+  };
 
   const updateRegistrationStatus = async (id, status) => {
     try {
@@ -892,7 +1054,7 @@ const processAction = async (registration, action, rejectionReason = '') => {
     refreshData();
   };
 
-  const openImageViewer = (url, label, index) => {
+  const openImageViewer = async (url, label, index) => {
     const images = [];
     
     if (selectedRegistration?.validIdFront) {
@@ -924,6 +1086,33 @@ const processAction = async (registration, action, rejectionReason = '') => {
     setCurrentImage({ url, label });
     setCurrentImageIndex(index);
     setImageViewerVisible(true);
+
+    // Run verification if models are loaded
+    if (modelsLoaded) {
+      const imgElement = new Image();
+      imgElement.crossOrigin = 'anonymous';
+      imgElement.src = url;
+      
+      imgElement.onload = async () => {
+        try {
+          let results;
+          if (label.includes('Selfie')) {
+            results = await ImageVerification.verifyFace(imgElement);
+          } else if (label.includes('ID')) {
+            results = await ImageVerification.verifyID(imgElement);
+          }
+          
+          if (results) {
+            setVerificationResults(prev => ({
+              ...prev,
+              [label]: results
+            }));
+          }
+        } catch (error) {
+          console.error('Verification error:', error);
+        }
+      };
+    }
   };
 
   const closeImageViewer = () => {
@@ -1101,7 +1290,17 @@ const processAction = async (registration, action, rejectionReason = '') => {
                   <div style={styles.imageGrid}>
                     {selectedRegistration?.validIdFront && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Valid ID Front</p>
+                        <p style={styles.imageLabel}>
+                          Valid ID Front
+                          {verificationResults['Valid ID Front'] && (
+                            <span style={{ 
+                              ...styles.verificationBadge,
+                              ...(verificationResults['Valid ID Front'].isID ? styles.verificationGood : styles.verificationBad)
+                            }}>
+                              {verificationResults['Valid ID Front'].isID ? '✓ Verified' : '✗ Not Verified'}
+                            </span>
+                          )}
+                        </p>
                         <img
                           src={selectedRegistration.validIdFront}
                           alt="Valid ID Front"
@@ -1113,7 +1312,17 @@ const processAction = async (registration, action, rejectionReason = '') => {
                     )}
                     {selectedRegistration?.validIdBack && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Valid ID Back</p>
+                        <p style={styles.imageLabel}>
+                          Valid ID Back
+                          {verificationResults['Valid ID Back'] && (
+                            <span style={{ 
+                              ...styles.verificationBadge,
+                              ...(verificationResults['Valid ID Back'].isID ? styles.verificationGood : styles.verificationBad)
+                            }}>
+                              {verificationResults['Valid ID Back'].isID ? '✓ Verified' : '✗ Not Verified'}
+                            </span>
+                          )}
+                        </p>
                         <img
                           src={selectedRegistration.validIdBack}
                           alt="Valid ID Back"
@@ -1125,7 +1334,17 @@ const processAction = async (registration, action, rejectionReason = '') => {
                     )}
                     {selectedRegistration?.selfie && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Selfie</p>
+                        <p style={styles.imageLabel}>
+                          Selfie
+                          {verificationResults['Selfie'] && (
+                            <span style={{ 
+                              ...styles.verificationBadge,
+                              ...(verificationResults['Selfie'].isFace ? styles.verificationGood : styles.verificationBad)
+                            }}>
+                              {verificationResults['Selfie'].isFace ? '✓ Verified' : '✗ Not Verified'}
+                            </span>
+                          )}
+                        </p>
                         <img
                           src={selectedRegistration.selfie}
                           alt="Selfie"
@@ -1137,7 +1356,17 @@ const processAction = async (registration, action, rejectionReason = '') => {
                     )}
                     {selectedRegistration?.selfieWithId && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Selfie with ID</p>
+                        <p style={styles.imageLabel}>
+                          Selfie with ID
+                          {verificationResults['Selfie with ID'] && (
+                            <span style={{ 
+                              ...styles.verificationBadge,
+                              ...(verificationResults['Selfie with ID'].isFace ? styles.verificationGood : styles.verificationBad)
+                            }}>
+                              {verificationResults['Selfie with ID'].isFace ? '✓ Verified' : '✗ Not Verified'}
+                            </span>
+                          )}
+                        </p>
                         <img
                           src={selectedRegistration.selfieWithId}
                           alt="Selfie with ID"
@@ -1381,6 +1610,24 @@ const processAction = async (registration, action, rejectionReason = '') => {
               <FaTimes />
             </button>
             <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+            
+            {verificationResults[currentImage.label] && (
+              <div style={styles.verificationResult}>
+                {currentImage.label.includes('Selfie') ? (
+                  verificationResults[currentImage.label].isFace ? (
+                    <p>✅ Real face detected (confidence: {Math.round(verificationResults[currentImage.label].confidence * 100)}%)</p>
+                  ) : (
+                    <p>❌ No face detected or poor quality</p>
+                  )
+                ) : currentImage.label.includes('ID') ? (
+                  verificationResults[currentImage.label].isID ? (
+                    <p>✅ Valid ID detected (confidence: {Math.round(verificationResults[currentImage.label].confidence * 100)}%)</p>
+                  ) : (
+                    <p>❌ ID verification failed</p>
+                  )
+                ) : null}
+              </div>
+            )}
           </div>
         </div>
       )}

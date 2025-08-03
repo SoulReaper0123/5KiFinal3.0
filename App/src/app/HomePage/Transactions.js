@@ -76,8 +76,8 @@ const Transactions = ({ route }) => {
               transactionData.label = 'Deposit';
               transactionData.depositOption = details.depositOption;
               break;
-            case 'PayLoans':
-              transactionData.amount = parseFloat(details.amount).toFixed(2);
+            case 'Payments':
+              transactionData.amount = parseFloat(details.amountToBePaid).toFixed(2);
               transactionData.label = 'Loan Payment';
               transactionData.paymentOption = details.paymentOption;
               break;

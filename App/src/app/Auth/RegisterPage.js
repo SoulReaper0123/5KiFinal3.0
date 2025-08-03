@@ -19,6 +19,19 @@ import { MaterialIcons } from '@expo/vector-icons';
 import ModalSelector from 'react-native-modal-selector';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
+// Add this right before const RegisterPage = () => {
+const RadioButton = ({ selected, onPress }) => (
+  <TouchableOpacity 
+    onPress={onPress} 
+    style={[
+      styles.radioButton,
+      selected && styles.radioButtonSelected
+    ]}
+  >
+    {selected && <View style={styles.radioButtonInner} />}
+  </TouchableOpacity>
+);
+
 const RegisterPage = () => {
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
@@ -44,6 +57,10 @@ const RegisterPage = () => {
   const addressInput = useRef(null);
   const placeOfBirthInput = useRef(null);
 
+  const [attendedOrientation, setAttendedOrientation] = useState(false);
+  const [orientationCode, setOrientationCode] = useState('');
+  const orientationCodeInput = useRef(null);
+
   useEffect(() => {
     const handleBackPress = () => {
       navigation.navigate('Login');
@@ -63,9 +80,11 @@ const RegisterPage = () => {
     }
   }, [dateOfBirth]);
 
+
+
   // Update isFormComplete to NOT require middleName
 const isFormComplete = () => {
-  return (
+  const basicInfoComplete = (
     firstName &&
     lastName &&
     email &&
@@ -77,55 +96,85 @@ const isFormComplete = () => {
     governmentId &&
     age >= 21
   );
+  
+  if (attendedOrientation) {
+    return basicInfoComplete && orientationCode;
+  }
+  return basicInfoComplete;
 };
 
-  const handleNext = () => {
-    if (!firstName || !lastName || !email || !phoneNumber || !gender || !civilStatus || !placeOfBirth || !address) {
-      Alert.alert('Incomplete Form', 'Please fill in all required fields before proceeding.');
-      return;
-    }
+const handleNext = () => {
+  // Basic field validation
+  if (!firstName || !lastName || !email || !phoneNumber || !gender || !civilStatus || !placeOfBirth || !address || !governmentId) {
+    Alert.alert('Incomplete Form', 'Please fill in all required fields before proceeding.');
+    return;
+  }
 
-    if (!email.includes('@') || !email.endsWith('.com')) {
-      Alert.alert('Invalid Email', 'Please provide a valid email address (e.g., example@domain.com).');
-      return;
-    }
+  // Email validation
+  if (!email.includes('@') || !email.endsWith('.com')) {
+    Alert.alert('Invalid Email', 'Please provide a valid email address (e.g., example@domain.com).');
+    return;
+  }
 
-    if (phoneNumber.length < 11) {
-      Alert.alert('Invalid Phone Number', 'Phone numbers should be at least 11 digits long.');
-      return;
-    }
-    if (age < 21) {
-      Alert.alert('Age Restriction', 'You must be at least 21 years old to register.');
-      return;
-    }
+  // Phone number validation
+  if (phoneNumber.length < 11) {
+    Alert.alert('Invalid Phone Number', 'Phone numbers should be at least 11 digits long.');
+    return;
+  }
 
-    // Show confirmation alert before navigating
+  // Age validation
+  if (age < 21) {
+    Alert.alert('Age Restriction', 'You must be at least 21 years old to register.');
+    return;
+  }
+
+  // Orientation validation
+  if (!attendedOrientation) {
     Alert.alert(
-      'Verify Your Information',
-      'Please double-check all the information you have provided. Make sure everything is accurate before proceeding.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Proceed', onPress: () => {
-            const dateOfBirthISO = dateOfBirth.toISOString();
-            navigation.navigate('Register2', {
-              firstName,
-              middleName,
-              lastName,
-              email,
-              phoneNumber,
-              gender,
-              civilStatus,
-              placeOfBirth,
-              address,
-              age,
-              dateOfBirth: dateOfBirthISO,
-              governmentId,
-            });
-          }
-        }
-      ]
+      'Orientation Required',
+      'For you to be able to continue your registration, you are required to attend the Orientation.',
+      [{ text: 'OK' }]
     );
-  };
+    return;
+  }
+
+  // Orientation code validation if attended
+  if (attendedOrientation && !orientationCode) {
+    Alert.alert('Orientation Code Required', 'Please enter your orientation code to proceed.');
+    return;
+  }
+
+  // Show confirmation alert before navigating
+  Alert.alert(
+    'Verify Your Information',
+    'Please double-check all the information you have provided. Make sure everything is accurate before proceeding.',
+    [
+      { text: 'Cancel', style: 'cancel' },
+      { 
+        text: 'Proceed', 
+        onPress: () => {
+          const dateOfBirthISO = dateOfBirth.toISOString();
+          navigation.navigate('Register2', {
+            firstName,
+            middleName,
+            lastName,
+            email,
+            phoneNumber,
+            gender,
+            civilStatus,
+            placeOfBirth,
+            address,
+            age,
+            dateOfBirth: dateOfBirthISO,
+            governmentId,
+            attendedOrientation,
+            orientationCode,
+          });
+        }
+      }
+    ]
+  );
+};
 
   const handleDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || dateOfBirth;
@@ -398,6 +447,42 @@ const isFormComplete = () => {
           </ModalSelector>
         </View>
 
+         {/* New Orientation Attendance Section */}
+        <View style={styles.radioContainer}>
+          <Text style={styles.radioLabel}>
+            Have you attended the Orientation Conducted by the Company? <Text style={styles.required}>*</Text>
+          </Text>
+          <View style={styles.radioGroup}>
+            <View style={styles.radioOption}>
+              <RadioButton 
+                selected={attendedOrientation} 
+                onPress={() => setAttendedOrientation(true)} 
+              />
+              <Text style={styles.radioOptionText}>Yes</Text>
+            </View>
+            <View style={styles.radioOption}>
+              <RadioButton 
+                selected={!attendedOrientation} 
+                onPress={() => setAttendedOrientation(false)} 
+              />
+              <Text style={styles.radioOptionText}>No</Text>
+            </View>
+          </View>
+        </View>
+
+        {attendedOrientation && (
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Orientation Code <Text style={styles.required}>*</Text></Text>
+            <TextInput
+              placeholder="Enter Orientation Code"
+              value={orientationCode}
+              onChangeText={setOrientationCode}
+              style={styles.input}
+              returnKeyType="done"
+              ref={orientationCodeInput}
+            />
+          </View>
+        )}
         <TouchableOpacity
           style={[
             styles.nextButton,
@@ -541,6 +626,46 @@ const styles = StyleSheet.create({
   },
   required: {
   color: 'red',
+},
+radioContainer: {
+  marginBottom: 15,
+  marginTop: 10,
+},
+radioLabel: {
+  fontSize: 16,
+  color: 'black',
+  marginBottom: 8,
+},
+radioGroup: {
+  flexDirection: 'row',
+},
+radioOption: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  marginRight: 20,
+},
+radioOptionText: {
+  marginLeft: 8,
+  fontSize: 16,
+  color: 'black',
+},
+radioButton: {
+  width: 20,
+  height: 20,
+  borderRadius: 10,
+  borderWidth: 2,
+  borderColor: '#ccc',
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+radioButtonSelected: {
+  borderColor: '#4FE7AF',
+},
+radioButtonInner: {
+  width: 10,
+  height: 10,
+  borderRadius: 5,
+  backgroundColor: '#4FE7AF',
 },
 
 });

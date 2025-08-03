@@ -28,7 +28,10 @@ import VerifyCode from '../src/app/Auth/VerifyCode';
 import Bot from '../src/app/HomePage/Bot';
 import Inbox from '../src/app/HomePage/Inbox';
 import WithdrawMembership from '../src/app/HomePage/WithdrawMembership';
-import ApplyLoanCoMaker from '../src/app/HomePage/ApplyLoanCoMaker';
+import ChangePassword from '../src/app/Drawer/ChangePassword'; // Import the ChangePassword component
+import AboutUs from '../src/app/Drawer/AboutUs';
+import ContactUs from '../src/app/Drawer/ContactUs';
+
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -153,6 +156,8 @@ const DrawerNavigator = ({ route }) => {
       <Drawer.Screen name="Account Management" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
       <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
       <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
+      <Drawer.Screen name="About Us" component={AboutUs} options={{ headerShown: false }} />
+      <Drawer.Screen name="Contact Us" component={ContactUs} options={{ headerShown: false }} />
     </Drawer.Navigator>
   );
 };
@@ -180,7 +185,10 @@ const AppNav = () => (
       <Stack.Screen name="Inbox" component={Inbox} options={{ headerShown: false }} />
       <Stack.Screen name="Transactions" component={Transactions} options={{ headerShown: false }} />
       <Stack.Screen name="WithdrawMembership" component={WithdrawMembership} options={{ headerShown: false }} />
-      <Stack.Screen name="ApplyLoanCoMaker" component={ApplyLoanCoMaker} options={{ headerShown: false }} />
+      <Stack.Screen name="ChangePassword" component={ChangePassword} options={{ headerShown: false }} />
+      <Stack.Screen name="AboutUs" component={AboutUs} options={{ headerShown: false }} />
+      <Stack.Screen name="ContactUs" component={ContactUs} options={{ headerShown: false }} />
+      
     </Stack.Navigator>
   </NavigationContainer>
 );

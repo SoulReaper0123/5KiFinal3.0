@@ -687,7 +687,7 @@ const Transactions = () => {
                               transaction.loanAmount || 
                               transaction.amount || 
                               transaction.amountWithdrawn || 
-                              transaction.paymentAmount
+                              transaction.amountToBePaid
                             )}
                           </span>
                         </div>

@@ -238,6 +238,7 @@ const Dashboard = () => {
         type: 'line',
         pointRadius: 6,
         pointHoverRadius: 8,
+        yAxisID: 'y',
       }
     ],
   };
@@ -277,7 +278,8 @@ const Dashboard = () => {
         ticks: {
           callback: function(value) {
             return `₱${formatCurrency(value)}`;
-          }
+          },
+          stepSize: 500, // Default step size
         }
       }
     }
@@ -290,7 +292,8 @@ const Dashboard = () => {
         ...chartOptions.scales.y,
         ticks: {
           ...chartOptions.scales.y.ticks,
-          stepSize: 500
+          stepSize: 500,
+          suggestedMax: Math.ceil(fundsData.totalReceivables / 500) * 500 || 2000
         }
       }
     }
@@ -303,7 +306,8 @@ const Dashboard = () => {
         ...chartOptions.scales.y,
         ticks: {
           ...chartOptions.scales.y.ticks,
-          stepSize: 50
+          stepSize: 50,
+          suggestedMax: 200
         }
       }
     }
@@ -376,7 +380,7 @@ const Dashboard = () => {
     <div className="dashboard-container">
       {/* Header */}
       <div className="dashboard-header">
-        <h1>Business Loan Services Dashboard</h1>
+        <h1>5KI Financial Services Dashboard</h1>
         <div className="header-controls">
         </div>
       </div>

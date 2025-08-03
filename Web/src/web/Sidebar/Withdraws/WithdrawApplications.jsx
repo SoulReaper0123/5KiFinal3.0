@@ -308,26 +308,24 @@ const styles = {
       backgroundColor: '#d32f2f'
     }
   },
-  actionText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  approveText: {
-    color: '#4CAF50'
-  },
-  rejectText: {
-    color: '#f44336'
-  }
+ actionText: {
+  fontSize: '14px',
+  cursor: 'pointer',
+  fontWeight: '500',
+  color: '#2D5783',
+  textDecoration: 'none',
+  margin: '0 5px',
+  transition: 'color 0.2s ease, text-decoration 0.2s ease',
+  outline: 'none'
+},
+approveHover: {
+  color: '#4CAF50',
+  textDecoration: 'underline'
+},
+rejectHover: {
+  color: '#f44336',
+  textDecoration: 'underline'
+}
 };
 
 const rejectionReasons = [
@@ -356,6 +354,18 @@ const WithdrawApplications = ({ withdraws, currentPage, totalPages, onPageChange
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
+  
+  const [hoverStates, setHoverStates] = useState({});
+
+  const handleHover = (transactionId, type, isHovering) => {
+  setHoverStates(prev => ({
+    ...prev,
+    [transactionId]: {
+      ...prev[transactionId],
+      [type]: isHovering ? styles[`${type}Hover`] : {}
+    }
+  }));
+};
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -677,23 +687,33 @@ const callApiReject = async (withdraw) => {
                 <td style={styles.tableCell}>{item.accountName}</td>
                 <td style={styles.tableCell}>{item.accountNumber}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>
-                <td style={styles.tableCell}>
-                  <span 
-                    style={{...styles.actionText, ...styles.approveText}}
-                    onClick={() => handleApproveClick(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    Approve
-                  </span>
-                  <span style={{color: '#aaa', margin: '0 10px'}}> | </span>
-                  <span 
-                    style={{...styles.actionText, ...styles.rejectText}}
-                    onClick={() => handleRejectClick(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    Reject
-                  </span>
-                </td>
+<td style={styles.tableCell}>
+  <span 
+    style={{
+      ...styles.actionText,
+      ...(hoverStates[item.transactionId]?.approve || {})
+    }}
+    onClick={() => handleApproveClick(item)}
+    onMouseEnter={() => handleHover(item.transactionId, 'approve', true)}
+    onMouseLeave={() => handleHover(item.transactionId, 'approve', false)}
+    onFocus={(e) => e.target.style.outline = 'none'}
+  >
+    Approve
+  </span>
+  <span style={{color: '#aaa', margin: '0 10px'}}> | </span>
+  <span 
+    style={{
+      ...styles.actionText,
+      ...(hoverStates[item.transactionId]?.reject || {})
+    }}
+    onClick={() => handleRejectClick(item)}
+    onMouseEnter={() => handleHover(item.transactionId, 'reject', true)}
+    onMouseLeave={() => handleHover(item.transactionId, 'reject', false)}
+    onFocus={(e) => e.target.style.outline = 'none'}
+  >
+    Reject
+  </span>
+</td>
               </tr>
             ))}
           </tbody>

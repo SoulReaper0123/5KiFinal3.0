@@ -308,26 +308,24 @@ const styles = {
       backgroundColor: '#d32f2f'
     }
   },
-  actionText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  approveText: {
-    color: '#4CAF50'
-  },
-  rejectText: {
-    color: '#f44336'
-  }
+ actionText: {
+  fontSize: '14px',
+  cursor: 'pointer',
+  fontWeight: '500',
+  color: '#2D5783',
+  textDecoration: 'none',
+  margin: '0 5px',
+  transition: 'color 0.2s ease, text-decoration 0.2s ease',
+  outline: 'none'
+},
+approveHover: {
+  color: '#4CAF50',
+  textDecoration: 'underline'
+},
+rejectHover: {
+  color: '#f44336',
+  textDecoration: 'underline'
+}
 };
 
 const rejectionReasons = [
@@ -356,6 +354,18 @@ const PaymentApplications = ({ payments, currentPage, totalPages, onPageChange, 
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
+
+  const [hoverStates, setHoverStates] = useState({});
+  
+  const handleHover = (transactionId, type, isHovering) => {
+  setHoverStates(prev => ({
+    ...prev,
+    [transactionId]: {
+      ...prev[transactionId],
+      [type]: isHovering ? styles[`${type}Hover`] : {}
+    }
+  }));
+};
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -492,6 +502,7 @@ const processDatabaseApprove = async (payment) => {
     let currentLoanData = null;
     let currentLoanKey = null;
     let isLoanPayment = false;
+    let interestAmount = 0;
     
     if (memberLoansSnap.exists()) {
       memberLoansSnap.forEach((loanSnap) => {
@@ -499,6 +510,7 @@ const processDatabaseApprove = async (payment) => {
           currentLoanData = loanSnap.val();
           currentLoanKey = loanSnap.key;
           isLoanPayment = true;
+          interestAmount = parseFloat(currentLoanData.interest) || 0;
         }
       });
     }
@@ -509,6 +521,7 @@ const processDatabaseApprove = async (payment) => {
     const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
     const fundsRef = database.ref('Settings/Funds');
     const savingsRef = database.ref('Settings/Savings');
+    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
     
     // Fetch data
     const [paymentSnap, fundsSnap, savingsSnap] = await Promise.all([
@@ -526,13 +539,11 @@ const processDatabaseApprove = async (payment) => {
     const memberBalance = parseFloat(memberData.balance || 0);
 
     // Payment calculations
-    let interestAmount = 0;
     let principalAmount = paymentAmount;
     let excessPayment = 0;
     let newMemberBalance = memberBalance;
 
     if (isLoanPayment && currentLoanData) {
-      interestAmount = parseFloat(currentLoanData.interest) || 0;
       principalAmount = Math.max(0, paymentAmount - interestAmount);
       
       const remainingLoan = parseFloat(currentLoanData.loanAmount) - principalAmount;
@@ -565,12 +576,28 @@ const processDatabaseApprove = async (payment) => {
     }
 
     // Update all databases
+    const now = new Date();
+    const dateKey = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
+    
+    // Only update savings if there's interest
+    if (interestAmount > 0) {
+      const newSavingsTotal = currentSavings + interestAmount;
+      
+      // Update savings total
+      await savingsRef.set(newSavingsTotal);
+      
+      // Update savings history
+      const savingsHistoryUpdate = {};
+      savingsHistoryUpdate[dateKey] = interestAmount;
+      
+      await savingsHistoryRef.update(savingsHistoryUpdate);
+    }
+
+    // Update funds and member balance
     await fundsRef.set(currentFunds + principalAmount);
-    if (interestAmount > 0) await savingsRef.set(currentSavings + interestAmount);
     await memberRef.update({ balance: newMemberBalance });
 
     // Create payment record
-    const now = new Date();
     const approvedData = {
       ...paymentData,
       dateApproved: formatDate(now),
@@ -586,7 +613,6 @@ const processDatabaseApprove = async (payment) => {
     // Finalize operations
     await approvedRef.set(approvedData);
     await transactionRef.set(approvedData);
-    // await paymentRef.remove();
 
     return { 
       success: true,
@@ -835,23 +861,33 @@ const callApiReject = async (payment) => {
                     <FaImage /> View
                   </span>
                 </td>
-                <td style={styles.tableCell}>
-                  <span 
-                    style={{...styles.actionText, ...styles.approveText}}
-                    onClick={() => handleApproveClick(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    Approve
-                  </span>
-                  <span style={{color: '#aaa', margin: '0 10px'}}> | </span>
-                  <span 
-                    style={{...styles.actionText, ...styles.rejectText}}
-                    onClick={() => handleRejectClick(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    Reject
-                  </span>
-                </td>
+<td style={styles.tableCell}>
+  <span 
+    style={{
+      ...styles.actionText,
+      ...(hoverStates[item.transactionId]?.approve || {})
+    }}
+    onClick={() => handleApproveClick(item)}
+    onMouseEnter={() => handleHover(item.transactionId, 'approve', true)}
+    onMouseLeave={() => handleHover(item.transactionId, 'approve', false)}
+    onFocus={(e) => e.target.style.outline = 'none'}
+  >
+    Approve
+  </span>
+  <span style={{color: '#aaa', margin: '0 10px'}}> | </span>
+  <span 
+    style={{
+      ...styles.actionText,
+      ...(hoverStates[item.transactionId]?.reject || {})
+    }}
+    onClick={() => handleRejectClick(item)}
+    onMouseEnter={() => handleHover(item.transactionId, 'reject', true)}
+    onMouseLeave={() => handleHover(item.transactionId, 'reject', false)}
+    onFocus={(e) => e.target.style.outline = 'none'}
+  >
+    Reject
+  </span>
+</td>
               </tr>
             ))}
           </tbody>

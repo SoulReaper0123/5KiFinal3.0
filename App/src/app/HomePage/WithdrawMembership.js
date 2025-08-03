@@ -10,21 +10,22 @@ import {
   Modal,
   Pressable,
   Alert,
+  ActivityIndicator
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { database } from '../../firebaseConfig'; // Adjust the import path as necessary
+import { ref, get, set } from 'firebase/database';
 
 export default function WithdrawMembership() {
   const navigation = useNavigation();
 
   const [form, setForm] = useState({
+    email: '',
     firstName: '',
-    middleName: '',
     lastName: '',
-    dob: '',
     address: '',
     contact: '',
-    email: '',
     joined: '',
     reason: '',
     hasLoan: '',
@@ -32,120 +33,195 @@ export default function WithdrawMembership() {
 
   const [agreed, setAgreed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [memberId, setMemberId] = useState('');
+  const [isLoadingMember, setIsLoadingMember] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
-  const handleSubmit = () => {
-    const {
-      firstName,
-      lastName,
-      dob,
-      address,
-      contact,
-      email,
-      joined,
-      reason,
-      hasLoan,
-    } = form;
-
-    if (
-      !firstName ||
-      !lastName ||
-      !dob ||
-      !address ||
-      !contact ||
-      !email ||
-      !joined ||
-      !reason ||
-      !hasLoan ||
-      !agreed
-    ) {
-      Alert.alert('Incomplete Form', 'Please complete all required fields.');
+  const fetchMemberData = async (email) => {
+    if (!email.includes('@')) {
+      setEmailError('Please enter a valid email');
       return;
     }
 
-    setModalVisible(true);
-    setForm({
+    setIsLoadingMember(true);
+    setEmailError('');
+    
+    try {
+      const membersRef = ref(database, 'Members');
+      const snapshot = await get(membersRef);
+      
+      if (snapshot.exists()) {
+        const members = snapshot.val();
+        const member = Object.values(members).find(m => 
+          m.email && m.email.toLowerCase() === email.toLowerCase()
+        );
+        
+        if (member) {
+          setMemberId(member.memberId);
+          setForm(prev => ({
+            ...prev,
+            firstName: member.firstName || '',
+            lastName: member.lastName || '',
+            joined: member.dateApproved || '',
+            address: member.address || '',
+            contact: member.contact || ''
+          }));
+        } else {
+          setEmailError('No member found with this email');
+          resetMemberData();
+        }
+      } else {
+        setEmailError('No members found in database');
+        resetMemberData();
+      }
+    } catch (error) {
+      console.error('Error fetching member data:', error);
+      setEmailError('Failed to fetch member data');
+      resetMemberData();
+    } finally {
+      setIsLoadingMember(false);
+    }
+  };
+
+  const resetMemberData = () => {
+    setMemberId('');
+    setForm(prev => ({
+      ...prev,
       firstName: '',
-      middleName: '',
       lastName: '',
-      dob: '',
+      joined: '',
+      address: '',
+      contact: ''
+    }));
+  };
+
+  const handleEmailChange = (text) => {
+    setForm({...form, email: text});
+    setEmailError('');
+    if (text.includes('@') && text.length > 5) {
+      fetchMemberData(text);
+    } else if (text === '') {
+      resetMemberData();
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!memberId) {
+      Alert.alert('Error', 'Please enter a valid member email first');
+      return;
+    }
+
+    if (!form.reason || !form.hasLoan || !agreed) {
+      Alert.alert('Incomplete Form', 'Please complete all required fields');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const withdrawalRef = ref(database, `Withdrawals/PermanentWithdrawal/${memberId}`);
+      
+      await set(withdrawalRef, {
+        memberId,
+        ...form,
+        dateSubmitted: new Date().toISOString(),
+        status: 'Pending'
+      });
+      
+      setModalVisible(true);
+      resetForm();
+    } catch (error) {
+      console.error('Error submitting withdrawal:', error);
+      Alert.alert('Error', 'Failed to submit withdrawal request');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setForm({
+      email: '',
+      firstName: '',
+      lastName: '',
       address: '',
       contact: '',
-      email: '',
       joined: '',
       reason: '',
       hasLoan: '',
     });
+    setMemberId('');
     setAgreed(false);
+    setEmailError('');
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Back Button */}
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <MaterialIcons name="arrow-back" size={30} color="white" />
       </TouchableOpacity>
 
-      {/* Header Title */}
       <Text style={styles.title}>Membership Withdrawal</Text>
 
-      {/* Content */}
       <View style={styles.content}>
         <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={styles.emailContainer}>
+            <TextInput
+              placeholder="Email *"
+              value={form.email}
+              onChangeText={handleEmailChange}
+              style={[styles.input, emailError ? styles.inputError : null]}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            {isLoadingMember && (
+              <ActivityIndicator style={styles.loader} color="#2D5783" />
+            )}
+          </View>
+          {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+
           <TextInput
             placeholder="First Name"
             value={form.firstName}
-            onChangeText={(text) => setForm({ ...form, firstName: text })}
-            style={styles.input}
+            editable={false}
+            style={[styles.input, styles.disabledInput]}
           />
-          <TextInput
-            placeholder="Middle Name"
-            value={form.middleName}
-            onChangeText={(text) => setForm({ ...form, middleName: text })}
-            style={styles.input}
-          />
+
           <TextInput
             placeholder="Last Name"
             value={form.lastName}
-            onChangeText={(text) => setForm({ ...form, lastName: text })}
-            style={styles.input}
+            editable={false}
+            style={[styles.input, styles.disabledInput]}
           />
-          <TextInput
-            placeholder="Date of Birth"
-            value={form.dob}
-            onChangeText={(text) => setForm({ ...form, dob: text })}
-            style={styles.input}
-          />
+
           <TextInput
             placeholder="Address"
             value={form.address}
-            onChangeText={(text) => setForm({ ...form, address: text })}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Contact Number"
-            value={form.contact}
-            onChangeText={(text) => setForm({ ...form, contact: text })}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Email"
-            value={form.email}
-            onChangeText={(text) => setForm({ ...form, email: text })}
-            style={styles.input}
-          />
-          <TextInput
-            placeholder="Date Joined"
-            value={form.joined}
-            onChangeText={(text) => setForm({ ...form, joined: text })}
+            onChangeText={(text) => setForm({...form, address: text})}
             style={styles.input}
           />
 
-          <Text style={styles.sectionTitle}>Reason for withdrawal</Text>
+          <TextInput
+            placeholder="Contact Number"
+            value={form.contact}
+            onChangeText={(text) => setForm({...form, contact: text})}
+            style={styles.input}
+            keyboardType="phone-pad"
+          />
+
+          <TextInput
+            placeholder="Date Joined"
+            value={form.joined}
+            editable={false}
+            style={[styles.input, styles.disabledInput]}
+          />
+
+          <Text style={styles.sectionTitle}>Reason for withdrawal *</Text>
           {['Relocation', 'Financial', 'No longer interested', 'Others'].map((r) => (
             <TouchableOpacity
               key={r}
               style={styles.radioOption}
-              onPress={() => setForm({ ...form, reason: r })}
+              onPress={() => setForm({...form, reason: r})}
             >
               <View style={styles.radioCircle}>
                 {form.reason === r && <View style={styles.selectedRb} />}
@@ -154,12 +230,12 @@ export default function WithdrawMembership() {
             </TouchableOpacity>
           ))}
 
-          <Text style={styles.sectionTitle}>Do you have existing loans?</Text>
+          <Text style={styles.sectionTitle}>Do you have existing loans? *</Text>
           {['Yes', 'No'].map((opt) => (
             <TouchableOpacity
               key={opt}
               style={styles.radioOption}
-              onPress={() => setForm({ ...form, hasLoan: opt })}
+              onPress={() => setForm({...form, hasLoan: opt})}
             >
               <View style={styles.radioCircle}>
                 {form.hasLoan === opt && <View style={styles.selectedRb} />}
@@ -168,7 +244,6 @@ export default function WithdrawMembership() {
             </TouchableOpacity>
           ))}
 
-          {/* Checkbox */}
           <TouchableOpacity
             style={styles.checkboxContainer}
             onPress={() => setAgreed(!agreed)}
@@ -179,17 +254,33 @@ export default function WithdrawMembership() {
               color={agreed ? '#2D5783' : '#888'}
             />
             <Text style={styles.checkboxLabel}>
-              I agree and wish to proceed with my request.
+              I agree and wish to proceed with my request. *
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
-            <Text style={styles.submitText}>Submit</Text>
-          </TouchableOpacity>
+         <TouchableOpacity 
+  style={[
+    styles.submitButton, 
+    (isSubmitting || !memberId || !form.reason || !form.hasLoan || !agreed) && styles.submitButtonDisabled
+  ]} 
+  onPress={handleSubmit}
+  disabled={isSubmitting || !memberId || !form.reason || !form.hasLoan || !agreed}
+>
+  {isSubmitting ? (
+    <ActivityIndicator color="white" />
+  ) : (
+    <Text style={styles.submitText}>
+      {!memberId ? 'Enter Valid Email First' : 
+       !form.reason ? 'Select Reason' :
+       !form.hasLoan ? 'Select Loan Status' :
+       !agreed ? 'Agree to Terms' : 
+       'Submit'}
+    </Text>
+  )}
+</TouchableOpacity>
         </ScrollView>
       </View>
 
-      {/* Modal */}
       <Modal
         visible={modalVisible}
         animationType="fade"
@@ -202,7 +293,13 @@ export default function WithdrawMembership() {
             <Text style={styles.modalText}>
               Your membership withdrawal request has been submitted.
             </Text>
-            <Pressable style={styles.okButton} onPress={() => setModalVisible(false)}>
+            <Pressable 
+              style={styles.okButton} 
+              onPress={() => {
+                setModalVisible(false);
+                navigation.goBack();
+              }}
+            >
               <Text style={{ color: 'white' }}>Ok</Text>
             </Pressable>
           </View>
@@ -211,7 +308,6 @@ export default function WithdrawMembership() {
     </SafeAreaView>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
@@ -327,5 +423,28 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 30,
     borderRadius: 6,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  emailContainer: {
+    position: 'relative',
+  },
+  loader: {
+    position: 'absolute',
+    right: 15,
+    top: 15,
+  },
+  inputError: {
+    borderColor: 'red',
+  },
+  errorText: {
+    color: 'red',
+    marginBottom: 15,
+    marginTop: -10,
+  },
+  disabledInput: {
+    backgroundColor: '#f5f5f5',
+    color: '#666',
   },
 });

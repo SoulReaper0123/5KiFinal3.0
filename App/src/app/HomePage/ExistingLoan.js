@@ -13,246 +13,358 @@ const ExistingLoan = () => {
   const [loanDetails, setLoanDetails] = useState(null);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [isOverdue, setIsOverdue] = useState(false);
+  const [loanStatus, setLoanStatus] = useState('Active');
+  const [statusColor, setStatusColor] = useState('#3A7F0D');
+
+  // Robust date formatter
+  const formatDisplayDate = (dateInput) => {
+    try {
+      if (!dateInput) return 'N/A';
+
+      // Handle Firebase Timestamp objects
+      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+        const date = new Date(dateInput.seconds * 1000);
+        return date.toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      }
+
+      // Handle string dates
+      if (typeof dateInput === 'string') {
+        // Return as-is if in "mm/dd/yyyy at 00:00" format
+        if (/^\d{2}\/\d{2}\/\d{4} at \d{2}:\d{2}$/.test(dateInput)) {
+          return dateInput;
+        }
+        
+        // Try to parse other string formats
+        const parsedDate = new Date(dateInput);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.toLocaleString();
+        }
+        return dateInput; // Return original if can't parse
+      }
+
+      return 'N/A';
+    } catch (error) {
+      console.warn('Date formatting error:', error);
+      return 'N/A';
+    }
+  };
+
+  // Safe date parser
+  const parseDateTime = (dateInput) => {
+    try {
+      if (!dateInput) return new Date();
+
+      // Firebase Timestamp
+      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+        return new Date(dateInput.seconds * 1000);
+      }
+
+      // Handle "mm/dd/yyyy at 00:00" format
+      if (typeof dateInput === 'string' && dateInput.includes(' at ')) {
+        const [datePart, timePart] = dateInput.split(' at ');
+        const [month, day, year] = datePart.split('/');
+        const [hours, minutes] = timePart.split(':');
+        return new Date(year, month - 1, day, hours, minutes);
+      }
+
+      // Fallback to native Date parsing
+      return new Date(dateInput);
+    } catch (error) {
+      console.warn('Date parsing error:', error);
+      return new Date(); // Return current date as fallback
+    }
+  };
 
   useEffect(() => {
     const user = auth.currentUser;
-    if (user && user.email) {
+    if (user?.email) {
       fetchUserLoan(user.email);
     }
   }, []);
 
   useEffect(() => {
-    const handleBackPress = () => {
-      navigation.navigate('Home');
-      return true;
-    };
-
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        navigation.navigate('Home');
+        return true;
+      }
+    );
     return () => backHandler.remove();
   }, [navigation]);
 
   const fetchUserLoan = async (userEmail) => {
     try {
-      const loansRef = dbRef(database, 'Loans/CurrentLoans');
-      const snapshot = await get(loansRef);
+      setLoading(true);
+      
+      // Fetch approved loans
+      const approvedLoansRef = dbRef(database, 'Loans/ApprovedLoans');
+      const approvedSnapshot = await get(approvedLoansRef);
+      
+      let approvedData = {
+        loanAmount: 0,
+        dateApproved: null,
+        interestRate: 0,
+        interest: 0,
+        term: 0
+      };
 
-      if (snapshot.exists()) {
-        const allLoans = snapshot.val();
-        let found = false;
-
-        for (const memberId in allLoans) {
-          const transactions = allLoans[memberId];
-          for (const transactionId in transactions) {
-            const loan = transactions[transactionId];
-            if (loan.email === userEmail) {
-              setLoanDetails(loan);
-              checkOverdueStatus(loan);
-              fetchTransactionHistory(memberId);
-              found = true;
+      if (approvedSnapshot.exists()) {
+        const allApprovedLoans = approvedSnapshot.val();
+        for (const memberId in allApprovedLoans) {
+          const loans = allApprovedLoans[memberId];
+          for (const loanId in loans) {
+            const loan = loans[loanId];
+            if (loan?.email === userEmail) {
+              approvedData = {
+                loanAmount: parseFloat(loan.loanAmount || 0),
+                dateApproved: loan.dateApproved,
+                interestRate: parseFloat(loan.interestRate || 0),
+                interest: parseFloat(loan.interest || 0),
+                term: parseInt(loan.term || 0)
+              };
               break;
             }
           }
-          if (found) break;
         }
-
-        if (!found) {
-          setLoanDetails(null);
-        }
-      } else {
-        setLoanDetails(null);
       }
+
+      // Fetch current loans
+      const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+      const currentSnapshot = await get(currentLoansRef);
+
+      if (currentSnapshot.exists()) {
+        const allCurrentLoans = currentSnapshot.val();
+        for (const memberId in allCurrentLoans) {
+          const loans = allCurrentLoans[memberId];
+          for (const loanId in loans) {
+            const currentLoan = loans[loanId];
+            if (currentLoan?.email === userEmail) {
+              const loanData = {
+                ...currentLoan,
+                ...approvedData,
+                outstandingBalance: approvedData.loanAmount,
+                dateApplied: currentLoan.dateApplied,
+                dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
+              };
+              setLoanDetails(loanData);
+              checkLoanStatus(loanData);
+              fetchTransactionHistory(memberId);
+              return;
+            }
+          }
+        }
+      }
+      setLoanDetails(null);
     } catch (error) {
       console.error('Error fetching loans:', error);
+      Alert.alert('Error', 'Failed to load loan data');
       setLoanDetails(null);
     } finally {
       setLoading(false);
     }
   };
 
-  const checkOverdueStatus = (loan) => {
-    if (loan.dueDate || loan.nextDueDate) {
-      const dueDate = new Date(loan.dueDate || loan.nextDueDate);
-      const today = new Date();
-      if (today > dueDate) {
-        setIsOverdue(true);
-        Alert.alert(
-          'Overdue Payment',
-          'You have an overdue payment. Please make your payment as soon as possible to avoid penalties.',
-          [{ text: 'OK' }]
-        );
-      }
+  const checkLoanStatus = (loan) => {
+    if (!loan) {
+      setLoanStatus('Unknown');
+      setStatusColor('#666');
+      return;
     }
-  };
 
-  const fetchTransactionHistory = async (memberId) => {
     try {
-      const transactionsRef = dbRef(database, `Transactions/Payments/${memberId}`);
-      const snapshot = await get(transactionsRef);
+      const dueDate = parseDateTime(loan.dueDate || loan.nextDueDate);
+      const today = new Date();
+      
+      const hasPaymentThisMonth = transactionHistory.some(t => {
+        const paymentDate = parseDateTime(t.dateApproved);
+        return (
+          t.status?.toLowerCase() === 'paid' &&
+          paymentDate.getMonth() === today.getMonth() &&
+          paymentDate.getFullYear() === today.getFullYear()
+        );
+      });
 
-      if (snapshot.exists()) {
-        const transactionsData = snapshot.val();
-        const transactions = [];
-
-        Object.entries(transactionsData).forEach(([transactionId, transactionData]) => {
-          transactions.push({
-            transactionId,
-            type: transactionData.type || 'Payment',
-            amount: transactionData.amount ? parseFloat(transactionData.amount) : 0,
-            date: transactionData.date || '',
-            description: transactionData.description || '',
-            status: transactionData.status || 'Pending',
-            paymentMethod: transactionData.paymentMethod || 'Not specified',
-          });
-        });
-
-        transactions.sort((a, b) => new Date(b.date) - new Date(a.date));
-        setTransactionHistory(transactions);
+      if (hasPaymentThisMonth) {
+        setLoanStatus('Paid');
+        setStatusColor('#4CAF50');
+      } else if (today > dueDate) {
+        setLoanStatus('Overdue');
+        setStatusColor('#F44336');
       } else {
-        setTransactionHistory([]);
+        setLoanStatus('Active');
+        setStatusColor('#2D5783');
       }
     } catch (error) {
-      console.error('Error fetching transactions:', error);
+      console.warn('Status check error:', error);
+      setLoanStatus('Unknown');
+      setStatusColor('#666');
     }
   };
+
+ const fetchTransactionHistory = async (memberId) => {
+  try {
+    const transactionsRef = dbRef(database, `Transactions/Payments/${memberId}`);
+    const snapshot = await get(transactionsRef);
+
+    if (snapshot.exists()) {
+      const transactionsData = snapshot.val();
+      const transactions = Object.entries(transactionsData)
+        .map(([id, t]) => ({
+          transactionId: id,
+          type: t.type || 'Payment',
+          amountToBePaid: parseFloat(t.amountToBePaid || 0),
+          dateApproved: t.dateApproved,
+          description: t.description || '',
+          status: t.status || 'Pending',
+          paymentOption: t.paymentOption || 'Not specified'
+        }))
+        // Only include "Completed" or "Paid" transactions
+        .filter(t => {
+          const status = t.status.toLowerCase();
+          return status === 'completed' || status === 'paid';
+        });
+
+      transactions.sort((a, b) => 
+        parseDateTime(b.dateApproved).getTime() - parseDateTime(a.dateApproved).getTime()
+      );
+      
+      setTransactionHistory(transactions);
+    } else {
+      setTransactionHistory([]);
+    }
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    setTransactionHistory([]);
+  }
+};
 
   const getStatusColor = (status) => {
-    switch(status.toLowerCase()) {
+    switch(String(status).toLowerCase()) {
       case 'approved':
-      case 'paid':
-        return '#3A7F0D';
-      case 'pending':
-        return '#FFA000';
-      case 'rejected':
-        return '#D32F2F';
-      default:
-        return '#2D5783';
+      case 'paid': return '#3A7F0D';
+      case 'pending': return '#FFA000';
+      case 'rejected': return '#D32F2F';
+      default: return '#2D5783';
     }
   };
 
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Invalid Date';
-    const date = new Date(dateString);
-    return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const getCardStyle = () => [
+    styles.loanSummaryCard,
+    loanStatus === 'Overdue' ? styles.overdueCard :
+    loanStatus === 'Paid' ? styles.paidCard : styles.activeCard
+  ];
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#3A7F0D" />
+        <Text style={styles.loadingText}>Loading loan details...</Text>
+      </View>
+    );
+  }
+
+  if (!loanDetails) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.noLoansText}>No active loan found</Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+      <TouchableOpacity 
+        onPress={() => navigation.goBack()} 
+        style={styles.backButton}
+      >
         <MaterialIcons name="arrow-back" size={30} color="#2D5783" />
       </TouchableOpacity>
+
       <Text style={styles.headerTitle}>Loan Details</Text>
-      <View style={{ width: 24 }} />
 
-      {loading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3A7F0D" />
-          <Text style={styles.loadingText}>Loading transactions...</Text>
-        </View>
-      ) : (
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          {loanDetails && (
-            <View style={[styles.loanSummaryCard, isOverdue && styles.overdueCard]}>
-              <Text style={styles.summaryTitle}>Current Loan {isOverdue && '⚠️'}</Text>
-              
-              {isOverdue && (
-                <View style={styles.overdueBanner}>
-                  <Text style={styles.overdueText}>OVERDUE PAYMENT</Text>
-                </View>
-              )}
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Loan Type</Text>
-                <Text style={styles.summaryValue}>{loanDetails.loanType || 'N/A'}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Loan Amount</Text>
-                <Text style={styles.summaryValue}>₱{parseFloat(loanDetails.loanAmount || 0).toFixed(2)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Date Applied</Text>
-                <Text style={styles.summaryValue}>{formatDate(loanDetails.dateApplied)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Outstanding Balance</Text>
-                <Text style={styles.summaryValue}>₱{parseFloat(loanDetails.outstandingBalance || loanDetails.balance || 0).toFixed(2)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Monthly Payment</Text>
-                <Text style={styles.summaryValue}>₱{parseFloat(loanDetails.totalMonthlyPayment || loanDetails.monthlyPayment || 0).toFixed(2)}</Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Due Date</Text>
-                <Text style={[styles.summaryValue, isOverdue && styles.overdueText]}>
-                  {formatDate(loanDetails.dueDate || loanDetails.nextDueDate)}
-                </Text>
-              </View>
-              
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>Status</Text>
-                <Text style={[styles.summaryValue, { color: getStatusColor(loanDetails.status) }]}>
-                  {loanDetails.status || 'Active'}
-                </Text>
-              </View>
-            </View>
-          )}
-
-          <Text style={styles.sectionTitle}>Payment History</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={getCardStyle()}>
+          <View style={styles.summaryHeader}>
+            <Text style={styles.summaryTitle}>Current Loan</Text>
+            <Text style={[styles.loanStatus, { color: statusColor }]}>
+              {loanStatus.toUpperCase()}
+            </Text>
+          </View>
           
-          {transactionHistory.length > 0 ? (
-            transactionHistory.map((transaction, index) => (
-              <View key={index} style={styles.transactionCard}>
-                <View style={styles.transactionHeader}>
-                  <Text style={styles.transactionType}>{transaction.type}</Text>
-                  <Text style={[styles.transactionStatus, { color: getStatusColor(transaction.status) }]}>
-                    {transaction.status.toUpperCase()}
-                  </Text>
-                </View>
-                
-                <View style={styles.transactionRow}>
-                  <Text style={styles.transactionLabel}>Amount:</Text>
-                  <Text style={styles.transactionValue}>₱{transaction.amount.toFixed(2)}</Text>
-                </View>
-                
-                <View style={styles.transactionRow}>
-                  <Text style={styles.transactionLabel}>Transaction ID:</Text>
-                  <Text style={styles.transactionValue}>{transaction.transactionId}</Text>
-                </View>
-                
-                <View style={styles.transactionRow}>
-                  <Text style={styles.transactionLabel}>Payment Date:</Text>
-                  <Text style={styles.transactionValue}>{formatDate(transaction.date)}</Text>
-                </View>
-                
-                <View style={styles.transactionRow}>
-                  <Text style={styles.transactionLabel}>Mode of Payment:</Text>
-                  <Text style={styles.transactionValue}>{transaction.paymentMethod}</Text>
-                </View>
-                
-                {transaction.description && (
-                  <Text style={styles.transactionDescription}>
-                    Notes: {transaction.description}
-                  </Text>
-                )}
-              </View>
-            ))
-          ) : (
-            <View style={styles.emptyState}>
-              <MaterialIcons name="receipt" size={48} color="#D3D3D3" />
-              <Text style={styles.emptyText}>No transactions found</Text>
+          {[
+            { label: 'Loan ID', value: loanDetails.transactionId || 'N/A' },
+            { label: 'Loan Type', value: loanDetails.loanType || 'N/A' },
+            { label: 'Approved Amount', value: `₱${(loanDetails.loanAmount || 0).toFixed(2)}` },
+            { label: 'Outstanding Balance', value: `₱${(loanDetails.outstandingBalance || 0).toFixed(2)}` },
+            { label: 'Date Applied', value: formatDisplayDate(loanDetails.dateApplied) },
+            { label: 'Date Approved', value: formatDisplayDate(loanDetails.dateApproved) },
+            { label: 'Interest Rate', value: `${(loanDetails.interestRate || 0).toFixed(2)}%` },
+            { label: 'Total Interest', value: `₱${(loanDetails.interest || 0).toFixed(2)}` },
+            { label: 'Terms', value: loanDetails.term ? `${loanDetails.term} months` : 'N/A' },
+            { label: 'Monthly Payment', value: `₱${(loanDetails.monthlyPayment || 0).toFixed(2)}` },
+            { 
+              label: 'Due Date', 
+              value: formatDisplayDate(loanDetails.dueDate || loanDetails.nextDueDate),
+              style: loanStatus === 'Overdue' ? styles.overdueText : null 
+            }
+          ].map((item, index) => (
+            <View key={index} style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>{item.label}</Text>
+              <Text style={[styles.summaryValue, item.style]}>
+                {item.value}
+              </Text>
             </View>
-          )}
-        </ScrollView>
-      )}
+          ))}
+        </View>
+
+        <Text style={styles.sectionTitle}>Payment History</Text>
+        
+        {transactionHistory.length > 0 ? (
+          transactionHistory.map((transaction) => (
+            <View key={transaction.transactionId} style={styles.transactionCard}>
+              <View style={styles.transactionHeader}>
+                <Text style={styles.transactionType}>{transaction.type}</Text>
+                <Text style={[
+                  styles.transactionStatus, 
+                  { color: getStatusColor(transaction.status) }
+                ]}>
+                  {transaction.status.toUpperCase()}
+                </Text>
+              </View>
+              
+              {[
+                { label: 'Amount:', value: `₱${transaction.amountToBePaid.toFixed(2)}` },
+                { label: 'Transaction ID:', value: transaction.transactionId },
+                { label: 'Payment Date:', value: formatDisplayDate(transaction.dateApproved) },
+                { label: 'Mode of Payment:', value: transaction.paymentOption }
+              ].map((item, index) => (
+                <View key={index} style={styles.transactionRow}>
+                  <Text style={styles.transactionLabel}>{item.label}</Text>
+                  <Text style={styles.transactionValue}>{item.value}</Text>
+                </View>
+              ))}
+              
+              {transaction.description && (
+                <Text style={styles.transactionDescription}>
+                  Notes: {transaction.description}
+                </Text>
+              )}
+            </View>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="receipt" size={48} color="#D3D3D3" />
+            <Text style={styles.emptyText}>No payment history found</Text>
+          </View>
+        )}
+      </ScrollView>
     </View>
   );
 };
@@ -260,143 +372,161 @@ const ExistingLoan = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffffff',
-    paddingTop: 50,
+    backgroundColor: '#fff',
+    paddingTop: 60,
+    paddingHorizontal: 16
   },
   backButton: {
     position: 'absolute',
     top: 50,
     left: 20,
-    zIndex: 10,
+    zIndex: 10
   },
   headerTitle: {
-    fontSize: 30,
+    fontSize: 24,
     fontWeight: 'bold',
     color: '#2D5783',
     textAlign: 'center',
-    marginBottom: 15,
-  },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 30,
+    marginBottom: 20
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#555',
+    color: '#555'
+  },
+  noLoansText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 40,
+    color: '#666'
+  },
+  scrollContent: {
+    paddingBottom: 30
   },
   loanSummaryCard: {
-    backgroundColor: '#d3e8fdff',
     borderRadius: 8,
     padding: 16,
-    marginBottom: 16,
+    marginBottom: 20,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  activeCard: {
+    backgroundColor: '#EFF6FF',
+    borderLeftWidth: 5,
+    borderLeftColor: '#2D5783'
   },
   overdueCard: {
-    borderWidth: 2,
-    borderColor: '#D32F2F',
+    backgroundColor: '#FFF0F0',
+    borderLeftWidth: 5,
+    borderLeftColor: '#D32F2F'
   },
-  overdueBanner: {
-    backgroundColor: '#D32F2F',
-    padding: 5,
-    borderRadius: 4,
-    marginBottom: 10,
+  paidCard: {
+    backgroundColor: '#F0FFF4',
+    borderLeftWidth: 5,
+    borderLeftColor: '#3A7F0D'
   },
-  overdueText: {
-    color: '#D32F2F',
-    fontWeight: 'bold',
-    textAlign: 'center',
+  summaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12
   },
   summaryTitle: {
-    fontSize: 16,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#2D5783',
-    marginBottom: 12,
+    color: '#2D5783'
+  },
+  loanStatus: {
+    fontSize: 20,
+    fontWeight: 'bold'
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 8
   },
   summaryLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#666'
   },
   summaryValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2D5783',
+    color: '#2D5783'
+  },
+  overdueText: {
+    color: '#D32F2F',
+    fontWeight: 'bold'
   },
   sectionTitle: {
     fontSize: 20,
     fontWeight: '600',
     color: '#2D5783',
     marginBottom: 12,
+    marginTop: 8
   },
   transactionCard: {
-    backgroundColor: '#d3e8fdff',
+    backgroundColor: '#F8FAFC',
     borderRadius: 8,
     padding: 16,
     marginBottom: 12,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 1
   },
   transactionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 8
   },
   transactionType: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#2D5783',
+    color: '#2D5783'
   },
   transactionStatus: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '500'
   },
   transactionRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 6,
+    marginBottom: 6
   },
   transactionLabel: {
     fontSize: 14,
-    color: '#666',
+    color: '#666'
   },
   transactionValue: {
     fontSize: 14,
     fontWeight: '500',
-    color: '#2D5783',
+    color: '#2D5783'
   },
   transactionDescription: {
     fontSize: 14,
     color: '#666',
     marginTop: 8,
-    fontStyle: 'italic',
+    fontStyle: 'italic'
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    padding: 40
   },
   emptyText: {
     fontSize: 16,
     color: '#888',
-    marginTop: 16,
-  },
+    marginTop: 16
+  }
 });
 
 export default ExistingLoan;

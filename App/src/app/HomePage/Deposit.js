@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TextInput, StyleSheet, 
   TouchableOpacity, Alert, ScrollView, Image, 
-  ActivityIndicator, Modal, BackHandler 
+  ActivityIndicator, Modal, BackHandler, KeyboardAvoidingView, Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -81,6 +81,12 @@ const Deposit = () => {
     setDepositOption(option.key);
     setAccountNumber(option.key === 'Bank' ? '9876543' : '0123456');
   };
+  
+  const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
+
+useEffect(() => {
+  setIsSubmitDisabled(!depositOption || !amountToBeDeposited || !proofOfDeposit);
+}, [depositOption, amountToBeDeposited, proofOfDeposit]);
 
   const handleSelectProofOfDeposit = async () => {
     try {
@@ -167,60 +173,68 @@ const Deposit = () => {
 
   // Step 1: Show confirmation modal
   Alert.alert(
-    'Confirm Deposit',
-    `Balance: ₱${balance}\nDeposit Option: ${depositOption}\nAccount Name: 5KI\nAccount Number: ${accountNumber}\nAmount to be Deposited: ₱${parseFloat(amountToBeDeposited).toFixed(2)}`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          setLoading(true);
-          try {
-            // Step 2: Upload image and store data in database
-            const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'proofsOfDeposit');
-            await storeDepositDataInDatabase(proofOfDepositUrl);
+  'Confirm Deposit',
+  `Balance: ₱${balance}\nDeposit Option: ${depositOption}\nAccount Name: 5KI\nAccount Number: ${accountNumber}\nAmount to be Deposited: ₱${parseFloat(amountToBeDeposited).toFixed(2)}`,
+  [
+    { text: 'Cancel', style: 'cancel' },
+    {
+      text: 'Confirm',
+      onPress: async () => {
+        setLoading(true);
+        try {
+          // Step 1: Upload image and store data in database
+          const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'proofsOfDeposit');
+          await storeDepositDataInDatabase(proofOfDepositUrl);
 
-            // Prepare deposit data for API
-            const depositApplication = {
-              email,
-              accountName: '5KI',
-              firstName,
-              lastName,
-              depositOption,
-              accountNumber,
-              amountToBeDeposited: parseFloat(amountToBeDeposited),
-            };
+          // Step 2: Prepare and send API request
+          const depositApplication = {
+            email,
+            accountName: '5KI',
+            firstName,
+            lastName,
+            depositOption,
+            accountNumber,
+            amountToBeDeposited: parseFloat(amountToBeDeposited),
+          };
+          await MemberDeposit(depositApplication);
 
-            // Step 3: Show success modal
-            Alert.alert(
-              'Success', 
-              'Deposit application submitted successfully',
-              [
-                {
-                  text: 'OK',
-                  onPress: async () => {
-                    try {
-                      // Step 4: Make API call after success modal is dismissed
-                      await MemberDeposit(depositApplication);
-                      navigation.goBack();
-                      resetFormFields();
-                    } catch (apiError) {
-                      console.error('API Error:', apiError);
-                      Alert.alert('Error', 'There was an issue sending the deposit notification');
-                    }
-                  }
+          // Step 3: Show success modal
+          Alert.alert(
+            'Success', 
+            'Deposit application submitted successfully',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  resetFormFields();
+                  navigation.navigate('Home'); // Direct navigation when OK is pressed
                 }
-              ]
-            );
-          } catch (error) {
-            console.error('Error during deposit submission:', error);
-            Alert.alert('Error', 'Error recording deposit');
-          } finally {
-            setLoading(false);
-          }
-        },
-      },
-    ]
+              }
+            ],
+            { cancelable: false }
+          );
+        } catch (error) {
+          console.error('Error during deposit submission:', error);
+          // Show error but still allow navigation
+          Alert.alert(
+            'Notice',
+            'Deposit was recorded but there was an issue',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  resetFormFields();
+                  navigation.navigate('Home');
+                }
+              }
+            ]
+          );
+        } finally {
+          setLoading(false);
+        }
+      }
+    },
+  ]
   );
 };
 
@@ -240,6 +254,11 @@ const Deposit = () => {
   };
 
   return (
+    <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.container}
+  >
+
     <ScrollView contentContainerStyle={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <MaterialIcons name="arrow-back" size={30} color="white" />
@@ -252,7 +271,7 @@ const Deposit = () => {
         <Text style={styles.label}>Balance</Text>
         <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-        <Text style={styles.label}>Deposit Option</Text>
+        <Text style={styles.label}>Deposit Option<Text style={styles.required}>*</Text></Text>
         <ModalSelector
           data={depositOptions}
           initValue="Select Deposit Option"
@@ -271,7 +290,7 @@ const Deposit = () => {
         <Text style={styles.label}>Account Number</Text>
         <TextInput value={accountNumber} style={[styles.input, styles.fixedInput]} editable={false} />
 
-        <Text style={styles.label}>Deposit Amount</Text>
+        <Text style={styles.label}>Deposit Amount<Text style={styles.required}>*</Text></Text>
         <TextInput
           placeholder="Enter Amount"
           value={amountToBeDeposited}
@@ -280,22 +299,29 @@ const Deposit = () => {
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Proof of Deposit</Text>
-        <View style={styles.imagePreviewContainer}>
-          {proofOfDeposit ? (
-            <Image source={{ uri: proofOfDeposit }} style={styles.imagePreview} />
-          ) : (
-            <MaterialIcons name="photo" size={100} color="#ccc" />
-          )}
-        </View>
-        <TouchableOpacity onPress={handleSelectProofOfDeposit} style={styles.uploadButton}>
-          <Text style={styles.uploadButtonText}>{proofOfDeposit ? 'Change Proof of Deposit' : 'Upload Proof of Deposit'}</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <Text style={styles.label}>Proof of Deposit<Text style={styles.required}>*</Text></Text>
+          <TouchableOpacity 
+            onPress={handleSelectProofOfDeposit} 
+            style={styles.imagePreviewContainer}
+          >
+            {proofOfDeposit ? (
+              <Image source={{ uri: proofOfDeposit }} style={styles.imagePreview} />
+            ) : (
+              <View style={styles.uploadPlaceholder}>
+                <MaterialIcons name="photo" size={100} color="#ccc" />
+                <Text style={styles.uploadPromptText}>Tap To Upload</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
+          onPress={handleSubmit}
+          disabled={isSubmitDisabled}
+        >
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
 
       {/* Loading Modal */}
       <Modal transparent={true} visible={loading}>
@@ -304,7 +330,8 @@ const Deposit = () => {
           <Text style={styles.loadingText}>Please wait...</Text>
         </View>
       </Modal>
-    </ScrollView>
+      </KeyboardAvoidingView>
+    
   );
 };
 
@@ -326,6 +353,7 @@ const styles = StyleSheet.create({
     paddingEnd: 40,
     paddingTop: 20,
     paddingBottom: 40,
+    minHeight: '100%', // Ensures the content takes full height
   },
   title: {
     fontSize: 30,
@@ -374,34 +402,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: 'grey',
   },
-  imagePreviewContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 8,
-    height: 150,
-    marginBottom: 15,
-  },
+imagePreviewContainer: {
+  alignItems: 'center',
+  justifyContent: 'center',
+  borderWidth: 1,
+  borderColor: '#ccc',
+  borderRadius: 8,
+  height: 150,
+  marginBottom: 15,
+  backgroundColor: '#f5f5f5',
+},
   imagePreview: {
     width: '100%',
     height: '100%',
     borderRadius: 8,
   },
-  uploadButton: {
-    backgroundColor: '#001F3F',
-    padding: 15,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  uploadButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    fontSize: 16,
-  },
   submitButton: {
-    backgroundColor: '#4FE7AF',
+    backgroundColor: '#2D5783',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
@@ -421,6 +438,23 @@ const styles = StyleSheet.create({
     marginTop: 10,
     color: 'white',
   },
+  required: {
+  color: 'red',
+},
+disabledButton: {
+  backgroundColor: '#cccccc',
+  opacity: 0.6,
+},
+uploadPlaceholder: {
+  alignItems: 'center',
+  justifyContent: 'center',
+},
+uploadPromptText: {
+  color: '#2D5783',
+  fontWeight: 'bold',
+  marginTop: 10,
+  fontSize: 16,
+},
 });
 
 export default Deposit;

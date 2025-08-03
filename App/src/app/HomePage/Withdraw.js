@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, Modal, ActivityIndicator, BackHandler } from 'react-native';
+import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, ActivityIndicator, BackHandler } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -78,6 +78,14 @@ const Withdraw = () => {
     setAccountNumber('');
   };
 
+const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
+
+useEffect(() => {
+  const hasEmptyFields = !withdrawOption || !accountName || !accountNumber || !withdrawAmount;
+  const insufficientBalance = parseFloat(withdrawAmount) > balance;
+  setIsSubmitDisabled(hasEmptyFields || insufficientBalance);
+}, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
+
  const handleSubmit = async () => {
   if (!withdrawOption || !accountName || !accountNumber || !withdrawAmount) {
     Alert.alert('Error', 'All fields are required');
@@ -131,35 +139,47 @@ const Withdraw = () => {
               status: 'Pending',
             });
 
+            // Make API call before showing success
+            await MemberWithdraw({
+              email,
+              firstName,
+              lastName,
+              withdrawOption,
+              accountName,
+              accountNumber,
+              amountWithdrawn: parseFloat(withdrawAmount),
+            });
+
+            // Show success modal
             Alert.alert(
               'Success',
               'Withdrawal recorded successfully',
               [
                 {
                   text: 'OK',
-                  onPress: async () => {
-                    try {
-                      await MemberWithdraw({
-                        email,
-                        firstName,
-                        lastName,
-                        withdrawOption,
-                        accountName,
-                        accountNumber,
-                        amountWithdrawn: parseFloat(withdrawAmount),
-                      });
-                      navigation.goBack();
-                    } catch (apiError) {
-                      console.error('API Error:', apiError);
-                      Alert.alert('Error', 'There was an issue sending the withdrawal notification');
-                    }
+                  onPress: () => {
+                    resetFormFields();
+                    navigation.navigate('Home');
+                  }
+                }
+              ],
+              { cancelable: false }
+            );
+          } catch (error) {
+            console.error('Error during withdrawal submission:', error);
+            Alert.alert(
+              'Notice',
+              'Withdrawal was recorded but there was an issue',
+              [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    resetFormFields();
+                    navigation.navigate('Home');
                   }
                 }
               ]
             );
-          } catch (error) {
-            console.error('Error during withdrawal submission:', error);
-            Alert.alert('Error', 'Error recording withdrawal');
           } finally {
             setIsLoading(false);
           }
@@ -178,6 +198,10 @@ const Withdraw = () => {
   };
 
   return (
+    <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            style={styles.container}
+          >
     <ScrollView contentContainerStyle={styles.container}>
       <TouchableOpacity
         style={styles.backButton}
@@ -192,7 +216,7 @@ const Withdraw = () => {
         <Text style={styles.label}>Balance</Text>
         <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-        <Text style={styles.label}>Disbursement</Text>
+        <Text style={styles.label}>Disbursement<Text style={styles.required}>*</Text></Text>
         <ModalSelector
           data={withdrawOptions}
           initValue="Select Withdraw Option"
@@ -205,7 +229,7 @@ const Withdraw = () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}>Account Name</Text>
+        <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
         <TextInput
           placeholder="Enter Account Name"
           value={accountName}
@@ -213,7 +237,7 @@ const Withdraw = () => {
           style={styles.input}
         />
 
-        <Text style={styles.label}>Account Number</Text>
+        <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
         <TextInput
           placeholder="Enter Account Number"
           value={accountNumber}
@@ -222,7 +246,7 @@ const Withdraw = () => {
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Withdraw Amount</Text>
+        <Text style={styles.label}>Withdraw Amount<Text style={styles.required}>*</Text></Text>
         <TextInput
           placeholder="Enter Amount"
           value={withdrawAmount}
@@ -231,10 +255,15 @@ const Withdraw = () => {
           keyboardType="numeric"
         />
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <TouchableOpacity 
+          style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
+          onPress={handleSubmit}
+          disabled={isSubmitDisabled}
+        >
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
 
       <Modal transparent={true} visible={isLoading}>
         <View style={styles.modalContainer}>
@@ -242,7 +271,7 @@ const Withdraw = () => {
           <Text style={styles.modalText}>Please wait...</Text>
         </View>
       </Modal>
-    </ScrollView>
+      </KeyboardAvoidingView>
   );
 };
 
@@ -264,6 +293,7 @@ const styles = StyleSheet.create({
     paddingEnd: 50,
     paddingTop: 20,
     paddingBottom: 40,
+    minHeight: '100%',
   },
   title: {
     fontSize: 30,
@@ -309,7 +339,7 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   submitButton: {
-    backgroundColor: '#4FE7AF',
+    backgroundColor: '#2D5783',
     marginTop: 15,
     padding: 15,
     borderRadius: 8,
@@ -331,6 +361,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
   },
+  required: {
+  color: 'red',
+},
+disabledButton: {
+  backgroundColor: '#cccccc',
+  opacity: 0.6,
+},
 });
 
 export default Withdraw;

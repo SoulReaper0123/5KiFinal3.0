@@ -177,22 +177,7 @@ const Settings = () => {
           {renderTabContent()}
         </div>
 
-        {/* Optional pagination - can be removed if not needed */}
-        <div className="pagination-container">
-          <span className="pagination-info">Page 1 of 1</span>
-          <button
-            disabled={true}
-            className="pagination-button disabled-button"
-          >
-            <FaChevronLeft />
-          </button>
-          <button
-            disabled={true}
-            className="pagination-button disabled-button"
-          >
-            <FaChevronRight />
-          </button>
-        </div>
+
       </div>
     </div>
   );

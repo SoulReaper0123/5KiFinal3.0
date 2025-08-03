@@ -10,6 +10,7 @@ import {
   Modal,
   ActivityIndicator,
   BackHandler,
+  KeyboardAvoidingView, Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -277,6 +278,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     Alert.alert('Error', 'Error recording loan application');
   } finally {
     setIsLoading(false);
+    
   }
 };
  const showConfirmationAlert = () => {
@@ -377,6 +379,10 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   );
 
   return (
+    <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
     <ScrollView contentContainerStyle={styles.container}>
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
         <MaterialIcons name="arrow-back" size={30} color="white" />
@@ -555,6 +561,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
+      </ScrollView>
 
       <Modal transparent={true} visible={isLoading}>
         <View style={styles.modalContainer}>
@@ -562,9 +569,10 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           <Text style={styles.modalText}>Please wait...</Text>
         </View>
       </Modal>
-    </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
+
 
 const styles = StyleSheet.create({
   container: {
@@ -584,6 +592,7 @@ const styles = StyleSheet.create({
     paddingEnd: 50,
     paddingTop: 20,
     paddingBottom: 40,
+    minHeight: '100%',
   },
   title: {
     fontSize: 30,
@@ -636,7 +645,7 @@ const styles = StyleSheet.create({
     color: 'grey',
   },
   submitButton: {
-    backgroundColor: '#4FE7AF',
+    backgroundColor: '#2D5783',
     marginTop: 15,
     padding: 15,
     borderRadius: 8,
@@ -706,7 +715,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#cccccc',
   },
   continueButton: {
-    backgroundColor: '#4FE7AF',
+    backgroundColor: '#2D5783',
   },
 });
 

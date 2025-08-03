@@ -19,65 +19,51 @@ export default function Inbox() {
   const [loading, setLoading] = useState(true);
   const email = auth.currentUser?.email || route.params?.email;
 
- const fetchMessages = async () => {
-  setLoading(true);
-  try {
-    const transactionsRef = ref(database, 'Transactions');
-    const snapshot = await get(transactionsRef);
-
-    if (snapshot.exists()) {
-      const data = snapshot.val();
-      // Removed the console.log for raw data
-      const parsedMessages = parseMessages(data);
-
-      const filteredMessages = parsedMessages.filter(
-        message => message.email?.toLowerCase() === email?.toLowerCase()
-      );
-
-      // Sort by timestamp (newest first)
-      filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
-      setMessages(filteredMessages);
-    } else {
-      setMessages([]);
+  // Helper functions
+  const getRawDateFromFirebase = (dateObj) => {
+    if (!dateObj) return 'Date not available';
+    
+    // If it's a Firebase timestamp object
+    if (typeof dateObj === 'object' && dateObj.seconds) {
+      const date = new Date(dateObj.seconds * 1000);
+      return date.toLocaleString();
     }
-  } catch (error) {
-    console.error('Error fetching messages:', error);
-    setMessages([]);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  useEffect(() => {
-    if (email) {
-      fetchMessages();
+    
+    // If it's already a string, return as-is
+    if (typeof dateObj === 'string') {
+      return dateObj;
     }
-  }, [email]);
+    
+    return 'Date not available';
+  };
 
-  const parseDateTime = (dateString, timeString) => {
-    // Handle Firebase timestamp objects
-    if (typeof dateString === 'object' && dateString.seconds) {
-      return dateString.seconds * 1000;
+  const getStatusMessage = (status, amount, type, rejectionReason) => {
+    switch (status) {
+      case 'approved':
+        return `Your ${type} of ${amount} has been approved.`;
+      case 'rejected':
+        return `Your ${type} of ${amount} was rejected. Reason: ${rejectionReason}`;
+      default:
+        return `Your ${type} of ${amount} is pending approval.`;
     }
+  };
 
-    // Handle separate date and time strings
-    if (dateString && timeString) {
-      const combined = `${dateString} ${timeString}`;
-      return Date.parse(combined) || Date.now();
+  const getIcon = (status) => {
+    switch (status) {
+      case 'approved': return 'check-circle';
+      case 'rejected': return 'cancel';
+      case 'reminder': return 'alarm';
+      default: return 'hourglass-empty';
     }
+  };
 
-    // Handle "Month Day, Year at HH:MM" format
-    if (dateString && dateString.includes(' at ')) {
-      const normalized = dateString.replace(' at ', ' ');
-      return Date.parse(normalized) || Date.now();
+  const getColor = (status) => {
+    switch (status) {
+      case 'approved': return '#4CAF50';
+      case 'rejected': return '#F44336';
+      case 'reminder': return '#FFC107';
+      default: return '#FFC107';
     }
-
-    // Handle standalone date strings
-    if (dateString) {
-      return Date.parse(dateString) || Date.now();
-    }
-
-    return Date.now();
   };
 
   const parseMessages = (data) => {
@@ -88,18 +74,18 @@ export default function Inbox() {
         for (const [transactionId, details] of Object.entries(transactions)) {
           try {
             const status = (details.status || 'pending').toLowerCase();
-            let timestamp, displayDate;
+            let displayDate, timestamp;
 
-            // Determine timestamp based on status
+            // Get the appropriate date based on status
             if (status === 'approved') {
-              timestamp = parseDateTime(details.dateApproved);
-              displayDate = formatDisplayDate(timestamp);
+              displayDate = getRawDateFromFirebase(details.dateApproved);
+              timestamp = details.dateApproved?.seconds ? details.dateApproved.seconds * 1000 : Date.now();
             } else if (status === 'rejected') {
-              timestamp = parseDateTime(details.dateRejected, details.timeRejected);
-              displayDate = formatDisplayDate(timestamp);
+              displayDate = getRawDateFromFirebase(details.dateRejected);
+              timestamp = details.dateRejected?.seconds ? details.dateRejected.seconds * 1000 : Date.now();
             } else {
-              timestamp = parseDateTime(details.dateApplied || details.date);
-              displayDate = formatDisplayDate(timestamp);
+              displayDate = 'Pending approval';
+              timestamp = Date.now();
             }
 
             let amount = 0;
@@ -115,8 +101,24 @@ export default function Inbox() {
                 break;
               case 'Loans':
                 amount = parseFloat(details.loanAmount || 0).toFixed(2);
+                const monthlyPayment = parseFloat(details.monthlyPayment || 0).toFixed(2);
                 title = 'Loan';
                 message = getStatusMessage(status, `₱${amount}`, 'loan', rejectionReason);
+                
+                if (status === 'approved' && details.dueDate) {
+                  const dueDate = getRawDateFromFirebase(details.dueDate);
+                  parsed.push({
+                    id: `${type}-${transactionId}-reminder`,
+                    title: 'Loan Payment Reminder',
+                    message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
+                    timestamp: Date.now(),
+                    displayDate: 'Reminder',
+                    email: details.email,
+                    icon: 'alarm',
+                    color: '#FF9800',
+                    status: 'reminder',
+                  });
+                }
                 break;
               case 'Withdrawals':
                 amount = parseFloat(details.amountWithdrawn || 0).toFixed(2);
@@ -154,59 +156,54 @@ export default function Inbox() {
     return parsed;
   };
 
-  const formatDisplayDate = (timestamp) => {
-    const date = new Date(timestamp);
-    if (isNaN(date.getTime())) return 'Date not available';
-    
-    return date.toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
+  const fetchMessages = async () => {
+    setLoading(true);
+    try {
+      const transactionsRef = ref(database, 'Transactions');
+      const snapshot = await get(transactionsRef);
 
-  const getStatusMessage = (status, amount, type, rejectionReason) => {
-    switch (status) {
-      case 'approved':
-        return `Your ${type} of ${amount} has been approved.`;
-      case 'rejected':
-        return `Your ${type} of ${amount} was rejected. Reason: ${rejectionReason}`;
-      default:
-        return `Your ${type} of ${amount} is pending approval.`;
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        const parsedMessages = parseMessages(data);
+
+        const filteredMessages = parsedMessages.filter(
+          message => message.email?.toLowerCase() === email?.toLowerCase()
+        );
+
+        filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
+        setMessages(filteredMessages);
+      } else {
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+      setMessages([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getIcon = (status) => {
-    switch (status) {
-      case 'approved': return 'check-circle';
-      case 'rejected': return 'cancel';
-      default: return 'hourglass-empty';
+  useEffect(() => {
+    if (email) {
+      fetchMessages();
     }
-  };
-
-  const getColor = (status) => {
-    switch (status) {
-      case 'approved': return '#4CAF50';
-      case 'rejected': return '#E53935';
-      default: return '#FFC107';
-    }
-  };
+  }, [email]);
 
   const renderItem = ({ item }) => (
-    <View style={[styles.card, { borderLeftWidth: 5, borderLeftColor: item.color }]}>
-      <MaterialIcons name={item.icon} size={32} color={item.color} style={styles.icon} />
-      <View style={styles.textContainer}>
-        <Text style={styles.title}>{item.title} - {item.status.toUpperCase()}</Text>
-        <Text style={styles.message}>{item.message}</Text>
-        {item.status === 'rejected' && (
-          <Text style={styles.rejectionReason}>Reason: {item.rejectionReason}</Text>
-        )}
-        <Text style={styles.time}>{item.displayDate}</Text>
-      </View>
+  <View style={[styles.card, { borderLeftWidth: 5, borderLeftColor: item.color }]}>
+    <MaterialIcons name={item.icon} size={32} color={item.color} style={styles.icon} />
+    <View style={styles.textContainer}>
+      <Text style={styles.title}>{item.title} - {item.status.toUpperCase()}</Text>
+      <Text style={styles.message}>{item.message}</Text>
+      {item.status === 'rejected' && (
+        <Text style={styles.rejectionReason}>Reason: {item.rejectionReason}</Text>
+      )}
+      {item.displayDate !== 'Pending approval' && (
+        <Text style={styles.time}>{item.displayDate}</Text>  // Removed the labels here
+      )}
     </View>
-  );
+  </View>
+);
 
   return (
     <View style={styles.container}>

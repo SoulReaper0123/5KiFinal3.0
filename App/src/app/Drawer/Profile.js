@@ -14,16 +14,14 @@ import {
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import { getDatabase, ref, get, child, update } from 'firebase/database';
-import firebase from 'firebase/app';
-import 'firebase/storage';
+import { database, storage } from '../../firebaseConfig';
 
 const Profile = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { email } = route.params;
   const [profilePic, setProfilePic] = useState(null);
-  const [selfie, setSelfie] = useState(null); // ✅ updated
+  const [selfie, setSelfie] = useState(null);
   const [userDetails, setUserDetails] = useState({});
   const [loading, setLoading] = useState(true);
   const [modalVisible, setModalVisible] = useState(false);
@@ -32,10 +30,8 @@ const Profile = () => {
 
   useEffect(() => {
     const fetchUserData = async () => {
-      const db = getDatabase();
-      const dbRef = ref(db);
       try {
-        const snapshot = await get(child(dbRef, 'Members'));
+        const snapshot = await database.ref('Members').once('value');
         if (snapshot.exists()) {
           const members = snapshot.val();
           let foundUser = null;
@@ -49,7 +45,7 @@ const Profile = () => {
 
           if (foundUser) {
             setUserDetails(foundUser);
-            setSelfie(foundUser.selfie || null); // ✅ updated
+            setSelfie(foundUser.selfie || null);
             setNewDetails(foundUser);
           } else {
             Alert.alert('User not found', 'No user found with the provided email.');
@@ -101,18 +97,23 @@ const Profile = () => {
   };
 
   const uploadImage = async (uri) => {
-    const response = await fetch(uri);
-    const blob = await response.blob();
-    const storageRef = firebase.storage().ref();
-    const profilePicRef = storageRef.child('profile_pics/' + new Date().toISOString());
-
     try {
-      await profilePicRef.put(blob);
-      const downloadURL = await profilePicRef.getDownloadURL();
-      const db = getDatabase();
-      const userRef = ref(db, 'Members/' + userDetails.id);
-      await userRef.update({ selfie: downloadURL }); // ✅ updated
-      setSelfie(downloadURL); // ✅ updated
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      // Create a reference to the file location
+      const fileRef = storage.ref().child('profile_pics/' + new Date().toISOString());
+      
+      // Upload the file
+      await fileRef.put(blob);
+      
+      // Get the download URL
+      const downloadURL = await fileRef.getDownloadURL();
+      
+      // Update user profile in database
+      const userRef = database.ref('Members/' + userDetails.id);
+      await userRef.update({ selfie: downloadURL });
+      setSelfie(downloadURL);
     } catch (error) {
       console.error('Upload failed', error);
       Alert.alert('Upload failed', 'Could not upload the image. Please try again.');
@@ -124,10 +125,9 @@ const Profile = () => {
   };
 
   const handleSaveDetails = async () => {
-    const db = getDatabase();
-    const userRef = ref(db, 'Members/' + userDetails.id);
     try {
-      await update(userRef, newDetails);
+      const userRef = database.ref('Members/' + userDetails.id);
+      await userRef.update(newDetails);
       Alert.alert('Success', 'Profile updated successfully!');
       setModalVisible(false);
       setUserDetails(newDetails);
@@ -171,48 +171,80 @@ const Profile = () => {
         <View style={styles.detailsContainer}>
           <DetailRow label="Member ID:" detail={userDetails.id || 'N/A'} />
           <DetailRow label="Name:" detail={`${userDetails.firstName || 'N/A'} ${userDetails.middleName || ''} ${userDetails.lastName || ''}`} />
+          <DetailRow label="Email:" detail={userDetails.email || 'N/A'} />
           <DetailRow label="Address:" detail={userDetails.address || 'N/A'} />
           <DetailRow label="Birthday:" detail={userDetails.dateOfBirth || 'N/A'} />
           <DetailRow label="Contact Number:" detail={userDetails.phoneNumber || 'N/A'} />
           <DetailRow label="Gender:" detail={userDetails.gender || 'N/A'} />
           <DetailRow label="Place of Birth:" detail={userDetails.placeOfBirth || 'N/A'} />
           <DetailRow label="Civil Status:" detail={userDetails.civilStatus || 'N/A'} />
+          
           <TouchableOpacity onPress={handleEditDetails} style={styles.editButton}>
             <Text style={styles.editButtonText}>Edit Profile</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            onPress={() => navigation.navigate('ChangePassword', { email: email })}
+            style={[styles.editButton, { backgroundColor: '#6C63FF', marginTop: 10 }]}
+          >
+            <Text style={styles.editButtonText}>Change Password</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
 
       {/* Edit Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
+      {/* Edit Modal */}
+<Modal
+  animationType="slide"
+  transparent={true}
+  visible={modalVisible}
+  onRequestClose={() => setModalVisible(false)}
+>
+  <View style={styles.modalContainer}>
+    <View style={styles.modalHeader}>
+      <TouchableOpacity 
+        onPress={() => setModalVisible(false)} 
+        style={styles.modalBackButton}
       >
-        <View style={styles.modalContainer}>
-          <ScrollView contentContainerStyle={styles.modalContent}>
-            <Text style={styles.modalTitle}>Edit Profile Details</Text>
-            {['firstName', 'middleName', 'lastName', 'address', 'dateOfBirth', 'phoneNumber', 'gender', 'placeOfBirth', 'civilStatus'].map((field) => (
-              <View key={field}>
-                <Text style={styles.label}>{capitalizeFirstLetter(field)}:</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder={capitalizeFirstLetter(field)}
-                  value={newDetails[field]}
-                  onChangeText={(text) => setNewDetails({ ...newDetails, [field]: text })}
-                />
-              </View>
-            ))}
-            <TouchableOpacity onPress={handleSaveDetails} style={styles.saveButton}>
-              <Text style={styles.saveButtonText}>Save Changes</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.cancelButton}>
-              <Text style={styles.cancelButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </ScrollView>
+        <MaterialIcons name="arrow-back" size={24} color="white" />
+      </TouchableOpacity>
+      <Text style={styles.modalHeaderTitle}>Edit Profile Details</Text>
+    </View>
+    <ScrollView contentContainerStyle={styles.modalContent}>
+      {[
+        {field: 'firstName', required: true},
+        {field: 'middleName', required: false},
+        {field: 'lastName', required: true},
+        {field: 'address', required: true},
+        {field: 'dateOfBirth', required: true},
+        {field: 'phoneNumber', required: true},
+        {field: 'gender', required: true},
+        {field: 'placeOfBirth', required: true},
+        {field: 'civilStatus', required: true}
+      ].map(({field, required}) => (
+        <View key={field} style={styles.inputContainer}>
+          <Text style={styles.label}>
+            {capitalizeFirstLetter(field)}{required && <Text style={styles.requiredStar}> *</Text>}:
+          </Text>
+          <TextInput
+            style={styles.input}
+            placeholder={`Enter ${capitalizeFirstLetter(field)}`}
+            value={newDetails[field]}
+            onChangeText={(text) => setNewDetails({ ...newDetails, [field]: text })}
+          />
         </View>
-      </Modal>
+      ))}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.cancelButton}>
+          <Text style={styles.cancelButtonText}>Cancel</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={handleSaveDetails} style={styles.saveButton}>
+          <Text style={styles.saveButtonText}>Save Changes</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  </View>
+</Modal>
 
       {/* Full Image Modal */}
       <Modal
@@ -284,6 +316,7 @@ const styles = StyleSheet.create({
     right: 10,
     backgroundColor: 'white',
     borderRadius: 50,
+    padding: 5,
   },
   detailsContainer: {
     backgroundColor: 'white',
@@ -318,17 +351,14 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
   },
-  modalContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modalContent: {
-    backgroundColor: 'white',
-    marginHorizontal: 20,
-    padding: 20,
-    borderRadius: 10,
-  },
+ modalContainer: {
+  flex: 1,
+  backgroundColor: 'rgba(0, 0, 0, 0.5)',
+},
+modalContent: {
+  backgroundColor: 'white',
+  padding: 20,
+},
   modalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
@@ -345,24 +375,28 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 15,
   },
-  saveButton: {
-    backgroundColor: '#4FE7AF',
-    borderRadius: 5,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
+ saveButton: {
+  backgroundColor: '#4FE7AF',
+  borderRadius: 5,
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  alignItems: 'center',
+  flex: 1,
+  marginLeft: 10,
+},
   saveButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
-  cancelButton: {
-    backgroundColor: '#FF0000',
-    borderRadius: 5,
-    paddingVertical: 10,
-    alignItems: 'center',
-    marginTop: 10,
-  },
+ cancelButton: {
+  backgroundColor: '#FF0000',
+  borderRadius: 5,
+  paddingVertical: 12,
+  paddingHorizontal: 20,
+  alignItems: 'center',
+  flex: 1,
+  marginRight: 10,
+},
   cancelButtonText: {
     color: 'white',
     fontWeight: 'bold',
@@ -393,6 +427,35 @@ const styles = StyleSheet.create({
   closeImageModalButtonText: {
     fontWeight: 'bold',
   },
+  modalHeader: {
+  flexDirection: 'row',
+  alignItems: 'center',
+  backgroundColor: '#2D5783',
+  paddingVertical: 15,
+  paddingHorizontal: 10,
+  borderTopLeftRadius: 10,
+  borderTopRightRadius: 10,
+},
+modalHeaderTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  color: 'white',
+  marginLeft: 10,
+},
+modalBackButton: {
+  marginRight: 10,
+},
+inputContainer: {
+  marginBottom: 15,
+},
+requiredStar: {
+  color: 'red',
+},
+buttonContainer: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  marginTop: 20,
+},
 });
 
 export default Profile;

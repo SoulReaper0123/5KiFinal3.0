@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { FaTrashAlt, FaPlus, FaMinus, FaExchangeAlt } from 'react-icons/fa';
+import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo } from 'react-icons/fa';
 
 const styles = {
   container: {
@@ -13,11 +13,11 @@ const styles = {
   contentContainer: {
     maxWidth: '900px',
     margin: '0 auto',
-    fontFamily: "'Segoe UI', Tahoma, Geneva, Verdana, sans-serif"
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif"
   },
   header: {
     fontSize: '28px',
-    fontWeight: '600',
+    fontWeight: '700',
     marginBottom: '25px',
     textAlign: 'center',
     color: '#1e293b',
@@ -26,16 +26,20 @@ const styles = {
   },
   card: {
     backgroundColor: '#ffffff',
-    padding: '20px',
+    padding: '25px',
     borderRadius: '12px',
     marginBottom: '20px',
     boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)',
-    border: '1px solid #e2e8f0'
+    border: '1px solid #e2e8f0',
+    transition: 'box-shadow 0.2s ease',
+    '&:hover': {
+      boxShadow: '0 6px 12px rgba(0, 0, 0, 0.1)'
+    }
   },
   sectionTitle: {
     fontSize: '20px',
     fontWeight: '600',
-    marginBottom: '15px',
+    marginBottom: '20px',
     color: '#1e293b',
     display: 'flex',
     alignItems: 'center',
@@ -45,7 +49,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '15px',
+    marginBottom: '18px',
     gap: '15px'
   },
   label: {
@@ -58,16 +62,21 @@ const styles = {
     flex: 1,
     border: '1px solid #cbd5e1',
     borderRadius: '8px',
-    padding: '10px 12px',
+    padding: '12px',
     fontSize: '16px',
     backgroundColor: '#fff',
-    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)'
+    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)',
+    transition: 'border-color 0.2s',
+    '&:focus': {
+      borderColor: '#2563eb',
+      outline: 'none'
+    }
   },
   staticInput: {
     flex: 1,
     border: '1px solid #e2e8f0',
     borderRadius: '8px',
-    padding: '10px 12px',
+    padding: '12px',
     fontSize: '16px',
     backgroundColor: '#f8fafc',
     color: '#64748b'
@@ -76,23 +85,32 @@ const styles = {
     width: '80px',
     border: '1px solid #cbd5e1',
     borderRadius: '8px',
-    padding: '8px',
+    padding: '10px',
     fontSize: '16px',
-    textAlign: 'center'
+    textAlign: 'center',
+    transition: 'border-color 0.2s',
+    '&:focus': {
+      borderColor: '#2563eb',
+      outline: 'none'
+    }
   },
   staticText: {
     fontSize: '16px',
     color: '#334155',
-    padding: '10px 0'
+    padding: '12px 0'
   },
   rateRow: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: '12px',
-    padding: '10px',
+    padding: '12px',
     backgroundColor: '#f8fafc',
-    borderRadius: '8px'
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: '#f1f5f9'
+    }
   },
   termText: {
     fontSize: '16px',
@@ -102,7 +120,7 @@ const styles = {
   editRateRow: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px'
+    gap: '12px'
   },
   deleteTermBtn: {
     background: 'none',
@@ -110,24 +128,33 @@ const styles = {
     color: '#ef4444',
     cursor: 'pointer',
     fontSize: '16px',
-    padding: '5px'
+    padding: '6px',
+    borderRadius: '4px',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: '#fee2e2'
+    }
   },
   addTermBtn: {
     backgroundColor: '#10b981',
     color: 'white',
-    padding: '10px 16px',
+    padding: '12px 16px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: '500',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px'
+    gap: '8px',
+    transition: 'background-color 0.2s',
+    '&:hover': {
+      backgroundColor: '#059669'
+    }
   },
   saveBtn: {
     backgroundColor: '#2563eb',
     color: 'white',
-    padding: '14px',
+    padding: '16px',
     border: 'none',
     borderRadius: '8px',
     cursor: 'pointer',
@@ -136,13 +163,18 @@ const styles = {
     width: '100%',
     marginTop: '20px',
     marginBottom: '30px',
-    transition: 'background-color 0.2s',
+    transition: 'all 0.2s',
     '&:hover': {
-      backgroundColor: '#1d4ed8'
+      backgroundColor: '#1d4ed8',
+      transform: 'translateY(-1px)'
+    },
+    '&:active': {
+      transform: 'translateY(0)'
     }
   },
   saveMode: {
-    backgroundColor: '#1d4ed8'
+    backgroundColor: '#1d4ed8',
+    boxShadow: '0 4px 6px rgba(29, 78, 216, 0.3)'
   },
   dateButton: {
     color: '#2563eb',
@@ -152,17 +184,22 @@ const styles = {
     cursor: 'pointer',
     fontSize: '16px',
     textAlign: 'left',
-    padding: '10px 0',
+    padding: '12px 0',
     fontWeight: '500',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px'
+    gap: '8px',
+    transition: 'color 0.2s',
+    '&:hover': {
+      color: '#1d4ed8'
+    }
   },
   calendarContainer: {
     marginTop: '10px',
     border: '1px solid #e2e8f0',
     borderRadius: '8px',
-    overflow: 'hidden'
+    overflow: 'hidden',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)'
   },
   switch: {
     position: 'relative',
@@ -221,7 +258,8 @@ const styles = {
     borderRadius: '12px',
     width: '90%',
     maxWidth: '400px',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)'
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    animation: 'fadeIn 0.3s ease'
   },
   modalTitle: {
     fontSize: '20px',
@@ -244,7 +282,12 @@ const styles = {
     borderRadius: '8px',
     fontSize: '16px',
     marginBottom: '20px',
-    boxSizing: 'border-box'
+    boxSizing: 'border-box',
+    transition: 'border-color 0.2s',
+    '&:focus': {
+      borderColor: '#2563eb',
+      outline: 'none'
+    }
   },
   modalButtons: {
     display: 'flex',
@@ -259,7 +302,14 @@ const styles = {
     fontWeight: '600',
     fontSize: '16px',
     flex: 1,
-    transition: 'opacity 0.2s'
+    transition: 'all 0.2s',
+    '&:hover': {
+      opacity: 0.9,
+      transform: 'translateY(-1px)'
+    },
+    '&:active': {
+      transform: 'translateY(0)'
+    }
   },
   cancelBtn: {
     backgroundColor: '#f1f5f9',
@@ -286,19 +336,26 @@ const styles = {
   fundsActions: {
     display: 'flex',
     gap: '10px',
-    marginTop: '10px'
+    marginTop: '15px'
   },
   actionBtn: {
-    padding: '8px 12px',
-    borderRadius: '6px',
+    padding: '10px 16px',
+    borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
     fontWeight: '500',
     fontSize: '14px',
     display: 'flex',
     alignItems: 'center',
-    gap: '6px',
-    transition: 'background-color 0.2s'
+    gap: '8px',
+    transition: 'all 0.2s',
+    '&:hover': {
+      opacity: 0.9,
+      transform: 'translateY(-1px)'
+    },
+    '&:active': {
+      transform: 'translateY(0)'
+    }
   },
   addFundsBtn: {
     backgroundColor: '#10b981',
@@ -307,6 +364,73 @@ const styles = {
   withdrawFundsBtn: {
     backgroundColor: '#f97316',
     color: 'white'
+  },
+  copyBtn: {
+    backgroundColor: '#dbeafe',
+    color: '#2563eb',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.2s',
+    '&:hover': {
+      backgroundColor: '#bfdbfe'
+    }
+  },
+  generateBtn: {
+    backgroundColor: '#2563eb',
+    color: 'white',
+    padding: '10px 16px',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s',
+    '&:hover': {
+      backgroundColor: '#1d4ed8'
+    }
+  },
+  copiedText: {
+    fontSize: '14px',
+    color: '#10b981',
+    marginLeft: '10px',
+    fontWeight: '500'
+  },
+  orientationCodeContainer: {
+    marginTop: '20px',
+    padding: '15px',
+    backgroundColor: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #bae6fd'
+  },
+  orientationCodeTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#0369a1',
+    marginBottom: '10px'
+  },
+  orientationCodeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+  orientationCodeValue: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#075985',
+    backgroundColor: '#e0f2fe',
+    padding: '8px 12px',
+    borderRadius: '6px'
+  },
+  orientationCodeDescription: {
+    fontSize: '14px',
+    color: '#64748b',
+    marginTop: '8px'
   }
 };
 
@@ -320,6 +444,7 @@ const SystemSettings = () => {
     DividendDate: '',
     PenaltyValue: '',
     PenaltyType: 'percentage',
+    OrientationCode: ''
   });
 
   const [newTerm, setNewTerm] = useState('');
@@ -327,6 +452,7 @@ const SystemSettings = () => {
   const [editMode, setEditMode] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [orientationCopied, setOrientationCopied] = useState(false);
 
   // Modal states
   const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
@@ -356,6 +482,7 @@ const SystemSettings = () => {
           DividendDate: data.DividendDate || '',
           PenaltyValue: data.PenaltyValue?.toString() || '',
           PenaltyType: data.PenaltyType || 'percentage',
+          OrientationCode: data.OrientationCode || generateOrientationCode()
         });
       }
       setLoading(false);
@@ -363,6 +490,33 @@ const SystemSettings = () => {
 
     return () => unsubscribe();
   }, []);
+
+  const generateOrientationCode = () => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluded easily confused chars
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setOrientationCopied(true);
+      setTimeout(() => setOrientationCopied(false), 2000);
+      showMessage('Success', 'Code copied to clipboard!');
+    } catch (err) {
+      console.error('Failed to copy: ', err);
+      showMessage('Error', 'Failed to copy code', true);
+    }
+  };
+
+  const handleGenerateOrientationCode = () => {
+    const newCode = generateOrientationCode();
+    setSettings({ ...settings, OrientationCode: newCode });
+    showMessage('Success', 'New orientation code generated!');
+  };
 
   const showMessage = (title, message, isError = false) => {
     setMessageModal({ visible: true, title, message, isError });
@@ -444,6 +598,7 @@ const SystemSettings = () => {
       DividendDate: settings.DividendDate,
       PenaltyValue: parseFloat(settings.PenaltyValue),
       PenaltyType: settings.PenaltyType,
+      OrientationCode: settings.OrientationCode
     };
 
     update(settingsRef, updatedData)
@@ -601,6 +756,40 @@ const SystemSettings = () => {
               </button>
             </div>
           )}
+        </div>
+
+        {/* Orientation Code */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Orientation Registration Code</h2>
+          <div style={styles.orientationCodeContainer}>
+            <div style={styles.orientationCodeTitle}>Orientation Attendance Code</div>
+            <div style={styles.orientationCodeRow}>
+              <div style={styles.orientationCodeValue}>
+                {settings.OrientationCode || 'Not set'}
+              </div>
+              {settings.OrientationCode && (
+                <button 
+                  style={styles.copyBtn}
+                  onClick={() => copyToClipboard(settings.OrientationCode)}
+                  aria-label="Copy orientation code"
+                >
+                  <FaCopy />
+                </button>
+              )}
+              {orientationCopied && <span style={styles.copiedText}>Copied!</span>}
+            </div>
+            {editMode && (
+              <button 
+                style={styles.generateBtn}
+                onClick={handleGenerateOrientationCode}
+              >
+                <FaRedo /> Generate New Code
+              </button>
+            )}
+            <p style={styles.orientationCodeDescription}>
+              This code is used for registration when attending the orientation. Share this code with attendees.
+            </p>
+          </div>
         </div>
 
         {/* Interest Rates */}
