@@ -50,7 +50,11 @@ const Withdraw = () => {
       console.error('Error fetching user data:', error);
     }
   };
-
+ const resetFormFields = () => {
+    setWithdrawOption('');
+    setAccountNumber('');
+    setWithdrawAmount('');
+  };
   useEffect(() => {
     const user = auth.currentUser;
     if (user) {
@@ -113,9 +117,10 @@ useEffect(() => {
           setIsLoading(true);
           try {
             const transactionId = generateTransactionId();
-            const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
+            const currentDate = new Date().toISOString();
 
-            await set(newWithdrawRef, {
+            // Prepare withdrawal data
+            const withdrawalData = {
               transactionId,
               id: memberId,
               email,
@@ -137,20 +142,26 @@ useEffect(() => {
               .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
               .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
               status: 'Pending',
-            });
+            };
 
-            // Make API call before showing success
+            // Save to Firebase
+            const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
+            await set(newWithdrawRef, withdrawalData);
+
+            // Make API call with correct field names
             await MemberWithdraw({
               email,
               firstName,
               lastName,
-              withdrawOption,
-              accountName,
-              accountNumber,
-              amountWithdrawn: parseFloat(withdrawAmount),
+              amount: parseFloat(withdrawAmount),
+              date: currentDate,
+              recipientAccount: accountNumber, // Matches backend expectation
+              referenceNumber: transactionId,  // Using transactionId as reference
+              withdrawOption,                  // Additional field for your records
+              accountName                      // Additional field for your records
             });
 
-            // Show success modal
+            // Show success
             Alert.alert(
               'Success',
               'Withdrawal recorded successfully',
@@ -168,17 +179,9 @@ useEffect(() => {
           } catch (error) {
             console.error('Error during withdrawal submission:', error);
             Alert.alert(
-              'Notice',
-              'Withdrawal was recorded but there was an issue',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    resetFormFields();
-                    navigation.navigate('Home');
-                  }
-                }
-              ]
+              'Error',
+              'Failed to process withdrawal: ' + error.message,
+              [{ text: 'OK' }]
             );
           } finally {
             setIsLoading(false);

@@ -194,7 +194,6 @@ useEffect(() => {
     return;
   }
 
-  // Step 1: Show confirmation modal
   Alert.alert(
     'Confirm Payment',
     `Balance: ₱${balance}\nPayment Option: ${paymentOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Paid: ₱${parseFloat(amountToBePaid).toFixed(2)}`,
@@ -205,41 +204,59 @@ useEffect(() => {
         onPress: async () => {
           setIsLoading(true);
           try {
-            // Step 2: Upload image and store data in database
+            // Step 1: Upload proof of payment
             const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
+            
+            // Step 2: Store payment data in database
             await storePaymentDataInDatabase(proofOfPaymentUrl);
 
-            // Prepare payment data for API
-            const paymentApplication = {
+            // Step 3: Prepare payment data for API (with all required fields)
+            const paymentData = {
               email,
               firstName,
               lastName,
-              paymentOption,
-              accountName,
-              accountNumber,
-              amountToBePaid: parseFloat(amountToBePaid),
-              interest,
-              interestRate,
+              amount: parseFloat(amountToBePaid),
+              paymentMethod: paymentOption,
+              date: new Date().toISOString(),
+              interestPaid: interest,
+              principalPaid: parseFloat(amountToBePaid) - interest,
+              isLoanPayment: true
             };
 
-           // Step 3: Show success modal
+            // Step 4: Make API call to trigger emails
+            const response = await MemberPayment(paymentData);
+            console.log('Payment API response:', response);
+
+            // Step 5: Show success
             Alert.alert(
               'Success', 
-              'Payment submitted successfully',
+              'Payment submitted successfully. You will receive a confirmation email shortly.',
               [
                 {
                   text: 'OK',
                   onPress: () => {
                     resetFormFields();
-                    navigation.navigate('Home'); // Direct navigation when OK is pressed
+                    navigation.navigate('Home');
                   }
                 }
               ],
               { cancelable: false }
             );
           } catch (error) {
-            console.error('Error during payment submission:', error);
-            Alert.alert('Error', 'Error recording payment');
+            console.error('Error during payment submission:', {
+              error: error.message,
+              stack: error.stack,
+              paymentData: {
+                email,
+                amount: amountToBePaid,
+                paymentOption
+              }
+            });
+            Alert.alert(
+              'Notice',
+              'Payment was recorded but email notification failed. Please check your email later.',
+              [{ text: 'OK' }]
+            );
           } finally {
             setIsLoading(false);
           }

@@ -424,7 +424,13 @@ Best regards,
 
 app.post('/send-verification-code', async (req, res) => {
     console.log('[NOTIFICATION] Initiating 2FA verification email', req.body);
-    const { email, firstName, verificationCode } = req.body;
+    const { 
+        email, 
+        firstName, 
+        verificationCode,
+        websiteLink,
+        facebookLink 
+    } = req.body;
 
     // Validate required fields
     if (!email || !verificationCode) {
@@ -443,31 +449,45 @@ app.post('/send-verification-code', async (req, res) => {
         });
     }
 
+    // Validate verification code format (6 digits)
+    if (!/^\d{6}$/.test(verificationCode)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Verification code must be 6 digits'
+        });
+    }
+
     try {
-        console.log('[NOTIFICATION] Sending 2FA verification email');
+        // Log the code for development purposes (mask part of it in production)
+        const codeToLog = process.env.NODE_ENV === 'production' 
+            ? `${verificationCode.substring(0, 3)}***` 
+            : verificationCode;
+        console.log(`[DEBUG] Sending verification code ${codeToLog} to ${email}`);
+
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Your 5KI Financial Services Verification Code',
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                    <h2 style="color: #2D5783;">Security Verification</h2>
-                    <p>Hi ${firstName || 'Customer'},</p>
-                    <p>Your verification code is:</p>
-                    <div style="background: #f5f5f5; padding: 20px; text-align: center; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin: 20px 0;">
-                        ${verificationCode}
-                    </div>
-                    <p>This code will expire in 10 minutes. Please enter it in the verification page to complete your login process.</p>
-                    <p style="color: #ff0000; font-weight: bold;">For your security, never share this code with anyone. 5KI Financial Services will never ask you for this code.</p>
-                    <p>If you didn't request this code, please contact our support team immediately at <a href="mailto:${GMAIL_OWNER}">${GMAIL_OWNER}</a>.</p>
-                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                    <p>Best regards,<br>5KI Financial Services Team</p>
-                    <div style="margin-top: 20px; font-size: 12px; color: #777;">
-                        Connect with us:<br>
-                        <a href="${WEBSITE_LINK}">Website</a> | 
-                        <a href="${FACEBOOK_LINK}">Facebook</a>
-                    </div>
-                </div>
+            text: `
+Security Verification
+
+Hi ${firstName || 'Customer'},
+
+Your verification code is: ${verificationCode}
+
+This code will expire in 10 minutes. Please enter it in the verification page to complete your login process.
+
+IMPORTANT SECURITY NOTICE:
+- Never share this code with anyone
+- 5KI Financial Services will never ask you for this code
+- If you didn't request this code, contact us immediately at ${GMAIL_OWNER}
+
+Connect with us:
+- Website: ${websiteLink || WEBSITE_LINK}
+- Facebook: ${facebookLink || FACEBOOK_LINK}
+
+Best regards,
+5KI Financial Services Team
             `
         };
 
@@ -475,14 +495,19 @@ app.post('/send-verification-code', async (req, res) => {
         console.log('[NOTIFICATION SUCCESS] 2FA verification email sent successfully');
         res.status(200).json({ 
             success: true,
-            message: 'Verification code sent successfully'
+            message: 'Verification code sent successfully',
+            data: {
+                emailSent: email,
+                timestamp: new Date().toISOString()
+            }
         });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending 2FA verification email:', error);
         res.status(500).json({ 
             success: false,
             message: 'Failed to send verification code',
-            error: error.message
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
 });
@@ -493,51 +518,82 @@ app.post('/send-verification-code', async (req, res) => {
 
 app.post('/deposit', async (req, res) => {
     console.log('[NOTIFICATION] Initiating deposit notification emails', req.body);
-    const { email, firstName, lastName, amount, referenceNumber, method, date } = req.body;
-    const fullName = `${firstName} ${lastName}`;
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        amountToBeDeposited,
+        depositOption,
+        accountNumber,
+        accountName,
+        proofOfDepositUrl,
+        dateApplied,
+        transactionId,
+        websiteLink,
+        facebookLink
+    } = req.body;
 
-    if (!email || !firstName || !lastName || !amount || !referenceNumber || !method) {
+    if (!email || !firstName || !lastName || !amountToBeDeposited || !depositOption) {
         console.log('[NOTIFICATION ERROR] Missing required fields for deposit notification');
         return res.status(400).json({ message: 'Missing required fields' });
     }
 
     try {
-        console.log('[NOTIFICATION] Sending deposit notification to owner');
+        const currentDate = dateApplied || new Date().toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
+
+        // Email to system owner
+        console.log('[NOTIFICATION] Sending deposit application notification to owner');
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
-            subject: 'Deposit Application Submitted',
+            subject: 'New Deposit Application Received',
             text: `
-Deposit Application Submitted
+New Deposit Application
 
-Hi Admin,
+Member: ${firstName} ${lastName}
+Email: ${email}
+Amount: ₱${amountToBeDeposited}
+Method: ${depositOption}
+Account Name: ${accountName || '5KI'}
+Account Number: ${accountNumber || 'N/A'}
+Transaction ID: ${transactionId || 'N/A'}
+Date Submitted: ${currentDate}
+${proofOfDepositUrl ? 'Proof of deposit attached' : ''}
 
-A deposit application has been submitted with the following details:
-
-Member: ${fullName}
-Amount: ₱${amount}
-Date Submitted: ${formatDisplayDate(date)}
-Reference No.: ${referenceNumber}
-
-Kindly review and process this request via the admin dashboard: ${DASHBOARD_LINK}
+Please review this application in the admin dashboard: ${DASHBOARD_LINK}
             `
         });
 
+        // Email to member
         console.log('[NOTIFICATION] Sending deposit confirmation to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Deposit Successful',
+            subject: 'Deposit Application Received',
             text: `
-Deposit Successful
-
 Hi ${firstName},
 
-We have successfully received your deposit amounting ₱${amount} under reference number ${referenceNumber} and was completed using ${method}.
+We have received your deposit application for ₱${amountToBeDeposited} via ${depositOption}.
 
-Please log in to your account to view your updated balance.
+Application Details:
+- Account Name: ${accountName || '5KI'}
+- Account Number: ${accountNumber || 'N/A'}
+- Transaction ID: ${transactionId || 'N/A'}
+- Date Submitted: ${currentDate}
 
-Thank you for keeping your 5Ki Financial Services account active.
+Our team will process your request and notify you once completed. This typically takes 1-2 business days.
+
+For any questions, please contact us at ${GMAIL_OWNER}.
+
+Connect with us:
+- Website: ${websiteLink || WEBSITE_LINK}
+- Facebook: ${facebookLink || FACEBOOK_LINK}
 
 Best regards,
 5KI Financial Services Team

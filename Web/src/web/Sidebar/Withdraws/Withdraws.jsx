@@ -12,6 +12,7 @@ import ExcelJS from 'exceljs';
 import WithdrawApplications from './WithdrawApplications';
 import ApprovedWithdraws from './ApprovedWithdraws';
 import RejectedWithdraws from './RejectedWithdraws';
+import PermanentWithdraws from './PermanentWithdraws';
 import { database } from '../../../../../Database/firebaseConfig';
 
 const Withdraws = () => {
@@ -19,6 +20,7 @@ const Withdraws = () => {
   const [withdrawApplications, setWithdrawApplications] = useState([]);
   const [approvedWithdraws, setApprovedWithdraws] = useState([]);
   const [rejectedWithdraws, setRejectedWithdraws] = useState([]);
+  const [permanentWithdraws, setPermanentWithdraws] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -262,10 +264,11 @@ const Withdraws = () => {
     const fetchAllData = async () => {
       setLoading(true);
       try {
-        const [wSnap, aSnap, rSnap] = await Promise.all([
+        const [wSnap, aSnap, rSnap, pSnap] = await Promise.all([
           database.ref('Withdrawals/WithdrawalApplications').once('value'),
           database.ref('Withdrawals/ApprovedWithdrawals').once('value'),
           database.ref('Withdrawals/RejectedWithdrawals').once('value'),
+          database.ref('MembershipWithdrawal').once('value'),
         ]);
 
         const toArray = snap => {
@@ -282,6 +285,7 @@ const Withdraws = () => {
         setWithdrawApplications(toArray(wSnap));
         setApprovedWithdraws(toArray(aSnap));
         setRejectedWithdraws(toArray(rSnap));
+        setPermanentWithdraws(toArray(pSnap));
         setFilteredData(toArray(wSnap));
       } catch (error) {
         console.error('Error fetching withdrawals:', error);
@@ -304,7 +308,9 @@ const Withdraws = () => {
         ? withdrawApplications
         : activeSection === 'approvedWithdraws'
         ? approvedWithdraws
-        : rejectedWithdraws;
+        : activeSection === 'rejectedWithdraws'
+        ? rejectedWithdraws
+        : permanentWithdraws;
 
     const filtered = currentData.filter(item => {
       const memberId = item.id?.toString() || '';
@@ -333,7 +339,9 @@ const Withdraws = () => {
           ? 'PendingWithdrawals'
           : activeSection === 'approvedWithdraws'
           ? 'ApprovedWithdrawals'
-          : 'RejectedWithdrawals';
+          : activeSection === 'rejectedWithdraws'
+          ? 'RejectedWithdrawals'
+          : 'PermanentWithdrawals';
 
       if (dataToDownload.length === 0) {
         setErrorMessage('No data to export');
@@ -344,12 +352,74 @@ const Withdraws = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet(fileName);
 
-      const headers = Object.keys(dataToDownload[0]);
+      // Define headers based on the section
+      const headers = [];
+      if (activeSection === 'permanentWithdraws') {
+        headers.push(
+          'Transaction ID',
+          'Member ID',
+          'First Name',
+          'Last Name',
+          'Email',
+          'Address',
+          'Contact',
+          'Date Joined',
+          'Reason',
+          'Balance',
+          'Date Submitted',
+          'Status',
+          'Has Existing Loan'
+        );
+      } else {
+        headers.push(
+          'Transaction ID',
+          'Member ID',
+          'First Name',
+          'Last Name',
+          'Email',
+          'Withdraw Option',
+          'Account Name',
+          'Account Number',
+          'Amount',
+          'Date Applied',
+          'Status'
+        );
+      }
+
       worksheet.addRow(headers);
 
       dataToDownload.forEach(item => {
-        const row = headers.map(header => item[header]);
-        worksheet.addRow(row);
+        if (activeSection === 'permanentWithdraws') {
+          worksheet.addRow([
+            item.transactionId,
+            item.id,
+            item.firstName,
+            item.lastName,
+            item.email,
+            item.address,
+            item.contact,
+            item.dateJoined,
+            item.reason,
+            item.balance,
+            item.dateSubmitted,
+            item.status,
+            item.hasExistingLoan ? 'Yes' : 'No'
+          ]);
+        } else {
+          worksheet.addRow([
+            item.transactionId,
+            item.id,
+            item.firstName,
+            item.lastName,
+            item.email,
+            item.withdrawOption,
+            item.accountName,
+            item.accountNumber,
+            item.amountWithdrawn,
+            item.dateApplied,
+            item.status
+          ]);
+        }
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -383,7 +453,9 @@ const Withdraws = () => {
         ? withdrawApplications
         : section === 'approvedWithdraws'
         ? approvedWithdraws
-        : rejectedWithdraws;
+        : section === 'rejectedWithdraws'
+        ? rejectedWithdraws
+        : permanentWithdraws;
     setFilteredData(defaultData);
     setNoMatch(false);
   };
@@ -410,7 +482,7 @@ const Withdraws = () => {
               { key: 'withdrawApplications', label: 'Pending', color: '#2D5783' },
               { key: 'approvedWithdraws', label: 'Approved', color: '#008000' },
               { key: 'rejectedWithdraws', label: 'Rejected', color: '#FF0000' },
-              { key: 'rejectedWithdraws', label: 'Permanent', color: '#2D5783' },
+              { key: 'permanentWithdraws', label: 'Permanent', color: '#800080' },
             ].map((tab) => {
               const isActive = activeSection === tab.key;
               return (
@@ -495,6 +567,14 @@ const Withdraws = () => {
               )}
               {activeSection === 'rejectedWithdraws' && (
                 <RejectedWithdraws 
+                  withdraws={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
+              )}
+              {activeSection === 'permanentWithdraws' && (
+                <PermanentWithdraws 
                   withdraws={paginatedData} 
                   currentPage={currentPage}
                   totalPages={totalPages}

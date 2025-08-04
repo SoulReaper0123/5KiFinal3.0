@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,16 +10,17 @@ import {
   Modal,
   Pressable,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  BackHandler
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { database } from '../../firebaseConfig'; // Adjust the import path as necessary
-import { ref, get, set } from 'firebase/database';
+import { ref as dbRef, get, set } from 'firebase/database';
+import { database, auth } from '../../firebaseConfig';
+import { KeyboardAvoidingView, Platform } from 'react-native';
 
 export default function WithdrawMembership() {
   const navigation = useNavigation();
-
   const [form, setForm] = useState({
     email: '',
     firstName: '',
@@ -29,14 +30,56 @@ export default function WithdrawMembership() {
     joined: '',
     reason: '',
     hasLoan: '',
+    otherReason: ''
   });
-
   const [agreed, setAgreed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [memberId, setMemberId] = useState('');
   const [isLoadingMember, setIsLoadingMember] = useState(false);
   const [emailError, setEmailError] = useState('');
+  const [balance, setBalance] = useState(0);
+  const [hasExistingLoan, setHasExistingLoan] = useState(false);
+  const [showOtherReasonInput, setShowOtherReasonInput] = useState(false);
+
+  useEffect(() => {
+    const handleBackPress = () => {
+      navigation.navigate('Home');
+      return true;
+    };
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    return () => backHandler.remove();
+  }, [navigation]);
+
+  const checkExistingLoans = async (userId) => {
+    try {
+      const loansRef = dbRef(database, `Loans/CurrentLoans/${userId}`);
+      const snapshot = await get(loansRef);
+      
+      if (snapshot.exists()) {
+        const loans = snapshot.val();
+        const activeLoans = Object.values(loans).filter(loan => 
+          loan.status !== 'completed' && loan.status !== 'rejected'
+        );
+        
+        setHasExistingLoan(activeLoans.length > 0);
+        setForm(prev => ({
+          ...prev,
+          hasLoan: activeLoans.length > 0 ? 'Yes' : 'No'
+        }));
+      } else {
+        setHasExistingLoan(false);
+        setForm(prev => ({
+          ...prev,
+          hasLoan: 'No'
+        }));
+      }
+    } catch (error) {
+      console.error('Error checking existing loans:', error);
+      setHasExistingLoan(false);
+    }
+  };
 
   const fetchMemberData = async (email) => {
     if (!email.includes('@')) {
@@ -48,7 +91,7 @@ export default function WithdrawMembership() {
     setEmailError('');
     
     try {
-      const membersRef = ref(database, 'Members');
+      const membersRef = dbRef(database, 'Members');
       const snapshot = await get(membersRef);
       
       if (snapshot.exists()) {
@@ -58,7 +101,9 @@ export default function WithdrawMembership() {
         );
         
         if (member) {
-          setMemberId(member.memberId);
+          setMemberId(member.id);
+          setBalance(member.balance || 0);
+          await checkExistingLoans(member.id);
           setForm(prev => ({
             ...prev,
             firstName: member.firstName || '',
@@ -86,13 +131,18 @@ export default function WithdrawMembership() {
 
   const resetMemberData = () => {
     setMemberId('');
+    setBalance(0);
+    setHasExistingLoan(false);
     setForm(prev => ({
       ...prev,
       firstName: '',
       lastName: '',
       joined: '',
       address: '',
-      contact: ''
+      contact: '',
+      hasLoan: '',
+      reason: '',
+      otherReason: ''
     }));
   };
 
@@ -106,37 +156,91 @@ export default function WithdrawMembership() {
     }
   };
 
+  const handleReasonChange = (reason) => {
+    setForm(prev => ({
+      ...prev,
+      reason,
+      otherReason: reason === 'Others' ? '' : prev.otherReason
+    }));
+    setShowOtherReasonInput(reason === 'Others');
+  };
+
   const handleSubmit = async () => {
     if (!memberId) {
       Alert.alert('Error', 'Please enter a valid member email first');
       return;
     }
 
-    if (!form.reason || !form.hasLoan || !agreed) {
+    if (!form.reason || (form.reason === 'Others' && !form.otherReason) || !agreed) {
       Alert.alert('Incomplete Form', 'Please complete all required fields');
       return;
     }
 
-    setIsSubmitting(true);
-
-    try {
-      const withdrawalRef = ref(database, `Withdrawals/PermanentWithdrawal/${memberId}`);
-      
-      await set(withdrawalRef, {
-        memberId,
-        ...form,
-        dateSubmitted: new Date().toISOString(),
-        status: 'Pending'
-      });
-      
-      setModalVisible(true);
-      resetForm();
-    } catch (error) {
-      console.error('Error submitting withdrawal:', error);
-      Alert.alert('Error', 'Failed to submit withdrawal request');
-    } finally {
-      setIsSubmitting(false);
+    if (hasExistingLoan) {
+      Alert.alert(
+        'Existing Loan Detected',
+        'You cannot withdraw your membership while you have an active loan. Please settle your loan first.',
+        [{ text: 'OK' }]
+      );
+      return;
     }
+
+    const finalReason = form.reason === 'Others' ? form.otherReason : form.reason;
+
+    Alert.alert(
+      'Confirm Membership Withdrawal',
+      `You are about to submit a membership withdrawal request. This action cannot be undone.\n\nMember: ${form.firstName} ${form.lastName}\nBalance: ₱${balance.toFixed(2)}\nReason: ${finalReason}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setIsSubmitting(true);
+            try {
+              const withdrawalRef = dbRef(database, `MembershipWithdrawal/${memberId}`);
+              const transactionId = generateTransactionId();
+              
+              await set(withdrawalRef, {
+                transactionId,
+                memberId,
+                firstName: form.firstName,
+                lastName: form.lastName,
+                email: form.email,
+                address: form.address,
+                contact: form.contact,
+                dateJoined: form.joined,
+                reason: finalReason,
+                balance: balance,
+                dateSubmitted: new Date().toLocaleString('en-US', {
+                  month: 'long',
+                  day: '2-digit',
+                  year: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false
+                }).replace(',', '')
+                  .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+                  .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+                status: 'Pending',
+                hasExistingLoan: hasExistingLoan
+              });
+              
+              setModalVisible(true);
+              resetForm();
+            } catch (error) {
+              console.error('Error submitting withdrawal:', error);
+              Alert.alert('Error', 'Failed to submit withdrawal request');
+            } finally {
+              setIsSubmitting(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  const generateTransactionId = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
   const resetForm = () => {
@@ -149,169 +253,209 @@ export default function WithdrawMembership() {
       joined: '',
       reason: '',
       hasLoan: '',
+      otherReason: ''
     });
     setMemberId('');
     setAgreed(false);
     setEmailError('');
+    setBalance(0);
+    setHasExistingLoan(false);
+    setShowOtherReasonInput(false);
   };
 
+  const isSubmitDisabled = !memberId || 
+                         !form.reason || 
+                         (form.reason === 'Others' && !form.otherReason) || 
+                         !agreed ||
+                         hasExistingLoan;
+
   return (
-    <SafeAreaView style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
-
-      <Text style={styles.title}>Membership Withdrawal</Text>
-
-      <View style={styles.content}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.emailContainer}>
-            <TextInput
-              placeholder="Email *"
-              value={form.email}
-              onChangeText={handleEmailChange}
-              style={[styles.input, emailError ? styles.inputError : null]}
-              keyboardType="email-address"
-              autoCapitalize="none"
-            />
-            {isLoadingMember && (
-              <ActivityIndicator style={styles.loader} color="#2D5783" />
-            )}
-          </View>
-          {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
-
-          <TextInput
-            placeholder="First Name"
-            value={form.firstName}
-            editable={false}
-            style={[styles.input, styles.disabledInput]}
-          />
-
-          <TextInput
-            placeholder="Last Name"
-            value={form.lastName}
-            editable={false}
-            style={[styles.input, styles.disabledInput]}
-          />
-
-          <TextInput
-            placeholder="Address"
-            value={form.address}
-            onChangeText={(text) => setForm({...form, address: text})}
-            style={styles.input}
-          />
-
-          <TextInput
-            placeholder="Contact Number"
-            value={form.contact}
-            onChangeText={(text) => setForm({...form, contact: text})}
-            style={styles.input}
-            keyboardType="phone-pad"
-          />
-
-          <TextInput
-            placeholder="Date Joined"
-            value={form.joined}
-            editable={false}
-            style={[styles.input, styles.disabledInput]}
-          />
-
-          <Text style={styles.sectionTitle}>Reason for withdrawal *</Text>
-          {['Relocation', 'Financial', 'No longer interested', 'Others'].map((r) => (
-            <TouchableOpacity
-              key={r}
-              style={styles.radioOption}
-              onPress={() => setForm({...form, reason: r})}
-            >
-              <View style={styles.radioCircle}>
-                {form.reason === r && <View style={styles.selectedRb} />}
-              </View>
-              <Text style={styles.radioText}>{r}</Text>
-            </TouchableOpacity>
-          ))}
-
-          <Text style={styles.sectionTitle}>Do you have existing loans? *</Text>
-          {['Yes', 'No'].map((opt) => (
-            <TouchableOpacity
-              key={opt}
-              style={styles.radioOption}
-              onPress={() => setForm({...form, hasLoan: opt})}
-            >
-              <View style={styles.radioCircle}>
-                {form.hasLoan === opt && <View style={styles.selectedRb} />}
-              </View>
-              <Text style={styles.radioText}>{opt}</Text>
-            </TouchableOpacity>
-          ))}
-
-          <TouchableOpacity
-            style={styles.checkboxContainer}
-            onPress={() => setAgreed(!agreed)}
-          >
-            <MaterialIcons
-              name={agreed ? 'check-box' : 'check-box-outline-blank'}
-              size={24}
-              color={agreed ? '#2D5783' : '#888'}
-            />
-            <Text style={styles.checkboxLabel}>
-              I agree and wish to proceed with my request. *
-            </Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
+        <SafeAreaView style={styles.container}>
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={30} color="white" />
           </TouchableOpacity>
 
-         <TouchableOpacity 
-  style={[
-    styles.submitButton, 
-    (isSubmitting || !memberId || !form.reason || !form.hasLoan || !agreed) && styles.submitButtonDisabled
-  ]} 
-  onPress={handleSubmit}
-  disabled={isSubmitting || !memberId || !form.reason || !form.hasLoan || !agreed}
->
-  {isSubmitting ? (
-    <ActivityIndicator color="white" />
-  ) : (
-    <Text style={styles.submitText}>
-      {!memberId ? 'Enter Valid Email First' : 
-       !form.reason ? 'Select Reason' :
-       !form.hasLoan ? 'Select Loan Status' :
-       !agreed ? 'Agree to Terms' : 
-       'Submit'}
-    </Text>
-  )}
-</TouchableOpacity>
-        </ScrollView>
-      </View>
+          <Text style={styles.title}>Membership Withdrawal</Text>
 
-      <Modal
-        visible={modalVisible}
-        animationType="fade"
-        transparent
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalView}>
-            <Text style={styles.modalIcon}>✅</Text>
-            <Text style={styles.modalText}>
-              Your membership withdrawal request has been submitted.
-            </Text>
-            <Pressable 
-              style={styles.okButton} 
-              onPress={() => {
-                setModalVisible(false);
-                navigation.goBack();
-              }}
+          <View style={styles.content}>
+            <View style={styles.emailContainer}>
+              <TextInput
+                placeholder="Email *"
+                value={form.email}
+                onChangeText={handleEmailChange}
+                style={[styles.input, emailError ? styles.inputError : null]}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+              {isLoadingMember && (
+                <ActivityIndicator style={styles.loader} color="#2D5783" />
+              )}
+            </View>
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
+
+            {memberId && (
+              <>
+                <Text style={styles.balanceText}>Balance: ₱{balance.toFixed(2)}</Text>
+
+                <TextInput
+                  placeholder="First Name"
+                  value={form.firstName}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
+                />
+
+                <TextInput
+                  placeholder="Last Name"
+                  value={form.lastName}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
+                />
+
+                <TextInput
+                  placeholder="Address"
+                  value={form.address}
+                  onChangeText={(text) => setForm({...form, address: text})}
+                  style={styles.input}
+                />
+
+                <TextInput
+                  placeholder="Contact Number"
+                  value={form.contact}
+                  onChangeText={(text) => setForm({...form, contact: text})}
+                  style={styles.input}
+                  keyboardType="phone-pad"
+                />
+
+                <TextInput
+                  placeholder="Date Joined"
+                  value={form.joined}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
+                />
+
+                <Text style={styles.sectionTitle}>Reason for withdrawal *</Text>
+                {['Relocation', 'Financial', 'No longer interested', 'Others'].map((r) => (
+                  <TouchableOpacity
+                    key={r}
+                    style={styles.radioOption}
+                    onPress={() => handleReasonChange(r)}
+                  >
+                    <View style={styles.radioCircle}>
+                      {form.reason === r && <View style={styles.selectedRb} />}
+                    </View>
+                    <Text style={styles.radioText}>{r}</Text>
+                  </TouchableOpacity>
+                ))}
+
+                {showOtherReasonInput && (
+                  <TextInput
+                    placeholder="Please specify your reason"
+                    value={form.otherReason}
+                    onChangeText={(text) => setForm({...form, otherReason: text})}
+                    style={styles.input}
+                  />
+                )}
+
+                <Text style={styles.sectionTitle}>Existing Loans</Text>
+                <View style={styles.loanStatusContainer}>
+                  <Text style={styles.loanStatusText}>
+                    {hasExistingLoan ? 
+                      'You have an existing loan. Please settle it before withdrawing.' : 
+                      'No existing loans found'}
+                  </Text>
+                  {hasExistingLoan && (
+                    <MaterialIcons 
+                      name="error" 
+                      size={24} 
+                      color="#f44336" 
+                      style={styles.warningIcon} 
+                    />
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => setAgreed(!agreed)}
+                >
+                  <MaterialIcons
+                    name={agreed ? 'check-box' : 'check-box-outline-blank'}
+                    size={24}
+                    color={agreed ? '#2D5783' : '#888'}
+                  />
+                  <Text style={styles.checkboxLabel}>
+                    I understand this action is irreversible and wish to proceed with my membership withdrawal request. *
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+
+            <TouchableOpacity 
+              style={[
+                styles.submitButton, 
+                isSubmitDisabled && styles.submitButtonDisabled,
+                hasExistingLoan && styles.blockedButton
+              ]} 
+              onPress={handleSubmit}
+              disabled={isSubmitDisabled}
             >
-              <Text style={{ color: 'white' }}>Ok</Text>
-            </Pressable>
+              {isSubmitting ? (
+                <ActivityIndicator color="white" />
+              ) : (
+                <Text style={styles.submitText}>
+                  {!memberId ? 'Enter Valid Email First' : 
+                  !form.reason ? 'Select Reason' : 
+                  (form.reason === 'Others' && !form.otherReason) ? 'Specify Reason' :
+                  !agreed ? 'Agree to Terms' : 
+                  hasExistingLoan ? 'Cannot Withdraw (Existing Loan)' :
+                  'Submit Withdrawal Request'}
+                </Text>
+              )}
+            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
-    </SafeAreaView>
+
+          <Modal
+            visible={modalVisible}
+            animationType="fade"
+            transparent
+            onRequestClose={() => setModalVisible(false)}
+          >
+            <View style={styles.modalOverlay}>
+              <View style={styles.modalView}>
+                <MaterialIcons name="check-circle" size={50} color="#2D5783" />
+                <Text style={styles.modalTitle}>Request Submitted</Text>
+                <Text style={styles.modalText}>
+                  Your membership withdrawal request has been received and is under review.
+                </Text>
+                <Pressable 
+                  style={styles.okButton} 
+                  onPress={() => {
+                    setModalVisible(false);
+                    navigation.navigate('Home');
+                  }}
+                >
+                  <Text style={styles.okButtonText}>OK</Text>
+                </Pressable>
+              </View>
+            </View>
+          </Modal>
+        </SafeAreaView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: '#2D5783',
+  },
+  scrollContainer: {
+    flexGrow: 1,
   },
   backButton: {
     marginTop: 40,
@@ -320,7 +464,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 30,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 20,
     textAlign: 'center',
     color: 'white',
   },
@@ -329,8 +473,8 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 50,
     borderTopRightRadius: 50,
     flex: 1,
-    paddingStart: 50,
-    paddingEnd: 50,
+    paddingStart: 25,
+    paddingEnd: 25,
     paddingTop: 20,
     paddingBottom: 40,
   },
@@ -342,11 +486,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     marginBottom: 15,
   },
+  disabledInput: {
+    backgroundColor: '#f5f5f5',
+    color: '#666',
+  },
   sectionTitle: {
     fontWeight: 'bold',
-    marginBottom: 5,
-    marginTop: 15,
+    marginBottom: 10,
+    marginTop: 10,
     color: '#333',
+    fontSize: 16,
   },
   radioOption: {
     flexDirection: 'row',
@@ -376,20 +525,27 @@ const styles = StyleSheet.create({
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 15,
+    marginTop: 20,
     marginBottom: 25,
   },
   checkboxLabel: {
     marginLeft: 10,
-    fontSize: 12,
+    fontSize: 14,
     color: '#333',
     flex: 1,
   },
   submitButton: {
-    backgroundColor: '#00c853',
+    backgroundColor: '#2D5783',
     padding: 15,
     borderRadius: 8,
     alignItems: 'center',
+    marginTop: 20,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#cccccc',
+  },
+  blockedButton: {
+    backgroundColor: '#f44336',
   },
   submitText: {
     color: 'white',
@@ -398,34 +554,39 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalView: {
     backgroundColor: 'white',
     padding: 30,
-    borderRadius: 10,
-    width: 300,
+    borderRadius: 15,
+    width: '80%',
     alignItems: 'center',
   },
-  modalIcon: {
-    fontSize: 40,
-    marginBottom: 10,
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginVertical: 15,
+    color: '#2D5783',
   },
   modalText: {
     fontSize: 16,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: 25,
+    color: '#555',
   },
   okButton: {
     backgroundColor: '#2D5783',
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    borderRadius: 6,
+    paddingVertical: 12,
+    paddingHorizontal: 40,
+    borderRadius: 8,
   },
-  submitButtonDisabled: {
-    backgroundColor: '#cccccc',
+  okButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
   emailContainer: {
     position: 'relative',
@@ -442,9 +603,29 @@ const styles = StyleSheet.create({
     color: 'red',
     marginBottom: 15,
     marginTop: -10,
+    fontSize: 12,
   },
-  disabledInput: {
+  balanceText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  loanStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 15,
+    padding: 10,
     backgroundColor: '#f5f5f5',
-    color: '#666',
+    borderRadius: 6,
+  },
+  loanStatusText: {
+    flex: 1,
+    fontSize: 14,
+    color: '#333',
+  },
+  warningIcon: {
+    marginLeft: 10,
   },
 });

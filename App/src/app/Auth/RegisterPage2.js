@@ -81,7 +81,7 @@ const RegisterPage2 = () => {
             return;
         }
 
-        navigation.navigate('CreatePassword', {
+        navigation.navigate('RegistrationFee', {
             ...route.params,
             validIdFront,
             validIdBack,

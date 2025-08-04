@@ -2,98 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { database, auth } from '../../../../../Database/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { ApproveRegistration, RejectRegistration } from '../../../../../Server/api';
-import { FaTimes, FaCheckCircle, FaExclamationCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaExclamationCircle, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
 import * as faceapi from 'face-api.js';
-import { createWorker } from 'tesseract.js';
-
-// Initialize the image verification module
-const ImageVerification = {
-  worker: null,
-  modelsLoaded: false,
-
-  async init() {
-    try {
-      // Load face detection models
-      await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
-      await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
-      await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
-      
-      // Initialize OCR worker
-      this.worker = await createWorker();
-      await this.worker.loadLanguage('eng');
-      await this.worker.initialize('eng');
-      
-      this.modelsLoaded = true;
-      return true;
-    } catch (error) {
-      console.error('Failed to initialize verification models:', error);
-      return false;
-    }
-  },
-
-  async verifyFace(imageElement) {
-    if (!this.modelsLoaded) return { isFace: false, error: 'Models not loaded' };
-    
-    try {
-      const detections = await faceapi.detectAllFaces(
-        imageElement, 
-        new faceapi.TinyFaceDetectorOptions()
-      ).withFaceLandmarks();
-      
-      return {
-        isFace: detections.length > 0,
-        faceCount: detections.length,
-        landmarks: detections.length > 0 ? detections[0].landmarks : null,
-        confidence: detections.length > 0 ? 0.9 : 0.1
-      };
-    } catch (error) {
-      console.error('Face detection error:', error);
-      return { isFace: false, error: error.message };
-    }
-  },
-
-  async verifyID(imageElement) {
-    if (!this.modelsLoaded) return { isID: false, error: 'Models not loaded' };
-    
-    try {
-      const { data: { text } } = await this.worker.recognize(imageElement);
-      
-      // Enhanced ID verification checks
-      const hasIDText = text.length > 20;
-      const hasDates = /\d{2}[\/\-]\d{2}[\/\-]\d{4}/.test(text);
-      const hasIDNumber = /[A-Za-z0-9]{6,}/.test(text);
-      const commonPhrases = ['REPUBLIC', 'GOVERNMENT', 'LICENSE', 'IDENTIFICATION', 'PASSPORT'];
-      const hasCommonPhrase = commonPhrases.some(phrase => text.toUpperCase().includes(phrase));
-      
-      const confidence = [
-        hasIDText ? 0.3 : 0,
-        hasDates ? 0.2 : 0,
-        hasIDNumber ? 0.2 : 0,
-        hasCommonPhrase ? 0.3 : 0
-      ].reduce((a, b) => a + b, 0);
-      
-      return {
-        isID: confidence > 0.6,
-        textFound: text,
-        confidence,
-        details: {
-          hasDates,
-          hasIDNumber,
-          hasCommonPhrase
-        }
-      };
-    } catch (error) {
-      console.error('ID verification error:', error);
-      return { isID: false, error: error.message };
-    }
-  },
-
-  async cleanup() {
-    if (this.worker) {
-      await this.worker.terminate();
-    }
-  }
-};
+import Tesseract from 'tesseract.js';
 
 const styles = {
   container: {
@@ -236,8 +147,7 @@ const styles = {
   imageBlock: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    position: 'relative'
+    alignItems: 'flex-start'
   },
   imageLabel: {
     fontSize: '13px',
@@ -541,40 +451,34 @@ const styles = {
       backgroundColor: '#d32f2f'
     }
   },
-  verificationBadge: {
-    position: 'absolute',
-    bottom: '10px',
-    right: '10px',
-    backgroundColor: 'rgba(0,0,0,0.7)',
+  validationText: {
     color: 'white',
-    borderRadius: '4px',
-    padding: '2px 5px',
-    fontSize: '10px',
-    fontWeight: 'bold'
-  },
-  verificationGood: {
-    backgroundColor: '#4CAF50'
-  },
-  verificationBad: {
-    backgroundColor: '#f44336'
-  },
-  verificationDetails: {
-    marginTop: '10px',
     fontSize: '12px',
-    color: '#666',
-    textAlign: 'left',
-    padding: '5px',
-    backgroundColor: '#f9f9f9',
-    borderRadius: '4px'
-  },
-  verificationResult: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    padding: '10px',
-    borderRadius: '4px',
-    marginTop: '10px',
-    color: 'white',
-    maxWidth: '80%',
+    marginTop: '8px',
     textAlign: 'center'
+  },
+  validText: {
+    color: '#4CAF50'
+  },
+  invalidText: {
+    color: '#f44336'
+  },
+  verifyingText: {
+    color: '#FFC107'
+  },
+  paymentStatus: {
+    fontWeight: 'bold',
+    padding: '4px 8px',
+    borderRadius: '4px',
+    fontSize: '12px'
+  },
+  paidStatus: {
+    backgroundColor: '#4CAF50',
+    color: 'white'
+  },
+  unpaidStatus: {
+    backgroundColor: '#f44336',
+    color: 'white'
   }
 };
 
@@ -611,26 +515,127 @@ const Registrations = ({
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [verificationResults, setVerificationResults] = useState({});
+  const [validationStatus, setValidationStatus] = useState({});
   const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [validationResults, setValidationResults] = useState(null);
+  const [isValidating, setIsValidating] = useState(false);
 
-  // Initialize verification models
   useEffect(() => {
-    const initializeVerification = async () => {
+    const loadModels = async () => {
       try {
-        const loaded = await ImageVerification.init();
-        setModelsLoaded(loaded);
-      } catch (error) {
-        console.error('Failed to initialize verification:', error);
+        await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        setModelsLoaded(true);
+      } catch (err) {
+        console.error('Failed to load face-api.js models:', err);
       }
     };
 
-    initializeVerification();
-
-    return () => {
-      ImageVerification.cleanup();
-    };
+    loadModels();
   }, []);
+
+  const verifyID = async (imageUrl, label) => {
+    setIsValidating(true);
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Verifying ID...' }
+    }));
+
+    try {
+      // Face detection
+      const img = await faceapi.fetchImage(imageUrl);
+      const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+
+      // OCR text recognition
+      const { data: { text } } = await Tesseract.recognize(
+        imageUrl,
+        'eng',
+        { logger: m => console.log(m) }
+      );
+
+      // Check for ID features
+      const hasDate = /\d{2}\/\d{2}\/\d{4}/.test(text);
+      const hasIDNumber = /[A-Za-z0-9]{8,}/.test(text);
+      const hasName = /[A-Z][a-z]+ [A-Z][a-z]+/.test(text);
+
+      if (detections.length > 0 && hasDate && hasIDNumber && hasName) {
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { 
+            status: 'valid', 
+            message: 'ID appears valid',
+            details: `Detected: ${detections.length} face(s)\nText: ${text.substring(0, 50)}...` 
+          }
+        }));
+      } else {
+        let issues = [];
+        if (detections.length === 0) issues.push('No faces detected');
+        if (!hasDate) issues.push('Missing date');
+        if (!hasIDNumber) issues.push('Missing ID number');
+        if (!hasName) issues.push('Missing name');
+
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { 
+            status: 'invalid', 
+            message: `ID validation failed: ${issues.join(', ')}`,
+            details: `Extracted text: ${text.substring(0, 100)}...`
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('ID verification failed:', error);
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Verification failed', details: error.message }
+      }));
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
+  const verifyFace = async (imageUrl, label) => {
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Verifying face...' }
+    }));
+
+    try {
+      const img = await faceapi.fetchImage(imageUrl);
+      const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+
+      if (detections.length > 0) {
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status: 'valid', message: 'Face detected' }
+        }));
+      } else {
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status: 'invalid', message: 'No faces detected' }
+        }));
+      }
+    } catch (error) {
+      console.error('Face verification failed:', error);
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Verification failed' }
+      }));
+    }
+  };
+
+  const handleImageClick = (url, label) => {
+    if (label.includes('ID')) {
+      verifyID(url, label);
+    } else if (label.includes('Selfie')) {
+      verifyFace(url, label);
+    }
+    setCurrentImage({ url, label });
+    setImageViewerVisible(true);
+  };
 
   const formatTime = (date) => {
     let hours = date.getHours();
@@ -655,7 +660,7 @@ const Registrations = ({
   const openModal = (registration) => {
     setSelectedRegistration(registration);
     setModalVisible(true);
-    setVerificationResults({});
+    setValidationStatus({});
   };
 
   const closeModal = () => {
@@ -673,24 +678,6 @@ const Registrations = ({
   };
 
   const handleApproveClick = () => {
-    // Check verification results before showing confirmation
-    const faceResults = verificationResults['Selfie'] || verificationResults['Selfie with ID'];
-    const idResults = verificationResults['Valid ID Front'] || verificationResults['Valid ID Back'];
-
-    if (modelsLoaded) {
-      if (!faceResults?.isFace) {
-        setErrorMessage('Face verification failed. Cannot approve without valid face detection.');
-        setErrorModalVisible(true);
-        return;
-      }
-
-      if (!idResults?.isID) {
-        setErrorMessage('ID verification failed. Cannot approve without valid ID detection.');
-        setErrorModalVisible(true);
-        return;
-      }
-    }
-
     setShowApproveConfirmation(true);
   };
 
@@ -723,6 +710,10 @@ const Registrations = ({
       return;
     }
 
+    const rejectionReason = selectedReason === "Other (please specify)" 
+      ? customReason 
+      : selectedReason;
+
     setShowRejectionModal(false);
     setShowRejectConfirmation(true);
   };
@@ -739,14 +730,12 @@ const Registrations = ({
 
     try {
       if (action === 'approve') {
-        // First check if same person exists (matching email, firstName, lastName)
         const samePersonCheck = await checkIfSamePersonExists(
           registration.email, 
           registration.firstName, 
           registration.lastName
         );
 
-        // Only check for email existence if it's not the same person
         if (!samePersonCheck.exists) {
           const onDB = await checkIfEmailExistsInDatabase(registration.email);
           if (onDB) {
@@ -759,6 +748,8 @@ const Registrations = ({
         }
         
         const memberId = await processDatabaseApprove(registration);
+        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+        
         setSuccessMessage('Registration approved successfully!');
         setSuccessMessageModalVisible(true);
         
@@ -770,7 +761,6 @@ const Registrations = ({
           status: 'approved'
         }));
 
-        // Call API in background
         callApiApprove({
           ...registration,
           memberId,
@@ -780,6 +770,8 @@ const Registrations = ({
 
       } else {
         await processDatabaseReject(registration, rejectionReason);
+        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+        
         setSuccessMessage('Registration rejected successfully!');
         setSuccessMessageModalVisible(true);
         
@@ -791,7 +783,6 @@ const Registrations = ({
           status: 'rejected'
         }));
 
-        // Call API in background
         callApiReject({
           ...registration,
           dateRejected: formatDate(new Date()),
@@ -820,14 +811,12 @@ const Registrations = ({
 
   const checkIfEmailExistsInDatabase = async (email) => {
     try {
-      // Check in Members
       const membersSnap = await database.ref('Members').once('value');
       const membersData = membersSnap.val() || {};
       const memberExists = Object.values(membersData).some(u => u.email?.toLowerCase() === email.toLowerCase());
       
       if (memberExists) return true;
 
-      // Check in Admin
       const adminsSnap = await database.ref('Users/Admin').once('value');
       const adminsData = adminsSnap.val() || {};
       const adminExists = Object.values(adminsData).some(u => u.email?.toLowerCase() === email.toLowerCase());
@@ -841,7 +830,6 @@ const Registrations = ({
 
   const checkIfSamePersonExists = async (email, firstName, lastName) => {
     try {
-      // Check in Members
       const membersSnap = await database.ref('Members').once('value');
       const membersData = membersSnap.val() || {};
       
@@ -855,7 +843,6 @@ const Registrations = ({
         return { exists: true, id: memberEntry[0], data: memberEntry[1] };
       }
 
-      // Check in Admin
       const adminsSnap = await database.ref('Users/Admin').once('value');
       const adminsData = adminsSnap.val() || {};
       
@@ -876,38 +863,50 @@ const Registrations = ({
     }
   };
 
-  const processDatabaseApprove = async (reg) => {
+    const updateFunds = async (amount) => {
     try {
-      const { id, email, password, firstName, lastName, ...rest } = reg;
+      const fundsRef = database.ref('Settings/Funds');
+      const snapshot = await fundsRef.once('value');
+      const currentFunds = snapshot.val() || 0;
+      await fundsRef.set(currentFunds + parseFloat(amount));
+    } catch (error) {
+      console.error('Error updating funds:', error);
+      throw error;
+    }
+  };
+
+const processDatabaseApprove = async (reg) => {
+    try {
+      const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
       let userId = null;
       
-      // First check if same person exists (matching email, firstName, lastName)
       const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
       
       if (samePersonCheck.exists) {
-        // It's the same person - update their record with new registration data
+        // If user already exists, update their data but don't create new auth account
         const now = new Date();
         const approvedDate = formatDate(now);
         const approvedTime = formatTime(now);
         
-        // Create an update object with only the fields that are different or missing
         const updateData = {};
         
-        // Compare each field and add to update if different or missing
         Object.keys(rest).forEach(key => {
           if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
             updateData[key] = rest[key];
           }
         });
         
-        // Add approval info
+        // Add registration fee to existing balance
+        const currentBalance = samePersonCheck.data.balance || 0;
+        updateData.balance = currentBalance + parseFloat(registrationFee);
+        
         updateData.dateApproved = approvedDate;
         updateData.approvedTime = approvedTime;
         updateData.status = 'active';
         
         await database.ref(`Members/${samePersonCheck.id}`).update(updateData);
+        await updateFunds(registrationFee);
         
-        // Save to ApprovedRegistrations with all registration data
         await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
           firstName,
           lastName,
@@ -922,21 +921,22 @@ const Registrations = ({
         return parseInt(samePersonCheck.id);
       }
 
-      // Check if email exists (regardless of name) - this would be a different person
       const emailExists = await checkIfEmailExistsInDatabase(email);
       if (emailExists) {
         throw new Error('This email is already registered to a different member.');
       }
 
-      // Normal flow for new emails
+      // Create Firebase Auth account with email and password
       try {
         const userCredential = await createUserWithEmailAndPassword(auth, email, password);
         userId = userCredential.user.uid;
       } catch (authError) {
-        if (authError.code !== 'auth/email-already-in-use') {
+        if (authError.code === 'auth/email-already-in-use') {
+          // Handle case where email exists in auth but not in our database
+          throw new Error('This email is already in use by another account.');
+        } else {
           throw authError;
         }
-        // If email is already in use in auth but not in our DB, we'll proceed with the existing auth user
       }
 
       const membersSnap = await database.ref('Members').once('value');
@@ -954,6 +954,10 @@ const Registrations = ({
       const approvedDate = formatDate(now);
       const approvedTime = formatTime(now);
       
+      // Set initial balance to the registration fee
+      const initialBalance = parseFloat(registrationFee) || 0;
+      
+      // Create member record in database
       await database.ref(`Members/${newId}`).set({
         id: newId,
         authUid: userId,
@@ -963,11 +967,14 @@ const Registrations = ({
         email,
         dateApproved: approvedDate,
         approvedTime: approvedTime,
-        balance: 0.0,
+        balance: initialBalance,
         loans: 0.0,
         status: 'active'
       });
+
+      await updateFunds(registrationFee);
       
+      // Add to approved registrations
       await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
         firstName,
         lastName,
@@ -985,7 +992,7 @@ const Registrations = ({
       throw new Error(err.message || 'Failed to approve registration');
     }
   };
-
+  
   const processDatabaseReject = async (reg, rejectionReason) => {
     try {
       const { id, ...rest } = reg;
@@ -1054,7 +1061,7 @@ const Registrations = ({
     refreshData();
   };
 
-  const openImageViewer = async (url, label, index) => {
+  const openImageViewer = (url, label, index) => {
     const images = [];
     
     if (selectedRegistration?.validIdFront) {
@@ -1081,38 +1088,17 @@ const Registrations = ({
         label: 'Selfie with ID' 
       });
     }
+    if (selectedRegistration?.paymentProof) {
+      images.push({ 
+        url: selectedRegistration.paymentProof, 
+        label: 'Payment Proof' 
+      });
+    }
 
     setAvailableImages(images);
     setCurrentImage({ url, label });
     setCurrentImageIndex(index);
     setImageViewerVisible(true);
-
-    // Run verification if models are loaded
-    if (modelsLoaded) {
-      const imgElement = new Image();
-      imgElement.crossOrigin = 'anonymous';
-      imgElement.src = url;
-      
-      imgElement.onload = async () => {
-        try {
-          let results;
-          if (label.includes('Selfie')) {
-            results = await ImageVerification.verifyFace(imgElement);
-          } else if (label.includes('ID')) {
-            results = await ImageVerification.verifyID(imgElement);
-          }
-          
-          if (results) {
-            setVerificationResults(prev => ({
-              ...prev,
-              [label]: results
-            }));
-          }
-        } catch (error) {
-          console.error('Verification error:', error);
-        }
-      };
-    }
   };
 
   const closeImageViewer = () => {
@@ -1133,6 +1119,44 @@ const Registrations = ({
 
     setCurrentImageIndex(newIndex);
     setCurrentImage(availableImages[newIndex]);
+  };
+
+  const getValidationText = (label) => {
+    if (!validationStatus[label]) return null;
+    
+    const status = validationStatus[label];
+    let statusStyle = styles.verifyingText;
+    
+    if (status.status === 'valid') {
+      statusStyle = styles.validText;
+    } else if (status.status === 'invalid' || status.status === 'error') {
+      statusStyle = styles.invalidText;
+    }
+
+    return (
+      <div style={{ ...styles.validationText, ...statusStyle }}>
+        {status.message}
+      </div>
+    );
+  };
+
+  const getPaymentStatus = () => {
+    if (!selectedRegistration) return null;
+    
+    const isPaid = selectedRegistration.paymentStatus === 'paid';
+    return (
+      <div style={styles.compactField}>
+        <span style={styles.fieldLabel}>Payment Status:</span>
+        <span 
+          style={{ 
+            ...styles.paymentStatus,
+            ...(isPaid ? styles.paidStatus : styles.unpaidStatus)
+          }}
+        >
+          {isPaid ? 'PAID' : 'UNPAID'}
+        </span>
+      </div>
+    );
   };
 
   if (!registrations.length) return (
@@ -1248,6 +1272,13 @@ const Registrations = ({
                     <span style={styles.fieldLabel}>Address:</span>
                     <span style={styles.fieldValue}>{selectedRegistration?.address || 'N/A'}</span>
                   </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Registration Fee:</span>
+                    <span style={styles.fieldValue}>
+                      {selectedRegistration?.registrationFee ? `₱${parseFloat(selectedRegistration.registrationFee).toFixed(2)}` : 'N/A'}
+                    </span>
+                  </div>
+                  {getPaymentStatus()}
 
                   {selectedRegistration?.dateApproved && (
                     <>
@@ -1263,6 +1294,12 @@ const Registrations = ({
                       <div style={styles.compactField}>
                         <span style={styles.fieldLabel}>Member ID:</span>
                         <span style={styles.fieldValue}>{selectedRegistration.memberId || 'N/A'}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Initial Balance:</span>
+                        <span style={styles.fieldValue}>
+                          ₱{(parseFloat(selectedRegistration.registrationFee) || 0).toFixed(2)}
+                        </span>
                       </div>
                     </>
                   )}
@@ -1290,17 +1327,7 @@ const Registrations = ({
                   <div style={styles.imageGrid}>
                     {selectedRegistration?.validIdFront && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>
-                          Valid ID Front
-                          {verificationResults['Valid ID Front'] && (
-                            <span style={{ 
-                              ...styles.verificationBadge,
-                              ...(verificationResults['Valid ID Front'].isID ? styles.verificationGood : styles.verificationBad)
-                            }}>
-                              {verificationResults['Valid ID Front'].isID ? '✓ Verified' : '✗ Not Verified'}
-                            </span>
-                          )}
-                        </p>
+                        <p style={styles.imageLabel}>Valid ID Front</p>
                         <img
                           src={selectedRegistration.validIdFront}
                           alt="Valid ID Front"
@@ -1312,17 +1339,7 @@ const Registrations = ({
                     )}
                     {selectedRegistration?.validIdBack && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>
-                          Valid ID Back
-                          {verificationResults['Valid ID Back'] && (
-                            <span style={{ 
-                              ...styles.verificationBadge,
-                              ...(verificationResults['Valid ID Back'].isID ? styles.verificationGood : styles.verificationBad)
-                            }}>
-                              {verificationResults['Valid ID Back'].isID ? '✓ Verified' : '✗ Not Verified'}
-                            </span>
-                          )}
-                        </p>
+                        <p style={styles.imageLabel}>Valid ID Back</p>
                         <img
                           src={selectedRegistration.validIdBack}
                           alt="Valid ID Back"
@@ -1334,17 +1351,7 @@ const Registrations = ({
                     )}
                     {selectedRegistration?.selfie && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>
-                          Selfie
-                          {verificationResults['Selfie'] && (
-                            <span style={{ 
-                              ...styles.verificationBadge,
-                              ...(verificationResults['Selfie'].isFace ? styles.verificationGood : styles.verificationBad)
-                            }}>
-                              {verificationResults['Selfie'].isFace ? '✓ Verified' : '✗ Not Verified'}
-                            </span>
-                          )}
-                        </p>
+                        <p style={styles.imageLabel}>Selfie</p>
                         <img
                           src={selectedRegistration.selfie}
                           alt="Selfie"
@@ -1356,22 +1363,24 @@ const Registrations = ({
                     )}
                     {selectedRegistration?.selfieWithId && (
                       <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>
-                          Selfie with ID
-                          {verificationResults['Selfie with ID'] && (
-                            <span style={{ 
-                              ...styles.verificationBadge,
-                              ...(verificationResults['Selfie with ID'].isFace ? styles.verificationGood : styles.verificationBad)
-                            }}>
-                              {verificationResults['Selfie with ID'].isFace ? '✓ Verified' : '✗ Not Verified'}
-                            </span>
-                          )}
-                        </p>
+                        <p style={styles.imageLabel}>Selfie with ID</p>
                         <img
                           src={selectedRegistration.selfieWithId}
                           alt="Selfie with ID"
                           style={styles.imageThumbnail}
                           onClick={() => openImageViewer(selectedRegistration.selfieWithId, 'Selfie with ID', 3)}
+                          onFocus={(e) => e.target.style.outline = 'none'}
+                        />
+                      </div>
+                    )}
+                    {selectedRegistration?.paymentProof && (
+                      <div style={styles.imageBlock}>
+                        <p style={styles.imageLabel}>Payment Proof</p>
+                        <img
+                          src={selectedRegistration.paymentProof}
+                          alt="Payment Proof"
+                          style={styles.imageThumbnail}
+                          onClick={() => openImageViewer(selectedRegistration.paymentProof, 'Payment Proof', 4)}
                           onFocus={(e) => e.target.style.outline = 'none'}
                         />
                       </div>
@@ -1610,24 +1619,7 @@ const Registrations = ({
               <FaTimes />
             </button>
             <p style={styles.imageViewerLabel}>{currentImage.label}</p>
-            
-            {verificationResults[currentImage.label] && (
-              <div style={styles.verificationResult}>
-                {currentImage.label.includes('Selfie') ? (
-                  verificationResults[currentImage.label].isFace ? (
-                    <p>✅ Real face detected (confidence: {Math.round(verificationResults[currentImage.label].confidence * 100)}%)</p>
-                  ) : (
-                    <p>❌ No face detected or poor quality</p>
-                  )
-                ) : currentImage.label.includes('ID') ? (
-                  verificationResults[currentImage.label].isID ? (
-                    <p>✅ Valid ID detected (confidence: {Math.round(verificationResults[currentImage.label].confidence * 100)}%)</p>
-                  ) : (
-                    <p>❌ ID verification failed</p>
-                  )
-                ) : null}
-              </div>
-            )}
+            {getValidationText(currentImage.label)}
           </div>
         </div>
       )}

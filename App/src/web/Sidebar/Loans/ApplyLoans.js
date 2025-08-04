@@ -218,7 +218,7 @@ const ApplyLoans = () => {
         interestPercentage: Number(parseFloat(selectedLoan.interestPercentage).toFixed(2)),
       });
         // Remove loan from ApplyLoans
-        await set(ref(db, `Loans/ApplyLoans/${selectedLoan.id}`), null);
+        await set(ref(db, `Loans/LoanApplications/${selectedLoan.id}`), null);
         // Update success message
         setSuccessMessage(`Loan Application rejected for Member ID: ${selectedLoan.id} \nDate Rejected: ${formattedDateRejected}`);
         setSuccessMessageModalVisible(true); // Show success modal

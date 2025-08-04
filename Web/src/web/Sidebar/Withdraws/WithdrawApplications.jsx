@@ -553,7 +553,7 @@ const processDatabaseReject = async (withdraw, rejectionReason) => {
     await transactionRef.set(rejectedWithdraw);
     
     // Remove from pending AFTER saving to rejected
-    // await pendingRef.remove();
+   //  await pendingRef.remove();
   } catch (err) {
     console.error('Rejection DB error:', err);
     throw new Error(err.message || 'Failed to reject withdrawal');

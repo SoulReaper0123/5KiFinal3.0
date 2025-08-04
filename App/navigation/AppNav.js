@@ -31,6 +31,8 @@ import WithdrawMembership from '../src/app/HomePage/WithdrawMembership';
 import ChangePassword from '../src/app/Drawer/ChangePassword'; // Import the ChangePassword component
 import AboutUs from '../src/app/Drawer/AboutUs';
 import ContactUs from '../src/app/Drawer/ContactUs';
+import RegistrationFeePage from '../src/app/Auth/RegistrationFeePage';
+import BiometricSetupScreen from '../src/app/Auth/BiometricSetupScreen';
 
 
 const Stack = createNativeStackNavigator();
@@ -188,6 +190,15 @@ const AppNav = () => (
       <Stack.Screen name="ChangePassword" component={ChangePassword} options={{ headerShown: false }} />
       <Stack.Screen name="AboutUs" component={AboutUs} options={{ headerShown: false }} />
       <Stack.Screen name="ContactUs" component={ContactUs} options={{ headerShown: false }} />
+      <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} options={{ headerShown: false }} />
+      <Stack.Screen 
+  name="BiometricSetup" 
+  component={BiometricSetupScreen} 
+  options={{ 
+    headerShown: false,
+    gestureEnabled: false 
+  }} 
+/>
       
     </Stack.Navigator>
   </NavigationContainer>

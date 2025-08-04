@@ -18,8 +18,9 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
 import ModalSelector from 'react-native-modal-selector';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import { getDatabase, ref, get } from 'firebase/database';
 
-// Add this right before const RegisterPage = () => {
+// RadioButton component
 const RadioButton = ({ selected, onPress }) => (
   <TouchableOpacity 
     onPress={onPress} 
@@ -47,6 +48,10 @@ const RegisterPage = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateText, setDateText] = useState('Select Date of Birth');
   const [governmentId, setGovernmentId] = useState('');
+  const [attendedOrientation, setAttendedOrientation] = useState(false);
+  const [orientationCode, setOrientationCode] = useState('');
+  const [validOrientationCode, setValidOrientationCode] = useState('');
+  const [isCheckingCode, setIsCheckingCode] = useState(false);
 
   const navigation = useNavigation();
 
@@ -56,9 +61,6 @@ const RegisterPage = () => {
   const phoneNumberInput = useRef(null);
   const addressInput = useRef(null);
   const placeOfBirthInput = useRef(null);
-
-  const [attendedOrientation, setAttendedOrientation] = useState(false);
-  const [orientationCode, setOrientationCode] = useState('');
   const orientationCodeInput = useRef(null);
 
   useEffect(() => {
@@ -69,7 +71,7 @@ const RegisterPage = () => {
   
     const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
   
-    return () => backHandler.remove(); // ✅ modern remove
+    return () => backHandler.remove();
   }, [navigation]);
 
   useEffect(() => {
@@ -80,101 +82,153 @@ const RegisterPage = () => {
     }
   }, [dateOfBirth]);
 
-
-
-  // Update isFormComplete to NOT require middleName
-const isFormComplete = () => {
-  const basicInfoComplete = (
-    firstName &&
-    lastName &&
-    email &&
-    phoneNumber &&
-    gender &&
-    civilStatus &&
-    placeOfBirth &&
-    address &&
-    governmentId &&
-    age >= 21
-  );
-  
-  if (attendedOrientation) {
-    return basicInfoComplete && orientationCode;
-  }
-  return basicInfoComplete;
-};
-
-const handleNext = () => {
-  // Basic field validation
-  if (!firstName || !lastName || !email || !phoneNumber || !gender || !civilStatus || !placeOfBirth || !address || !governmentId) {
-    Alert.alert('Incomplete Form', 'Please fill in all required fields before proceeding.');
-    return;
-  }
-
-  // Email validation
-  if (!email.includes('@') || !email.endsWith('.com')) {
-    Alert.alert('Invalid Email', 'Please provide a valid email address (e.g., example@domain.com).');
-    return;
-  }
-
-  // Phone number validation
-  if (phoneNumber.length < 11) {
-    Alert.alert('Invalid Phone Number', 'Phone numbers should be at least 11 digits long.');
-    return;
-  }
-
-  // Age validation
-  if (age < 21) {
-    Alert.alert('Age Restriction', 'You must be at least 21 years old to register.');
-    return;
-  }
-
-  // Orientation validation
-  if (!attendedOrientation) {
-    Alert.alert(
-      'Orientation Required',
-      'For you to be able to continue your registration, you are required to attend the Orientation.',
-      [{ text: 'OK' }]
-    );
-    return;
-  }
-
-  // Orientation code validation if attended
-  if (attendedOrientation && !orientationCode) {
-    Alert.alert('Orientation Code Required', 'Please enter your orientation code to proceed.');
-    return;
-  }
-
-  // Show confirmation alert before navigating
-  Alert.alert(
-    'Verify Your Information',
-    'Please double-check all the information you have provided. Make sure everything is accurate before proceeding.',
-    [
-      { text: 'Cancel', style: 'cancel' },
-      { 
-        text: 'Proceed', 
-        onPress: () => {
-          const dateOfBirthISO = dateOfBirth.toISOString();
-          navigation.navigate('Register2', {
-            firstName,
-            middleName,
-            lastName,
-            email,
-            phoneNumber,
-            gender,
-            civilStatus,
-            placeOfBirth,
-            address,
-            age,
-            dateOfBirth: dateOfBirthISO,
-            governmentId,
-            attendedOrientation,
-            orientationCode,
-          });
+  // Fetch the valid orientation code from Firebase
+  useEffect(() => {
+    const fetchOrientationCode = async () => {
+      try {
+        const db = getDatabase();
+        const orientationRef = ref(db, 'Settings/OrientationCode');
+        const snapshot = await get(orientationRef);
+        
+        if (snapshot.exists()) {
+          setValidOrientationCode(snapshot.val());
         }
+      } catch (error) {
+        console.error('Error fetching orientation code:', error);
       }
-    ]
-  );
-};
+    };
+
+    fetchOrientationCode();
+  }, []);
+
+  const isFormComplete = () => {
+    const basicInfoComplete = (
+      firstName &&
+      lastName &&
+      email &&
+      phoneNumber &&
+      gender &&
+      civilStatus &&
+      placeOfBirth &&
+      address &&
+      governmentId &&
+      age >= 21
+    );
+    
+    if (attendedOrientation) {
+      return basicInfoComplete && orientationCode && orientationCode === validOrientationCode;
+    }
+    return basicInfoComplete;
+  };
+
+  const validateOrientationCode = async () => {
+    if (!orientationCode) {
+      Alert.alert('Error', 'Please enter an orientation code');
+      return false;
+    }
+
+    setIsCheckingCode(true);
+    try {
+      const db = getDatabase();
+      const orientationRef = ref(db, 'Settings/OrientationCode');
+      const snapshot = await get(orientationRef);
+
+      if (!snapshot.exists()) {
+        Alert.alert('Error', 'Orientation system not configured. Please contact support.');
+        setIsCheckingCode(false);
+        return false;
+      }
+
+      const validCode = snapshot.val();
+      setIsCheckingCode(false);
+      
+      if (orientationCode !== validCode) {
+        Alert.alert('Invalid Code', 'The orientation code you entered is incorrect. Please try again or contact support.');
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      console.error('Error validating orientation code:', error);
+      setIsCheckingCode(false);
+      Alert.alert('Error', 'Failed to validate orientation code. Please try again.');
+      return false;
+    }
+  };
+
+  const handleNext = async () => {
+    // Basic field validation
+    if (!firstName || !lastName || !email || !phoneNumber || !gender || 
+        !civilStatus || !placeOfBirth || !address || !governmentId) {
+      Alert.alert('Incomplete Form', 'Please fill in all required fields before proceeding.');
+      return;
+    }
+
+    // Email validation
+    if (!email.includes('@') || !email.endsWith('.com')) {
+      Alert.alert('Invalid Email', 'Please provide a valid email address (e.g., example@domain.com).');
+      return;
+    }
+
+    // Phone number validation
+    if (phoneNumber.length < 11) {
+      Alert.alert('Invalid Phone Number', 'Phone numbers should be at least 11 digits long.');
+      return;
+    }
+
+    // Age validation
+    if (age < 21) {
+      Alert.alert('Age Restriction', 'You must be at least 21 years old to register.');
+      return;
+    }
+
+    // Orientation validation
+    if (!attendedOrientation) {
+      Alert.alert(
+        'Orientation Required',
+        'For you to be able to continue your registration, you are required to attend the Orientation.',
+        [{ text: 'OK' }]
+      );
+      return;
+    }
+
+    // Orientation code validation if attended
+    if (attendedOrientation) {
+      const isValidCode = await validateOrientationCode();
+      if (!isValidCode) return;
+    }
+
+    // Show confirmation alert before navigating
+    Alert.alert(
+      'Verify Your Information',
+      'Please double-check all the information you have provided. Make sure everything is accurate before proceeding.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Proceed', 
+          onPress: () => {
+            const dateOfBirthISO = dateOfBirth.toISOString();
+            navigation.navigate('Register2', {
+              firstName,
+              middleName,
+              lastName,
+              email,
+              phoneNumber,
+              gender,
+              civilStatus,
+              placeOfBirth,
+              address,
+              age,
+              dateOfBirth: dateOfBirthISO,
+              governmentId,
+              attendedOrientation,
+              orientationCode,
+            });
+          }
+        }
+      ]
+    );
+  };
 
   const handleDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || dateOfBirth;
@@ -201,39 +255,41 @@ const handleNext = () => {
     { key: 'Separated', label: 'Separated' },
   ];
     
- const governmentIdOptions = [
-  {
-    key: 'message',
-    section: true,
-    label: '',
-    component: (
-      <View
-        style={{
-          paddingVertical: 10,
-          paddingHorizontal: 12,
-          backgroundColor: '#E2ECF8', // softer blue tone
-          borderRadius: 8,
-          marginBottom: 8,
-        }}
-      >
-        <Text
+  const governmentIdOptions = [
+    {
+      key: 'message',
+      section: true,
+      label: '',
+      component: (
+        <View
           style={{
-            color: '#1A365D', // deeper blue for contrast
-            fontWeight: '600',
-            fontSize: 15,
-            lineHeight: 22,
+            paddingVertical: 10,
+            paddingHorizontal: 12,
+            backgroundColor: '#E2ECF8',
+            borderRadius: 8,
+            marginBottom: 8,
           }}
         >
-          Kindly choose the type of government-issued ID you will be using to proceed with your registration.
-        </Text>
-      </View>
-    ),
-  },
-  { key: 'national', label: 'National ID (PhilSys)' },
-  { key: 'sss', label: 'SSS ID' },
-  { key: 'philhealth', label: 'PhilHealth ID' },
-  { key: 'drivers_license', label: 'Driver’s License' },
-];
+          <Text
+            style={{
+              color: '#1A365D',
+              fontWeight: '600',
+              fontSize: 15,
+              lineHeight: 22,
+            }}
+          >
+            Kindly choose the type of government-issued ID you will be using to proceed with your registration.
+          </Text>
+        </View>
+      ),
+    },
+    { key: 'national', label: 'National ID (PhilSys)' },
+    { key: 'sss', label: 'SSS ID' },
+    { key: 'philhealth', label: 'PhilHealth ID' },
+    { key: 'drivers_license', label: 'Drivers License' },
+  
+  
+  ];
 
   return (
     <KeyboardAvoidingView
@@ -242,7 +298,7 @@ const handleNext = () => {
       keyboardVerticalOffset={Platform.OS === 'ios' ? 100 : 0}
     >
       <ScrollView
-        contentContainerStyle={[styles.container, { flexGrow: 1 }]} // Ensure flexGrow is applied
+        contentContainerStyle={[styles.container, { flexGrow: 1 }]}
         keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -252,259 +308,266 @@ const handleNext = () => {
         <Text style={styles.title}>Register</Text>
 
         <View style={styles.formContainer}>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>First Name <Text style={styles.required}>*</Text> </Text>
-          <TextInput
-            placeholder="Enter First Name"
-            value={firstName}
-            onChangeText={setFirstName}
-            style={styles.input}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            onSubmitEditing={() => middleNameInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Middle Name</Text>
-          <TextInput
-            placeholder="Enter Middle Name"
-            value={middleName}
-            onChangeText={setMiddleName}
-            style={styles.input}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            ref={middleNameInput}
-            onSubmitEditing={() => lastNameInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Last Name <Text style={styles.required}>*</Text> </Text>
-          <TextInput
-            placeholder="Enter Last Name"
-            value={lastName}
-            onChangeText={setLastName}
-            style={styles.input}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            ref={lastNameInput}
-            onSubmitEditing={() => placeOfBirthInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Gender <Text style={styles.required}>*</Text> </Text>
-          <ModalSelector
-            data={genderOptions}
-            initValue="Select Gender"
-            cancelText="Cancel" // Capital C
-            onChange={(option) => setGender(option.key)}
-            style={styles.picker}
-            selectStyle={styles.pickerWithIcon}
-          >
-            <View style={styles.pickerContent}>
-              <Text style={[styles.pickerText, gender ? styles.selectedText : styles.placeholderText]}>
-                {gender || 'Select Gender'}
-              </Text>
-              <Icon name="arrow-drop-down" size={24} color={gender ? '#000' : 'grey'} style={styles.pickerIcon} />
-            </View>
-          </ModalSelector>
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Date of Birth <Text style={styles.required}>*</Text> </Text>
-          <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateInput}>
-            <Text style={[styles.dateText, dateOfBirth.toDateString() !== new Date().toDateString() ? { color: 'black' } : { color: 'grey' }]}>
-              {dateText}
-            </Text>
-            <Icon name="calendar-today" size={24} color="grey" style={styles.calendarIcon} />
-          </TouchableOpacity>
-          {showDatePicker && (
-            <DateTimePicker
-              testID="dateTimePicker"
-              value={dateOfBirth}
-              mode="date"
-              display="default"
-              onChange={handleDateChange}
-            />
-          )}
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Age</Text>
-          <TextInput
-            placeholder="Age"
-            value={age.toString()}
-            onChangeText={text => setAge(text)}
-            style={styles.input}
-            keyboardType="numeric"
-            editable={false}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Place of Birth <Text style={styles.required}>*</Text> </Text>
-          <TextInput
-            placeholder="Enter Place of Birth"
-            value={placeOfBirth}
-            onChangeText={setPlaceOfBirth}
-            style={styles.input}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            ref={placeOfBirthInput}
-            onSubmitEditing={() => addressInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Current Address <Text style={styles.required}>*</Text> </Text>
-          <TextInput
-            placeholder="Enter Address"
-            value={address}
-            onChangeText={setAddress}
-            style={styles.input}
-            returnKeyType="next"
-            blurOnSubmit={false}
-            ref={addressInput}
-            onSubmitEditing={() => emailInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Civil Status <Text style={styles.required}>*</Text> </Text>
-          <ModalSelector
-            data={civilStatusOptions}
-            initValue="Select Civil Status"
-            cancelText="Cancel" // Capital C
-            onChange={(option) => setCivilStatus(option.key)}
-            style={styles.picker}
-            selectStyle={styles.pickerWithIcon}
-          >
-            <View style={styles.pickerContent}>
-              <Text style={[styles.pickerText, civilStatus ? styles.selectedText : styles.placeholderText]}>
-                {civilStatus || 'Select Civil Status'}
-              </Text>
-              <Icon name="arrow-drop-down" size={24} color={civilStatus ? '#000' : 'grey'} style={styles.pickerIcon} />
-            </View>
-          </ModalSelector>
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Email <Text style={styles.required}>*</Text> </Text>
-          <TextInput
-            placeholder="example@domain.com"
-            value={email}
-            onChangeText={setEmail}
-            style={styles.input}
-            keyboardType="email-address"
-            returnKeyType="next"
-            blurOnSubmit={false}
-            ref={emailInput}
-            onSubmitEditing={() => phoneNumberInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Phone Number <Text style={styles.required}>*</Text> </Text>
-          <TextInput
-            placeholder="Enter Phone Number"
-            value={phoneNumber}
-            onChangeText={handlePhoneNumberChange}
-            style={styles.input}
-            keyboardType="phone-pad"
-            returnKeyType="next"
-            blurOnSubmit={false}
-            ref={phoneNumberInput}
-            onSubmitEditing={() => passwordInput.current?.focus()}
-          />
-        </View>
-
-        <View style={styles.inputContainer}>
-          <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
-          <ModalSelector
-            data={governmentIdOptions}
-            initValue="Select Government ID"
-            cancelText="Cancel" // This will show "Cancel" with a capital C
-            onChange={(option) => {
-              if (option.key !== 'message') setGovernmentId(option.label);
-            }}
-            style={styles.picker}
-            selectStyle={styles.pickerWithIcon}
-            optionTextStyle={{ fontSize: 16, color: '#222' }}
-            optionContainerStyle={{ backgroundColor: '#fff' }}
-          >
-            <View style={styles.pickerContent}>
-              <Text style={[
-                styles.pickerText,
-                governmentId ? styles.selectedText : styles.placeholderText
-              ]}>
-                {governmentId || 'Select Government ID'}
-              </Text>
-              <Icon name="arrow-drop-down" size={24} color={governmentId ? '#000' : 'grey'} style={styles.pickerIcon} />
-            </View>
-          </ModalSelector>
-        </View>
-
-         {/* New Orientation Attendance Section */}
-        <View style={styles.radioContainer}>
-          <Text style={styles.radioLabel}>
-            Have you attended the Orientation Conducted by the Company? <Text style={styles.required}>*</Text>
-          </Text>
-          <View style={styles.radioGroup}>
-            <View style={styles.radioOption}>
-              <RadioButton 
-                selected={attendedOrientation} 
-                onPress={() => setAttendedOrientation(true)} 
-              />
-              <Text style={styles.radioOptionText}>Yes</Text>
-            </View>
-            <View style={styles.radioOption}>
-              <RadioButton 
-                selected={!attendedOrientation} 
-                onPress={() => setAttendedOrientation(false)} 
-              />
-              <Text style={styles.radioOptionText}>No</Text>
-            </View>
-          </View>
-        </View>
-
-        {attendedOrientation && (
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Orientation Code <Text style={styles.required}>*</Text></Text>
+            <Text style={styles.label}>First Name <Text style={styles.required}>*</Text> </Text>
             <TextInput
-              placeholder="Enter Orientation Code"
-              value={orientationCode}
-              onChangeText={setOrientationCode}
+              placeholder="Enter First Name"
+              value={firstName}
+              onChangeText={setFirstName}
               style={styles.input}
-              returnKeyType="done"
-              ref={orientationCodeInput}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              onSubmitEditing={() => middleNameInput.current?.focus()}
             />
           </View>
-        )}
-        <TouchableOpacity
-          style={[
-            styles.nextButton,
-            { backgroundColor: isFormComplete() ? '#4FE7AF' : '#B0B0B0' }
-          ]}
-          onPress={handleNext}
-          disabled={!isFormComplete()}
-        >
-          <Text style={styles.nextButtonText}>Next</Text>
-        </TouchableOpacity>
-        
-        <View style={styles.loginRedirect}>
-    <Text style={styles.loginRedirectText}>
-      Already have an account? 
-    </Text>
-    <TouchableOpacity onPress={() => navigation.navigate('Login')}>
-      <Text style={[styles.loginRedirectText, styles.loginText]}>
-        Login Here
-      </Text>
-    </TouchableOpacity>
-  </View>
-  </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Middle Name</Text>
+            <TextInput
+              placeholder="Enter Middle Name"
+              value={middleName}
+              onChangeText={setMiddleName}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={middleNameInput}
+              onSubmitEditing={() => lastNameInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Last Name <Text style={styles.required}>*</Text> </Text>
+            <TextInput
+              placeholder="Enter Last Name"
+              value={lastName}
+              onChangeText={setLastName}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={lastNameInput}
+              onSubmitEditing={() => placeOfBirthInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Gender <Text style={styles.required}>*</Text> </Text>
+            <ModalSelector
+              data={genderOptions}
+              initValue="Select Gender"
+              cancelText="Cancel"
+              onChange={(option) => setGender(option.key)}
+              style={styles.picker}
+              selectStyle={styles.pickerWithIcon}
+            >
+              <View style={styles.pickerContent}>
+                <Text style={[styles.pickerText, gender ? styles.selectedText : styles.placeholderText]}>
+                  {gender || 'Select Gender'}
+                </Text>
+                <Icon name="arrow-drop-down" size={24} color={gender ? '#000' : 'grey'} style={styles.pickerIcon} />
+              </View>
+            </ModalSelector>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Date of Birth <Text style={styles.required}>*</Text> </Text>
+            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateInput}>
+              <Text style={[styles.dateText, dateOfBirth.toDateString() !== new Date().toDateString() ? { color: 'black' } : { color: 'grey' }]}>
+                {dateText}
+              </Text>
+              <Icon name="calendar-today" size={24} color="grey" style={styles.calendarIcon} />
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                testID="dateTimePicker"
+                value={dateOfBirth}
+                mode="date"
+                display="default"
+                onChange={handleDateChange}
+              />
+            )}
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Age</Text>
+            <TextInput
+              placeholder="Age"
+              value={age.toString()}
+              onChangeText={text => setAge(text)}
+              style={styles.input}
+              keyboardType="numeric"
+              editable={false}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Place of Birth <Text style={styles.required}>*</Text> </Text>
+            <TextInput
+              placeholder="Enter Place of Birth"
+              value={placeOfBirth}
+              onChangeText={setPlaceOfBirth}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={placeOfBirthInput}
+              onSubmitEditing={() => addressInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Current Address <Text style={styles.required}>*</Text> </Text>
+            <TextInput
+              placeholder="Enter Address"
+              value={address}
+              onChangeText={setAddress}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={addressInput}
+              onSubmitEditing={() => emailInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Civil Status <Text style={styles.required}>*</Text> </Text>
+            <ModalSelector
+              data={civilStatusOptions}
+              initValue="Select Civil Status"
+              cancelText="Cancel"
+              onChange={(option) => setCivilStatus(option.key)}
+              style={styles.picker}
+              selectStyle={styles.pickerWithIcon}
+            >
+              <View style={styles.pickerContent}>
+                <Text style={[styles.pickerText, civilStatus ? styles.selectedText : styles.placeholderText]}>
+                  {civilStatus || 'Select Civil Status'}
+                </Text>
+                <Icon name="arrow-drop-down" size={24} color={civilStatus ? '#000' : 'grey'} style={styles.pickerIcon} />
+              </View>
+            </ModalSelector>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Email <Text style={styles.required}>*</Text> </Text>
+            <TextInput
+              placeholder="example@domain.com"
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+              keyboardType="email-address"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={emailInput}
+              onSubmitEditing={() => phoneNumberInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Phone Number <Text style={styles.required}>*</Text> </Text>
+            <TextInput
+              placeholder="Enter Phone Number"
+              value={phoneNumber}
+              onChangeText={handlePhoneNumberChange}
+              style={styles.input}
+              keyboardType="phone-pad"
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={phoneNumberInput}
+              onSubmitEditing={() => Keyboard.dismiss()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
+            <ModalSelector
+              data={governmentIdOptions}
+              initValue="Select Government ID"
+              cancelText="Cancel"
+              onChange={(option) => {
+                if (option.key !== 'message') setGovernmentId(option.label);
+              }}
+              style={styles.picker}
+              selectStyle={styles.pickerWithIcon}
+              optionTextStyle={{ fontSize: 16, color: '#222' }}
+              optionContainerStyle={{ backgroundColor: '#fff' }}
+            >
+              <View style={styles.pickerContent}>
+                <Text style={[
+                  styles.pickerText,
+                  governmentId ? styles.selectedText : styles.placeholderText
+                ]}>
+                  {governmentId || 'Select Government ID'}
+                </Text>
+                <Icon name="arrow-drop-down" size={24} color={governmentId ? '#000' : 'grey'} style={styles.pickerIcon} />
+              </View>
+            </ModalSelector>
+          </View>
+
+          <View style={styles.radioContainer}>
+            <Text style={styles.radioLabel}>
+              Have you attended the Orientation Conducted by the Company? <Text style={styles.required}>*</Text>
+            </Text>
+            <View style={styles.radioGroup}>
+              <View style={styles.radioOption}>
+                <RadioButton 
+                  selected={attendedOrientation} 
+                  onPress={() => setAttendedOrientation(true)} 
+                />
+                <Text style={styles.radioOptionText}>Yes</Text>
+              </View>
+              <View style={styles.radioOption}>
+                <RadioButton 
+                  selected={!attendedOrientation} 
+                  onPress={() => setAttendedOrientation(false)} 
+                />
+                <Text style={styles.radioOptionText}>No</Text>
+              </View>
+            </View>
+          </View>
+
+          {attendedOrientation && (
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Orientation Code <Text style={styles.required}>*</Text></Text>
+              <TextInput
+                placeholder="Enter Orientation Code"
+                value={orientationCode}
+                onChangeText={setOrientationCode}
+                style={styles.input}
+                returnKeyType="done"
+                ref={orientationCodeInput}
+                onSubmitEditing={validateOrientationCode}
+              />
+              {isCheckingCode && <Text style={styles.checkingText}>Verifying code...</Text>}
+              {orientationCode && validOrientationCode && orientationCode === validOrientationCode && (
+                <Text style={styles.validText}>✓ Valid orientation code</Text>
+              )}
+              {orientationCode && validOrientationCode && orientationCode !== validOrientationCode && (
+                <Text style={styles.invalidText}>✗ Invalid orientation code</Text>
+              )}
+            </View>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.nextButton,
+              { backgroundColor: isFormComplete() ? '#4FE7AF' : '#B0B0B0' }
+            ]}
+            onPress={handleNext}
+            disabled={!isFormComplete()}
+          >
+            <Text style={styles.nextButtonText}>Next</Text>
+          </TouchableOpacity>
+          
+          <View style={styles.loginRedirect}>
+            <Text style={styles.loginRedirectText}>
+              Already have an account? 
+            </Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+              <Text style={[styles.loginRedirectText, styles.loginText]}>
+                Login Here
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -519,7 +582,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 50,
     borderTopRightRadius: 50,
-    flexGrow: 1, // To make it take the full height up to the bottom
+    flexGrow: 1,
     paddingStart: 40,
     paddingEnd: 40,
     paddingTop: 40,
@@ -598,18 +661,18 @@ const styles = StyleSheet.create({
     zIndex: 1,
   },
   nextButton: {
-    backgroundColor: '#4FE7AF', // Change color as needed
-    borderRadius: 10, // Adjust the border radius
-    paddingVertical: 10, // Adjust padding
-    paddingHorizontal: 20, // Adjust padding
-    alignItems: 'center', // Center text
-    marginTop: 10, // Add margin if needed
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginTop: 10,
     width: '50%',
     alignSelf: 'center',
   },
   nextButtonText: {
-    color: 'black', // Text color
-    fontSize: 18, // Font size
+    color: 'black',
+    fontSize: 18,
   },
   loginRedirect: {
     flexDirection: 'row',
@@ -621,53 +684,67 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   loginText: {
-    color: '#4FE7AF', // Change to your preferred color
+    color: '#4FE7AF',
     fontWeight: 'bold',
   },
   required: {
-  color: 'red',
-},
-radioContainer: {
-  marginBottom: 15,
-  marginTop: 10,
-},
-radioLabel: {
-  fontSize: 16,
-  color: 'black',
-  marginBottom: 8,
-},
-radioGroup: {
-  flexDirection: 'row',
-},
-radioOption: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  marginRight: 20,
-},
-radioOptionText: {
-  marginLeft: 8,
-  fontSize: 16,
-  color: 'black',
-},
-radioButton: {
-  width: 20,
-  height: 20,
-  borderRadius: 10,
-  borderWidth: 2,
-  borderColor: '#ccc',
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-radioButtonSelected: {
-  borderColor: '#4FE7AF',
-},
-radioButtonInner: {
-  width: 10,
-  height: 10,
-  borderRadius: 5,
-  backgroundColor: '#4FE7AF',
-},
-
+    color: 'red',
+  },
+  radioContainer: {
+    marginBottom: 15,
+    marginTop: 10,
+  },
+  radioLabel: {
+    fontSize: 16,
+    color: 'black',
+    marginBottom: 8,
+  },
+  radioGroup: {
+    flexDirection: 'row',
+  },
+  radioOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 20,
+  },
+  radioOptionText: {
+    marginLeft: 8,
+    fontSize: 16,
+    color: 'black',
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#ccc',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioButtonSelected: {
+    borderColor: '#4FE7AF',
+  },
+  radioButtonInner: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#4FE7AF',
+  },
+  checkingText: {
+    color: '#666',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  validText: {
+    color: 'green',
+    fontSize: 14,
+    marginTop: 5,
+  },
+  invalidText: {
+    color: 'red',
+    fontSize: 14,
+    marginTop: 5,
+  },
 });
 
 export default RegisterPage;

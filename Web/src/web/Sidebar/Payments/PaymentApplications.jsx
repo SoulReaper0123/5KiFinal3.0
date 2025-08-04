@@ -503,6 +503,7 @@ const processDatabaseApprove = async (payment) => {
     let currentLoanKey = null;
     let isLoanPayment = false;
     let interestAmount = 0;
+    let loanAmount = 0;
     
     if (memberLoansSnap.exists()) {
       memberLoansSnap.forEach((loanSnap) => {
@@ -511,6 +512,7 @@ const processDatabaseApprove = async (payment) => {
           currentLoanKey = loanSnap.key;
           isLoanPayment = true;
           interestAmount = parseFloat(currentLoanData.interest) || 0;
+          loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
         }
       });
     }
@@ -533,7 +535,7 @@ const processDatabaseApprove = async (payment) => {
     if (!paymentSnap.exists()) throw new Error('Payment data not found');
 
     const paymentData = paymentSnap.val();
-    const paymentAmount = parseFloat(amountToBePaid);
+    const paymentAmount = parseFloat(amountToBePaid) || 0;
     const currentFunds = parseFloat(fundsSnap.val()) || 0;
     const currentSavings = parseFloat(savingsSnap.val()) || 0;
     const memberBalance = parseFloat(memberData.balance || 0);
@@ -544,35 +546,36 @@ const processDatabaseApprove = async (payment) => {
     let newMemberBalance = memberBalance;
 
     if (isLoanPayment && currentLoanData) {
+      // Calculate principal (payment minus interest)
       principalAmount = Math.max(0, paymentAmount - interestAmount);
       
-      const remainingLoan = parseFloat(currentLoanData.loanAmount) - principalAmount;
+      // Calculate remaining loan after this payment
+      let remainingLoan = loanAmount - principalAmount;
       
-      // Handle overpayment
-      if (remainingLoan < 0) {
-        excessPayment = Math.abs(remainingLoan);
-        principalAmount = parseFloat(currentLoanData.loanAmount);
-      }
-
-      // Update member balance (principal + excess)
-      newMemberBalance = memberBalance + principalAmount + excessPayment;
-
-      // Update loan or close if fully paid
+      // Handle overpayment (payment exceeds remaining loan + interest)
       if (remainingLoan <= 0) {
-        await memberLoansRef.child(currentLoanKey).remove();
+        excessPayment = Math.abs(remainingLoan);
+        principalAmount = loanAmount;
+        
+        // Remove the loan since it's fully paid
+        // await memberLoansRef.child(currentLoanKey).remove();
       } else {
+        // For partial payments, update the loan terms
         const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
-        const remainingTerm = currentLoanData.term - paymentsMade;
+        const remainingTerm = Math.max(1, currentLoanData.term - paymentsMade);
         const newMonthlyPayment = remainingLoan / remainingTerm;
         
         await memberLoansRef.child(currentLoanKey).update({
           loanAmount: remainingLoan,
           monthlyPayment: newMonthlyPayment,
           totalMonthlyPayment: newMonthlyPayment + interestAmount,
-          dueDate: formatDate(new Date(new Date().setDate(new Date().getDate() + 30))),
+          dueDate: formatDate(new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000)), // 30 days later
           paymentsMade: paymentsMade
         });
       }
+
+      // Update member balance (principal + excess)
+      newMemberBalance = memberBalance + principalAmount + excessPayment;
     }
 
     // Update all databases

@@ -117,7 +117,7 @@ const ApplyDeposits = () => {
           dateApproved: formattedApprovalDate,
         });
   
-        // await depositRef.remove();
+        await depositRef.remove();
   
         const currentBalance = parseFloat(memberData.balance) || 0;
         const newBalance = currentBalance + parseFloat(depositData.amountToBeDeposited);
@@ -191,7 +191,7 @@ const ApplyDeposits = () => {
           email: memberData.email,
         });
   
-        // await depositRef.remove();
+        await depositRef.remove();
   
         setSuccessMessage(`Deposit rejected for Member ID: ${currentMemberId} \nDate Rejected: ${formattedRejectionDate}`);
         setSuccessMessageModalVisible(true);

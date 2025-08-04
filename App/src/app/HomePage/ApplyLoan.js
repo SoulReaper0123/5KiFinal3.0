@@ -211,74 +211,86 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 };
 
   const submitLoanApplication = async () => {
-    setIsLoading(true);
-    try {
-      const loanAmountNum = parseFloat(loanAmount);
-      const applicationData = {
-        loanAmount: loanAmountNum,
-        term,
-        disbursement,
-        accountName,
-        accountNumber,
-        interestRate,
-        firstName,
-        lastName,
-        email,
-        userId,
-        loanType,
-        requiresCollateral,
-        ...(requiresCollateral && {
-          collateralType,
-          collateralValue,
-          collateralDescription
-        })
-      };
+  setIsLoading(true);
+  try {
+    const loanAmountNum = parseFloat(loanAmount);
+    const applicationData = {
+      loanAmount: loanAmountNum,
+      term,
+      disbursement,
+      accountName,
+      accountNumber,
+      interestRate,
+      firstName,
+      lastName,
+      email,
+      userId,
+      loanType,
+      requiresCollateral,
+      ...(requiresCollateral && {
+        collateralType,
+        collateralValue,
+        collateralDescription
+      })
+    };
 
-      const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
-      if (!storedSuccessfully) return;
+    const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
+    if (!storedSuccessfully) return;
 
-      const loanApplication = {
-        email,
-        firstName,
-        lastName,
-        loanType,
-        loanAmount: loanAmountNum,
-        term,
-        interestRate,
-        disbursement,
-        accountName,
-        accountNumber,
-        requiresCollateral,
-        ...(requiresCollateral && {
-          collateralType,
-          collateralValue,
-          collateralDescription
-        })
-      };
+    // Prepare loan data for API with all required fields
+    const loanData = {
+      email,
+      firstName,
+      lastName,
+      amount: loanAmountNum,
+      term,
+      date: new Date().toISOString(), // Add current date
+      loanType,
+      disbursementMethod: disbursement,
+      accountNumber,
+      requiresCollateral,
+      ...(requiresCollateral && {
+        collateralType,
+        collateralValue,
+        collateralDescription
+      })
+    };
 
- Alert.alert(
+    // Make API call to trigger emails
+    const response = await MemberLoan(loanData);
+    console.log('Loan API response:', response);
+
+    Alert.alert(
       'Success',
-      'Loan application submitted successfully',
+      'Loan application submitted successfully. You will receive a confirmation email shortly.',
       [
         {
           text: 'OK',
           onPress: () => {
             resetForm();
-            navigation.navigate('Home'); // Navigate to Home when OK is pressed
+            navigation.navigate('Home');
           }
         }
       ],
-      { onDismiss: () => {
-        resetForm();
-        navigation.navigate('Home'); // Also navigate if alert is dismissed
-      }}
+      { cancelable: false }
     );
   } catch (error) {
-    console.error('Error during loan submission:', error);
-    Alert.alert('Error', 'Error recording loan application');
+    console.error('Error during loan submission:', {
+      error: error.message,
+      stack: error.stack,
+      loanData: {
+        email,
+        amount: loanAmount,
+        term
+      }
+    });
+    Alert.alert(
+      'Notice',
+      'Loan application was recorded but email notification failed. Please check your email later.',
+      [{ text: 'OK' }]
+    );
   } finally {
     setIsLoading(false);
-    
   }
 };
  const showConfirmationAlert = () => {

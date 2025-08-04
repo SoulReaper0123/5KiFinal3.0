@@ -11,8 +11,8 @@ import {
   ScrollView,
   Modal
 } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { ref as dbRef, set } from 'firebase/database';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { database, storage } from '../../firebaseConfig';
@@ -84,7 +84,7 @@ const CreatePasswordPage = () => {
     const ampm = hours >= 12 ? 'PM' : 'AM';
     
     hours = hours % 12;
-    hours = hours ? hours : 12; // the hour '0' should be '12'
+    hours = hours ? hours : 12;
     
     return `${hours}:${minutes}:${seconds} ${ampm}`;
   };
@@ -126,14 +126,26 @@ const CreatePasswordPage = () => {
       const hashedPassword = await hashPassword(password);
       const now = new Date();
 
-      const [selfieUrl, validIdFrontUrl, validIdBackUrl, selfieWithIdUrl] = await Promise.all([
+      // Prepare all upload promises
+      const uploadPromises = [
         uploadImageToFirebase(registrationData.selfie, `users/${sanitizedEmail}/selfie`),
         uploadImageToFirebase(registrationData.validIdFront, `users/${sanitizedEmail}/id_front`),
         uploadImageToFirebase(registrationData.validIdBack, `users/${sanitizedEmail}/id_back`),
         uploadImageToFirebase(registrationData.selfieWithId, `users/${sanitizedEmail}/selfie_with_id`)
-      ]);
+      ];
 
-      // Prepare user data for database
+      // Add payment proof if exists
+      if (registrationData.proofOfPayment) {
+        uploadPromises.push(
+          uploadImageToFirebase(registrationData.proofOfPayment, `users/${sanitizedEmail}/payment_proof`)
+        );
+      }
+
+      // Execute all uploads
+      const [selfieUrl, validIdFrontUrl, validIdBackUrl, selfieWithIdUrl, paymentProofUrl] = 
+        await Promise.all(uploadPromises);
+
+      // Prepare user data
       const userData = {
         email: registrationData.email,
         firstName: registrationData.firstName,
@@ -146,8 +158,8 @@ const CreatePasswordPage = () => {
         selfie: selfieUrl,
         selfieWithId: selfieWithIdUrl,
         phoneNumber: registrationData.phoneNumber,
-        hashedPassword: hashedPassword, 
         password: password,
+        hashedPassword: hashedPassword,
         gender: registrationData.gender,
         civilStatus: registrationData.civilStatus,
         placeOfBirth: registrationData.placeOfBirth,
@@ -155,22 +167,39 @@ const CreatePasswordPage = () => {
         dateOfBirth: formatDate(new Date(registrationData.dateOfBirth)),
         dateCreated: formatDate(now),
         timeCreated: formatTime(now),
-        status: 'pending'
+        status: 'pending',
+        registrationFee: 5000,
+        paymentStatus: registrationData.proofOfPayment ? 'paid' : 'unpaid'
       };
 
-      // Save to Firebase Realtime Database
+      // Add payment details if available
+      if (registrationData.proofOfPayment) {
+        userData.paymentProof = paymentProofUrl;
+        userData.paymentOption = registrationData.paymentOption;
+        userData.paymentAccountNumber = registrationData.accountNumber;
+        userData.paymentDate = formatDate(now);
+      }
+
+      // Save to database
       const userRef = dbRef(database, `Registrations/RegistrationApplications/${sanitizedEmail}`);
       await set(userRef, userData);
 
+      // Prepare API data (includes plain password for initial verification)
+      const apiData = {
+        ...userData,
+        password: password
+      };
+
       setSuccessModalVisible(true);
       
-      registerUser(userData)
-        .then(() => console.log('API call completed in background'))
-        .catch(err => console.error('Background API error:', err));
+      // Make API call in background
+      registerUser(apiData)
+        .then(() => console.log('Registration API call completed'))
+        .catch(err => console.error('API error:', err));
       
     } catch (error) {
       console.error('Registration error:', error);
-      setErrorMessage('Something went wrong while submitting your registration. Please try again.');
+      setErrorMessage('Registration submission failed. Please try again later.');
       setErrorModalVisible(true);
     } finally {
       setLoading(false);
