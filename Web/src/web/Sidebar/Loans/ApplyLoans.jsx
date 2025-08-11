@@ -749,7 +749,7 @@ const ApplyLoans = ({
       await memberRef.set(memberBalance - amount);
 
       // Remove from pending loans AFTER all other operations succeed
-      // await loanRef.remove();
+      await loanRef.remove();
 
     } catch (err) {
       console.error('Approval DB error:', err);
@@ -782,7 +782,7 @@ const ApplyLoans = ({
       await transactionRef.set(rejectedLoan);
 
       // Remove from pending loans AFTER saving to rejected
-      // await loanRef.remove();
+      await loanRef.remove();
 
     } catch (err) {
       console.error('Rejection DB error:', err);

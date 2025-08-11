@@ -450,6 +450,38 @@ const styles = {
     fontWeight: '600',
     marginBottom: '10px',
     color: '#1e293b'
+  },
+  inputContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px'
+  },
+  textarea: {
+    border: '1px solid #cbd5e1',
+    borderRadius: '8px',
+    padding: '12px',
+    fontSize: '16px',
+    backgroundColor: '#fff',
+    boxShadow: 'inset 0 1px 2px rgba(0, 0, 0, 0.05)',
+    transition: 'border-color 0.2s',
+    minHeight: '300px',
+    resize: 'vertical',
+    width: '100%',
+    '&:focus': {
+      borderColor: '#2563eb',
+      outline: 'none'
+    }
+  },
+  editSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px'
+  },
+  editButtons: {
+    display: 'flex',
+    gap: '10px',
+    marginTop: '15px'
   }
 };
 
@@ -467,12 +499,32 @@ const SystemSettings = () => {
     Accounts: {
       Bank: { accountName: '', accountNumber: '' },
       GCash: { accountName: '', accountNumber: '' }
+    },
+    TermsAndConditions: {
+      title: 'Terms and Conditions',
+      content: ''
+    },
+    PrivacyPolicy: {
+      title: 'Privacy Policy',
+      content: ''
+    },
+    AboutUs: {
+      title: 'About Us',
+      content: ''
+    },
+    ContactUs: {
+      title: 'Contact Us',
+      content: ''
     }
   });
 
   const [newTerm, setNewTerm] = useState('');
   const [newRate, setNewRate] = useState('');
   const [editMode, setEditMode] = useState(false);
+  const [editTerms, setEditTerms] = useState(false);
+  const [editPrivacy, setEditPrivacy] = useState(false);
+  const [editAboutUs, setEditAboutUs] = useState(false);
+  const [editContactUs, setEditContactUs] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orientationCopied, setOrientationCopied] = useState(false);
@@ -509,6 +561,22 @@ const SystemSettings = () => {
           Accounts: data.Accounts || {
             Bank: { accountName: '', accountNumber: '' },
             GCash: { accountName: '', accountNumber: '' }
+          },
+          TermsAndConditions: data.TermsAndConditions || {
+            title: 'Terms and Conditions',
+            content: 'No terms available.'
+          },
+          PrivacyPolicy: data.PrivacyPolicy || {
+            title: 'Privacy Policy',
+            content: 'No privacy policy available.'
+          },
+          AboutUs: data.AboutUs || {
+            title: 'About Us',
+            content: 'No information available.'
+          },
+          ContactUs: data.ContactUs || {
+            title: 'Contact Us',
+            content: 'No contact information available.'
           }
         });
       }
@@ -639,13 +707,21 @@ const SystemSettings = () => {
       PenaltyValue: parseFloat(settings.PenaltyValue),
       PenaltyType: settings.PenaltyType,
       OrientationCode: settings.OrientationCode,
-      Accounts: settings.Accounts
+      Accounts: settings.Accounts,
+      TermsAndConditions: settings.TermsAndConditions,
+      PrivacyPolicy: settings.PrivacyPolicy,
+      AboutUs: settings.AboutUs,
+      ContactUs: settings.ContactUs
     };
 
     update(settingsRef, updatedData)
       .then(() => {
         setConfirmationModalVisible(false);
         setEditMode(false);
+        setEditTerms(false);
+        setEditPrivacy(false);
+        setEditAboutUs(false);
+        setEditContactUs(false);
         showMessage('Success', 'Settings updated successfully!');
       })
       .catch((error) => {
@@ -994,6 +1070,270 @@ const SystemSettings = () => {
                   })
                 : 'Not set'}
             </span>
+          )}
+        </div>
+
+        {/* Terms and Conditions Section */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Terms and Conditions</h2>
+          {editMode && editTerms ? (
+            <div style={styles.editSection}>
+              <div style={styles.inputContainer}>
+                <label>Title</label>
+                <input
+                  style={styles.input}
+                  value={settings.TermsAndConditions.title}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    TermsAndConditions: {
+                      ...settings.TermsAndConditions,
+                      title: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.inputContainer}>
+                <label>Content</label>
+                <textarea
+                  style={styles.textarea}
+                  value={settings.TermsAndConditions.content}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    TermsAndConditions: {
+                      ...settings.TermsAndConditions,
+                      content: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.editButtons}>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#10b981' }}
+                  onClick={() => setEditTerms(false)}
+                >
+                  Save Terms
+                </button>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#ef4444' }}
+                  onClick={() => setEditTerms(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ whiteSpace: 'pre-line', marginBottom: '20px' }}>
+                <h3>{settings.TermsAndConditions.title}</h3>
+                <p>{settings.TermsAndConditions.content}</p>
+              </div>
+              {editMode && (
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#3b82f6' }}
+                  onClick={() => setEditTerms(true)}
+                >
+                  Edit Terms
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Privacy Policy Section */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Privacy Policy</h2>
+          {editMode && editPrivacy ? (
+            <div style={styles.editSection}>
+              <div style={styles.inputContainer}>
+                <label>Title</label>
+                <input
+                  style={styles.input}
+                  value={settings.PrivacyPolicy.title}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    PrivacyPolicy: {
+                      ...settings.PrivacyPolicy,
+                      title: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.inputContainer}>
+                <label>Content</label>
+                <textarea
+                  style={styles.textarea}
+                  value={settings.PrivacyPolicy.content}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    PrivacyPolicy: {
+                      ...settings.PrivacyPolicy,
+                      content: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.editButtons}>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#10b981' }}
+                  onClick={() => setEditPrivacy(false)}
+                >
+                  Save Privacy Policy
+                </button>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#ef4444' }}
+                  onClick={() => setEditPrivacy(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ whiteSpace: 'pre-line', marginBottom: '20px' }}>
+                <h3>{settings.PrivacyPolicy.title}</h3>
+                <p>{settings.PrivacyPolicy.content}</p>
+              </div>
+              {editMode && (
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#3b82f6' }}
+                  onClick={() => setEditPrivacy(true)}
+                >
+                  Edit Privacy Policy
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* About Us Section */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>About Us</h2>
+          {editMode && editAboutUs ? (
+            <div style={styles.editSection}>
+              <div style={styles.inputContainer}>
+                <label>Title</label>
+                <input
+                  style={styles.input}
+                  value={settings.AboutUs.title}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    AboutUs: {
+                      ...settings.AboutUs,
+                      title: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.inputContainer}>
+                <label>Content</label>
+                <textarea
+                  style={styles.textarea}
+                  value={settings.AboutUs.content}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    AboutUs: {
+                      ...settings.AboutUs,
+                      content: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.editButtons}>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#10b981' }}
+                  onClick={() => setEditAboutUs(false)}
+                >
+                  Save About Us
+                </button>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#ef4444' }}
+                  onClick={() => setEditAboutUs(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ whiteSpace: 'pre-line', marginBottom: '20px' }}>
+                <h3>{settings.AboutUs.title}</h3>
+                <p>{settings.AboutUs.content}</p>
+              </div>
+              {editMode && (
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#3b82f6' }}
+                  onClick={() => setEditAboutUs(true)}
+                >
+                  Edit About Us
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Contact Us Section */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Contact Us</h2>
+          {editMode && editContactUs ? (
+            <div style={styles.editSection}>
+              <div style={styles.inputContainer}>
+                <label>Title</label>
+                <input
+                  style={styles.input}
+                  value={settings.ContactUs.title}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    ContactUs: {
+                      ...settings.ContactUs,
+                      title: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.inputContainer}>
+                <label>Content</label>
+                <textarea
+                  style={styles.textarea}
+                  value={settings.ContactUs.content}
+                  onChange={(e) => setSettings({
+                    ...settings,
+                    ContactUs: {
+                      ...settings.ContactUs,
+                      content: e.target.value
+                    }
+                  })}
+                />
+              </div>
+              <div style={styles.editButtons}>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#10b981' }}
+                  onClick={() => setEditContactUs(false)}
+                >
+                  Save Contact Us
+                </button>
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#ef4444' }}
+                  onClick={() => setEditContactUs(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ whiteSpace: 'pre-line', marginBottom: '20px' }}>
+                <h3>{settings.ContactUs.title}</h3>
+                <p>{settings.ContactUs.content}</p>
+              </div>
+              {editMode && (
+                <button 
+                  style={{ ...styles.saveBtn, backgroundColor: '#3b82f6' }}
+                  onClick={() => setEditContactUs(true)}
+                >
+                  Edit Contact Us
+                </button>
+              )}
+            </div>
           )}
         </div>
 

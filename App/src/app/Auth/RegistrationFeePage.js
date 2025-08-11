@@ -16,21 +16,51 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import ModalSelector from 'react-native-modal-selector';
+import { ref as dbRef, get } from 'firebase/database';
+import { database } from '../../firebaseConfig';
 
 const RegistrationFeePage = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const [paymentOption, setPaymentOption] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [proofOfPayment, setProofOfPayment] = useState(null);
   const [loading, setLoading] = useState(false);
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
+  const [paymentAccounts, setPaymentAccounts] = useState({
+    Bank: { accountName: '', accountNumber: '' },
+    GCash: { accountName: '', accountNumber: '' }
+  });
 
   const registrationData = route.params;
 
   useEffect(() => {
+    fetchPaymentSettings();
+  }, []);
+
+  useEffect(() => {
     setIsSubmitDisabled(!paymentOption || !proofOfPayment);
   }, [paymentOption, proofOfPayment]);
+
+  const fetchPaymentSettings = async () => {
+    try {
+      const settingsRef = dbRef(database, 'Settings/Accounts');
+      const snapshot = await get(settingsRef);
+      if (snapshot.exists()) {
+        setPaymentAccounts(snapshot.val());
+      } else {
+        // Fallback to old path if Accounts doesn't exist
+        const oldSettingsRef = dbRef(database, 'Settings/DepositAccounts');
+        const oldSnapshot = await get(oldSettingsRef);
+        if (oldSnapshot.exists()) {
+          setPaymentAccounts(oldSnapshot.val());
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching payment settings:', error);
+    }
+  };
 
   const paymentOptions = [
     { key: 'Bank', label: 'Bank' },
@@ -39,7 +69,9 @@ const RegistrationFeePage = () => {
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option.key);
-    setAccountNumber(option.key === 'Bank' ? '9876543' : '0123456');
+    const selectedAccount = paymentAccounts[option.key];
+    setAccountNumber(selectedAccount.accountNumber || '');
+    setAccountName(selectedAccount.accountName || '');
   };
 
   const handleSelectProofOfPayment = async () => {
@@ -73,6 +105,7 @@ const RegistrationFeePage = () => {
       ...registrationData,
       paymentOption,
       accountNumber,
+      accountName,
       proofOfPayment,
       registrationFee: 5000 // Adding the registration fee amount
     });
@@ -109,10 +142,18 @@ const RegistrationFeePage = () => {
           </ModalSelector>
 
           <Text style={styles.label}>Account Name</Text>
-          <TextInput value="5KI" style={[styles.input, styles.fixedInput]} editable={false} />
+          <TextInput 
+            value={accountName} 
+            style={[styles.input, styles.fixedInput]} 
+            editable={false} 
+          />
 
           <Text style={styles.label}>Account Number</Text>
-          <TextInput value={accountNumber} style={[styles.input, styles.fixedInput]} editable={false} />
+          <TextInput 
+            value={accountNumber} 
+            style={[styles.input, styles.fixedInput]} 
+            editable={false} 
+          />
 
           <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
           <TouchableOpacity 

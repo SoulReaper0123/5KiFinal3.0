@@ -1,57 +1,53 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import { getDatabase, ref, onValue } from 'firebase/database';
 
 const Privacy = () => {
-  const navigation = useNavigation(); // Use the navigation hook
+  const navigation = useNavigation();
+  const [privacy, setPrivacy] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const db = getDatabase();
+    const privacyRef = ref(db, 'Settings/PrivacyPolicy');
+    
+    const unsubscribe = onValue(privacyRef, (snapshot) => {
+      if (snapshot.exists()) {
+        setPrivacy(snapshot.val());
+      } else {
+        setPrivacy({
+          title: 'Privacy Policy',
+          content: 'No privacy policy available.'
+        });
+      }
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#0000ff" />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollView}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()} // Go back to the previous screen
-          accessibilityLabel="Back" // Accessibility label
+          onPress={() => navigation.goBack()}
         >
           <MaterialIcons name="arrow-back" size={30} color="black" />
         </TouchableOpacity>
-        <Text style={styles.title}>Privacy Policy</Text>
-
-        <Text style={styles.paragraph}>
-          5KI Financial Services is committed to protecting your personal information. This Privacy Policy explains how we collect,
-          use, and share your information when you use our loan system services.
-        </Text>
-        <Text style={styles.heading}>1. Information We Collect</Text>
-        <Text style={styles.paragraph}>
-          We may collect personal information like your name, email address, phone number, and financial details.
-        </Text>
-        <Text style={styles.heading}>2. How We Use Your Information</Text>
-        <Text style={styles.paragraph}>
-          We use your information to assess your loan application, communicate with you, and improve our services.
-        </Text>
-        <Text style={styles.heading}>3. Sharing of Information</Text>
-        <Text style={styles.paragraph}>
-          We do not share your personal information with third parties unless required by law or necessary for the provision 
-          of services, such as credit checks.
-        </Text>
-        <Text style={styles.heading}>4. Security</Text>
-        <Text style={styles.paragraph}>
-          We implement industry-standard security measures to protect your personal data, but we cannot guarantee absolute 
-          security against all threats.
-        </Text>
-        <Text style={styles.heading}>5. Data Retention</Text>
-        <Text style={styles.paragraph}>
-          We retain your data only as long as necessary to fulfill the purposes outlined in this policy or as required by law.
-        </Text>
-        <Text style={styles.heading}>6. Changes to Privacy Policy</Text>
-        <Text style={styles.paragraph}>
-          We may update this Privacy Policy from time to time. You will be notified of any significant changes via our platform.
-        </Text>
-        <Text style={styles.heading}>7. Contact Us</Text>
-        <Text style={styles.paragraph}>
-          If you have any questions about our Privacy Policy or the way we handle your data, please contact us at 5kifinancials@gmail.com.
-        </Text>
+        
+        <Text style={styles.title}>{privacy?.title || 'Privacy Policy'}</Text>
+        <Text style={styles.content}>{privacy?.content || 'No privacy policy available.'}</Text>
       </ScrollView>
     </View>
   );
@@ -74,16 +70,12 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 20,
   },
-  heading: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginTop: 20,
-  },
-  paragraph: {
+  content: {
     fontSize: 16,
-    marginTop: 10,
+    lineHeight: 24,
+    whiteSpace: 'pre-line',
   },
 });
 
