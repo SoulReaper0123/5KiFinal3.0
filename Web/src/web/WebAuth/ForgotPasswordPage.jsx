@@ -1,13 +1,16 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaArrowLeft, FaEnvelope, FaCheckCircle } from 'react-icons/fa';
+import { FiAlertCircle } from 'react-icons/fi';
 import { auth } from '../../../../Database/firebaseConfig';
 
 const ForgotPasswordPage = () => {
   const [email, setEmail] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [confirmVisible, setConfirmVisible] = useState(false);
+  const [successVisible, setSuccessVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const navigate = useNavigate();
 
   const handlePasswordReset = async () => {
@@ -21,18 +24,24 @@ const ForgotPasswordPage = () => {
       return;
     }
 
-    setIsLoading(true);
+    setConfirmVisible(true);
+  };
+
+  const handleConfirmReset = async () => {
+    setConfirmVisible(false);
+    setIsProcessing(true);
     setError('');
     setMessage('');
 
     try {
       await auth.sendPasswordResetEmail(email);
       setMessage('Password reset email sent! Please check your inbox.');
+      setSuccessVisible(true);
     } catch (error) {
       console.error(error);
       setError(error.message || 'Could not send password reset email. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsProcessing(false);
     }
   };
 
@@ -228,30 +237,75 @@ const ForgotPasswordPage = () => {
       alignItems: 'center',
       zIndex: 1000
     },
-    modalCard: {
-      backgroundColor: '#fff',
-      borderRadius: '10px',
-      padding: '30px',
+    modalCardSmall: {
+      width: '300px',
+      backgroundColor: 'white',
+      borderRadius: '8px',
+      padding: '20px',
+      position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      justifyContent: 'center',
-      width: '300px',
-      height: '150px'
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      textAlign: 'center'
     },
-    spinner: {
-      border: '4px solid rgba(0, 31, 63, 0.1)',
-      borderRadius: '50%',
-      borderTop: '4px solid #001F3F',
-      width: '40px',
-      height: '40px',
-      animation: 'spin 1s linear infinite'
+    confirmIcon: {
+      marginBottom: '12px',
+      fontSize: '32px'
     },
     modalText: {
-      marginTop: '15px',
-      fontSize: '16px',
+      fontSize: '14px',
+      marginBottom: '16px',
       textAlign: 'center',
-      color: '#001F3F'
+      color: '#333',
+      lineHeight: '1.4'
+    },
+    actionButton: {
+      padding: '8px 16px',
+      borderRadius: '4px',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: 'bold',
+      fontSize: '14px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      transition: 'all 0.2s',
+      minWidth: '100px',
+      outline: 'none',
+      '&:focus': {
+        outline: 'none',
+        boxShadow: 'none'
+      }
+    },
+    closeButton: {
+      position: 'absolute',
+      top: '10px',
+      right: '10px',
+      cursor: 'pointer',
+      fontSize: '18px',
+      color: 'grey',
+      backgroundColor: 'transparent',
+      border: 'none',
+      padding: '4px',
+      outline: 'none',
+      '&:focus': {
+        outline: 'none',
+        boxShadow: 'none'
+      }
+    },
+    spinner: {
+      border: '4px solid rgba(0, 0, 0, 0.1)',
+      borderLeftColor: '#2D5783',
+      borderRadius: '50%',
+      width: '36px',
+      height: '36px',
+      animation: 'spin 1s linear infinite'
+    },
+    '@keyframes spin': {
+      '0%': { transform: 'rotate(0deg)' },
+      '100%': { transform: 'rotate(360deg)' }
     }
   };
 
@@ -303,10 +357,10 @@ const ForgotPasswordPage = () => {
             <button
               style={{ ...styles.button, ...styles.submitButton }}
               onClick={handlePasswordReset}
-              disabled={isLoading}
+              disabled={isProcessing}
             >
               <span style={styles.buttonText}>
-                {isLoading ? 'Sending...' : 'Send Reset Link'}
+                {isProcessing ? 'Sending...' : 'Send Reset Link'}
               </span>
             </button>
           </div>
@@ -327,13 +381,65 @@ const ForgotPasswordPage = () => {
         </button>
       </div>
 
-      {/* Loading Modal */}
-      {isLoading && (
+      {/* Confirmation Modal */}
+      {confirmVisible && (
         <div style={styles.modalOverlay}>
-          <div style={styles.modalCard}>
-            <div style={styles.spinner} />
-            <p style={styles.modalText}>Sending Reset Link...</p>
+          <div style={styles.modalCardSmall}>
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to send a password reset link to {email}?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={handleConfirmReset}
+              >
+                Yes
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setConfirmVisible(false)}
+              >
+                No
+              </button>
+            </div>
           </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {successVisible && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCardSmall}>
+            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+            <p style={styles.modalText}>Password reset email sent successfully!</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => {
+                setSuccessVisible(false);
+                setEmail('');
+              }}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Overlay (no modal, just overlay like logout) */}
+      {isProcessing && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.spinner}></div>
         </div>
       )}
     </div>

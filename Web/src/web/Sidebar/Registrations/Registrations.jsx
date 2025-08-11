@@ -748,7 +748,7 @@ const Registrations = ({
         }
         
         const memberId = await processDatabaseApprove(registration);
-        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+       // await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
         
         setSuccessMessage('Registration approved successfully!');
         setSuccessMessageModalVisible(true);
@@ -770,7 +770,7 @@ const Registrations = ({
 
       } else {
         await processDatabaseReject(registration, rejectionReason);
-        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+        //await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
         
         setSuccessMessage('Registration rejected successfully!');
         setSuccessMessageModalVisible(true);

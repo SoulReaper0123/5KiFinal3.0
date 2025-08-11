@@ -523,7 +523,7 @@ const processDatabaseApprove = async (deposit) => {
       await fundsRef.set(updatedFund);
 
       // Remove from pending AFTER all other operations succeed
-      // await pendingRef.remove();
+      await pendingRef.remove();
     }
   } catch (err) {
     console.error('Approval DB error:', err);
@@ -557,7 +557,7 @@ const processDatabaseReject = async (deposit, rejectionReason) => {
     await transactionRef.set(rejectedDeposit);
     
     // Remove from pending AFTER saving to rejected
-    // await pendingRef.remove();
+    await pendingRef.remove();
   } catch (err) {
     console.error('Rejection DB error:', err);
     throw new Error(err.message || 'Failed to reject deposit');

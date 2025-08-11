@@ -558,7 +558,7 @@ const processDatabaseApprove = async (payment) => {
         principalAmount = loanAmount;
         
         // Remove the loan since it's fully paid
-        // await memberLoansRef.child(currentLoanKey).remove();
+        await memberLoansRef.child(currentLoanKey).remove();
       } else {
         // For partial payments, update the loan terms
         const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
@@ -656,7 +656,7 @@ const processDatabaseApprove = async (payment) => {
 
       await rejectedRef.set(rejectedPayment);
       await transactionRef.set(rejectedPayment);
-      // await paymentRef.remove();
+      await paymentRef.remove();
 
     } catch (err) {
       console.error('Rejection DB error:', err);

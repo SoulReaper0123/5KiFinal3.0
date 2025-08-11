@@ -660,11 +660,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Date Added:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.dateAdded || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Time Added:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.timeAdded || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedMember?.dateApproved || 'N/A'}</span>
                   </div>
                 </div>
                 <div style={styles.rightColumn}>

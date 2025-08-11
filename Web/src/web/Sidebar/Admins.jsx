@@ -603,7 +603,6 @@ const Admins = () => {
       });
 
       await auth.currentUser.updatePassword(password);
-      await auth.currentUser.sendEmailVerification();
 
       await database.ref(`Users/Admin/${newId}`).set({
         id: newId,

@@ -8,74 +8,69 @@ import {
   Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-
-export function TwoFactorEmail({ navigation }) {
-  const [email, setEmail] = useState('');
-
-  const handleSendCode = () => {
-    if (!email) {
-      Alert.alert('Error', 'Please enter your email');
-      return;
-    }
-
-    const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(`Verification code sent to ${email}: ${verificationCode}`);
-    Alert.alert('Code Sent', `A 6-digit verification code has been sent to your email.`);
-    navigation.navigate('VerifyCode', { email, verificationCode });
-  };
-
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Two-Factor Authentication</Text>
-      <TextInput
-        style={styles.input}
-        placeholder="Enter Email"
-        value={email}
-        onChangeText={setEmail}
-        keyboardType="email-address"
-        autoCapitalize="none"
-        placeholderTextColor="#999"
-      />
-      <TouchableOpacity style={styles.button} onPress={handleSendCode}>
-        <Text style={styles.buttonText}>Send Code</Text>
-      </TouchableOpacity>
-    </View>
-  );
-}
+import * as Keychain from 'react-native-keychain';
+import * as LocalAuthentication from 'expo-local-authentication';
+import { useNavigation, useRoute } from '@react-navigation/native';
 
 export default function VerifyCode({ route, navigation }) {
-  const { email, verificationCode } = route.params;
+  const { email, password, verificationCode, fromBiometric } = route.params;
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
   const inputRefs = useRef([]);
+  const nav = useNavigation();
 
   useEffect(() => {
-    // Initialize refs array
     inputRefs.current = inputRefs.current.slice(0, 6);
-    // Focus first input on mount
     inputRefs.current[0]?.focus();
   }, []);
 
+  const promptBiometricSetup = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!hasHardware || !isEnrolled) {
+        nav.navigate('DrawerNav', { email });
+        return;
+      }
+
+      Alert.alert(
+        'Enable Fingerprint Login?',
+        'Do you want to enable fingerprint authentication for faster login next time?',
+        [
+          {
+            text: 'Not Now',
+            onPress: () => nav.navigate('DrawerNav', { email }),
+            style: 'cancel',
+          },
+          {
+            text: 'Enable',
+            onPress: () => nav.navigate('BiometricSetup', { email, password }),
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Biometric check error:', error);
+      nav.navigate('DrawerNav', { email });
+    }
+  };
+
   const handleChange = (text, index) => {
-    // Only allow single digit input
     if (!/^\d?$/.test(text)) return;
 
     const newDigits = [...digits];
     newDigits[index] = text;
     setDigits(newDigits);
 
-    // Auto-focus next input if digit was entered
     if (text && index < 5) {
       inputRefs.current[index + 1]?.focus();
     }
 
-    // Auto-submit if last digit was entered
     if (index === 5 && text) {
       handleVerify();
     }
   };
 
   const handleKeyPress = ({ nativeEvent: { key } }, index) => {
-    // Handle backspace to move to previous input
     if (key === 'Backspace' && !digits[index] && index > 0) {
       const newDigits = [...digits];
       newDigits[index - 1] = '';
@@ -89,11 +84,13 @@ export default function VerifyCode({ route, navigation }) {
     if (code.length < 6) return;
 
     if (code === verificationCode) {
-      Alert.alert('Success', 'Verification successful!');
-      navigation.navigate('DrawerNav', { email });
+      if (fromBiometric) {
+        nav.navigate('DrawerNav', { email });
+      } else {
+        promptBiometricSetup();
+      }
     } else {
       Alert.alert('Error', 'Invalid verification code. Please try again.');
-      // Reset all inputs and focus first one
       setDigits(['', '', '', '', '', '']);
       inputRefs.current[0]?.focus();
     }
@@ -145,25 +142,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#2D5783',
     padding: 20,
   },
-  title: {
-    fontSize: 35,
-    fontWeight: 'bold',
-    color: 'white',
-    marginTop: -100,
-    marginBottom: 80,
-    textAlign: 'center',
-  },
-  input: {
-    width: '80%',
-    height: 50,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    backgroundColor: '#F5F5F5',
-    marginBottom: 50,
-    fontSize: 16,
-    color: '#333',
+  backButton: {
+    position: 'absolute',
+    top: 50,
+    left: 20,
+    zIndex: 1,
   },
   infoText: {
     fontSize: 16,
@@ -205,11 +188,5 @@ const styles = StyleSheet.create({
     color: 'black',
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
   },
 });

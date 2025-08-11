@@ -15,10 +15,13 @@ import {
   TouchableWithoutFeedback,
   ScrollView,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useIsFocused } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
+import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { auth } from '../../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 
 const { width, height } = Dimensions.get('window');
 
@@ -27,7 +30,9 @@ export default function AppLoginPage() {
   const [password, setPassword] = useState('');
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [showBiometricOption, setShowBiometricOption] = useState(false);
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
   const passwordInputRef = useRef(null);
 
   useEffect(() => {
@@ -44,93 +49,160 @@ export default function AppLoginPage() {
     return () => backHandler.remove();
   }, []);
 
+  useEffect(() => {
+    if (isFocused) {
+      checkForBiometricCredentials();
+    }
+  }, [isFocused]);
+
+  const checkForBiometricCredentials = async () => {
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!hasHardware || !isEnrolled) {
+        setShowBiometricOption(false);
+        return;
+      }
+
+      const credentials = await SecureStore.getItemAsync('biometricCredentials');
+      
+      if (credentials) {
+        const { email } = JSON.parse(credentials);
+        setShowBiometricOption(true);
+        setEmail(email);
+      } else {
+        setShowBiometricOption(false);
+      }
+    } catch (error) {
+      console.log('SecureStore error:', error);
+      setShowBiometricOption(false);
+    }
+  };
+
+  const handleBiometricLogin = async () => {
+    try {
+      setLoading(true);
+      
+      const result = await LocalAuthentication.authenticateAsync({
+        promptMessage: 'Authenticate with biometrics to login',
+        disableDeviceFallback: true,
+        fallbackLabel: '',
+      });
+
+      if (result.success) {
+        const credentials = await SecureStore.getItemAsync('biometricCredentials');
+        
+        if (credentials) {
+          const { email, password } = JSON.parse(credentials);
+          navigation.navigate('TwoFactorEmail', { 
+            email,
+            password,
+            fromBiometric: true 
+          });
+          setEmail('');
+          setPassword('');
+        }
+      }
+    } catch (error) {
+      Alert.alert('Authentication Failed', 'Biometric authentication failed. Please try again or use email/password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleLogin = async () => {
-  if (!email || !password) {
-    Alert.alert('Missing Information', 'Please enter both your email and password to continue');
-    return;
-  }
-
-  // Friendly email format validation
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    Alert.alert(
-      'Check Your Email',
-      'This doesn\'t look like a valid email address. Please check for typos (e.g., yourname@example.com)'
-    );
-    return;
-  }
-
-  setLoading(true);
-
-  try {
-    const userCredential = await signInWithEmailAndPassword(auth, email, password);
-    navigation.navigate('TwoFactorEmail', { email });
-  } catch (error) {
-    let title = '';
-    let message = '';
-    let buttons = [{ text: 'OK' }];
-
-    switch (error.code) {
-      case 'auth/wrong-password':
-        title = 'Incorrect Password';
-        message = 'The password you entered is incorrect. Please try again.';
-        buttons = [
-          { text: 'Try Again' },
-          { 
-            text: 'Reset Password', 
-            onPress: () => navigation.navigate('ForgotPassword', { email }) 
-          }
-        ];
-        break;
-
-      case 'auth/user-not-found':
-        title = 'Account Not Found';
-        message = `No account found with ${email}. Would you like to sign up instead?`;
-        buttons = [
-          { text: 'Try Different Email' },
-          { 
-            text: 'Sign Up', 
-            onPress: () => navigation.navigate('Register', { prefillEmail: email }) 
-          }
-        ];
-        break;
-
-      case 'auth/invalid-email':
-        title = 'Invalid Email';
-        message = 'Please enter a complete email address (e.g., yourname@example.com)';
-        break;
-
-      case 'auth/too-many-requests':
-        title = 'Too Many Attempts';
-        message = 'For your security, login is temporarily blocked. Please try again later or reset your password.';
-        buttons = [
-          { text: 'OK' },
-          { 
-            text: 'Reset Password', 
-            onPress: () => navigation.navigate('ForgotPassword', { email }) 
-          }
-        ];
-        break;
-
-      case 'auth/user-disabled':
-        title = 'Account Disabled';
-        message = 'This account has been deactivated. Please contact support for assistance.';
-        break;
-
-      case 'auth/network-request-failed':
-        title = 'Connection Error';
-        message = 'Unable to connect to our servers. Please check your internet connection and try again.';
-        break;
-
-      default:
-        title = 'Login Error';
-        message = 'We encountered an unexpected error. Please try again.';
+    if (!email || !password) {
+      Alert.alert('Missing Information', 'Please enter both your email and password to continue');
+      return;
     }
 
-    Alert.alert(title, message, buttons);
-  } finally {
-    setLoading(false);
-  }
-};
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      Alert.alert(
+        'Check Your Email',
+        'This doesn\'t look like a valid email address. Please check for typos (e.g., yourname@example.com)'
+      );
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      navigation.navigate('TwoFactorEmail', { 
+        email,
+        password,
+        fromBiometric: false 
+      });
+      setEmail('');
+      setPassword('');
+    } catch (error) {
+      let title = '';
+      let message = '';
+      let buttons = [{ text: 'OK' }];
+
+      switch (error.code) {
+        case 'auth/wrong-password':
+          title = 'Incorrect Password';
+          message = 'The password you entered is incorrect. Please try again.';
+          buttons = [
+            { text: 'Try Again' },
+            { 
+              text: 'Reset Password', 
+              onPress: () => navigation.navigate('ForgotPassword', { email }) 
+            }
+          ];
+          break;
+
+        case 'auth/user-not-found':
+          title = 'Account Not Found';
+          message = `No account found with ${email}. Would you like to sign up instead?`;
+          buttons = [
+            { text: 'Try Different Email' },
+            { 
+              text: 'Sign Up', 
+              onPress: () => navigation.navigate('Register', { prefillEmail: email }) 
+            }
+          ];
+          break;
+
+        case 'auth/invalid-email':
+          title = 'Invalid Email';
+          message = 'Please enter a complete email address (e.g., yourname@example.com)';
+          break;
+
+        case 'auth/too-many-requests':
+          title = 'Too Many Attempts';
+          message = 'For your security, login is temporarily blocked. Please try again later or reset your password.';
+          buttons = [
+            { text: 'OK' },
+            { 
+              text: 'Reset Password', 
+              onPress: () => navigation.navigate('ForgotPassword', { email }) 
+            }
+          ];
+          break;
+
+        case 'auth/user-disabled':
+          title = 'Account Disabled';
+          message = 'This account has been deactivated. Please contact support for assistance.';
+          break;
+
+        case 'auth/network-request-failed':
+          title = 'Connection Error';
+          message = 'Unable to connect to our servers. Please check your internet connection and try again.';
+          break;
+
+        default:
+          title = 'Login Error';
+          message = 'We encountered an unexpected error. Please try again.';
+      }
+
+      Alert.alert(title, message, buttons);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleRegister = () => {
     navigation.navigate('Register');
@@ -231,6 +303,16 @@ export default function AppLoginPage() {
               <Text style={styles.loginButtonText}>Sign In</Text>
             </TouchableOpacity>
 
+            {showBiometricOption && (
+              <TouchableOpacity 
+                style={styles.biometricButton}
+                onPress={handleBiometricLogin}
+                disabled={loading}
+              >
+              <MaterialIcons name="fingerprint" size={24} color="white" />
+              </TouchableOpacity>
+            )}
+
             <View style={styles.registerRow}>
               <Text style={styles.promptText}>Don't have an account?</Text>
               <TouchableOpacity onPress={handleRegister} disabled={loading}>
@@ -238,8 +320,6 @@ export default function AppLoginPage() {
               </TouchableOpacity>
             </View>
 
-
-            {/* Overlay to disable interaction while loading */}
             {loading && (
               <TouchableWithoutFeedback>
                 <View style={styles.loadingOverlay}>
@@ -269,6 +349,15 @@ const styles = StyleSheet.create({
     borderRadius: 100, 
     overflow: 'hidden',
     marginBottom: 40, 
+  },
+  biometricButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#4FE7AF',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginVertical: 10,
   },
   title: {
     fontSize: 30,
@@ -354,7 +443,6 @@ const styles = StyleSheet.create({
   loginButtonText: {
     color: 'white',
     fontSize: 18,
-    
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
@@ -372,7 +460,6 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
   },
-
   loadingOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
@@ -385,11 +472,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 10,
   },
-  
   inlineRegisterText: {
     color: '#4FE7AF',
     fontSize: 16,
     fontWeight: 'bold',
   },
-  
 });

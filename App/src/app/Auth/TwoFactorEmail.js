@@ -1,29 +1,41 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { sendVerificationCode } from '../../api';
 
 export default function TwoFactorEmail({ route, navigation }) {
-  // Email comes from previous screen and CANNOT be edited
-  const email = route.params?.email || '';
+  const { email, fromBiometric } = route.params;
 
   const handleSendCode = () => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // In production: Actually send this code via your email service
-    console.log(`Verification code sent to ${email}: ${verificationCode}`);
-    
+    // Immediately navigate to next screen
     navigation.navigate('VerifyCode', { 
       email,
       verificationCode,
-      // Lock these values so they can't be modified
-      lockedEmail: email,
-      lockedCode: verificationCode 
+      fromBiometric
     });
+
+    // Then send email in background (no await)
+    sendVerificationCode({
+      email,
+      verificationCode
+    })
+    .then(response => {
+      if (!response.success) {
+        console.error('Email sending failed:', response.message);
+      }
+    })
+    .catch(error => {
+      console.error('Email sending error:', error);
+    });
+
+    // Still keep console log for debugging
+    console.log(`Verification code sent to ${email}: ${verificationCode}`);
   };
 
   return (
     <View style={styles.container}>
-      {/* Back Button */}
       <TouchableOpacity 
         style={styles.backButton} 
         onPress={() => navigation.goBack()}
@@ -32,12 +44,9 @@ export default function TwoFactorEmail({ route, navigation }) {
         <MaterialIcons name="arrow-back" size={30} color="white" />
       </TouchableOpacity>
 
-      {/* Main Content */}
       <View style={styles.contentContainer}>
-        {/* Title */}
         <Text style={styles.title}>Two-Factor Authentication</Text>
         
-        {/* Email Display */}
         <View style={styles.emailContainer}>
           <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
             {email}
@@ -45,12 +54,10 @@ export default function TwoFactorEmail({ route, navigation }) {
           <MaterialIcons name="lock" size={20} color="#666" />
         </View>
 
-        {/* Instructions */}
         <Text style={styles.instructions}>
           For your security, we'll send a 6-digit verification code to this email address.
         </Text>
         
-        {/* Send Code Button */}
         <TouchableOpacity 
           style={styles.button} 
           onPress={handleSendCode}

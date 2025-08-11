@@ -5,7 +5,7 @@ import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@rea
 import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
 import { getDatabase, ref, get, child } from 'firebase/database';
 import { MaterialIcons } from '@expo/vector-icons';
-
+import { auth } from '../../App/src/firebaseConfig';
 
 import Splashscreen from '../src/app/Splashscreen';
 import AppLoginPage from '../src/app/Auth/AppLoginPage';
@@ -28,12 +28,11 @@ import VerifyCode from '../src/app/Auth/VerifyCode';
 import Bot from '../src/app/HomePage/Bot';
 import Inbox from '../src/app/HomePage/Inbox';
 import WithdrawMembership from '../src/app/HomePage/WithdrawMembership';
-import ChangePassword from '../src/app/Drawer/ChangePassword'; // Import the ChangePassword component
+import ChangePassword from '../src/app/Drawer/ChangePassword';
 import AboutUs from '../src/app/Drawer/AboutUs';
 import ContactUs from '../src/app/Drawer/ContactUs';
 import RegistrationFeePage from '../src/app/Auth/RegistrationFeePage';
 import BiometricSetupScreen from '../src/app/Auth/BiometricSetupScreen';
-
 
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
@@ -41,7 +40,7 @@ const Drawer = createDrawerNavigator();
 const CustomDrawerContent = ({ user, loading, ...props }) => {
   const [logoutLoading, setLogoutLoading] = useState(false);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     Alert.alert(
       'Confirm Logout',
       'Are you sure you want to logout?',
@@ -49,12 +48,17 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'OK',
-          onPress: () => {
+          onPress: async () => {
             setLogoutLoading(true);
-            setTimeout(() => {
-              setLogoutLoading(false);
+            try {
+              await auth.signOut();
               props.navigation.navigate('Login');
-            }, 2000);
+            } catch (error) {
+              console.error('Logout error:', error);
+              Alert.alert('Logout Error', 'There was an error during logout');
+            } finally {
+              setLogoutLoading(false);
+            }
           },
         },
       ],
@@ -66,21 +70,19 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
     <View style={{ flex: 1 }} pointerEvents={logoutLoading ? 'none' : 'auto'}>
       <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
         <View style={styles.profileContainer}>
-  {/* ← Back Arrow Button */}
-    <TouchableOpacity
-    style={styles.backArrow}
-    onPress={() => props.navigation.navigate('HomeTab')}
-  >
-    <MaterialIcons name="arrow-forward" size={28} color="white" />
-  </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.backArrow}
+            onPress={() => props.navigation.navigate('HomeTab')}
+          >
+            <MaterialIcons name="arrow-forward" size={28} color="white" />
+          </TouchableOpacity>
 
-
-  {user?.selfie && (
-    <Image source={{ uri: user.selfie }} style={styles.profileImage} />
-  )}
-  <Text style={styles.profileName}>{user?.fullName || 'User'}</Text>
-  <Text style={styles.profileEmail}>{user?.email}</Text>
-</View>
+          {user?.selfie && (
+            <Image source={{ uri: user.selfie }} style={styles.profileImage} />
+          )}
+          <Text style={styles.profileName}>{user?.fullName || 'User'}</Text>
+          <Text style={styles.profileEmail}>{user?.email}</Text>
+        </View>
 
         <View style={styles.separator} />
         {loading ? (
@@ -154,7 +156,7 @@ const DrawerNavigator = ({ route }) => {
         drawerStyle: { backgroundColor: 'black' },
       }}
     >
-       <Drawer.Screen name="Home" component={AppHome} initialParams={{ user }} options={{ headerShown: false }} />
+      <Drawer.Screen name="Home" component={AppHome} initialParams={{ user }} options={{ headerShown: false }} />
       <Drawer.Screen name="Account Management" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
       <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
       <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
@@ -192,14 +194,13 @@ const AppNav = () => (
       <Stack.Screen name="ContactUs" component={ContactUs} options={{ headerShown: false }} />
       <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} options={{ headerShown: false }} />
       <Stack.Screen 
-  name="BiometricSetup" 
-  component={BiometricSetupScreen} 
-  options={{ 
-    headerShown: false,
-    gestureEnabled: false 
-  }} 
-/>
-      
+        name="BiometricSetup" 
+        component={BiometricSetupScreen} 
+        options={{ 
+          headerShown: false,
+          gestureEnabled: false 
+        }} 
+      />
     </Stack.Navigator>
   </NavigationContainer>
 );
@@ -272,12 +273,11 @@ const styles = StyleSheet.create({
     color: 'black',
   },
   backArrow: {
-  position: 'absolute',
-  top: 50,
-  right: 20,
-  zIndex: 10,
-},
-
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+  },
 });
 
 export default AppNav;

@@ -453,10 +453,6 @@ const RejectedRegistrations = ({
                     <span style={styles.fieldValue}>{selectedRegistration?.dateRejected || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Time Rejected:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.rejectedTime || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Rejection Reason:</span>
                     <span style={styles.fieldValue}>{selectedRegistration?.rejectionReason || 'Rejected by admin'}</span>
                   </div>

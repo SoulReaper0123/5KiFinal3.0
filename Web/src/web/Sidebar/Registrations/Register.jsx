@@ -842,7 +842,6 @@ const Register = () => {
           <div className="circle-tab-wrapper">
             {[
               { key: 'registrations', label: 'Pending', color: '#2D5783' },
-              { key: 'approvedRegistrations', label: 'Approved', color: '#008000' },
               { key: 'rejectedRegistrations', label: 'Rejected', color: '#FF0000' },
               { key: 'members', label: 'Members', color: '#2D5783' },
             ].map((tab) => {
@@ -1074,13 +1073,7 @@ const Register = () => {
                 </div>
                 
                 <div className="modal-button-container">
-                  <button 
-                    className="modal-cancel-button" 
-                    onClick={closeAddModal}
-                  >
-                    Cancel
-                  </button>
-                  <button
+                                 <button
                     className="modal-submit-button"
                     onClick={handleSubmitConfirmation}
                     disabled={uploading}
@@ -1091,6 +1084,13 @@ const Register = () => {
                       'Add Member'
                     )}
                   </button>
+                  <button 
+                    className="modal-cancel-button" 
+                    onClick={closeAddModal}
+                  >
+                    Cancel
+                  </button>
+   
                 </div>
               </div>
             </div>

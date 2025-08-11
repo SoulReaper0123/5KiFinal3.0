@@ -6,15 +6,15 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Alert,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as Keychain from 'react-native-keychain';
+import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 export default function BiometricSetupScreen() {
   const [isLoading, setIsLoading] = useState(false);
-  const [biometricType, setBiometricType] = useState(null);
   const [error, setError] = useState(null);
   const navigation = useNavigation();
   const route = useRoute();
@@ -25,21 +25,23 @@ export default function BiometricSetupScreen() {
   }, []);
 
   const checkBiometricSupport = async () => {
-    const compatible = await LocalAuthentication.hasHardwareAsync();
-    const enrolled = await LocalAuthentication.isEnrolledAsync();
-    const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
-    
-    if (!compatible || !enrolled) {
-      setError('Biometric authentication not available or not set up on this device');
-      return;
+    try {
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!hasHardware) {
+        setError('Fingerprint scanner not available on this device');
+        return;
+      }
+      
+      if (!isEnrolled) {
+        setError('No fingerprints registered on this device. Please set up fingerprints in your device settings.');
+        return;
+      }
+    } catch (err) {
+      console.error('Biometric check error:', err);
+      setError('Unable to check biometric capabilities');
     }
-
-    const typeMap = {
-      [LocalAuthentication.AuthenticationType.FINGERPRINT]: 'Fingerprint',
-      [LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION]: 'Face ID',
-    };
-
-    setBiometricType(typeMap[types[0]] || 'Biometric');
   };
 
   const setupBiometrics = async () => {
@@ -48,19 +50,23 @@ export default function BiometricSetupScreen() {
 
     try {
       const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: `Register your ${biometricType} for future logins`,
+        promptMessage: 'Verify your fingerprint to enable login',
         disableDeviceFallback: true,
+        fallbackLabel: '',
       });
 
       if (result.success) {
-        await Keychain.setGenericPassword(email, password, {
-          accessControl: Keychain.ACCESS_CONTROL.BIOMETRY_ANY,
-          accessible: Keychain.ACCESSIBLE.WHEN_UNLOCKED,
-          authenticationType: Keychain.AUTHENTICATION_TYPE.BIOMETRICS,
-        });
-        navigation.goBack();
+        await SecureStore.setItemAsync(
+          'biometricCredentials',
+          JSON.stringify({ email, password })
+        );
+        Alert.alert(
+          'Success', 
+          'Fingerprint login has been enabled!',
+          [{ text: 'OK', onPress: () => navigation.navigate('DrawerNav', { email })}]
+        );
       } else {
-        setError('Authentication failed. Please try again.');
+        setError('Fingerprint authentication failed. Please try again.');
       }
     } catch (err) {
       console.error('Biometric setup error:', err);
@@ -71,39 +77,30 @@ export default function BiometricSetupScreen() {
   };
 
   const skipSetup = () => {
-    navigation.goBack();
-  };
-
-  // Choose appropriate icon based on biometric type
-  const getBiometricIcon = () => {
-    switch(biometricType) {
-      case 'Fingerprint':
-        return 'fingerprint';
-      case 'Face ID':
-        return 'face';
-      default:
-        return 'security';
-    }
+    navigation.navigate('DrawerNav', { email });
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        {/* Replace Image with Material Icon */}
         <MaterialIcons 
-          name={getBiometricIcon()} 
+          name="fingerprint" 
           size={120} 
           color="#4FE7AF" 
           style={styles.icon} 
         />
         
-        <Text style={styles.title}>Enable {biometricType} Login</Text>
+        <Text style={styles.title}>Enable Fingerprint Login</Text>
         
         <Text style={styles.description}>
-          You can use your {biometricType} to securely log in to your account without entering your password each time.
+          You can use your fingerprint to securely log in to your account without entering your password each time.
         </Text>
 
-        {error && <Text style={styles.errorText}>{error}</Text>}
+        {error && (
+          <Text style={styles.errorText}>
+            {error}
+          </Text>
+        )}
 
         <TouchableOpacity
           style={styles.primaryButton}
@@ -113,7 +110,7 @@ export default function BiometricSetupScreen() {
           {isLoading ? (
             <ActivityIndicator color="white" />
           ) : (
-            <Text style={styles.buttonText}>Set Up {biometricType}</Text>
+            <Text style={styles.buttonText}>Set Up Fingerprint</Text>
           )}
         </TouchableOpacity>
 
@@ -162,6 +159,7 @@ const styles = StyleSheet.create({
     color: '#FF6B6B',
     marginBottom: 20,
     textAlign: 'center',
+    paddingHorizontal: 20,
   },
   primaryButton: {
     backgroundColor: '#4FE7AF',
