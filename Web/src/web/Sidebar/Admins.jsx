@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { 
   FaSearch, 
   FaDownload, 
@@ -25,13 +25,11 @@ const generateRandomPassword = () => {
   return pwd;
 };
 
-// Helper function to format date as "Month Day, Year"
 const formatDate = (date) => {
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return date.toLocaleDateString('en-US', options);
 };
 
-// Helper function to format time as "HH:MM:SS"
 const formatTime = (date) => {
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
@@ -184,10 +182,28 @@ const Admins = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+  const [gender, setGender] = useState('');
+  const [civilStatus, setCivilStatus] = useState('');
+  const [placeOfBirth, setPlaceOfBirth] = useState('');
+  const [address, setAddress] = useState('');
+  const [age, setAge] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateText, setDateText] = useState('Select Date of Birth');
+  const [governmentId, setGovernmentId] = useState('');
+  const [validIdFront, setValidIdFront] = useState(null);
+  const [validIdBack, setValidIdBack] = useState(null);
+  const [selfie, setSelfie] = useState(null);
+  const [selfieWithId, setSelfieWithId] = useState(null);
   const [emailError, setEmailError] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [contactNumberError, setContactNumberError] = useState('');
+  const [genderError, setGenderError] = useState('');
+  const [civilStatusError, setCivilStatusError] = useState('');
+  const [placeOfBirthError, setPlaceOfBirthError] = useState('');
+  const [addressError, setAddressError] = useState('');
+  const [governmentIdError, setGovernmentIdError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmAddVisible, setConfirmAddVisible] = useState(false);
@@ -205,6 +221,25 @@ const Admins = () => {
   const [filteredData, setFilteredData] = useState([]);
   const [noMatch, setNoMatch] = useState(false);
   const pageSize = 10;
+
+  const genderOptions = [
+    { key: 'Male', label: 'Male' },
+    { key: 'Female', label: 'Female' }
+  ];
+
+  const civilStatusOptions = [
+    { key: 'Single', label: 'Single' },
+    { key: 'Married', label: 'Married' },
+    { key: 'Widowed', label: 'Widowed' },
+    { key: 'Separated', label: 'Separated' }
+  ];
+
+  const governmentIdOptions = [
+    { key: 'national', label: 'National ID (PhilSys)' },
+    { key: 'sss', label: 'SSS ID' },
+    { key: 'philhealth', label: 'PhilHealth ID' },
+    { key: 'drivers_license', label: 'Drivers License' }
+  ];
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -330,7 +365,7 @@ const Admins = () => {
         margin-top: 10px;
         background-color: #fff;
         border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        boxShadow: 0 1px 3px rgba(0,0,0,0.1);
       }
       .no-match-text {
         text-align: center;
@@ -352,6 +387,7 @@ const Admins = () => {
         padding: 20px;
         position: relative;
         overflow-x: hidden;
+        overflow-y: auto;
       }
       @media (max-width: 800px) {
         .modal-container {
@@ -393,6 +429,14 @@ const Admins = () => {
         border: 1px solid #ccc;
         border-radius: 5px;
         box-sizing: border-box;
+      }
+      .form-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        box-sizing: border-box;
+        background-color: white;
       }
       .error-text {
         color: red;
@@ -446,6 +490,42 @@ const Admins = () => {
         border-radius: 5px;
         cursor: pointer;
         font-weight: bold;
+      }
+      .date-input-container {
+        display: flex;
+        align-items: center;
+      }
+      .date-input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        margin-right: 10px;
+      }
+      .date-picker-button {
+        padding: 10px;
+        background-color: #2D5783;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+      .file-input-label {
+        display: block;
+        padding: 10px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: 5px;
+      }
+      .file-input {
+        display: none;
+      }
+      .file-name {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
       }
     `;
     document.head.appendChild(styleElement);
@@ -535,6 +615,11 @@ const Admins = () => {
     setLastNameError('');
     setEmailError('');
     setContactNumberError('');
+    setGenderError('');
+    setCivilStatusError('');
+    setPlaceOfBirthError('');
+    setAddressError('');
+    setGovernmentIdError('');
 
     if (!firstName.trim()) {
       setFirstNameError('First name is required');
@@ -562,7 +647,59 @@ const Admins = () => {
       isValid = false;
     }
 
+    if (!gender) {
+      setGenderError('Gender is required');
+      isValid = false;
+    }
+
+    if (!civilStatus) {
+      setCivilStatusError('Civil status is required');
+      isValid = false;
+    }
+
+    if (!placeOfBirth.trim()) {
+      setPlaceOfBirthError('Place of birth is required');
+      isValid = false;
+    }
+
+    if (!address.trim()) {
+      setAddressError('Address is required');
+      isValid = false;
+    }
+
+    if (!governmentId) {
+      setGovernmentIdError('Government ID is required');
+      isValid = false;
+    }
+
+    if (age < 21) {
+      setErrorMessage('Admin must be at least 21 years old');
+      setErrorModalVisible(true);
+      isValid = false;
+    }
+
+    if (!validIdFront || !validIdBack || !selfie || !selfieWithId) {
+      setErrorMessage('All image uploads are required');
+      setErrorModalVisible(true);
+      isValid = false;
+    }
+
     return isValid;
+  };
+
+  const handleDateChange = (date) => {
+    setDateOfBirth(date);
+    setDateText(date.toDateString());
+    const currentYear = new Date().getFullYear();
+    const birthYear = date.getFullYear();
+    setAge(currentYear - birthYear);
+  };
+
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file.name);
+    }
   };
 
   const onPressAdd = async () => {
@@ -579,7 +716,14 @@ const Admins = () => {
       middleName,
       lastName,
       email,
-      contactNumber
+      contactNumber,
+      gender,
+      civilStatus,
+      placeOfBirth,
+      address,
+      age,
+      dateOfBirth,
+      governmentId
     });
     setConfirmAddVisible(true);
   };
@@ -611,11 +755,22 @@ const Admins = () => {
         lastName,
         email,
         contactNumber,
+        gender,
+        civilStatus,
+        placeOfBirth,
+        address,
+        age,
+        dateOfBirth: dateOfBirth.toISOString(),
+        governmentId,
         dateAdded,
         timeAdded,
         role: 'admin',
         uid: userCredential.user.uid,
-        initialPassword: password
+        initialPassword: password,
+        validIdFront: validIdFront,
+        validIdBack: validIdBack,
+        selfie: selfie,
+        selfieWithId: selfieWithId
       });
 
       await database.ref(`Members/${newId}`).set({
@@ -625,11 +780,22 @@ const Admins = () => {
         lastName,
         email,
         contactNumber,
+        gender,
+        civilStatus,
+        placeOfBirth,
+        address,
+        age,
+        dateOfBirth: dateOfBirth.toISOString(),
+        governmentId,
         dateAdded,
         timeAdded,
         role: 'admin',
         status: 'active',
-        uid: userCredential.user.uid
+        uid: userCredential.user.uid,
+        validIdFront: validIdFront,
+        validIdBack: validIdBack,
+        selfie: selfie,
+        selfieWithId: selfieWithId
       });
 
       setPendingAdd({
@@ -638,7 +804,14 @@ const Admins = () => {
         lastName,
         email,
         contactNumber,
-        password
+        password,
+        gender,
+        civilStatus,
+        placeOfBirth,
+        address,
+        age,
+        dateOfBirth,
+        governmentId
       });
 
       setSuccessMessage(`Admin account created successfully!`);
@@ -740,6 +913,18 @@ const Admins = () => {
       setLastName('');
       setEmail('');
       setContactNumber('');
+      setGender('');
+      setCivilStatus('');
+      setPlaceOfBirth('');
+      setAddress('');
+      setAge('');
+      setDateOfBirth(new Date());
+      setDateText('Select Date of Birth');
+      setGovernmentId('');
+      setValidIdFront(null);
+      setValidIdBack(null);
+      setSelfie(null);
+      setSelfieWithId(null);
       setModalVisible(false);
     } 
     else if (pendingDelete) {
@@ -896,6 +1081,18 @@ const Admins = () => {
                   setLastName('');
                   setEmail('');
                   setContactNumber('');
+                  setGender('');
+                  setCivilStatus('');
+                  setPlaceOfBirth('');
+                  setAddress('');
+                  setAge('');
+                  setDateOfBirth(new Date());
+                  setDateText('Select Date of Birth');
+                  setGovernmentId('');
+                  setValidIdFront(null);
+                  setValidIdBack(null);
+                  setSelfie(null);
+                  setSelfieWithId(null);
                 }} 
                 style={styles.closeButton}
                 aria-label="Close modal"
@@ -945,6 +1142,104 @@ const Admins = () => {
 
                 <div className="form-group">
                   <label className="form-label">
+                    Gender<span className="required-asterisk">*</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value)}
+                  >
+                    <option value="">Select Gender</option>
+                    {genderOptions.map(option => (
+                      <option key={option.key} value={option.key}>{option.label}</option>
+                    ))}
+                  </select>
+                  {genderError && <span className="error-text">{genderError}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Date of Birth<span className="required-asterisk">*</span>
+                  </label>
+                  <div className="date-input-container">
+                    <input
+                      type="text"
+                      className="date-input"
+                      value={dateText}
+                      readOnly
+                    />
+                    <button
+                      className="date-picker-button"
+                      onClick={() => setShowDatePicker(!showDatePicker)}
+                    >
+                      Select
+                    </button>
+                  </div>
+                  {showDatePicker && (
+                    <input
+                      type="date"
+                      value={dateOfBirth.toISOString().split('T')[0]}
+                      onChange={(e) => handleDateChange(new Date(e.target.value))}
+                      style={{ marginTop: '10px' }}
+                    />
+                  )}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Age</label>
+                  <input
+                    className="form-input"
+                    placeholder="Age"
+                    value={age}
+                    readOnly
+                  />
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Place of Birth<span className="required-asterisk">*</span>
+                  </label>
+                  <input
+                    className="form-input"
+                    placeholder="Place of Birth"
+                    value={placeOfBirth}
+                    onChange={(e) => setPlaceOfBirth(e.target.value)}
+                  />
+                  {placeOfBirthError && <span className="error-text">{placeOfBirthError}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Current Address<span className="required-asterisk">*</span>
+                  </label>
+                  <input
+                    className="form-input"
+                    placeholder="Address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                  />
+                  {addressError && <span className="error-text">{addressError}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Civil Status<span className="required-asterisk">*</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    value={civilStatus}
+                    onChange={(e) => setCivilStatus(e.target.value)}
+                  >
+                    <option value="">Select Civil Status</option>
+                    {civilStatusOptions.map(option => (
+                      <option key={option.key} value={option.key}>{option.label}</option>
+                    ))}
+                  </select>
+                  {civilStatusError && <span className="error-text">{civilStatusError}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
                     Email<span className="required-asterisk">*</span>
                   </label>
                   <input
@@ -975,6 +1270,83 @@ const Admins = () => {
                   {contactNumberError && <span className="error-text">{contactNumberError}</span>}
                 </div>
 
+                <div className="form-group">
+                  <label className="form-label">
+                    Government ID<span className="required-asterisk">*</span>
+                  </label>
+                  <select
+                    className="form-select"
+                    value={governmentId}
+                    onChange={(e) => setGovernmentId(e.target.value)}
+                  >
+                    <option value="">Select Government ID</option>
+                    {governmentIdOptions.map(option => (
+                      <option key={option.key} value={option.label}>{option.label}</option>
+                    ))}
+                  </select>
+                  {governmentIdError && <span className="error-text">{governmentIdError}</span>}
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Valid ID Front<span className="required-asterisk">*</span>
+                  </label>
+                  <label className="file-input-label">
+                    {validIdFront ? validIdFront : 'Click to upload ID Front'}
+                    <input
+                      type="file"
+                      className="file-input"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, setValidIdFront)}
+                    />
+                  </label>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Valid ID Back<span className="required-asterisk">*</span>
+                  </label>
+                  <label className="file-input-label">
+                    {validIdBack ? validIdBack : 'Click to upload ID Back'}
+                    <input
+                      type="file"
+                      className="file-input"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, setValidIdBack)}
+                    />
+                  </label>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Selfie<span className="required-asterisk">*</span>
+                  </label>
+                  <label className="file-input-label">
+                    {selfie ? selfie : 'Click to upload Selfie'}
+                    <input
+                      type="file"
+                      className="file-input"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, setSelfie)}
+                    />
+                  </label>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">
+                    Selfie with ID<span className="required-asterisk">*</span>
+                  </label>
+                  <label className="file-input-label">
+                    {selfieWithId ? selfieWithId : 'Click to upload Selfie with ID'}
+                    <input
+                      type="file"
+                      className="file-input"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, setSelfieWithId)}
+                    />
+                  </label>
+                </div>
+
                 <div className="modal-button-container">
                   <button className="modal-submit-button" onClick={onPressAdd}>
                     Add Admin
@@ -988,6 +1360,18 @@ const Admins = () => {
                       setLastName('');
                       setEmail('');
                       setContactNumber('');
+                      setGender('');
+                      setCivilStatus('');
+                      setPlaceOfBirth('');
+                      setAddress('');
+                      setAge('');
+                      setDateOfBirth(new Date());
+                      setDateText('Select Date of Birth');
+                      setGovernmentId('');
+                      setValidIdFront(null);
+                      setValidIdBack(null);
+                      setSelfie(null);
+                      setSelfieWithId(null);
                     }}
                   >
                     Cancel
@@ -1028,12 +1412,40 @@ const Admins = () => {
                   <p>{selectedAdmin?.lastName || 'N/A'}</p>
                 </div>
                 <div className="form-group">
+                  <label className="form-label">Gender:</label>
+                  <p>{selectedAdmin?.gender || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Date of Birth:</label>
+                  <p>{selectedAdmin?.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Age:</label>
+                  <p>{selectedAdmin?.age || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Place of Birth:</label>
+                  <p>{selectedAdmin?.placeOfBirth || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Address:</label>
+                  <p>{selectedAdmin?.address || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Civil Status:</label>
+                  <p>{selectedAdmin?.civilStatus || 'N/A'}</p>
+                </div>
+                <div className="form-group">
                   <label className="form-label">Email Address:</label>
                   <p>{selectedAdmin?.email || 'N/A'}</p>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Contact Number:</label>
                   <p>{selectedAdmin?.contactNumber || 'N/A'}</p>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Government ID:</label>
+                  <p>{selectedAdmin?.governmentId || 'N/A'}</p>
                 </div>
                 <div className="form-group">
                   <label className="form-label">Date Added:</label>
@@ -1136,6 +1548,7 @@ const Admins = () => {
                   color: '#fff'
                 }} 
                 onClick={handleSuccessOk}
+                autoFocus
               >
                 OK
               </button>

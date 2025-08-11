@@ -9,6 +9,37 @@ console.log('GMAIL_USER:', process.env.GMAIL_USER);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// ==============================================
+// API ENDPOINT REFERENCE TABLE
+// ==============================================
+/*
+|--------------------------------------------------------------------------
+| EMAIL NOTIFICATION API ENDPOINTS
+|--------------------------------------------------------------------------
+| METHOD | ENDPOINT                     | DESCRIPTION
+|--------|------------------------------|-----------------------------------
+| POST   | /send-admin-email            | Send admin creation emails
+| POST   | /send-delete-admin-email     | Send admin deletion emails
+| POST   | /register                    | Send registration emails
+| POST   | /approveRegistrations        | Send registration approval email
+| POST   | /rejectRegistrations         | Send registration rejection email
+| POST   | /send-verification-code      | Send 2FA verification code
+| POST   | /deposit                     | Send deposit notification emails
+| POST   | /approveDeposits             | Send deposit approval email
+| POST   | /rejectDeposits              | Send deposit rejection email
+| POST   | /withdraw                    | Send withdrawal notification emails
+| POST   | /approveWithdraws            | Send withdrawal approval email
+| POST   | /rejectWithdraws             | Send withdrawal rejection email
+| POST   | /applyLoan                   | Send loan application emails
+| POST   | /approveLoans                | Send loan approval email
+| POST   | /rejectLoans                 | Send loan rejection email
+| POST   | /payment                     | Send payment confirmation emails
+| POST   | /approvePayments             | Send payment approval email
+| POST   | /rejectPayments              | Send payment rejection email
+| POST   | /membershipWithdrawal        | Send membership withdrawal emails
+|--------|------------------------------|-----------------------------------
+*/
+
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
@@ -37,15 +68,83 @@ const formatDisplayDate = (dateString) => {
     const options = { 
         year: 'numeric', 
         month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: 'numeric' 
     };
     return new Date(dateString).toLocaleDateString('en-US', options);
 };
 
 app.get('/', (req, res) => {
-    res.send('API is running ✅');
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>5KI Email Notification API</title>
+            <style>
+                body {
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    max-width: 800px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    color: #333;
+                }
+                h1 {
+                    color: #2c3e50;
+                    border-bottom: 2px solid #3498db;
+                    padding-bottom: 10px;
+                }
+                .endpoint {
+                    background-color: #f8f9fa;
+                    border-left: 4px solid #3498db;
+                    padding: 15px;
+                    margin-bottom: 20px;
+                    border-radius: 0 4px 4px 0;
+                }
+                .method {
+                    display: inline-block;
+                    padding: 3px 10px;
+                    border-radius: 3px;
+                    font-weight: bold;
+                    margin-right: 10px;
+                }
+                .post { background-color: #2ecc71; color: white; }
+                .get { background-color: #3498db; color: white; }
+                .status {
+                    color: #27ae60;
+                    font-weight: bold;
+                }
+            </style>
+        </head>
+        <body>
+            <h1>5KI Financial Services Email Notification API</h1>
+            <p class="status">API is running ✅</p>
+            
+            <h2>Available Endpoints</h2>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <strong>/send-admin-email</strong>
+                <p>Send admin creation emails to both the new admin and system owner.</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <strong>/send-delete-admin-email</strong>
+                <p>Send admin deletion emails to both the removed admin and system owner.</p>
+            </div>
+            
+            <div class="endpoint">
+                <span class="method post">POST</span>
+                <strong>/register</strong>
+                <p>Handle new member registration notifications.</p>
+            </div>
+            
+            <!-- Additional endpoints would be listed here -->
+            
+            <p>For full documentation, please refer to the API documentation.</p>
+        </body>
+        </html>
+    `);
 });
 
 // ==============================================
@@ -78,8 +177,6 @@ app.post('/send-admin-email', async (req, res) => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
     });
 
     try {
@@ -89,21 +186,34 @@ app.post('/send-admin-email', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Admin Account Created',
-            text: `
-New Admin Account Created
-
-A new admin account has been successfully created in the system.
-
-Admin Details:
-- Name: ${fullName}
-- Email: ${email}
-- Date Created: ${currentDate}
-
-This is an automated notification. No action is required unless this was unauthorized.
-
-Links:
-- Website: ${websiteLink || WEBSITE_LINK}
-- Facebook: ${facebookLink || FACEBOOK_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        New Admin Account Created
+                    </h2>
+                    <p>A new admin account has been successfully created in the system.</p>
+                    
+                    <h3 style="color: #2c3e50;">Admin Details:</h3>
+                    <ul>
+                        <li><strong>Name:</strong> ${fullName}</li>
+                        <li><strong>Email:</strong> ${email}</li>
+                        <li><strong>Date Created:</strong> ${currentDate}</li>
+                    </ul>
+                    
+                    <p style="font-style: italic; color: #7f8c8d;">
+                        This is an automated notification. No action is required unless this was unauthorized.
+                    </p>
+                    
+                    <h3 style="color: #2c3e50;">Quick Links:</h3>
+                    <ul>
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         };
 
@@ -113,30 +223,51 @@ Links:
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Your 5KI Financial Services Admin Account',
-            text: `
-Welcome to 5KI Financial Services
-
-Dear ${firstName},
-
-Your administrator account has been successfully created. Below are your login credentials:
-
-Account Information:
-- Email: ${email}
-- Temporary Password: ${password}
-- Account Type: Administrator
-
-Important Security Notice:
-- Change your password immediately after first login
-- Never share your credentials with anyone
-- Always log out after your session
-
-Login to your account here: ${websiteLink || WEBSITE_LINK}
-
-For any questions, please contact the system administrator.
-
-Links:
-- Website: ${websiteLink || WEBSITE_LINK}
-- Facebook: ${facebookLink || FACEBOOK_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Welcome to 5KI Financial Services
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    
+                    <p>Your administrator account has been successfully created. Below are your login credentials:</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Account Information:</h3>
+                        <ul>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Temporary Password:</strong> ${password}</li>
+                            <li><strong>Account Type:</strong> Administrator</li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="color: #2c3e50;">Important Security Notice:</h3>
+                    <ul>
+                        <li>Change your password immediately after first login</li>
+                        <li>Never share your credentials with anyone</li>
+                        <li>Always log out after your session</li>
+                    </ul>
+                    
+                    <p>
+                        <a href="${websiteLink || WEBSITE_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
+                            Login to your account
+                        </a>
+                    </p>
+                    
+                    <p>For any questions, please contact the system administrator.</p>
+                    
+                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
+                    <ul>
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         };
 
@@ -190,8 +321,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
     });
 
     try {
@@ -201,21 +330,37 @@ app.post('/send-delete-admin-email', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Admin Account Deleted',
-            text: `
-Admin Account Deletion Notification
-
-An administrator account has been permanently removed from the system.
-
-Account Details:
-- Name: ${fullName}
-- Email: ${email}
-- Date Deleted: ${currentDate}
-
-Note: This action is irreversible. All access privileges have been revoked.
-
-Links:
-- Website: ${websiteLink || WEBSITE_LINK}
-- Facebook: ${facebookLink || FACEBOOK_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Admin Account Deletion Notification
+                    </h2>
+                    
+                    <p>An administrator account has been permanently removed from the system.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Account Details:</h3>
+                        <ul>
+                            <li><strong>Name:</strong> ${fullName}</li>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Date Deleted:</strong> ${currentDate}</li>
+                        </ul>
+                    </div>
+                    
+                    <p style="font-weight: bold; color: #e74c3c;">
+                        Note: This action is irreversible. All access privileges have been revoked.
+                    </p>
+                    
+                    <h3 style="color: #2c3e50;">Quick Links:</h3>
+                    <ul>
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         };
 
@@ -225,28 +370,47 @@ Links:
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Your 5KI Financial Services Admin Access Has Been Removed',
-            text: `
-Account Access Update
-
-Dear ${firstName},
-
-We're writing to inform you that your administrator access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.
-
-Details:
-- Name: ${fullName}
-- Email: ${email}
-- Effective Date: ${currentDate}
-
-Important Information:
-- You will no longer have access to the admin dashboard
-- All admin privileges have been revoked
-- This action is permanent and cannot be undone
-
-If this action was taken in error or you have any questions, please contact the system administrator immediately at ${process.env.GMAIL_USER}.
-
-Links:
-- Website: ${websiteLink || WEBSITE_LINK}
-- Facebook: ${facebookLink || FACEBOOK_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Account Access Update
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <p>We're writing to inform you that your administrator access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Details:</h3>
+                        <ul>
+                            <li><strong>Name:</strong> ${fullName}</li>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Effective Date:</strong> ${currentDate}</li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="color: #2c3e50;">Important Information:</h3>
+                    <ul>
+                        <li>You will no longer have access to the admin dashboard</li>
+                        <li>All admin privileges have been revoked</li>
+                        <li>This action is permanent and cannot be undone</li>
+                    </ul>
+                    
+                    <p style="font-weight: bold;">
+                        If this action was taken in error or you have any questions, please contact the system administrator immediately at 
+                        <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
+                    </p>
+                    
+                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
+                    <ul>
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         };
 
@@ -294,40 +458,70 @@ app.post('/register', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Registration Received',
-            text: `
-New Registration Received
-
-Name: ${firstName} ${lastName}
-Email: ${email}
-Registration Date: ${formatDisplayDate(registrationDate)}
-
-Please review this application in the admin panel: ${DASHBOARD_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        New Registration Received
+                    </h2>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Member Details:</h3>
+                        <ul>
+                            <li><strong>Name:</strong> ${firstName} ${lastName}</li>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Registration Date:</strong> ${formatDisplayDate(registrationDate)}</li>
+                        </ul>
+                    </div>
+                    
+                    <p>
+                        <a href="${DASHBOARD_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                            Review Application
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         };
 
         await transporter.sendMail(ownerMailOptions);
 
         console.log('[NOTIFICATION] Sending registration confirmation to user');
-// Updated registration confirmation email
-const userMailOptions = {
-  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-  to: email,
-  subject: 'Registration Successfully Received - Thank You for Signing Up!',
-  text: `
-Hi ${firstName},
-
-Thank you for registering with 5KI Financial Services!
-
-We are pleased to inform you that we have successfully received your registration application on ${formatDisplayDate(registrationDate)}. Our team is currently reviewing your information and you will receive a confirmation once your application is approved.
-
-In the meantime, if you have any questions or would like to know more about our services, feel free to contact us at ${GMAIL_OWNER}.
-
-Connect with us on Facebook: ${FACEBOOK_LINK}
-
-Best regards,
-5KI Financial Services Team
-  `
-};
+        const userMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Registration Successfully Received - Thank You for Signing Up!',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Thank You for Registering with 5KI Financial Services!
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <p>We are pleased to inform you that we have successfully received your registration application on ${formatDisplayDate(registrationDate)}. Our team is currently reviewing your information and you will receive a confirmation once your application is approved.</p>
+                    
+                    <p>In the meantime, if you have any questions or would like to know more about our services, feel free to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p>
+                        <a href="${FACEBOOK_LINK}" 
+                           style="display: inline-block; background-color: #3b5998; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
+                            Connect With Us on Facebook
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
         await transporter.sendMail(userMailOptions);
         console.log('[NOTIFICATION SUCCESS] Registration emails sent successfully');
@@ -349,25 +543,56 @@ app.post('/approveRegistrations', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending registration approval to user');
-const mailOptions = {
-  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-  to: email,
-  subject: 'Welcome to 5Ki Financial Services - Your Account is Ready!',
-  text: `
-Hi ${firstName},
-
-Thank you for registering with 5Ki Financial Services on ${dateApproved} at ${approvedTime}. Your account has been successfully created and you now have access to our range of services including loan applications, transactions tracking, and account management.
-
-Your Member ID: ${memberId}
-
-Welcome aboard! Please log in to your account to get started.
-
-Connect with us on Facebook: ${FACEBOOK_LINK}
-
-Best regards,
-5KI Financial Services Team
-  `
-};
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Welcome to 5Ki Financial Services - Your Account is Ready!',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Welcome to 5Ki Financial Services!
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            Your account has been successfully approved!
+                        </p>
+                    </div>
+                    
+                    <p>Thank you for registering with 5Ki Financial Services on ${dateApproved}. Your account has been successfully created and you now have access to our range of services including loan applications, transactions tracking, and account management.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <p style="font-weight: bold; margin: 0 0 10px 0;">Your Member ID: <span style="color: #3498db;">${memberId}</span></p>
+                        <p style="margin: 0;">Please keep this ID safe as you'll need it for future transactions.</p>
+                    </div>
+                    
+                    <p style="font-weight: bold;">Welcome aboard! Please log in to your account to get started.</p>
+                    
+                    <p>
+                        <a href="${WEBSITE_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
+                            Login to Your Account
+                        </a>
+                    </p>
+                    
+                    <p>
+                        <a href="${FACEBOOK_LINK}" 
+                           style="display: inline-block; background-color: #3b5998; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
+                            Connect With Us on Facebook
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Registration approval email sent successfully');
@@ -389,26 +614,46 @@ app.post('/rejectRegistrations', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending registration rejection to user');
-const mailOptions = {
-  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-  to: email,
-  subject: 'Registration Application Status',
-  text: `
-Hi ${firstName},
-
-Thank you for your interest in becoming a member of 5KI Financial Services. After careful review, we regret to inform you that your registration application has not been approved at this time due to not meeting the eligibility criteria required for membership.
-
-${rejectionReason ? `Reason: ${rejectionReason}\n` : ''}
-Should you wish to reapply, we recommend reviewing the application guidelines thoroughly and ensuring that all required information is complete and accurate. 
-
-For questions or clarifications, please contact us at ${GMAIL_OWNER}.
-
-We appreciate your interest and hope to serve you in the future.
-
-Best regards,
-5KI Financial Services Team
-  `
-};
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Registration Application Status',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Registration Application Update
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+                            We regret to inform you that your registration application has not been approved at this time.
+                        </p>
+                    </div>
+                    
+                    <p>Thank you for your interest in becoming a member of 5KI Financial Services. After careful review, we regret to inform you that your registration application has not been approved at this time due to not meeting the eligibility criteria required for membership.</p>
+                    
+                    ${rejectionReason ? `
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Reason for Rejection:</h3>
+                        <p>${rejectionReason}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p>Should you wish to reapply, we recommend reviewing the application guidelines thoroughly and ensuring that all required information is complete and accurate.</p>
+                    
+                    <p>For questions or clarifications, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p>We appreciate your interest and hope to serve you in the future.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Registration rejection email sent successfully');
@@ -418,6 +663,7 @@ Best regards,
         res.status(500).json({ message: 'Failed to send email', error: error.message });
     }
 });
+
 // ==============================================
 // TWO-FACTOR AUTHENTICATION
 // ==============================================
@@ -468,26 +714,46 @@ app.post('/send-verification-code', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Your 5KI Financial Services Verification Code',
-            text: `
-Security Verification
-
-Hi ${firstName || 'Customer'},
-
-Your verification code is: ${verificationCode}
-
-This code will expire in 10 minutes. Please enter it in the verification page to complete your login process.
-
-IMPORTANT SECURITY NOTICE:
-- Never share this code with anyone
-- 5KI Financial Services will never ask you for this code
-- If you didn't request this code, contact us immediately at ${GMAIL_OWNER}
-
-Connect with us:
-- Website: ${websiteLink || WEBSITE_LINK}
-- Facebook: ${facebookLink || FACEBOOK_LINK}
-
-Best regards,
-5KI Financial Services Team
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Security Verification
+                    </h2>
+                    
+                    <p>Hi ${firstName || 'Customer'},</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; text-align: center; border-radius: 4px; margin: 20px 0;">
+                        <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">Your verification code is:</p>
+                        <p style="font-size: 28px; font-weight: bold; letter-spacing: 3px; margin: 10px 0; color: #2c3e50;">
+                            ${verificationCode}
+                        </p>
+                        <p style="margin: 0; font-size: 0.9em; color: #7f8c8d;">
+                            This code will expire in 10 minutes.
+                        </p>
+                    </div>
+                    
+                    <p>Please enter this code in the verification page to complete your login process.</p>
+                    
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">IMPORTANT SECURITY NOTICE:</h3>
+                        <ul style="margin-bottom: 0;">
+                            <li>Never share this code with anyone</li>
+                            <li>5KI Financial Services will never ask you for this code</li>
+                            <li>If you didn't request this code, contact us immediately at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a></li>
+                        </ul>
+                    </div>
+                    
+                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
+                    <ul>
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
             `
         };
 
@@ -543,8 +809,6 @@ app.post('/deposit', async (req, res) => {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
         });
 
         // Email to system owner
@@ -553,20 +817,39 @@ app.post('/deposit', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Deposit Application Received',
-            text: `
-New Deposit Application
-
-Member: ${firstName} ${lastName}
-Email: ${email}
-Amount: ₱${amountToBeDeposited}
-Method: ${depositOption}
-Account Name: ${accountName || '5KI'}
-Account Number: ${accountNumber || 'N/A'}
-Transaction ID: ${transactionId || 'N/A'}
-Date Submitted: ${currentDate}
-${proofOfDepositUrl ? 'Proof of deposit attached' : ''}
-
-Please review this application in the admin dashboard: ${DASHBOARD_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        New Deposit Application
+                    </h2>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Member Details:</h3>
+                        <ul>
+                            <li><strong>Name:</strong> ${firstName} ${lastName}</li>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Amount:</strong> ₱${amountToBeDeposited}</li>
+                            <li><strong>Method:</strong> ${depositOption}</li>
+                            <li><strong>Account Name:</strong> ${accountName || '5KI'}</li>
+                            <li><strong>Account Number:</strong> ${accountNumber || 'N/A'}</li>
+                            <li><strong>Transaction ID:</strong> ${transactionId || 'N/A'}</li>
+                            <li><strong>Date Submitted:</strong> ${currentDate}</li>
+                            ${proofOfDepositUrl ? '<li><strong>Proof of deposit:</strong> Attached</li>' : ''}
+                        </ul>
+                    </div>
+                    
+                    <p>
+                        <a href="${DASHBOARD_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                            Review Application
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         });
 
@@ -576,27 +859,41 @@ Please review this application in the admin dashboard: ${DASHBOARD_LINK}
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Deposit Application Received',
-            text: `
-Hi ${firstName},
-
-We have received your deposit application for ₱${amountToBeDeposited} via ${depositOption}.
-
-Application Details:
-- Account Name: ${accountName || '5KI'}
-- Account Number: ${accountNumber || 'N/A'}
-- Transaction ID: ${transactionId || 'N/A'}
-- Date Submitted: ${currentDate}
-
-Our team will process your request and notify you once completed. This typically takes 1-2 business days.
-
-For any questions, please contact us at ${GMAIL_OWNER}.
-
-Connect with us:
-- Website: ${websiteLink || WEBSITE_LINK}
-- Facebook: ${facebookLink || FACEBOOK_LINK}
-
-Best regards,
-5KI Financial Services Team
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Deposit Application Received
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <p>We have received your deposit application for <strong>₱${amountToBeDeposited}</strong> via <strong>${depositOption}</strong>.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Application Details:</h3>
+                        <ul>
+                            <li><strong>Account Name:</strong> ${accountName || '5KI'}</li>
+                            <li><strong>Account Number:</strong> ${accountNumber || 'N/A'}</li>
+                            <li><strong>Transaction ID:</strong> ${transactionId || 'N/A'}</li>
+                            <li><strong>Date Submitted:</strong> ${currentDate}</li>
+                        </ul>
+                    </div>
+                    
+                    <p>Our team will process your request and notify you once completed. This typically takes 1-2 business days.</p>
+                    
+                    <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
+                    <ul>
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
             `
         };
 
@@ -609,87 +906,111 @@ Best regards,
     }
 });
 
-// Add these endpoints to your server code
 app.post('/approveDeposits', async (req, res) => {
-  console.log('[NOTIFICATION] Initiating deposit approval email', req.body);
-  const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
+    console.log('[NOTIFICATION] Initiating deposit approval email', req.body);
+    const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
 
-  if (!email || !firstName || !lastName || !amount || !dateApproved || !timeApproved) {
-    console.log('[NOTIFICATION ERROR] Missing required fields for deposit approval');
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
+    if (!email || !firstName || !lastName || !amount || !dateApproved || !timeApproved) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for deposit approval');
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-  try {
-    console.log('[NOTIFICATION] Sending deposit approval to user');
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Deposit Approved - 5Ki Financial Services',
-      text: `
-Deposit Approved
+    try {
+        console.log('[NOTIFICATION] Sending deposit approval to user');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Deposit Approved - 5Ki Financial Services',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Deposit Approved
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved}.
+                        </p>
+                    </div>
+                    
+                    <p>Your account balance has been updated accordingly.</p>
+                    
+                    <p>Thank you for using 5Ki Financial Services.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
-Dear ${firstName},
-
-We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved} at ${timeApproved}.
-
-Your account balance has been updated accordingly.
-
-Thank you for using 5Ki Financial Services.
-
-Best regards,
-5KI Financial Services Team
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('[NOTIFICATION SUCCESS] Deposit approval email sent successfully');
-    res.status(200).json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('[NOTIFICATION ERROR] Error sending deposit approval email:', error);
-    res.status(500).json({ message: 'Failed to send email', error: error.message });
-  }
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Deposit approval email sent successfully');
+        res.status(200).json({ message: 'Email sent successfully' });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending deposit approval email:', error);
+        res.status(500).json({ message: 'Failed to send email', error: error.message });
+    }
 });
 
 app.post('/rejectDeposits', async (req, res) => {
-  console.log('[NOTIFICATION] Initiating deposit rejection email', req.body);
-  const { email, firstName, lastName, amount, dateRejected, timeRejected, rejectionReason } = req.body;
+    console.log('[NOTIFICATION] Initiating deposit rejection email', req.body);
+    const { email, firstName, lastName, amount, dateRejected, timeRejected, rejectionReason } = req.body;
 
-  if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
-    console.log('[NOTIFICATION ERROR] Missing required fields for deposit rejection');
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
+    if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for deposit rejection');
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-  try {
-    console.log('[NOTIFICATION] Sending deposit rejection to user');
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Deposit Application Status',
-      text: `
-Deposit Application Update
+    try {
+        console.log('[NOTIFICATION] Sending deposit rejection to user');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Deposit Application Status',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Deposit Application Update
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+                            We regret to inform you that your deposit application has not been approved.
+                        </p>
+                    </div>
+                    
+                    <p>After careful review, we regret to inform you that your deposit application submitted on ${dateRejected} has not been approved.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <p style="margin: 0 0 10px 0;"><strong>Amount:</strong> ₱${amount}</p>
+                        ${rejectionReason ? `<p style="margin: 0;"><strong>Reason:</strong> ${rejectionReason}</p>` : ''}
+                    </div>
+                    
+                    <p>You may submit a new deposit application after addressing any issues.</p>
+                    
+                    <p>For questions, contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
-Dear ${firstName},
-
-After careful review, we regret to inform you that your deposit application submitted on ${dateRejected} at ${timeRejected} has not been approved.
-
-Amount: ₱${amount}
-${rejectionReason ? `Reason: ${rejectionReason}\n` : ''}
-You may submit a new deposit application after addressing any issues. 
-
-For questions, contact us at ${GMAIL_OWNER}.
-
-Best regards,
-5KI Financial Services Team
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully');
-    res.status(200).json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('[NOTIFICATION ERROR] Error sending deposit rejection email:', error);
-    res.status(500).json({ message: 'Failed to send email', error: error.message });
-  }
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully');
+        res.status(200).json({ message: 'Email sent successfully' });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending deposit rejection email:', error);
+        res.status(500).json({ message: 'Failed to send email', error: error.message });
+    }
 });
 
 app.post('/withdraw', async (req, res) => {
@@ -708,40 +1029,71 @@ app.post('/withdraw', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Withdrawal Request Received',
-            text: `
-Withdrawal Request Received
-
-Dear Admin,
-
-A member has requested a withdrawal:
-
-Member: ${fullName}
-Amount: ₱${amount}
-Date: ${formatDisplayDate(date)}
-Recipient Account: ${recipientAccount}
-Reference No.: ${referenceNumber}
-
-Please verify and take appropriate action in the dashboard: ${DASHBOARD_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Withdrawal Request Received
+                    </h2>
+                    
+                    <p>Dear Admin,</p>
+                    
+                    <p>A member has requested a withdrawal:</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <ul>
+                            <li><strong>Member:</strong> ${fullName}</li>
+                            <li><strong>Amount:</strong> ₱${amount}</li>
+                            <li><strong>Date:</strong> ${formatDisplayDate(date)}</li>
+                            <li><strong>Recipient Account:</strong> ${recipientAccount}</li>
+                            <li><strong>Reference No.:</strong> ${referenceNumber}</li>
+                        </ul>
+                    </div>
+                    
+                    <p>
+                        <a href="${DASHBOARD_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                            Verify and Take Action
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         });
 
         console.log('[NOTIFICATION] Sending withdrawal confirmation to user');
-// Updated withdrawal confirmation email
-const mailOptions = {
-  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-  to: email,
-  subject: 'Withdrawal Successful',
-  text: `
-Hi ${firstName},
-
-Your withdrawal request for ₱${amount} has been processed on ${formatDisplayDate(date)}. The funds were sent to your recipient account (${recipientAccount}).
-
-Thank you for using 5Ki Financial Services.
-
-Best regards,
-5KI Financial Services Team
-  `
-};
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Withdrawal Successful',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Withdrawal Successful
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            Your withdrawal request for ₱${amount} has been processed on ${formatDisplayDate(date)}.
+                        </p>
+                    </div>
+                    
+                    <p>The funds were sent to your recipient account (${recipientAccount}).</p>
+                    
+                    <p>Thank you for using 5Ki Financial Services.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Withdrawal notification emails sent successfully');
@@ -753,84 +1105,108 @@ Best regards,
 });
 
 app.post('/approveWithdraws', async (req, res) => {
-  const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
+    const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
 
-  try {
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Withdrawal Approved - 5Ki Financial Services',
-      text: `
-Withdrawal Approved
+    try {
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Withdrawal Approved - 5Ki Financial Services',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Withdrawal Approved
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            Your withdrawal of ₱${amount} has been approved on ${dateApproved}.
+                        </p>
+                    </div>
+                    
+                    <p>Thank you for using 5Ki Financial Services.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
-Dear ${firstName},
-
-Your withdrawal of ₱${amount} has been approved on ${dateApproved} at ${timeApproved}.
-
-Thank you for using 5Ki Financial Services.
-
-Best regards,
-5KI Financial Services Team
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    res.status(200).json({ success: true, message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('Error sending approval email:', error);
-    res.status(500).json({ success: false, message: 'Failed to send email' });
-  }
+        await transporter.sendMail(mailOptions);
+        res.status(200).json({ success: true, message: 'Email sent successfully' });
+    } catch (error) {
+        console.error('Error sending approval email:', error);
+        res.status(500).json({ success: false, message: 'Failed to send email' });
+    }
 });
 
 app.post('/rejectWithdraws', async (req, res) => {
-  console.log('[NOTIFICATION] Initiating withdrawal rejection email', req.body);
-  const { 
-    email, 
-    firstName, 
-    lastName, 
-    amount, 
-    dateRejected, 
-    timeRejected, 
-    rejectionReason 
-  } = req.body;
+    console.log('[NOTIFICATION] Initiating withdrawal rejection email', req.body);
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        amount, 
+        dateRejected, 
+        timeRejected, 
+        rejectionReason 
+    } = req.body;
 
-  if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
-    console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal rejection');
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
+    if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal rejection');
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-  try {
-    console.log('[NOTIFICATION] Sending withdrawal rejection to user');
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Withdrawal Application Status',
-      text: `
-Withdrawal Application Update
+    try {
+        console.log('[NOTIFICATION] Sending withdrawal rejection to user');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Withdrawal Application Status',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Withdrawal Application Update
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+                            We regret to inform you that your withdrawal application has not been approved.
+                        </p>
+                    </div>
+                    
+                    <p>After careful review, we regret to inform you that your withdrawal application submitted on ${dateRejected} has not been approved.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <p style="margin: 0 0 10px 0;"><strong>Amount Requested:</strong> ₱${amount}</p>
+                        ${rejectionReason ? `<p style="margin: 0;"><strong>Reason:</strong> ${rejectionReason}</p>` : ''}
+                    </div>
+                    
+                    <p>You may submit a new withdrawal application after addressing any issues.</p>
+                    
+                    <p>For questions, contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
-Dear ${firstName},
-
-After careful review, we regret to inform you that your withdrawal application submitted on ${dateRejected} at ${timeRejected} has not been approved.
-
-Amount Requested: ₱${amount}
-${rejectionReason ? `Reason: ${rejectionReason}\n` : ''}
-
-You may submit a new withdrawal application after addressing any issues. 
-
-For questions, contact us at ${GMAIL_OWNER}.
-
-Best regards,
-5KI Financial Services Team
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('[NOTIFICATION SUCCESS] Withdrawal rejection email sent successfully');
-    res.status(200).json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('[NOTIFICATION ERROR] Error sending withdrawal rejection email:', error);
-    res.status(500).json({ message: 'Failed to send email', error: error.message });
-  }
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Withdrawal rejection email sent successfully');
+        res.status(200).json({ message: 'Email sent successfully' });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending withdrawal rejection email:', error);
+        res.status(500).json({ message: 'Failed to send email', error: error.message });
+    }
 });
 
 // ==============================================
@@ -853,40 +1229,71 @@ app.post('/applyLoan', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Loan Application Received',
-            text: `
-New Loan Application
-
-Applicant: ${fullName}
-Email: ${email}
-Amount: ₱${amount}
-Term: ${term} months
-Application Date: ${formatDisplayDate(date)}
-
-Review Application: ${DASHBOARD_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        New Loan Application
+                    </h2>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Applicant Details:</h3>
+                        <ul>
+                            <li><strong>Applicant:</strong> ${fullName}</li>
+                            <li><strong>Email:</strong> ${email}</li>
+                            <li><strong>Amount:</strong> ₱${amount}</li>
+                            <li><strong>Term:</strong> ${term} months</li>
+                            <li><strong>Application Date:</strong> ${formatDisplayDate(date)}</li>
+                        </ul>
+                    </div>
+                    
+                    <p>
+                        <a href="${DASHBOARD_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                            Review Application
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         });
 
         console.log('[NOTIFICATION] Sending loan application confirmation to user');
-const userMailOptions = {
-  from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-  to: email,
-  subject: 'Loan Application Received',
-  text: `
-Hi ${firstName},
-
-We have received your loan application on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.
-
-Loan Details:
-- Amount: ₱${amount}
-- Term: ${term} months
-- Status: Under Review
-
-For any questions, please contact us at ${GMAIL_OWNER}.
-
-Best regards,
-5KI Financial Services Team
-  `
-};
+        const userMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Loan Application Received',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Loan Application Received
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <p>We have received your loan application on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Loan Details:</h3>
+                        <ul>
+                            <li><strong>Amount:</strong> ₱${amount}</li>
+                            <li><strong>Term:</strong> ${term} months</li>
+                            <li><strong>Status:</strong> Under Review</li>
+                        </ul>
+                    </div>
+                    
+                    <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
         await transporter.sendMail(userMailOptions);
         console.log('[NOTIFICATION SUCCESS] Loan application emails sent successfully');
@@ -928,34 +1335,54 @@ app.post('/approveLoans', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Congratulations! Your Loan is Approved',
-            text: `
-Hi ${firstName},
-
-We're pleased to inform you that your loan application has been approved on ${dateApproved} at ${timeApproved}.
-
-Loan Details:
-- Approved Amount: ₱${amount}
-- Release Amount: ₱${releaseAmount} (after processing fee)
-- Processing Fee: ₱${processingFee}
-- Repayment Term: ${term} months
-- Interest Rate: ${interestRate}
-- Monthly Interest: ₱${interest}
-- Principal Payment: ₱${monthlyPayment}
-- Total Monthly Payment: ₱${totalMonthlyPayment}
-- Total Term Payment: ₱${totalTermPayment}
-- Due Date: ${dueDate}
-
-Payment Instructions:
-1. Payments are due on the ${new Date(dueDate).getDate()}th of each month
-2. Late payments will incur additional charges
-3. You may pay through our online portal or at any authorized payment center
-
-Please log in to your account to view the full payment schedule and details.
-
-Congratulations and thank you for trusting 5Ki Financial Services.
-
-Best regards,
-5KI Financial Services Team
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Congratulations! Your Loan is Approved
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            We're pleased to inform you that your loan application has been approved on ${dateApproved}.
+                        </p>
+                    </div>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Loan Details:</h3>
+                        <ul>
+                            <li><strong>Approved Amount:</strong> ₱${amount}</li>
+                            <li><strong>Release Amount:</strong> ₱${releaseAmount} (after processing fee)</li>
+                            <li><strong>Processing Fee:</strong> ₱${processingFee}</li>
+                            <li><strong>Repayment Term:</strong> ${term} months</li>
+                            <li><strong>Interest Rate:</strong> ${interestRate}</li>
+                            <li><strong>Monthly Interest:</strong> ₱${interest}</li>
+                            <li><strong>Principal Payment:</strong> ₱${monthlyPayment}</li>
+                            <li><strong>Total Monthly Payment:</strong> ₱${totalMonthlyPayment}</li>
+                            <li><strong>Total Term Payment:</strong> ₱${totalTermPayment}</li>
+                            <li><strong>Due Date:</strong> ${dueDate}</li>
+                        </ul>
+                    </div>
+                    
+                    <div style="background-color: #fff8e1; padding: 15px; border-left: 4px solid #f39c12; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Payment Instructions:</h3>
+                        <ol>
+                            <li>Payments are due on the ${new Date(dueDate).getDate()}th of each month</li>
+                            <li>Late payments will incur additional charges</li>
+                            <li>You may pay through our online portal or at any authorized payment center</li>
+                        </ol>
+                    </div>
+                    
+                    <p>Please log in to your account to view the full payment schedule and details.</p>
+                    
+                    <p>Congratulations and thank you for trusting 5Ki Financial Services.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
             `
         };
 
@@ -995,20 +1422,53 @@ app.post('/rejectLoans', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Loan Application Update',
-            text: `
-Hi ${firstName},
-
-${rejectionMessage || `We regret to inform you that your loan application has been rejected.${rejectionReason ? `\n\nReason: ${rejectionReason}` : ''}`}
-
-Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}
-${timeRejected ? `Time: ${timeRejected}` : ''}
-
-If you have any questions or need clarification, please don't hesitate to contact us at ${GMAIL_OWNER}.
-
-Connect with us on Facebook: ${FACEBOOK_LINK}
-
-Best regards,
-5KI Financial Services Team
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Loan Application Update
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    ${rejectionMessage ? `
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+                            ${rejectionMessage}
+                        </p>
+                    </div>
+                    ` : `
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+                            We regret to inform you that your loan application has been rejected.
+                        </p>
+                    </div>
+                    `}
+                    
+                    <p>Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}</p>
+        
+                    
+                    ${rejectionReason ? `
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Reason:</h3>
+                        <p>${rejectionReason}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p>If you have any questions or need clarification, please don't hesitate to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p>
+                        <a href="${FACEBOOK_LINK}" 
+                           style="display: inline-block; background-color: #3b5998; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
+                            Connect With Us on Facebook
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
             `
         };
 
@@ -1045,21 +1505,39 @@ app.post('/payment', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Loan Payment Received',
-            text: `
-Loan Payment Received
-
-Dear Admin,
-
-A loan payment has been recorded:
-
-Member: ${fullName}
-Amount Paid: ₱${amount}
-Date: ${formatDisplayDate(date)}
-Payment Method: ${paymentMethod}
-
-The system has updated the loan balance accordingly.
-
-View in Dashboard: ${DASHBOARD_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Loan Payment Received
+                    </h2>
+                    
+                    <p>Dear Admin,</p>
+                    
+                    <p>A loan payment has been recorded:</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <ul>
+                            <li><strong>Member:</strong> ${fullName}</li>
+                            <li><strong>Amount Paid:</strong> ₱${amount}</li>
+                            <li><strong>Date:</strong> ${formatDisplayDate(date)}</li>
+                            <li><strong>Payment Method:</strong> ${paymentMethod}</li>
+                        </ul>
+                    </div>
+                    
+                    <p>The system has updated the loan balance accordingly.</p>
+                    
+                    <p>
+                        <a href="${DASHBOARD_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                            View in Dashboard
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         });
 
@@ -1068,17 +1546,27 @@ View in Dashboard: ${DASHBOARD_LINK}
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Payment Confirmed',
-            text: `
-Payment Confirmed
-
-Hi ${firstName},
-
-We have received your payment of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
-
-Your transaction has been processed successfully. Thank you for your payment.
-
-Best regards,
-5KI Financial Services Team
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Payment Confirmed
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            We have received your payment of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
+                        </p>
+                    </div>
+                    
+                    <p>Your transaction has been processed successfully. Thank you for your payment.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
             `
         });
 
@@ -1090,118 +1578,148 @@ Best regards,
     }
 });
 
-// Add these endpoints to your server code
 app.post('/approvePayments', async (req, res) => {
-  console.log('[NOTIFICATION] Initiating payment approval email', req.body);
-  const { 
-    email, 
-    firstName, 
-    lastName, 
-    amount, 
-    paymentMethod,
-    dateApproved, 
-    timeApproved,
-    interestPaid,
-    principalPaid,
-    excessPayment,
-    isLoanPayment
-  } = req.body;
+    console.log('[NOTIFICATION] Initiating payment approval email', req.body);
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        amount, 
+        paymentMethod,
+        dateApproved, 
+        timeApproved,
+        interestPaid,
+        principalPaid,
+        excessPayment,
+        isLoanPayment
+    } = req.body;
 
-  if (!email || !firstName || !lastName || !amount || !dateApproved || !timeApproved) {
-    console.log('[NOTIFICATION ERROR] Missing required fields for payment approval');
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
+    if (!email || !firstName || !lastName || !amount || !dateApproved || !timeApproved) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for payment approval');
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-  try {
-    console.log('[NOTIFICATION] Sending payment approval to user');
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Payment Approved - 5Ki Financial Services',
-      text: `
-Payment Approved
+    try {
+        console.log('[NOTIFICATION] Sending payment approval to user');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Payment Approved - 5Ki Financial Services',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+                        Payment Approved
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
+                            We are pleased to inform you that your payment has been successfully processed.
+                        </p>
+                    </div>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Payment Details:</h3>
+                        <ul>
+                            <li><strong>Amount:</strong> ₱${amount}</li>
+                            <li><strong>Payment Method:</strong> ${paymentMethod}</li>
+                            <li><strong>Date Approved:</strong> ${dateApproved} </li>
+                            ${isLoanPayment ? `
+                            <li><strong>Loan Payment Breakdown:</strong>
+                                <ul>
+                                    <li>Principal Paid: ₱${principalPaid}</li>
+                                    <li>Interest Paid: ₱${interestPaid}</li>
+                                    ${excessPayment > 0 ? `<li>Excess Payment: ₱${excessPayment}</li>` : ''}
+                                </ul>
+                            </li>
+                            ` : ''}
+                        </ul>
+                    </div>
+                    
+                    <p>Your transaction has been completed successfully. Thank you for your payment.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
-Dear ${firstName},
-
-We are pleased to inform you that your payment has been successfully processed.
-
-Payment Details:
-- Amount: ₱${amount}
-- Payment Method: ${paymentMethod}
-- Date Approved: ${dateApproved} at ${timeApproved}
-${isLoanPayment ? `
-Loan Payment Breakdown:
-- Principal Paid: ₱${principalPaid}
-- Interest Paid: ₱${interestPaid}
-${excessPayment > 0 ? `- Excess Payment: ₱${excessPayment}` : ''}
-` : ''}
-
-Your transaction has been completed successfully. Thank you for your payment.
-
-Best regards,
-5KI Financial Services Team
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('[NOTIFICATION SUCCESS] Payment approval email sent successfully');
-    res.status(200).json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('[NOTIFICATION ERROR] Error sending payment approval email:', error);
-    res.status(500).json({ message: 'Failed to send email', error: error.message });
-  }
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Payment approval email sent successfully');
+        res.status(200).json({ message: 'Email sent successfully' });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending payment approval email:', error);
+        res.status(500).json({ message: 'Failed to send email', error: error.message });
+    }
 });
 
 app.post('/rejectPayments', async (req, res) => {
-  console.log('[NOTIFICATION] Initiating payment rejection email', req.body);
-  const { 
-    email, 
-    firstName, 
-    lastName, 
-    amount, 
-    paymentMethod,
-    dateRejected, 
-    timeRejected, 
-    rejectionReason,
-    rejectionMessage
-  } = req.body;
+    console.log('[NOTIFICATION] Initiating payment rejection email', req.body);
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        amount, 
+        paymentMethod,
+        dateRejected, 
+        timeRejected, 
+        rejectionReason,
+        rejectionMessage
+    } = req.body;
 
-  if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
-    console.log('[NOTIFICATION ERROR] Missing required fields for payment rejection');
-    return res.status(400).json({ message: 'Missing required fields' });
-  }
+    if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for payment rejection');
+        return res.status(400).json({ message: 'Missing required fields' });
+    }
 
-  try {
-    console.log('[NOTIFICATION] Sending payment rejection to user');
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: 'Payment Application Status',
-      text: `
-Payment Application Update
+    try {
+        console.log('[NOTIFICATION] Sending payment rejection to user');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Payment Application Status',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Payment Application Update
+                    </h2>
+                    
+                    <p>Dear ${firstName},</p>
+                    
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+                            ${rejectionMessage || `After careful review, we regret to inform you that your payment application submitted on ${dateRejected} has not been approved.`}
+                        </p>
+                    </div>
+                    
+                    ${rejectionReason ? `
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <p style="margin: 0;"><strong>Reason:</strong> ${rejectionReason}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p>You may submit a new payment application after addressing any issues.</p>
+                    
+                    <p>For questions, contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
 
-Dear ${firstName},
-
-After careful review, we regret to inform you that your payment application submitted on ${dateRejected} at ${timeRejected} has not been approved.
-
-${rejectionMessage || `Reason: ${rejectionReason || 'Payment rejected by admin'}`}
-
-You may submit a new payment application after addressing any issues. 
-
-For questions, contact us at ${GMAIL_OWNER}.
-
-Best regards,
-5KI Financial Services Team
-      `
-    };
-
-    await transporter.sendMail(mailOptions);
-    console.log('[NOTIFICATION SUCCESS] Payment rejection email sent successfully');
-    res.status(200).json({ message: 'Email sent successfully' });
-  } catch (error) {
-    console.error('[NOTIFICATION ERROR] Error sending payment rejection email:', error);
-    res.status(500).json({ message: 'Failed to send email', error: error.message });
-  }
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Payment rejection email sent successfully');
+        res.status(200).json({ message: 'Email sent successfully' });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending payment rejection email:', error);
+        res.status(500).json({ message: 'Failed to send email', error: error.message });
+    }
 });
 
 app.post('/membershipWithdrawal', async (req, res) => {
@@ -1220,19 +1738,38 @@ app.post('/membershipWithdrawal', async (req, res) => {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Membership Withdrawal Request',
-            text: `
-Membership Withdrawal Request
-
-Dear Admin,
-
-A new permanent membership withdrawal request has been received:
-
-Member: ${fullName}
-Date Requested: ${formatDisplayDate(date)}
-${reason ? `Reason: ${reason}\n` : ''}
-Kindly update the records and confirm in the system.
-
-View in Dashboard: ${DASHBOARD_LINK}
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Membership Withdrawal Request
+                    </h2>
+                    
+                    <p>Dear Admin,</p>
+                    
+                    <p>A new permanent membership withdrawal request has been received:</p>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <ul>
+                            <li><strong>Member:</strong> ${fullName}</li>
+                            <li><strong>Date Requested:</strong> ${formatDisplayDate(date)}</li>
+                            ${reason ? `<li><strong>Reason:</strong> ${reason}</li>` : ''}
+                        </ul>
+                    </div>
+                    
+                    <p>Kindly update the records and confirm in the system.</p>
+                    
+                    <p>
+                        <a href="${DASHBOARD_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+                            View in Dashboard
+                        </a>
+                    </p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
             `
         });
 
@@ -1241,18 +1778,29 @@ View in Dashboard: ${DASHBOARD_LINK}
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Membership Withdrawal Request Received',
-            text: `
-Membership Withdrawal Request Received
-
-Hi ${firstName},
-
-We have received your membership withdrawal request on ${formatDisplayDate(date)}.
-
-${reason ? `Your reason: ${reason}\n` : ''}
-Our team will process your request and notify you once completed.
-
-Best regards,
-5KI Financial Services Team
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Membership Withdrawal Request Received
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <p>We have received your membership withdrawal request on ${formatDisplayDate(date)}.</p>
+                    
+                    ${reason ? `
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <p style="margin: 0;"><strong>Your reason:</strong> ${reason}</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p>Our team will process your request and notify you once completed.</p>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
             `
         });
 

@@ -68,9 +68,7 @@ const formatDisplayDate = (dateString) => {
     const options = { 
         year: 'numeric', 
         month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: 'numeric' 
     };
     return new Date(dateString).toLocaleDateString('en-US', options);
 };
@@ -179,8 +177,6 @@ app.post('/send-admin-email', async (req, res) => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
     });
 
     try {
@@ -325,8 +321,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
         year: 'numeric',
         month: 'long',
         day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
     });
 
     try {
@@ -567,7 +561,7 @@ app.post('/approveRegistrations', async (req, res) => {
                         </p>
                     </div>
                     
-                    <p>Thank you for registering with 5Ki Financial Services on ${dateApproved} at ${approvedTime}. Your account has been successfully created and you now have access to our range of services including loan applications, transactions tracking, and account management.</p>
+                    <p>Thank you for registering with 5Ki Financial Services on ${dateApproved}. Your account has been successfully created and you now have access to our range of services including loan applications, transactions tracking, and account management.</p>
                     
                     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
                         <p style="font-weight: bold; margin: 0 0 10px 0;">Your Member ID: <span style="color: #3498db;">${memberId}</span></p>
@@ -815,8 +809,6 @@ app.post('/deposit', async (req, res) => {
             year: 'numeric',
             month: 'long',
             day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
         });
 
         // Email to system owner
@@ -939,7 +931,7 @@ app.post('/approveDeposits', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved} at ${timeApproved}.
+                            We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved}.
                         </p>
                     </div>
                     
@@ -993,7 +985,7 @@ app.post('/rejectDeposits', async (req, res) => {
                         </p>
                     </div>
                     
-                    <p>After careful review, we regret to inform you that your deposit application submitted on ${dateRejected} at ${timeRejected} has not been approved.</p>
+                    <p>After careful review, we regret to inform you that your deposit application submitted on ${dateRejected} has not been approved.</p>
                     
                     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
                         <p style="margin: 0 0 10px 0;"><strong>Amount:</strong> ₱${amount}</p>
@@ -1130,7 +1122,7 @@ app.post('/approveWithdraws', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            Your withdrawal of ₱${amount} has been approved on ${dateApproved} at ${timeApproved}.
+                            Your withdrawal of ₱${amount} has been approved on ${dateApproved}.
                         </p>
                     </div>
                     
@@ -1189,7 +1181,7 @@ app.post('/rejectWithdraws', async (req, res) => {
                         </p>
                     </div>
                     
-                    <p>After careful review, we regret to inform you that your withdrawal application submitted on ${dateRejected} at ${timeRejected} has not been approved.</p>
+                    <p>After careful review, we regret to inform you that your withdrawal application submitted on ${dateRejected} has not been approved.</p>
                     
                     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
                         <p style="margin: 0 0 10px 0;"><strong>Amount Requested:</strong> ₱${amount}</p>
@@ -1353,7 +1345,7 @@ app.post('/approveLoans', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            We're pleased to inform you that your loan application has been approved on ${dateApproved} at ${timeApproved}.
+                            We're pleased to inform you that your loan application has been approved on ${dateApproved}.
                         </p>
                     </div>
                     
@@ -1453,7 +1445,7 @@ app.post('/rejectLoans', async (req, res) => {
                     `}
                     
                     <p>Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}</p>
-                    ${timeRejected ? `<p>Time: ${timeRejected}</p>` : ''}
+        
                     
                     ${rejectionReason ? `
                     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
@@ -1632,7 +1624,7 @@ app.post('/approvePayments', async (req, res) => {
                         <ul>
                             <li><strong>Amount:</strong> ₱${amount}</li>
                             <li><strong>Payment Method:</strong> ${paymentMethod}</li>
-                            <li><strong>Date Approved:</strong> ${dateApproved} at ${timeApproved}</li>
+                            <li><strong>Date Approved:</strong> ${dateApproved} </li>
                             ${isLoanPayment ? `
                             <li><strong>Loan Payment Breakdown:</strong>
                                 <ul>
@@ -1699,7 +1691,7 @@ app.post('/rejectPayments', async (req, res) => {
                     
                     <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
                         <p style="font-weight: bold; color: #e74c3c; margin: 0;">
-                            ${rejectionMessage || `After careful review, we regret to inform you that your payment application submitted on ${dateRejected} at ${timeRejected} has not been approved.`}
+                            ${rejectionMessage || `After careful review, we regret to inform you that your payment application submitted on ${dateRejected} has not been approved.`}
                         </p>
                     </div>
                     

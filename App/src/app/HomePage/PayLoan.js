@@ -19,6 +19,7 @@ const PayLoan = () => {
 
   const [paymentOption, setPaymentOption] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [amountToBePaid, setAmountToBePaid] = useState('');
   const [proofOfPayment, setProofOfPayment] = useState(null);
   const [email, setEmail] = useState('');
@@ -27,14 +28,16 @@ const PayLoan = () => {
   const [interest, setInterest] = useState(0);
   const [interestRate, setInterestRate] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
-  const accountName = '5KI';
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
-
+  const [paymentAccounts, setPaymentAccounts] = useState({
+    Bank: { accountName: '', accountNumber: '' },
+    GCash: { accountName: '', accountNumber: '' }
+  });
 
   const paymentOptions = [
     { key: 'Bank', label: 'Bank' },
-    { key: 'Gcash', label: 'Gcash' },
+    { key: 'GCash', label: 'GCash' },
   ];
 
   useEffect(() => {
@@ -44,6 +47,7 @@ const PayLoan = () => {
     } else if (route.params?.user) {
       fetchUserData(route.params.user.email);
     }
+    fetchPaymentSettings();
   }, [route.params]);
 
   useEffect(() => {
@@ -63,6 +67,25 @@ const PayLoan = () => {
     }
   }, [memberId]);
 
+  const fetchPaymentSettings = async () => {
+    try {
+      const settingsRef = dbRef(database, 'Settings/Accounts');
+      const snapshot = await get(settingsRef);
+      if (snapshot.exists()) {
+        setPaymentAccounts(snapshot.val());
+      } else {
+        // Fallback to old path if Accounts doesn't exist
+        const oldSettingsRef = dbRef(database, 'Settings/PaymentAccounts');
+        const oldSnapshot = await get(oldSettingsRef);
+        if (oldSnapshot.exists()) {
+          setPaymentAccounts(oldSnapshot.val());
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching payment settings:', error);
+    }
+  };
+
   const fetchUserData = async (userEmail) => {
     const membersRef = dbRef(database, 'Members');
     try {
@@ -74,8 +97,8 @@ const PayLoan = () => {
           setBalance(foundUser.balance || 0);
           setEmail(userEmail);
           setMemberId(foundUser.id);
-          setFirstName(foundUser.firstName || ''); // Fetch firstName
-          setLastName(foundUser.lastName || '');   // Fetch lastName
+          setFirstName(foundUser.firstName || '');
+          setLastName(foundUser.lastName || '');
         }
       }
     } catch (error) {
@@ -99,14 +122,16 @@ const PayLoan = () => {
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option.key);
-    setAccountNumber(option.key === 'Bank' ? '9876543' : '0123456');
+    const selectedAccount = paymentAccounts[option.key];
+    setAccountNumber(selectedAccount.accountNumber || '');
+    setAccountName(selectedAccount.accountName || '');
   };
 
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
-useEffect(() => {
-  setIsSubmitDisabled(!paymentOption || !amountToBePaid || !proofOfPayment);
-}, [paymentOption, amountToBePaid, proofOfPayment]);
+  useEffect(() => {
+    setIsSubmitDisabled(!paymentOption || !amountToBePaid || !proofOfPayment);
+  }, [paymentOption, amountToBePaid, proofOfPayment]);
 
   const handleSelectProofOfPayment = async () => {
     try {
@@ -142,186 +167,184 @@ useEffect(() => {
     }
   };
 
- const storePaymentDataInDatabase = async (proofOfPaymentUrl) => {
-  const transactionId = generateTransactionId();
-  try {
-    const paymentRef = dbRef(database, `Payments/PaymentApplications/${memberId}/${transactionId}`);
+  const storePaymentDataInDatabase = async (proofOfPaymentUrl) => {
+    const transactionId = generateTransactionId();
+    try {
+      const paymentRef = dbRef(database, `Payments/PaymentApplications/${memberId}/${transactionId}`);
 
-    await set(paymentRef, {
-      transactionId,
-      id: memberId,
-      email,
-      firstName,
-      lastName,
-      paymentOption,
-      interest,
-      accountName,
-      accountNumber,
-      amountToBePaid: parseFloat(amountToBePaid),
-      proofOfPaymentUrl,
-      dateApplied: new Date().toLocaleString('en-US', {
-        month: 'long',
-        day: '2-digit',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        hour12: false
-      })
-      .replace(',', '')
-      .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-      .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
-      status: 'Pending',
-    });
-  } catch (error) {
-    console.error('Failed to store payment data in Realtime Database:', error);
-    Alert.alert('Error', 'Failed to store payment data');
-    throw error;
-  }
-};
+      await set(paymentRef, {
+        transactionId,
+        id: memberId,
+        email,
+        firstName,
+        lastName,
+        paymentOption,
+        interest,
+        accountName,
+        accountNumber,
+        amountToBePaid: parseFloat(amountToBePaid),
+        proofOfPaymentUrl,
+        dateApplied: new Date().toLocaleString('en-US', {
+          month: 'long',
+          day: '2-digit',
+          year: 'numeric',
+        })
+        .replace(',', '')
+        .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+        .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+        status: 'Pending',
+      });
+    } catch (error) {
+      console.error('Failed to store payment data in Realtime Database:', error);
+      Alert.alert('Error', 'Failed to store payment data');
+      throw error;
+    }
+  };
 
   const generateTransactionId = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
   const handleSubmit = async () => {
-  if (!paymentOption || !amountToBePaid || !proofOfPayment) {
-    Alert.alert('Error', 'All fields are required');
-    return;
-  }
+    if (!paymentOption || !amountToBePaid || !proofOfPayment) {
+      Alert.alert('Error', 'All fields are required');
+      return;
+    }
 
-  if (isNaN(amountToBePaid) || parseFloat(amountToBePaid) <= 0) {
-    Alert.alert('Error', 'Please enter a valid amount');
-    return;
-  }
+    if (isNaN(amountToBePaid) || parseFloat(amountToBePaid) <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
 
-  Alert.alert(
-    'Confirm Payment',
-    `Balance: ₱${balance}\nPayment Option: ${paymentOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Paid: ₱${parseFloat(amountToBePaid).toFixed(2)}`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            // Step 1: Upload proof of payment
-            const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
-            
-            // Step 2: Store payment data in database
-            await storePaymentDataInDatabase(proofOfPaymentUrl);
+    Alert.alert(
+      'Confirm Payment',
+      `Balance: ₱${balance}\nPayment Option: ${paymentOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Paid: ₱${parseFloat(amountToBePaid).toFixed(2)}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setIsLoading(true);
+            try {
+              const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
+              await storePaymentDataInDatabase(proofOfPaymentUrl);
 
-            // Step 3: Prepare payment data for API (with all required fields)
-            const paymentData = {
-              email,
-              firstName,
-              lastName,
-              amount: parseFloat(amountToBePaid),
-              paymentMethod: paymentOption,
-              date: new Date().toISOString(),
-              interestPaid: interest,
-              principalPaid: parseFloat(amountToBePaid) - interest,
-              isLoanPayment: true
-            };
-
-            // Step 4: Make API call to trigger emails
-            const response = await MemberPayment(paymentData);
-            console.log('Payment API response:', response);
-
-            // Step 5: Show success
-            Alert.alert(
-              'Success', 
-              'Payment submitted successfully. You will receive a confirmation email shortly.',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    resetFormFields();
-                    navigation.navigate('Home');
-                  }
-                }
-              ],
-              { cancelable: false }
-            );
-          } catch (error) {
-            console.error('Error during payment submission:', {
-              error: error.message,
-              stack: error.stack,
-              paymentData: {
+              const paymentData = {
                 email,
-                amount: amountToBePaid,
-                paymentOption
-              }
-            });
-            Alert.alert(
-              'Notice',
-              'Payment was recorded but email notification failed. Please check your email later.',
-              [{ text: 'OK' }]
-            );
-          } finally {
-            setIsLoading(false);
-          }
+                firstName,
+                lastName,
+                amount: parseFloat(amountToBePaid),
+                paymentMethod: paymentOption,
+                date: new Date().toISOString(),
+                interestPaid: interest,
+                principalPaid: parseFloat(amountToBePaid) - interest,
+                isLoanPayment: true
+              };
+
+              const response = await MemberPayment(paymentData);
+              console.log('Payment API response:', response);
+
+              Alert.alert(
+                'Success', 
+                'Payment submitted successfully. You will receive a confirmation email shortly.',
+                [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      resetFormFields();
+                      navigation.navigate('Home');
+                    }
+                  }
+                ],
+                { cancelable: false }
+              );
+            } catch (error) {
+              console.error('Error during payment submission:', {
+                error: error.message,
+                stack: error.stack,
+                paymentData: {
+                  email,
+                  amount: amountToBePaid,
+                  paymentOption
+                }
+              });
+              Alert.alert(
+                'Notice',
+                'Payment was recorded but email notification failed. Please check your email later.',
+                [{ text: 'OK' }]
+              );
+            } finally {
+              setIsLoading(false);
+            }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
 
   const resetFormFields = () => {
     setPaymentOption('');
     setAccountNumber('');
+    setAccountName('');
     setAmountToBePaid('');
     setProofOfPayment(null);
   };
+
   const formatCurrency = (amount) => {
     return `₱${parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
   };
 
   return (
     <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-          >
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
-      <Text style={styles.title}>Pay Loan</Text>
-      <View style={styles.content}>
-   
-
-        <Text style={styles.label}>Balance</Text>
-        <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
-
-        <Text style={styles.label}>Payment Option<Text style={styles.required}>*</Text></Text>
-        <ModalSelector
-          data={paymentOptions}
-          initValue="Select Payment Option"
-          onChange={handlePaymentOptionChange}
-          style={styles.picker}
-        >
-        <TouchableOpacity style={styles.pickerContainer}>
-        <Text style={styles.pickerText}>{paymentOption || 'Select Payment Option'}</Text>
-            <MaterialIcons name="arrow-drop-down" size={24} color="black" /> 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={30} color="white" />
         </TouchableOpacity>
+        <Text style={styles.title}>Pay Loan</Text>
+        <View style={styles.content}>
+          <Text style={styles.label}>Balance</Text>
+          <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-        </ModalSelector>
+          <Text style={styles.label}>Payment Option<Text style={styles.required}>*</Text></Text>
+          <ModalSelector
+            data={paymentOptions}
+            initValue="Select Payment Option"
+            onChange={handlePaymentOptionChange}
+            style={styles.picker}
+          >
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>{paymentOption || 'Select Payment Option'}</Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" /> 
+            </TouchableOpacity>
+          </ModalSelector>
 
-        <Text style={styles.label}>Account Name</Text>
-        <TextInput value={accountName} style={[styles.input, styles.fixedInput]} editable={false} />
+          <Text style={styles.label}>Account Name</Text>
+          <TextInput 
+            value={accountName} 
+            style={[styles.input, styles.fixedInput]} 
+            editable={false} 
+          />
 
-        <Text style={styles.label}>Account Number</Text>
-        <TextInput value={accountNumber} style={[styles.input, styles.fixedInput]} editable={false} />
+          <Text style={styles.label}>Account Number</Text>
+          <TextInput 
+            value={accountNumber} 
+            style={[styles.input, styles.fixedInput]} 
+            editable={false} 
+          />
 
-        <Text style={styles.label}>Amount to be Paid<Text style={styles.required}>*</Text></Text>
-        <TextInput
-          placeholder="Enter Amount"
-          value={amountToBePaid}
-          onChangeText={setAmountToBePaid}
-          style={styles.input}
-          keyboardType="numeric"
-        />
+          <Text style={styles.label}>Amount to be Paid<Text style={styles.required}>*</Text></Text>
+          <TextInput
+            placeholder="Enter Amount"
+            value={amountToBePaid}
+            onChangeText={setAmountToBePaid}
+            style={styles.input}
+            keyboardType="numeric"
+          />
 
-        <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
           <TouchableOpacity 
             onPress={handleSelectProofOfPayment} 
             style={styles.imagePreviewContainer}
@@ -336,14 +359,14 @@ useEffect(() => {
             )}
           </TouchableOpacity>
 
-        <TouchableOpacity 
-          style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
-          onPress={handleSubmit}
-          disabled={isSubmitDisabled}
-        >
-          <Text style={styles.submitButtonText}>Submit</Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity 
+            style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
+            onPress={handleSubmit}
+            disabled={isSubmitDisabled}
+          >
+            <Text style={styles.submitButtonText}>Submit</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       <Modal transparent={true} visible={isLoading}>
@@ -352,7 +375,7 @@ useEffect(() => {
           <Text style={styles.modalText}>Please wait...</Text>
         </View>
       </Modal>
-    </ KeyboardAvoidingView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -369,7 +392,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 50,
     borderTopRightRadius: 50,
-    flex: 1, // To make it take the full height up to the bottom
+    flex: 1,
     paddingStart: 50,
     paddingEnd: 50,
     paddingTop: 20,
@@ -459,22 +482,22 @@ const styles = StyleSheet.create({
     marginTop: 10,
   },
   required: {
-  color: 'red',
-},
-disabledButton: {
-  backgroundColor: '#cccccc',
-  opacity: 0.6,
-},
-uploadPlaceholder: {
-  alignItems: 'center',
-  justifyContent: 'center',
-},
-uploadPromptText: {
-  color: '#2D5783',
-  marginTop: 10,
-  fontWeight: 'bold',
-  fontSize: 16,
-},
+    color: 'red',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+    opacity: 0.6,
+  },
+  uploadPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadPromptText: {
+    color: '#2D5783',
+    marginTop: 10,
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
 });
 
 export default PayLoan;

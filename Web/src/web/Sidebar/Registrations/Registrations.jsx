@@ -960,7 +960,7 @@ const processDatabaseApprove = async (reg) => {
       // Create member record in database
       await database.ref(`Members/${newId}`).set({
         id: newId,
-        authUid: userId,
+        uid: userId,
         firstName,
         lastName,
         ...rest,

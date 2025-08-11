@@ -431,6 +431,25 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     marginTop: '8px'
+  },
+  accountRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    marginBottom: '15px'
+  },
+  accountCard: {
+    flex: 1,
+    padding: '15px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc'
+  },
+  accountTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    marginBottom: '10px',
+    color: '#1e293b'
   }
 };
 
@@ -444,7 +463,11 @@ const SystemSettings = () => {
     DividendDate: '',
     PenaltyValue: '',
     PenaltyType: 'percentage',
-    OrientationCode: ''
+    OrientationCode: '',
+    Accounts: {
+      Bank: { accountName: '', accountNumber: '' },
+      GCash: { accountName: '', accountNumber: '' }
+    }
   });
 
   const [newTerm, setNewTerm] = useState('');
@@ -482,7 +505,11 @@ const SystemSettings = () => {
           DividendDate: data.DividendDate || '',
           PenaltyValue: data.PenaltyValue?.toString() || '',
           PenaltyType: data.PenaltyType || 'percentage',
-          OrientationCode: data.OrientationCode || generateOrientationCode()
+          OrientationCode: data.OrientationCode || generateOrientationCode(),
+          Accounts: data.Accounts || {
+            Bank: { accountName: '', accountNumber: '' },
+            GCash: { accountName: '', accountNumber: '' }
+          }
         });
       }
       setLoading(false);
@@ -492,7 +519,7 @@ const SystemSettings = () => {
   }, []);
 
   const generateOrientationCode = () => {
-    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // Excluded easily confused chars
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
     for (let i = 0; i < 8; i++) {
       result += chars.charAt(Math.floor(Math.random() * chars.length));
@@ -535,6 +562,19 @@ const SystemSettings = () => {
     setSettings((prev) => ({
       ...prev,
       InterestRate: { ...prev.InterestRate, [term]: clean },
+    }));
+  };
+
+  const handleAccountChange = (accountType, field, value) => {
+    setSettings(prev => ({
+      ...prev,
+      Accounts: {
+        ...prev.Accounts,
+        [accountType]: {
+          ...prev.Accounts[accountType],
+          [field]: value
+        }
+      }
     }));
   };
 
@@ -598,7 +638,8 @@ const SystemSettings = () => {
       DividendDate: settings.DividendDate,
       PenaltyValue: parseFloat(settings.PenaltyValue),
       PenaltyType: settings.PenaltyType,
-      OrientationCode: settings.OrientationCode
+      OrientationCode: settings.OrientationCode,
+      Accounts: settings.Accounts
     };
 
     update(settingsRef, updatedData)
@@ -694,7 +735,46 @@ const SystemSettings = () => {
   return (
     <div style={styles.container}>
       <div style={styles.contentContainer}>
-        <h1 style={styles.header}>Loan System Settings</h1>
+        <h1 style={styles.header}>System Settings</h1>
+
+        {/* Accounts Section */}
+        <div style={styles.card}>
+          <h2 style={styles.sectionTitle}>Accounts</h2>
+          
+          <div style={styles.accountRow}>
+            <div style={styles.accountCard}>
+              <h3 style={styles.accountTitle}>Bank Account</h3>
+              <InputRow
+                label="Account Name"
+                value={settings.Accounts.Bank.accountName}
+                onChange={(text) => handleAccountChange('Bank', 'accountName', text)}
+                editable={editMode}
+              />
+              <InputRow
+                label="Account Number"
+                value={settings.Accounts.Bank.accountNumber}
+                onChange={(text) => handleAccountChange('Bank', 'accountNumber', text)}
+                editable={editMode}
+              />
+            </div>
+            
+            <div style={styles.accountCard}>
+              <h3 style={styles.accountTitle}>GCash Account</h3>
+              <InputRow
+                label="Account Name"
+                value={settings.Accounts.GCash.accountName}
+                onChange={(text) => handleAccountChange('GCash', 'accountName', text)}
+                editable={editMode}
+              />
+              <InputRow
+                label="Account Number"
+                value={settings.Accounts.GCash.accountNumber}
+                onChange={(text) => handleAccountChange('GCash', 'accountNumber', text)}
+                editable={editMode}
+              />
+            </div>
+          </div>
+        </div>
 
         {/* Financial Settings */}
         <div style={styles.card}>
@@ -1107,7 +1187,6 @@ const InputRow = ({ label, value, onChange, editable, suffix }) => (
           style={styles.input} 
           value={value} 
           onChange={(e) => onChange(e.target.value)} 
-          type="number" 
         />
         {suffix && <span>{suffix}</span>}
       </div>

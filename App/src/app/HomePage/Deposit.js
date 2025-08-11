@@ -9,7 +9,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import * as ImagePicker from 'expo-image-picker';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ref as dbRef, set, get } from 'firebase/database';
+import { ref as dbRef, get, set } from 'firebase/database';
 import { storage, database, auth } from '../../firebaseConfig';
 import { MemberDeposit } from '../../api';
 
@@ -19,6 +19,7 @@ const Deposit = () => {
 
   const [depositOption, setDepositOption] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [accountName, setAccountName] = useState('');
   const [amountToBeDeposited, setAmountToBeDeposited] = useState('');
   const [proofOfDeposit, setProofOfDeposit] = useState(null);
   const [email, setEmail] = useState('');
@@ -27,6 +28,10 @@ const Deposit = () => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [depositAccounts, setDepositAccounts] = useState({
+    Bank: { accountName: '', accountNumber: '' },
+    GCash: { accountName: '', accountNumber: '' }
+  });
 
   useEffect(() => {
     const user = auth.currentUser;
@@ -35,6 +40,7 @@ const Deposit = () => {
       setEmail(userEmail);
       fetchUserData(userEmail);
     }
+    fetchDepositSettings();
   }, [route.params]);
 
   useEffect(() => {
@@ -47,7 +53,25 @@ const Deposit = () => {
   
     return () => backHandler.remove(); 
   }, [navigation]);
-  
+
+  const fetchDepositSettings = async () => {
+    try {
+      const settingsRef = dbRef(database, 'Settings/Accounts');
+      const snapshot = await get(settingsRef);
+      if (snapshot.exists()) {
+        setDepositAccounts(snapshot.val());
+      } else {
+        // Fallback to old path if Accounts doesn't exist
+        const oldSettingsRef = dbRef(database, 'Settings/DepositAccounts');
+        const oldSnapshot = await get(oldSettingsRef);
+        if (oldSnapshot.exists()) {
+          setDepositAccounts(oldSnapshot.val());
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching deposit settings:', error);
+    }
+  };
 
   const fetchUserData = async (userEmail) => {
     const membersRef = dbRef(database, 'Members');
@@ -79,7 +103,9 @@ const Deposit = () => {
 
   const handleDepositOptionChange = (option) => {
     setDepositOption(option.key);
-    setAccountNumber(option.key === 'Bank' ? '9876543' : '0123456');
+    const selectedAccount = depositAccounts[option.key];
+    setAccountNumber(selectedAccount.accountNumber || '');
+    setAccountName(selectedAccount.accountName || '');
   };
 
   const handleSelectProofOfDeposit = async () => {
@@ -121,29 +147,25 @@ const Deposit = () => {
       const transactionId = generateTransactionId();
       const newDepositRef = dbRef(database, `Deposits/DepositApplications/${memberId}/${transactionId}`);
   
-      // Ensure the amountToBeDeposited is stored as a number (float)
       const depositAmount = parseFloat(amountToBeDeposited);
   
-     await set(newDepositRef, {
+      await set(newDepositRef, {
         transactionId,
         id: memberId,
         email,
         firstName,
         lastName,
-        accountName: '5KI',
+        accountName: accountName,
         depositOption,
         accountNumber,
         amountToBeDeposited: depositAmount,
         proofOfDepositUrl,
-        dateApplied: new Date().toLocaleString('en-GB', {
+        dateApplied: new Date().toLocaleString('en-US', {
           year: 'numeric',
           month: 'long',
           day: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false,
         }),
-        status: 'Pending',
+        status: 'pending',
       });
 
     } catch (error) {
@@ -152,82 +174,76 @@ const Deposit = () => {
       throw error;
     }
   };
-  
 
-const handleSubmit = async () => {
-  if (!depositOption || !amountToBeDeposited || !proofOfDeposit) {
-    Alert.alert('Error', 'All fields are required');
-    return;
-  }
+  const handleSubmit = async () => {
+    if (!depositOption || !amountToBeDeposited || !proofOfDeposit) {
+      Alert.alert('Error', 'All fields are required');
+      return;
+    }
 
-  if (isNaN(amountToBeDeposited) || parseFloat(amountToBeDeposited) <= 0) {
-    Alert.alert('Error', 'Please enter a valid amount');
-    return;
-  }
+    if (isNaN(amountToBeDeposited) || parseFloat(amountToBeDeposited) <= 0) {
+      Alert.alert('Error', 'Please enter a valid amount');
+      return;
+    }
 
-  Alert.alert(
-    'Confirm Deposit',
-    `Balance: ₱${balance}\nDeposit Option: ${depositOption}\nAccount Name: 5KI\nAccount Number: ${accountNumber}\nAmount to be Deposited: ₱${parseFloat(amountToBeDeposited).toFixed(2)}`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          setLoading(true);
-          try {
-            // Upload image first
-            const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'proofsOfDeposit');
-            
-            // Store data in database
-            await storeDepositDataInDatabase(proofOfDepositUrl);
+    Alert.alert(
+      'Confirm Deposit',
+      `Balance: ₱${balance}\nDeposit Option: ${depositOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Deposited: ₱${parseFloat(amountToBeDeposited).toFixed(2)}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Confirm',
+          onPress: async () => {
+            setLoading(true);
+            try {
+              const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'proofsOfDeposit');
+              await storeDepositDataInDatabase(proofOfDepositUrl);
 
-            // Prepare and send deposit data for email
-            const depositData = {
-              email,
-              accountName: '5KI',
-              firstName,
-              lastName,
-              depositOption,
-              accountNumber,
-              amountToBeDeposited: parseFloat(amountToBeDeposited),
-              proofOfDepositUrl, // Include this if needed in the email
-              transactionId: generateTransactionId(), // Include this if needed
-            };
+              const depositData = {
+                email,
+                accountName,
+                firstName,
+                lastName,
+                depositOption,
+                accountNumber,
+                amountToBeDeposited: parseFloat(amountToBeDeposited),
+                proofOfDepositUrl,
+                transactionId: generateTransactionId(),
+              };
 
-            // Make API call to send email
-            await MemberDeposit(depositData);
-            
-            // Show success message after everything is done
-            Alert.alert(
-              'Success', 
-              'Deposit application submitted successfully',
-              [{ 
-                text: 'OK', 
-                onPress: () => {
-                  navigation.goBack();
-                  resetFormFields();
-                }
-              }]
-            );
-          } catch (error) {
-            console.error('Error during deposit submission:', error);
-            Alert.alert(
-              'Error', 
-              error.response?.data?.message || 
-              'There was an issue processing your deposit. Please try again.'
-            );
-          } finally {
-            setLoading(false);
-          }
+              await MemberDeposit(depositData);
+              
+              Alert.alert(
+                'Success', 
+                'Deposit application submitted successfully',
+                [{ 
+                  text: 'OK', 
+                  onPress: () => {
+                    navigation.goBack();
+                    resetFormFields();
+                  }
+                }]
+              );
+            } catch (error) {
+              console.error('Error during deposit submission:', error);
+              Alert.alert(
+                'Error', 
+                error.response?.data?.message || 
+                'There was an issue processing your deposit. Please try again.'
+              );
+            } finally {
+              setLoading(false);
+            }
+          },
         },
-      },
-    ]
-  );
-};
+      ]
+    );
+  };
 
   const resetFormFields = () => {
     setDepositOption('');
     setAccountNumber('');
+    setAccountName('');
     setAmountToBeDeposited('');
     setProofOfDeposit(null);
   };
@@ -248,8 +264,6 @@ const handleSubmit = async () => {
       <Text style={styles.title}>Deposit</Text>
 
       <View style={styles.content}>
-
-
         <Text style={styles.label}>Balance</Text>
         <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
@@ -267,10 +281,18 @@ const handleSubmit = async () => {
         </ModalSelector>
 
         <Text style={styles.label}>Account Name</Text>
-        <TextInput value="5KI" style={[styles.input, styles.fixedInput]} editable={false} />
+        <TextInput 
+          value={accountName} 
+          style={[styles.input, styles.fixedInput]} 
+          editable={false} 
+        />
 
         <Text style={styles.label}>Account Number</Text>
-        <TextInput value={accountNumber} style={[styles.input, styles.fixedInput]} editable={false} />
+        <TextInput 
+          value={accountNumber} 
+          style={[styles.input, styles.fixedInput]} 
+          editable={false} 
+        />
 
         <Text style={styles.label}>Deposit Amount</Text>
         <TextInput
@@ -298,7 +320,6 @@ const handleSubmit = async () => {
         </TouchableOpacity>
       </View>
 
-      {/* Loading Modal */}
       <Modal transparent={true} visible={loading}>
         <View style={styles.modalOverlay}>
           <ActivityIndicator size="large" color="#0000ff" />
@@ -322,7 +343,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderTopLeftRadius: 50,
     borderTopRightRadius: 50,
-    flex: 1, // To make it take the full height up to the bottom
+    flex: 1,
     paddingStart: 40,
     paddingEnd: 40,
     paddingTop: 20,

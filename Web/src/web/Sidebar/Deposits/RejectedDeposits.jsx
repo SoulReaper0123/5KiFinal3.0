@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaTimesCircle, FaImage, FaTimes } from 'react-icons/fa';
+import { FaTimesCircle, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const styles = {
   container: {
@@ -73,7 +73,7 @@ const styles = {
   },
   modalCard: {
     width: '40%',
-    maxWidth: '800px',
+    maxWidth: '900px',
     backgroundColor: 'white',
     borderRadius: '8px',
     padding: '20px',
@@ -118,11 +118,16 @@ const styles = {
     wordBreak: 'break-word',
     lineHeight: '1.3'
   },
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    marginBottom: '12px',
+    gap: '10px'
+  },
   imageBlock: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    marginBottom: '12px'
+    alignItems: 'flex-start'
   },
   imageLabel: {
     fontSize: '13px',
@@ -134,8 +139,8 @@ const styles = {
     paddingLeft: 0
   },
   imageThumbnail: {
-    width: '100%',
-    height: '200px',
+    width: '90%',
+    height: '120px',
     borderRadius: '4px',
     border: '1px solid #ddd',
     objectFit: 'cover',
@@ -235,7 +240,7 @@ const styles = {
   imageViewerClose: {
     position: 'absolute',
     top: '-40px',
-    right: '0',
+    right: '80px',
     color: 'white',
     fontSize: '24px',
     cursor: 'pointer',
@@ -246,6 +251,30 @@ const styles = {
     '&:focus': {
       outline: 'none'
     }
+  },
+  imageViewerNav: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    '&:hover': {
+      color: '#2D5783'
+    },
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  prevButton: {
+    left: '50px'
+  },
+  nextButton: { 
+    right: '50px'
   },
   sectionTitle: {
     fontSize: '14px',
@@ -264,6 +293,8 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
   const [modalVisible, setModalVisible] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [availableImages, setAvailableImages] = useState([]);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -281,13 +312,40 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
     setModalVisible(false);
   };
 
-  const openImageViewer = (url, label) => {
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (url) {
+      images.push({ 
+        url, 
+        label 
+      });
+    }
+
+    setAvailableImages(images);
     setCurrentImage({ url, label });
+    setCurrentImageIndex(index);
     setImageViewerVisible(true);
   };
 
   const closeImageViewer = () => {
     setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
+  };
+
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
   };
 
   if (!deposits.length) {
@@ -304,34 +362,39 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Option</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Applied</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Proof</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {deposits.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
+                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountToBeDeposited)}</td>
                 <td style={styles.tableCell}>{item.depositOption}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>
+                <td style={{
+                  ...styles.tableCell,
+                  ...styles.statusRejected
+                }}>
+                  Rejected
+                </td>
                 <td style={styles.tableCell}>
                   <span 
-                    style={styles.viewText}
-                    onClick={() => openImageViewer(item.proofOfDepositUrl, 'Proof of Deposit')}
+                    style={styles.viewText} 
+                    onClick={() => openModal(item)}
                     onFocus={(e) => e.target.style.outline = 'none'}
                   >
-                    <FaImage /> View
+                    View
                   </span>
-                </td>
-                <td style={{...styles.tableCell, ...styles.statusRejected}}>
-                  <FaTimesCircle /> Rejected
                 </td>
               </tr>
             ))}
@@ -339,8 +402,7 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
         </table>
       </div>
 
-      {/* View Details Modal */}
-      {modalVisible && (
+      {modalVisible && selectedDeposit && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCard}>
             <button 
@@ -352,77 +414,69 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
               <FaTimes />
             </button>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Deposit Details</h2>
+              <h2 style={styles.modalTitle}>Deposit Application Details</h2>
             </div>
             <div style={styles.modalContent}>
               <div style={styles.columns}>
                 <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Transaction Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.id || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Transaction ID:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.transactionId || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Amount:</span>
-                    <span style={styles.fieldValue}>{formatCurrency(selectedDeposit?.amountToBeDeposited) || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Deposit Option:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.depositOption || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Reference Number:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.referenceNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Applied:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.dateApplied || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Rejected:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.dateRejected || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Time Rejected:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.timeRejected || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Rejection Reason:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.rejectionReason || 'N/A'}</span>
-                  </div>
-                </div>
-                <div style={styles.rightColumn}>
                   <div style={styles.sectionTitle}>Member Information</div>
                   <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Member ID:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.id || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Name:</span>
-                    <span style={styles.fieldValue}>{`${selectedDeposit?.firstName || ''} ${selectedDeposit?.lastName || ''}`}</span>
+                    <span style={styles.fieldValue}>{`${selectedDeposit.firstName || ''} ${selectedDeposit.lastName || ''}`}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedDeposit?.phoneNumber || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.email || 'N/A'}</span>
                   </div>
 
+                  <div style={styles.sectionTitle}>Transaction Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Transaction ID:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.transactionId || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Amount:</span>
+                    <span style={styles.fieldValue}>{formatCurrency(selectedDeposit.amountToBeDeposited)}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Deposit Option:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.depositOption || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Applied:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.dateApplied || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.sectionTitle}>Rejection Information</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Rejected:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.dateRejected}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Rejection Reason:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.rejectionReason || 'N/A'}</span>
+                  </div>
+                </div>
+                <div style={styles.rightColumn}>
                   <div style={styles.sectionTitle}>Proof of Deposit</div>
-                  {selectedDeposit?.proofOfDepositUrl && (
-                    <div style={styles.imageBlock}>
-                      <p style={styles.imageLabel}>Proof of Deposit</p>
-                      <img
-                        src={selectedDeposit.proofOfDepositUrl}
-                        alt="Proof of Deposit"
-                        style={styles.imageThumbnail}
-                        onClick={() => openImageViewer(selectedDeposit.proofOfDepositUrl, 'Proof of Deposit')}
-                        onFocus={(e) => e.target.style.outline = 'none'}
-                      />
-                    </div>
-                  )}
+                  <div style={styles.imageGrid}>
+                    {selectedDeposit.proofOfDepositUrl && (
+                      <div style={styles.imageBlock}>
+                        <p style={styles.imageLabel}>Proof of Deposit</p>
+                        <img
+                          src={selectedDeposit.proofOfDepositUrl}
+                          alt="Proof of Deposit"
+                          style={styles.imageThumbnail}
+                          onClick={() => openImageViewer(selectedDeposit.proofOfDepositUrl, 'Proof of Deposit', 0)}
+                          onFocus={(e) => e.target.style.outline = 'none'}
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -434,11 +488,25 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+              onClick={() => navigateImages('prev')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronLeft />
+            </button>
             <img
               src={currentImage.url}
               alt={currentImage.label}
               style={styles.largeImage}
             />
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+              onClick={() => navigateImages('next')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronRight />
+            </button>
             <button 
               style={styles.imageViewerClose} 
               onClick={closeImageViewer}
