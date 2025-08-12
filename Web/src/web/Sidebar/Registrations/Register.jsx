@@ -20,6 +20,7 @@ import Registrations from './Registrations';
 import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
+//import PermanentWithdrawals from './PermanentWithdrawals';
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -39,6 +40,7 @@ const Register = () => {
   const [rejectedRegistrations, setRejectedRegistrations] = useState([]);
   const [approvedRegistrations, setApprovedRegistrations] = useState([]);
   const [members, setMembers] = useState([]);
+  const [permanentWithdrawals, setPermanentWithdrawals] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -468,33 +470,38 @@ const Register = () => {
   const fetchAllData = async () => {
     setLoading(true);
     try {
-      const [regSnap, rejSnap, appSnap, membersSnap] = await Promise.all([
+      const [regSnap, rejSnap, appSnap, membersSnap, withdrawalsSnap] = await Promise.all([
         database.ref('Registrations/RegistrationApplications').once('value'),
         database.ref('Registrations/RejectedRegistrations').once('value'),
         database.ref('Registrations/ApprovedRegistrations').once('value'),
         database.ref('Members').once('value'),
+        database.ref('Withdrawals/PermanentWithdrawals').once('value'),
       ]);
 
       const regData = regSnap.val() || {};
       const rejData = rejSnap.val() || {};
       const appData = appSnap.val() || {};
       const membersData = membersSnap.val() || {};
+      const withdrawalsData = withdrawalsSnap.val() || {};
 
       const regArray = Object.keys(regData).map(key => ({ id: key, ...regData[key] }));
       const rejArray = Object.keys(rejData).map(key => ({ id: key, ...rejData[key] }));
       const appArray = Object.keys(appData).map(key => ({ id: key, ...appData[key] }));
       const membersArray = Object.keys(membersData).map(key => ({ id: key, ...membersData[key] }));
+      const withdrawalsArray = Object.keys(withdrawalsData).map(key => ({ id: key, ...withdrawalsData[key] }));
 
       setRegistrations(regArray);
       setRejectedRegistrations(rejArray);
       setApprovedRegistrations(appArray);
       setMembers(membersArray);
+      setPermanentWithdrawals(withdrawalsArray);
       
       // Update filtered data based on active section
       const newFilteredData = 
         activeSection === 'registrations' ? regArray :
         activeSection === 'rejectedRegistrations' ? rejArray :
         activeSection === 'approvedRegistrations' ? appArray :
+        activeSection === 'permanentWithdrawals' ? withdrawalsArray :
         membersArray;
       
       setFilteredData(newFilteredData);
@@ -539,6 +546,8 @@ const Register = () => {
         ? rejectedRegistrations
         : activeSection === 'approvedRegistrations'
         ? approvedRegistrations
+        : activeSection === 'permanentWithdrawals'
+        ? permanentWithdrawals
         : members;
 
     const filtered = currentData.filter(item => {
@@ -567,6 +576,8 @@ const Register = () => {
           ? 'ApprovedRegistrations'
           : activeSection === 'members'
           ? 'Members'
+          : activeSection === 'permanentWithdrawals'
+          ? 'PermanentWithdrawals'
           : 'Registrations';
 
       if (dataToDownload.length === 0) {
@@ -617,6 +628,8 @@ const Register = () => {
         ? rejectedRegistrations
         : section === 'approvedRegistrations'
         ? approvedRegistrations
+        : section === 'permanentWithdrawals'
+        ? permanentWithdrawals
         : members;
     setFilteredData(defaultData);
     setNoMatch(false);
@@ -843,7 +856,9 @@ const Register = () => {
             {[
               { key: 'registrations', label: 'Pending', color: '#2D5783' },
               { key: 'rejectedRegistrations', label: 'Rejected', color: '#FF0000' },
+              { key: 'approvedRegistrations', label: 'Approved', color: '#4CAF50' },
               { key: 'members', label: 'Members', color: '#2D5783' },
+              { key: 'permanentWithdrawals', label: 'Membership Withdrawals', color: '#FF0000' },
             ].map((tab) => {
               const isActive = activeSection === tab.key;
               return (
@@ -917,7 +932,7 @@ const Register = () => {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   onPageChange={setCurrentPage}
-                  refreshData={fetchAllData} // Pass the refresh function
+                  refreshData={fetchAllData}
                 />
               )}
               {activeSection === 'rejectedRegistrations' && (
@@ -936,6 +951,9 @@ const Register = () => {
                     <FaPlusCircle />
                   </button>
                 </>
+              )}
+              {activeSection === 'permanentWithdrawals' && (
+                <PermanentWithdrawals withdrawals={paginatedData} />
               )}
             </>
           )}
@@ -1073,7 +1091,7 @@ const Register = () => {
                 </div>
                 
                 <div className="modal-button-container">
-                                 <button
+                  <button
                     className="modal-submit-button"
                     onClick={handleSubmitConfirmation}
                     disabled={uploading}
@@ -1090,7 +1108,6 @@ const Register = () => {
                   >
                     Cancel
                   </button>
-   
                 </div>
               </div>
             </div>

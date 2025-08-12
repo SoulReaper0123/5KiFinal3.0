@@ -193,19 +193,28 @@ app.post('/send-admin-email', async (req, res) => {
                     </h2>
                     <p>A new admin account has been successfully created in the system.</p>
                     
-                    <h3 style="color: #2c3e50;">Admin Details:</h3>
-                    <ul>
-                        <li><strong>Name:</strong> ${fullName}</li>
-                        <li><strong>Email:</strong> ${email}</li>
-                        <li><strong>Date Created:</strong> ${currentDate}</li>
-                    </ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Admin Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Created</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
                     
                     <p style="font-style: italic; color: #7f8c8d;">
                         This is an automated notification. No action is required unless this was unauthorized.
                     </p>
                     
-                    <h3 style="color: #2c3e50;">Quick Links:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+                    <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
                         <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
@@ -234,15 +243,24 @@ app.post('/send-admin-email', async (req, res) => {
                     
                     <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
                         <h3 style="color: #2c3e50; margin-top: 0;">Account Information:</h3>
-                        <ul>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Temporary Password:</strong> ${password}</li>
-                            <li><strong>Account Type:</strong> Administrator</li>
-                        </ul>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Email</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Temporary Password</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${password}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Type</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Administrator</td>
+                            </tr>
+                        </table>
                     </div>
                     
-                    <h3 style="color: #2c3e50;">Important Security Notice:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Security Notice:</h3>
+                    <ul style="margin-bottom: 20px;">
                         <li>Change your password immediately after first login</li>
                         <li>Never share your credentials with anyone</li>
                         <li>Always log out after your session</li>
@@ -258,8 +276,8 @@ app.post('/send-admin-email', async (req, res) => {
                     
                     <p>For any questions, please contact the system administrator.</p>
                     
-                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
                         <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
@@ -338,21 +356,28 @@ app.post('/send-delete-admin-email', async (req, res) => {
                     
                     <p>An administrator account has been permanently removed from the system.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Account Details:</h3>
-                        <ul>
-                            <li><strong>Name:</strong> ${fullName}</li>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Date Deleted:</strong> ${currentDate}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Account Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Deleted</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
                     
                     <p style="font-weight: bold; color: #e74c3c;">
                         Note: This action is irreversible. All access privileges have been revoked.
                     </p>
                     
-                    <h3 style="color: #2c3e50;">Quick Links:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+                    <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
                         <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
@@ -380,17 +405,24 @@ app.post('/send-delete-admin-email', async (req, res) => {
                     
                     <p>We're writing to inform you that your administrator access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Details:</h3>
-                        <ul>
-                            <li><strong>Name:</strong> ${fullName}</li>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Effective Date:</strong> ${currentDate}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Effective Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
                     
-                    <h3 style="color: #2c3e50;">Important Information:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Information:</h3>
+                    <ul style="margin-bottom: 20px;">
                         <li>You will no longer have access to the admin dashboard</li>
                         <li>All admin privileges have been revoked</li>
                         <li>This action is permanent and cannot be undone</li>
@@ -401,8 +433,8 @@ app.post('/send-delete-admin-email', async (req, res) => {
                         <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
                     </p>
                     
-                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
                         <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
@@ -464,14 +496,21 @@ app.post('/register', async (req, res) => {
                         New Registration Received
                     </h2>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Member Details:</h3>
-                        <ul>
-                            <li><strong>Name:</strong> ${firstName} ${lastName}</li>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Registration Date:</strong> ${formatDisplayDate(registrationDate)}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Member Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${firstName} ${lastName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Registration Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(registrationDate)}</td>
+                        </tr>
+                    </table>
                     
                     <p>
                         <a href="${DASHBOARD_LINK}" 
@@ -563,10 +602,21 @@ app.post('/approveRegistrations', async (req, res) => {
                     
                     <p>Thank you for registering with 5Ki Financial Services on ${dateApproved}. Your account has been successfully created and you now have access to our range of services including loan applications, transactions tracking, and account management.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <p style="font-weight: bold; margin: 0 0 10px 0;">Your Member ID: <span style="color: #3498db;">${memberId}</span></p>
-                        <p style="margin: 0;">Please keep this ID safe as you'll need it for future transactions.</p>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Account Information:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Member ID</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; color: #3498db;">${memberId}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Active</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Approval Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dateApproved}</td>
+                        </tr>
+                    </table>
                     
                     <p style="font-weight: bold;">Welcome aboard! Please log in to your account to get started.</p>
                     
@@ -635,10 +685,12 @@ app.post('/rejectRegistrations', async (req, res) => {
                     <p>Thank you for your interest in becoming a member of 5KI Financial Services. After careful review, we regret to inform you that your registration application has not been approved at this time due to not meeting the eligibility criteria required for membership.</p>
                     
                     ${rejectionReason ? `
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Reason for Rejection:</h3>
-                        <p>${rejectionReason}</p>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Reason for Rejection:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${rejectionReason}</td>
+                        </tr>
+                    </table>
                     ` : ''}
                     
                     <p>Should you wish to reapply, we recommend reviewing the application guidelines thoroughly and ensuring that all required information is complete and accurate.</p>
@@ -734,17 +786,21 @@ app.post('/send-verification-code', async (req, res) => {
                     
                     <p>Please enter this code in the verification page to complete your login process.</p>
                     
-                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">IMPORTANT SECURITY NOTICE:</h3>
-                        <ul style="margin-bottom: 0;">
-                            <li>Never share this code with anyone</li>
-                            <li>5KI Financial Services will never ask you for this code</li>
-                            <li>If you didn't request this code, contact us immediately at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a></li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">IMPORTANT SECURITY NOTICE:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px; background-color: #fdedec; border-left: 4px solid #e74c3c;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #e74c3c;">
+                                <ul style="margin-bottom: 0;">
+                                    <li>Never share this code with anyone</li>
+                                    <li>5KI Financial Services will never ask you for this code</li>
+                                    <li>If you didn't request this code, contact us immediately at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a></li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </table>
                     
-                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
                         <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
@@ -823,20 +879,47 @@ app.post('/deposit', async (req, res) => {
                         New Deposit Application
                     </h2>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Member Details:</h3>
-                        <ul>
-                            <li><strong>Name:</strong> ${firstName} ${lastName}</li>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Amount:</strong> ₱${amountToBeDeposited}</li>
-                            <li><strong>Method:</strong> ${depositOption}</li>
-                            <li><strong>Account Name:</strong> ${accountName || '5KI'}</li>
-                            <li><strong>Account Number:</strong> ${accountNumber || 'N/A'}</li>
-                            <li><strong>Transaction ID:</strong> ${transactionId || 'N/A'}</li>
-                            <li><strong>Date Submitted:</strong> ${currentDate}</li>
-                            ${proofOfDepositUrl ? '<li><strong>Proof of deposit:</strong> Attached</li>' : ''}
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Member Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${firstName} ${lastName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amountToBeDeposited}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Method</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${depositOption}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${accountName || '5KI'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Number</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${accountNumber || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Transaction ID</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${transactionId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Submitted</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                        ${proofOfDepositUrl ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Proof of deposit</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Attached</td>
+                        </tr>
+                        ` : ''}
+                    </table>
                     
                     <p>
                         <a href="${DASHBOARD_LINK}" 
@@ -869,22 +952,32 @@ app.post('/deposit', async (req, res) => {
                     
                     <p>We have received your deposit application for <strong>₱${amountToBeDeposited}</strong> via <strong>${depositOption}</strong>.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Application Details:</h3>
-                        <ul>
-                            <li><strong>Account Name:</strong> ${accountName || '5KI'}</li>
-                            <li><strong>Account Number:</strong> ${accountNumber || 'N/A'}</li>
-                            <li><strong>Transaction ID:</strong> ${transactionId || 'N/A'}</li>
-                            <li><strong>Date Submitted:</strong> ${currentDate}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Application Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Account Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${accountName || '5KI'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Number</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${accountNumber || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Transaction ID</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${transactionId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Submitted</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
                     
                     <p>Our team will process your request and notify you once completed. This typically takes 1-2 business days.</p>
                     
                     <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
-                    <h3 style="color: #2c3e50;">Connect With Us:</h3>
-                    <ul>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
                         <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
@@ -934,6 +1027,22 @@ app.post('/approveDeposits', async (req, res) => {
                             We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved}.
                         </p>
                     </div>
+                    
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Transaction Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Approved</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Approval Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dateApproved}</td>
+                        </tr>
+                    </table>
                     
                     <p>Your account balance has been updated accordingly.</p>
                     
@@ -987,10 +1096,19 @@ app.post('/rejectDeposits', async (req, res) => {
                     
                     <p>After careful review, we regret to inform you that your deposit application submitted on ${dateRejected} has not been approved.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <p style="margin: 0 0 10px 0;"><strong>Amount:</strong> ₱${amount}</p>
-                        ${rejectionReason ? `<p style="margin: 0;"><strong>Reason:</strong> ${rejectionReason}</p>` : ''}
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Application Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        ${rejectionReason ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${rejectionReason}</td>
+                        </tr>
+                        ` : ''}
+                    </table>
                     
                     <p>You may submit a new deposit application after addressing any issues.</p>
                     
@@ -1039,15 +1157,29 @@ app.post('/withdraw', async (req, res) => {
                     
                     <p>A member has requested a withdrawal:</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <ul>
-                            <li><strong>Member:</strong> ${fullName}</li>
-                            <li><strong>Amount:</strong> ₱${amount}</li>
-                            <li><strong>Date:</strong> ${formatDisplayDate(date)}</li>
-                            <li><strong>Recipient Account:</strong> ${recipientAccount}</li>
-                            <li><strong>Reference No.:</strong> ${referenceNumber}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Transaction Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Recipient Account</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${recipientAccount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reference No.</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${referenceNumber}</td>
+                        </tr>
+                    </table>
                     
                     <p>
                         <a href="${DASHBOARD_LINK}" 
@@ -1082,6 +1214,22 @@ app.post('/withdraw', async (req, res) => {
                             Your withdrawal request for ₱${amount} has been processed on ${formatDisplayDate(date)}.
                         </p>
                     </div>
+                    
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Transaction Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Recipient Account</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${recipientAccount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Transaction Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                        </tr>
+                    </table>
                     
                     <p>The funds were sent to your recipient account (${recipientAccount}).</p>
                     
@@ -1125,6 +1273,22 @@ app.post('/approveWithdraws', async (req, res) => {
                             Your withdrawal of ₱${amount} has been approved on ${dateApproved}.
                         </p>
                     </div>
+                    
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Transaction Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Approved</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Approval Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dateApproved}</td>
+                        </tr>
+                    </table>
                     
                     <p>Thank you for using 5Ki Financial Services.</p>
                     
@@ -1183,10 +1347,19 @@ app.post('/rejectWithdraws', async (req, res) => {
                     
                     <p>After careful review, we regret to inform you that your withdrawal application submitted on ${dateRejected} has not been approved.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <p style="margin: 0 0 10px 0;"><strong>Amount Requested:</strong> ₱${amount}</p>
-                        ${rejectionReason ? `<p style="margin: 0;"><strong>Reason:</strong> ${rejectionReason}</p>` : ''}
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Application Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount Requested</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        ${rejectionReason ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${rejectionReason}</td>
+                        </tr>
+                        ` : ''}
+                    </table>
                     
                     <p>You may submit a new withdrawal application after addressing any issues.</p>
                     
@@ -1235,16 +1408,29 @@ app.post('/applyLoan', async (req, res) => {
                         New Loan Application
                     </h2>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Applicant Details:</h3>
-                        <ul>
-                            <li><strong>Applicant:</strong> ${fullName}</li>
-                            <li><strong>Email:</strong> ${email}</li>
-                            <li><strong>Amount:</strong> ₱${amount}</li>
-                            <li><strong>Term:</strong> ${term} months</li>
-                            <li><strong>Application Date:</strong> ${formatDisplayDate(date)}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Applicant Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Applicant</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Term</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${term} months</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Application Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                        </tr>
+                    </table>
                     
                     <p>
                         <a href="${DASHBOARD_LINK}" 
@@ -1276,14 +1462,21 @@ app.post('/applyLoan', async (req, res) => {
                     
                     <p>We have received your loan application on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Loan Details:</h3>
-                        <ul>
-                            <li><strong>Amount:</strong> ₱${amount}</li>
-                            <li><strong>Term:</strong> ${term} months</li>
-                            <li><strong>Status:</strong> Under Review</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Loan Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Term</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${term} months</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">Under Review</td>
+                        </tr>
+                    </table>
                     
                     <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
@@ -1349,21 +1542,49 @@ app.post('/approveLoans', async (req, res) => {
                         </p>
                     </div>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Loan Details:</h3>
-                        <ul>
-                            <li><strong>Approved Amount:</strong> ₱${amount}</li>
-                            <li><strong>Release Amount:</strong> ₱${releaseAmount} (after processing fee)</li>
-                            <li><strong>Processing Fee:</strong> ₱${processingFee}</li>
-                            <li><strong>Repayment Term:</strong> ${term} months</li>
-                            <li><strong>Interest Rate:</strong> ${interestRate}</li>
-                            <li><strong>Monthly Interest:</strong> ₱${interest}</li>
-                            <li><strong>Principal Payment:</strong> ₱${monthlyPayment}</li>
-                            <li><strong>Total Monthly Payment:</strong> ₱${totalMonthlyPayment}</li>
-                            <li><strong>Total Term Payment:</strong> ₱${totalTermPayment}</li>
-                            <li><strong>Due Date:</strong> ${dueDate}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Loan Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Approved Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Release Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${releaseAmount} (after processing fee)</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Processing Fee</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${processingFee}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Repayment Term</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${term} months</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Interest Rate</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${interestRate}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Interest</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${interest}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal Payment</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${monthlyPayment}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Monthly Payment</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${totalMonthlyPayment}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Term Payment</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${totalTermPayment}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Due Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dueDate}</td>
+                        </tr>
+                    </table>
                     
                     <div style="background-color: #fff8e1; padding: 15px; border-left: 4px solid #f39c12; margin: 20px 0;">
                         <h3 style="color: #2c3e50; margin-top: 0;">Payment Instructions:</h3>
@@ -1446,12 +1667,13 @@ app.post('/rejectLoans', async (req, res) => {
                     
                     <p>Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}</p>
         
-                    
                     ${rejectionReason ? `
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Reason:</h3>
-                        <p>${rejectionReason}</p>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Reason:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${rejectionReason}</td>
+                        </tr>
+                    </table>
                     ` : ''}
                     
                     <p>If you have any questions or need clarification, please don't hesitate to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
@@ -1515,14 +1737,25 @@ app.post('/payment', async (req, res) => {
                     
                     <p>A loan payment has been recorded:</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
-                        <ul>
-                            <li><strong>Member:</strong> ${fullName}</li>
-                            <li><strong>Amount Paid:</strong> ₱${amount}</li>
-                            <li><strong>Date:</strong> ${formatDisplayDate(date)}</li>
-                            <li><strong>Payment Method:</strong> ${paymentMethod}</li>
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Transaction Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount Paid</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${paymentMethod}</td>
+                        </tr>
+                    </table>
                     
                     <p>The system has updated the loan balance accordingly.</p>
                     
@@ -1559,6 +1792,22 @@ app.post('/payment', async (req, res) => {
                             We have received your payment of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
                         </p>
                     </div>
+                    
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Payment Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${paymentMethod}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Transaction Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                        </tr>
+                    </table>
                     
                     <p>Your transaction has been processed successfully. Thank you for your payment.</p>
                     
@@ -1619,23 +1868,44 @@ app.post('/approvePayments', async (req, res) => {
                         </p>
                     </div>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Payment Details:</h3>
-                        <ul>
-                            <li><strong>Amount:</strong> ₱${amount}</li>
-                            <li><strong>Payment Method:</strong> ${paymentMethod}</li>
-                            <li><strong>Date Approved:</strong> ${dateApproved} </li>
-                            ${isLoanPayment ? `
-                            <li><strong>Loan Payment Breakdown:</strong>
-                                <ul>
-                                    <li>Principal Paid: ₱${principalPaid}</li>
-                                    <li>Interest Paid: ₱${interestPaid}</li>
-                                    ${excessPayment > 0 ? `<li>Excess Payment: ₱${excessPayment}</li>` : ''}
-                                </ul>
-                            </li>
-                            ` : ''}
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Payment Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${paymentMethod}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Approved</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${dateApproved}</td>
+                        </tr>
+                        ${isLoanPayment ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Payment Breakdown</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr>
+                                        <td style="padding: 4px; border: none;">Principal Paid:</td>
+                                        <td style="padding: 4px; border: none;">₱${principalPaid}</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="padding: 4px; border: none;">Interest Paid:</td>
+                                        <td style="padding: 4px; border: none;">₱${interestPaid}</td>
+                                    </tr>
+                                    ${excessPayment > 0 ? `
+                                    <tr>
+                                        <td style="padding: 4px; border: none;">Excess Payment:</td>
+                                        <td style="padding: 4px; border: none;">₱${excessPayment}</td>
+                                    </tr>
+                                    ` : ''}
+                                </table>
+                            </td>
+                        </tr>
+                        ` : ''}
+                    </table>
                     
                     <p>Your transaction has been completed successfully. Thank you for your payment.</p>
                     
@@ -1696,9 +1966,12 @@ app.post('/rejectPayments', async (req, res) => {
                     </div>
                     
                     ${rejectionReason ? `
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <p style="margin: 0;"><strong>Reason:</strong> ${rejectionReason}</p>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Reason:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${rejectionReason}</td>
+                        </tr>
+                    </table>
                     ` : ''}
                     
                     <p>You may submit a new payment application after addressing any issues.</p>
@@ -1748,13 +2021,23 @@ app.post('/membershipWithdrawal', async (req, res) => {
                     
                     <p>A new permanent membership withdrawal request has been received:</p>
                     
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
-                        <ul>
-                            <li><strong>Member:</strong> ${fullName}</li>
-                            <li><strong>Date Requested:</strong> ${formatDisplayDate(date)}</li>
-                            ${reason ? `<li><strong>Reason:</strong> ${reason}</li>` : ''}
-                        </ul>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Request Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Requested</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                        </tr>
+                        ${reason ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${reason}</td>
+                        </tr>
+                        ` : ''}
+                    </table>
                     
                     <p>Kindly update the records and confirm in the system.</p>
                     
@@ -1789,9 +2072,12 @@ app.post('/membershipWithdrawal', async (req, res) => {
                     <p>We have received your membership withdrawal request on ${formatDisplayDate(date)}.</p>
                     
                     ${reason ? `
-                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-                        <p style="margin: 0;"><strong>Your reason:</strong> ${reason}</p>
-                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Your Reason:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${reason}</td>
+                        </tr>
+                    </table>
                     ` : ''}
                     
                     <p>Our team will process your request and notify you once completed.</p>

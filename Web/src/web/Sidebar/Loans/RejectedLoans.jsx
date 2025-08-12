@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FaTimesCircle, FaTimes } from 'react-icons/fa';
+import { FaTimesCircle, FaTimes, FaImage, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const styles = {
   container: {
@@ -73,7 +73,7 @@ const styles = {
   },
   modalCard: {
     width: '40%',
-    maxWidth: '800px',
+    maxWidth: '900px',
     backgroundColor: 'white',
     borderRadius: '8px',
     padding: '20px',
@@ -81,6 +81,19 @@ const styles = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     maxHeight: '90vh',
     height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalCardSingleColumn: {
+    width: '40%',
+    maxWidth: '600px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: 'auto',
     display: 'flex',
     flexDirection: 'column'
   },
@@ -118,6 +131,38 @@ const styles = {
     wordBreak: 'break-word',
     lineHeight: '1.3'
   },
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    marginBottom: '12px',
+    gap: '10px'
+  },
+  imageBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start'
+  },
+  imageLabel: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#333',
+    width: '100%',
+    textAlign: 'left',
+    marginLeft: 0,
+    paddingLeft: 0
+  },
+  imageThumbnail: {
+    width: '90%',
+    height: '120px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    objectFit: 'cover',
+    cursor: 'pointer',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
   closeButton: {
     position: 'absolute',
     top: '10px',
@@ -132,6 +177,20 @@ const styles = {
     '&:focus': {
       outline: 'none',
       boxShadow: 'none'
+    }
+  },
+  viewText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
     }
   },
   modalHeader: {
@@ -159,6 +218,77 @@ const styles = {
     color: '#333',
     fontSize: '13px'
   },
+  imageViewerModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000
+  },
+  imageViewerContent: {
+    position: 'relative',
+    width: '90%',
+    maxWidth: '800px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
+  },
+  largeImage: {
+    maxWidth: '100%',
+    maxHeight: '70vh',
+    objectFit: 'contain',
+    borderRadius: '4px'
+  },
+  imageViewerLabel: {
+    color: 'white',
+    fontSize: '18px',
+    marginTop: '16px',
+    textAlign: 'center'
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: '-40px',
+    right: '80px',
+    color: 'white',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '8px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  imageViewerNav: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '24px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    '&:hover': {
+      color: '#2D5783'
+    },
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  prevButton: {
+    left: '50px'
+  },
+  nextButton: { 
+    right: '50px'
+  },
   sectionTitle: {
     fontSize: '14px',
     fontWeight: 'bold',
@@ -168,12 +298,22 @@ const styles = {
     borderBottom: '1px solid #eee',
     textAlign: 'left',
     width: '100%'
+  },
+  noDocumentsMessage: {
+    textAlign: 'center',
+    margin: '20px 0',
+    color: '#666',
+    fontStyle: 'italic'
   }
 };
 
-const RejectedLoans = ({ loans }) => {
+const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [availableImages, setAvailableImages] = useState([]);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -191,6 +331,46 @@ const RejectedLoans = ({ loans }) => {
     setModalVisible(false);
   };
 
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (url) {
+      images.push({ 
+        url, 
+        label 
+      });
+    }
+
+    setAvailableImages(images);
+    setCurrentImage({ url, label });
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
+  };
+
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
+  };
+
+  const hasDocuments = (loan) => {
+    return loan.proofOfIncomeUrl || loan.proofOfIdentityUrl;
+  };
+
   if (!loans.length) {
     return (
       <div style={styles.loadingView}>
@@ -205,26 +385,41 @@ const RejectedLoans = ({ loans }) => {
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Term</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Disbursement</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Rejected</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Rejected</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {loans.map((item, index) => (
-              <tr key={index} style={styles.tableRow} onClick={() => openModal(item)}>
+              <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
+                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.loanAmount)}</td>
                 <td style={styles.tableCell}>{item.term} months</td>
                 <td style={styles.tableCell}>{item.disbursement}</td>
                 <td style={styles.tableCell}>{item.dateRejected}</td>
-                <td style={{...styles.tableCell, ...styles.statusRejected}}>
-                  <FaTimesCircle /> rejected
+                <td style={{
+                  ...styles.tableCell,
+                  ...styles.statusRejected
+                }}>
+                  rejected
+                </td>
+                <td style={styles.tableCell}>
+                  <span 
+                    style={styles.viewText} 
+                    onClick={() => openModal(item)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    View
+                  </span>
                 </td>
               </tr>
             ))}
@@ -232,10 +427,9 @@ const RejectedLoans = ({ loans }) => {
         </table>
       </div>
 
-      {/* View Details Modal */}
-      {modalVisible && (
+      {modalVisible && selectedLoan && (
         <div style={styles.centeredModal}>
-          <div style={styles.modalCard}>
+          <div style={hasDocuments(selectedLoan) ? styles.modalCard : styles.modalCardSingleColumn}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -245,80 +439,218 @@ const RejectedLoans = ({ loans }) => {
               <FaTimes />
             </button>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Loan Details</h2>
+              <h2 style={styles.modalTitle}>Loan Application Details</h2>
             </div>
             <div style={styles.modalContent}>
-              <div style={styles.columns}>
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Loan Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.id || 'N/A'}</span>
+              {hasDocuments(selectedLoan) ? (
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+                    <div style={styles.sectionTitle}>Member Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Member ID:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Name:</span>
+                      <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Email:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Contact:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.phoneNumber || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Loan Details</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Transaction ID:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Loan Amount:</span>
+                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Term:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.term} months</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Disbursement:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Applied:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Rejection Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Rejected:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Time Rejected:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.timeRejected}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Rejection Reason:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
+                    </div>
                   </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Transaction ID:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.transactionId || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Amount:</span>
-                    <span style={styles.fieldValue}>{formatCurrency(selectedLoan?.loanAmount) || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Term:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.term ? `${selectedLoan.term} months` : 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Disbursement:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.disbursement || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Applied:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.dateApplied || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Rejected:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.dateRejected || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Time Rejected:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.timeRejected || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Rejection Reason:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.rejectionReason || 'N/A'}</span>
+                  <div style={styles.rightColumn}>
+                    <div style={styles.sectionTitle}>Bank Details</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Account Name:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Account Number:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Bank Name:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.bankName || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Supporting Documents</div>
+                    <div style={styles.imageGrid}>
+                      {selectedLoan.proofOfIncomeUrl && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Proof of Income</p>
+                          <img
+                            src={selectedLoan.proofOfIncomeUrl}
+                            alt="Proof of Income"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
+                            onFocus={(e) => e.target.style.outline = 'none'}
+                          />
+                        </div>
+                      )}
+                      {selectedLoan.proofOfIdentityUrl && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Proof of Identity</p>
+                          <img
+                            src={selectedLoan.proofOfIdentityUrl}
+                            alt="Proof of Identity"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
+                            onFocus={(e) => e.target.style.outline = 'none'}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div style={styles.rightColumn}>
+              ) : (
+                <div style={styles.leftColumn}>
                   <div style={styles.sectionTitle}>Member Information</div>
                   <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Member ID:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Name:</span>
-                    <span style={styles.fieldValue}>{`${selectedLoan?.firstName || ''} ${selectedLoan?.lastName || ''}`}</span>
+                    <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.email || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.phoneNumber || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedLoan.phoneNumber || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.sectionTitle}>Loan Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Transaction ID:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Loan Amount:</span>
+                    <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Term:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.term} months</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Disbursement:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Applied:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.sectionTitle}>Rejection Information</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Rejected:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Time Rejected:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.timeRejected}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Rejection Reason:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
                   </div>
 
                   <div style={styles.sectionTitle}>Bank Details</div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.accountName || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.accountNumber || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Bank Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan?.bankName || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedLoan.bankName || 'N/A'}</span>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+      {imageViewerVisible && (
+        <div style={styles.imageViewerModal}>
+          <div style={styles.imageViewerContent}>
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+              onClick={() => navigateImages('prev')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronLeft />
+            </button>
+            <img
+              src={currentImage.url}
+              alt={currentImage.label}
+              style={styles.largeImage}
+            />
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+              onClick={() => navigateImages('next')}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaChevronRight />
+            </button>
+            <button 
+              style={styles.imageViewerClose} 
+              onClick={closeImageViewer}
+              aria-label="Close image viewer"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
           </div>
         </div>
       )}

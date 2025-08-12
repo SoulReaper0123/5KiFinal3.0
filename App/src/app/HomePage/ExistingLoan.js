@@ -149,7 +149,7 @@ const ExistingLoan = () => {
               const loanData = {
                 ...currentLoan,
                 ...approvedData,
-                outstandingBalance: approvedData.loanAmount,
+                outstandingBalance: currentLoan.loanAmount,
                 dateApplied: currentLoan.dateApplied,
                 dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
               };

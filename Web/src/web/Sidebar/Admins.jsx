@@ -5,7 +5,8 @@ import {
   FaChevronLeft, 
   FaChevronRight,
   FaCheckCircle,
-  FaTimes
+  FaTimes,
+  FaExclamationCircle
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -173,6 +174,137 @@ const styles = {
       boxShadow: 'none'
     }
   },
+  modalCard: {
+    width: '40%',
+    maxWidth: '800px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalContent: {
+    paddingBottom: '12px',
+    overflowY: 'auto',
+    flex: 1
+  },
+  columns: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '30px'
+  },
+  leftColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  rightColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  modalDetailText: {
+    fontSize: '13px',
+    marginBottom: '6px',
+    color: '#333',
+    wordBreak: 'break-word',
+    lineHeight: '1.3'
+  },
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    marginBottom: '12px',
+    gap: '10px'
+  },
+  imageBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start'
+  },
+  imageLabel: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#333',
+    width: '100%',
+    textAlign: 'left',
+    marginLeft: 0,
+    paddingLeft: 0
+  },
+  compactField: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '6px',
+    gap: '8px'
+  },
+  fieldLabel: {
+    fontWeight: 'bold',
+    color: '#555',
+    fontSize: '13px',
+    minWidth: '100px'
+  },
+  fieldValue: {
+    textAlign: 'right',
+    flex: 1,
+    wordBreak: 'break-word',
+    color: '#333',
+    fontSize: '13px'
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    margin: '12px 0 8px 0',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #eee',
+    textAlign: 'left',
+    width: '100%'
+  },
+  bottomButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '16px',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #eee'
+  },
+  deleteButton: {
+    backgroundColor: '#f44336',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+    opacity: '0.7'
+  },
+  modalHeader: {
+    borderBottom: '1px solid #eee',
+    paddingBottom: '12px',
+    marginBottom: '12px'
+  },
+  imageThumbnail: {
+    width: '100px',
+    height: '100px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    objectFit: 'cover',
+    cursor: 'pointer',
+    marginRight: '10px'
+  },
   imageViewerModal: {
     position: 'fixed',
     top: 0,
@@ -208,7 +340,7 @@ const styles = {
   imageViewerClose: {
     position: 'absolute',
     top: '-40px',
-    right: '80px',
+    right: '0',
     color: 'white',
     fontSize: '24px',
     cursor: 'pointer',
@@ -243,17 +375,27 @@ const styles = {
   },
   nextButton: { 
     right: '50px'
-  },
-  imageThumbnail: {
-    width: '100px',
-    height: '100px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    objectFit: 'cover',
-    cursor: 'pointer',
-    marginRight: '10px'
   }
 };
+
+const genderOptions = [
+  { key: 'Male', label: 'Male' },
+  { key: 'Female', label: 'Female' }
+];
+
+const civilStatusOptions = [
+  { key: 'Single', label: 'Single' },
+  { key: 'Married', label: 'Married' },
+  { key: 'Widowed', label: 'Widowed' },
+  { key: 'Separated', label: 'Separated' }
+];
+
+const governmentIdOptions = [
+  { key: 'national', label: 'National ID (PhilSys)' },
+  { key: 'sss', label: 'SSS ID' },
+  { key: 'philhealth', label: 'PhilHealth ID' },
+  { key: 'drivers_license', label: 'Drivers License' }
+];
 
 const Admins = () => {
   const [admins, setAdmins] = useState([]);
@@ -276,10 +418,6 @@ const Admins = () => {
   const [validIdBackFile, setValidIdBackFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
-  const [validIdFrontUrl, setValidIdFrontUrl] = useState('');
-  const [validIdBackUrl, setValidIdBackUrl] = useState('');
-  const [selfieUrl, setSelfieUrl] = useState('');
-  const [selfieWithIdUrl, setSelfieWithIdUrl] = useState('');
   const [emailError, setEmailError] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
@@ -305,30 +443,13 @@ const Admins = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [filteredData, setFilteredData] = useState([]);
   const [noMatch, setNoMatch] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableImages, setAvailableImages] = useState([]);
+  
   const pageSize = 10;
-
-  const genderOptions = [
-    { key: 'Male', label: 'Male' },
-    { key: 'Female', label: 'Female' }
-  ];
-
-  const civilStatusOptions = [
-    { key: 'Single', label: 'Single' },
-    { key: 'Married', label: 'Married' },
-    { key: 'Widowed', label: 'Widowed' },
-    { key: 'Separated', label: 'Separated' }
-  ];
-
-  const governmentIdOptions = [
-    { key: 'national', label: 'National ID (PhilSys)' },
-    { key: 'sss', label: 'SSS ID' },
-    { key: 'philhealth', label: 'PhilHealth ID' },
-    { key: 'drivers_license', label: 'Drivers License' }
-  ];
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -616,40 +737,6 @@ const Admins = () => {
         color: #666;
         margin-top: 5px;
       }
-      .image-preview-container {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 10px;
-      }
-      .image-preview {
-        position: relative;
-        width: 100px;
-        height: 100px;
-      }
-      .image-preview img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-        border-radius: 4px;
-        border: 1px solid #ddd;
-      }
-      .remove-image-btn {
-        position: absolute;
-        top: -5px;
-        right: -5px;
-        background-color: #f44336;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        font-size: 10px;
-      }
     `;
     document.head.appendChild(styleElement);
 
@@ -818,23 +905,11 @@ const Admins = () => {
     setAge(currentYear - birthYear);
   };
 
-  const handleFileChange = (e, setFileFunction, setUrlFunction) => {
+  const handleFileChange = (e, setFileFunction) => {
     const file = e.target.files[0];
     if (file) {
       setFileFunction(file);
-      
-      // Create a preview URL
-      const reader = new FileReader();
-      reader.onload = () => {
-        setUrlFunction(reader.result);
-      };
-      reader.readAsDataURL(file);
     }
-  };
-
-  const removeImage = (setFileFunction, setUrlFunction) => {
-    setFileFunction(null);
-    setUrlFunction('');
   };
 
   const uploadImageToStorage = async (file, path) => {
@@ -847,6 +922,60 @@ const Admins = () => {
       console.error('Error uploading image:', error);
       throw error;
     }
+  };
+
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (selectedAdmin?.validIdFront) {
+      images.push({ 
+        url: selectedAdmin.validIdFront, 
+        label: 'Valid ID Front' 
+      });
+    }
+    if (selectedAdmin?.validIdBack) {
+      images.push({ 
+        url: selectedAdmin.validIdBack, 
+        label: 'Valid ID Back' 
+      });
+    }
+    if (selectedAdmin?.selfie) {
+      images.push({ 
+        url: selectedAdmin.selfie, 
+        label: 'Selfie' 
+      });
+    }
+    if (selectedAdmin?.selfieWithId) {
+      images.push({ 
+        url: selectedAdmin.selfieWithId, 
+        label: 'Selfie with ID' 
+      });
+    }
+
+    setAvailableImages(images);
+    setCurrentImage({ url, label });
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
+  };
+
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
   };
 
   const onPressAdd = async () => {
@@ -882,6 +1011,7 @@ const Admins = () => {
   const handleAddAdmin = async () => {
     setConfirmAddVisible(false);
     setIsProcessing(true);
+    setActionInProgress(true);
 
     try {
       const password = generateRandomPassword();
@@ -994,12 +1124,14 @@ const Admins = () => {
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
+      setActionInProgress(false);
     }
   };
 
   const handleDeleteAdmin = async () => {
     setConfirmDeleteVisible(false);
     setIsProcessing(true);
+    setActionInProgress(true);
 
     try {
       const idToDelete = pendingDelete.id;
@@ -1009,12 +1141,30 @@ const Admins = () => {
 
       setSuccessMessage(`Admin account deleted successfully!`);
       setSuccessVisible(true);
+      
+      // Close the view modal and refresh data
+      setAdminModalVisible(false);
+      setSelectedAdmin(null);
+      
+      // Refresh the admin list
+      const snapshot = await database.ref('Users/Admin').once('value');
+      const data = snapshot.val() || {};
+      const adminList = Object.entries(data).map(([id, admin]) => ({
+        id,
+        ...admin,
+        name: admin.firstName 
+          ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
+          : admin.name || ''
+      }));
+      setAdmins(adminList);
+      setFilteredData(adminList);
     } catch (error) {
       console.error('Error deleting admin:', error);
       setErrorMessage(error.message || 'Failed to delete admin');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
+      setActionInProgress(false);
     }
   };
 
@@ -1097,10 +1247,6 @@ const Admins = () => {
       setValidIdBackFile(null);
       setSelfieFile(null);
       setSelfieWithIdFile(null);
-      setValidIdFrontUrl('');
-      setValidIdBackUrl('');
-      setSelfieUrl('');
-      setSelfieWithIdUrl('');
       setModalVisible(false);
     } 
     else if (pendingDelete) {
@@ -1134,60 +1280,6 @@ const Admins = () => {
     };
 
     fetchAdmins();
-  };
-
-  const openImageViewer = (url, label, index) => {
-    const images = [];
-    
-    if (selectedAdmin?.validIdFront) {
-      images.push({ 
-        url: selectedAdmin.validIdFront, 
-        label: 'Valid ID Front' 
-      });
-    }
-    if (selectedAdmin?.validIdBack) {
-      images.push({ 
-        url: selectedAdmin.validIdBack, 
-        label: 'Valid ID Back' 
-      });
-    }
-    if (selectedAdmin?.selfie) {
-      images.push({ 
-        url: selectedAdmin.selfie, 
-        label: 'Selfie' 
-      });
-    }
-    if (selectedAdmin?.selfieWithId) {
-      images.push({ 
-        url: selectedAdmin.selfieWithId, 
-        label: 'Selfie with ID' 
-      });
-    }
-
-    setAvailableImages(images);
-    setCurrentImage({ url, label });
-    setCurrentImageIndex(index);
-    setImageViewerVisible(true);
-  };
-
-  const closeImageViewer = () => {
-    setImageViewerVisible(false);
-    setCurrentImage({ url: '', label: '' });
-    setCurrentImageIndex(0);
-  };
-
-  const navigateImages = (direction) => {
-    if (availableImages.length === 0) return;
-
-    let newIndex;
-    if (direction === 'prev') {
-      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
-    } else {
-      newIndex = (currentImageIndex + 1) % availableImages.length;
-    }
-
-    setCurrentImageIndex(newIndex);
-    setCurrentImage(availableImages[newIndex]);
   };
 
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
@@ -1323,10 +1415,6 @@ const Admins = () => {
                   setValidIdBackFile(null);
                   setSelfieFile(null);
                   setSelfieWithIdFile(null);
-                  setValidIdFrontUrl('');
-                  setValidIdBackUrl('');
-                  setSelfieUrl('');
-                  setSelfieWithIdUrl('');
                 }} 
                 style={styles.closeButton}
                 aria-label="Close modal"
@@ -1531,29 +1619,9 @@ const Admins = () => {
                       type="file"
                       className="file-input"
                       accept="image/*"
-                      onChange={(e) => handleFileChange(e, setValidIdFrontFile, setValidIdFrontUrl)}
+                      onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
                     />
                   </label>
-                  {validIdFrontUrl && (
-                    <div className="image-preview-container">
-                      <div className="image-preview">
-                        <img 
-                          src={validIdFrontUrl} 
-                          alt="ID Front Preview" 
-                          onClick={() => {
-                            setCurrentImage({ url: validIdFrontUrl, label: 'ID Front Preview' });
-                            setImageViewerVisible(true);
-                          }}
-                        />
-                        <button 
-                          className="remove-image-btn"
-                          onClick={() => removeImage(setValidIdFrontFile, setValidIdFrontUrl)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="form-group">
@@ -1566,29 +1634,9 @@ const Admins = () => {
                       type="file"
                       className="file-input"
                       accept="image/*"
-                      onChange={(e) => handleFileChange(e, setValidIdBackFile, setValidIdBackUrl)}
+                      onChange={(e) => handleFileChange(e, setValidIdBackFile)}
                     />
                   </label>
-                  {validIdBackUrl && (
-                    <div className="image-preview-container">
-                      <div className="image-preview">
-                        <img 
-                          src={validIdBackUrl} 
-                          alt="ID Back Preview" 
-                          onClick={() => {
-                            setCurrentImage({ url: validIdBackUrl, label: 'ID Back Preview' });
-                            setImageViewerVisible(true);
-                          }}
-                        />
-                        <button 
-                          className="remove-image-btn"
-                          onClick={() => removeImage(setValidIdBackFile, setValidIdBackUrl)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="form-group">
@@ -1601,29 +1649,9 @@ const Admins = () => {
                       type="file"
                       className="file-input"
                       accept="image/*"
-                      onChange={(e) => handleFileChange(e, setSelfieFile, setSelfieUrl)}
+                      onChange={(e) => handleFileChange(e, setSelfieFile)}
                     />
                   </label>
-                  {selfieUrl && (
-                    <div className="image-preview-container">
-                      <div className="image-preview">
-                        <img 
-                          src={selfieUrl} 
-                          alt="Selfie Preview" 
-                          onClick={() => {
-                            setCurrentImage({ url: selfieUrl, label: 'Selfie Preview' });
-                            setImageViewerVisible(true);
-                          }}
-                        />
-                        <button 
-                          className="remove-image-btn"
-                          onClick={() => removeImage(setSelfieFile, setSelfieUrl)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="form-group">
@@ -1636,29 +1664,9 @@ const Admins = () => {
                       type="file"
                       className="file-input"
                       accept="image/*"
-                      onChange={(e) => handleFileChange(e, setSelfieWithIdFile, setSelfieWithIdUrl)}
+                      onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
                     />
                   </label>
-                  {selfieWithIdUrl && (
-                    <div className="image-preview-container">
-                      <div className="image-preview">
-                        <img 
-                          src={selfieWithIdUrl} 
-                          alt="Selfie with ID Preview" 
-                          onClick={() => {
-                            setCurrentImage({ url: selfieWithIdUrl, label: 'Selfie with ID Preview' });
-                            setImageViewerVisible(true);
-                          }}
-                        />
-                        <button 
-                          className="remove-image-btn"
-                          onClick={() => removeImage(setSelfieWithIdFile, setSelfieWithIdUrl)}
-                        >
-                          ×
-                        </button>
-                      </div>
-                    </div>
-                  )}
                 </div>
 
                 <div className="modal-button-container">
@@ -1686,10 +1694,6 @@ const Admins = () => {
                       setValidIdBackFile(null);
                       setSelfieFile(null);
                       setSelfieWithIdFile(null);
-                      setValidIdFrontUrl('');
-                      setValidIdBackUrl('');
-                      setSelfieUrl('');
-                      setSelfieWithIdUrl('');
                     }}
                   >
                     Cancel
@@ -1703,7 +1707,7 @@ const Admins = () => {
         {/* Admin Details Modal */}
         {adminModalVisible && (
           <div style={styles.centeredModal}>
-            <div className="modal-container">
+            <div style={styles.modalCard}>
               <button 
                 onClick={() => setAdminModalVisible(false)} 
                 style={styles.closeButton}
@@ -1711,120 +1715,151 @@ const Admins = () => {
               >
                 <AiOutlineClose />
               </button>
-              <div className="modal-content">
-                <h3 className="modal-title">Admin Details</h3>
-                <div className="form-group">
-                  <label className="form-label">ID:</label>
-                  <p>{selectedAdmin?.id || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">First Name:</label>
-                  <p>{selectedAdmin?.firstName || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Middle Name:</label>
-                  <p>{selectedAdmin?.middleName || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Last Name:</label>
-                  <p>{selectedAdmin?.lastName || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Gender:</label>
-                  <p>{selectedAdmin?.gender || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date of Birth:</label>
-                  <p>{selectedAdmin?.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Age:</label>
-                  <p>{selectedAdmin?.age || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Place of Birth:</label>
-                  <p>{selectedAdmin?.placeOfBirth || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Address:</label>
-                  <p>{selectedAdmin?.address || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Civil Status:</label>
-                  <p>{selectedAdmin?.civilStatus || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email Address:</label>
-                  <p>{selectedAdmin?.email || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Contact Number:</label>
-                  <p>{selectedAdmin?.contactNumber || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Government ID:</label>
-                  <p>{selectedAdmin?.governmentId || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date Added:</label>
-                  <p>{selectedAdmin?.dateAdded || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Time Added:</label>
-                  <p>{selectedAdmin?.timeAdded || 'N/A'}</p>
-                </div>
-                
-                {/* Image Previews */}
-                <div className="form-group">
-                  <label className="form-label">Documents:</label>
-                  <div className="image-preview-container">
-                    {selectedAdmin?.validIdFront && (
-                      <img
-                        src={selectedAdmin.validIdFront}
-                        alt="Valid ID Front"
-                        style={styles.imageThumbnail}
-                        onClick={() => openImageViewer(selectedAdmin.validIdFront, 'Valid ID Front', 0)}
-                      />
-                    )}
-                    {selectedAdmin?.validIdBack && (
-                      <img
-                        src={selectedAdmin.validIdBack}
-                        alt="Valid ID Back"
-                        style={styles.imageThumbnail}
-                        onClick={() => openImageViewer(selectedAdmin.validIdBack, 'Valid ID Back', 1)}
-                      />
-                    )}
-                    {selectedAdmin?.selfie && (
-                      <img
-                        src={selectedAdmin.selfie}
-                        alt="Selfie"
-                        style={styles.imageThumbnail}
-                        onClick={() => openImageViewer(selectedAdmin.selfie, 'Selfie', 2)}
-                      />
-                    )}
-                    {selectedAdmin?.selfieWithId && (
-                      <img
-                        src={selectedAdmin.selfieWithId}
-                        alt="Selfie with ID"
-                        style={styles.imageThumbnail}
-                        onClick={() => openImageViewer(selectedAdmin.selfieWithId, 'Selfie with ID', 3)}
-                      />
-                    )}
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Admin Details</h2>
+              </div>
+              <div style={styles.modalContent}>
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+                    <div style={styles.sectionTitle}>Personal Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>ID:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.id || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>First Name:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.firstName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Middle Name:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.middleName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Last Name:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.lastName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Gender:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.gender || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date of Birth:</span>
+                      <span style={styles.fieldValue}>
+                        {selectedAdmin?.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}
+                      </span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Age:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.age || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Place of Birth:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.placeOfBirth || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Address:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.address || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Civil Status:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.civilStatus || 'N/A'}</span>
+                    </div>
+                    
+                    <div style={styles.sectionTitle}>Contact Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Email:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.email || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Contact Number:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.contactNumber || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Government ID:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.governmentId || 'N/A'}</span>
+                    </div>
+                    
+                    <div style={styles.sectionTitle}>Account Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Added:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.dateAdded || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Time Added:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.timeAdded || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Status:</span>
+                      <span style={styles.fieldValue}>Active</span>
+                    </div>
+                  </div>
+                  
+                  <div style={styles.rightColumn}>
+                    <div style={styles.sectionTitle}>Submitted Documents</div>
+                    <div style={styles.imageGrid}>
+                      {selectedAdmin?.validIdFront && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Valid ID Front</p>
+                          <img
+                            src={selectedAdmin.validIdFront}
+                            alt="Valid ID Front"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedAdmin.validIdFront, 'Valid ID Front', 0)}
+                          />
+                        </div>
+                      )}
+                      {selectedAdmin?.validIdBack && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Valid ID Back</p>
+                          <img
+                            src={selectedAdmin.validIdBack}
+                            alt="Valid ID Back"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedAdmin.validIdBack, 'Valid ID Back', 1)}
+                          />
+                        </div>
+                      )}
+                      {selectedAdmin?.selfie && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Selfie</p>
+                          <img
+                            src={selectedAdmin.selfie}
+                            alt="Selfie"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedAdmin.selfie, 'Selfie', 2)}
+                          />
+                        </div>
+                      )}
+                      {selectedAdmin?.selfieWithId && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Selfie with ID</p>
+                          <img
+                            src={selectedAdmin.selfieWithId}
+                            alt="Selfie with ID"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedAdmin.selfieWithId, 'Selfie with ID', 3)}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-
-                <div className="action-buttons-container">
-                  <button
-                    className="delete-button"
-                    onClick={() => {
-                      setPendingDelete(selectedAdmin);
-                      setConfirmDeleteVisible(true);
-                      setAdminModalVisible(false);
-                    }}
-                  >
-                    Delete Admin
-                  </button>
-                </div>
+              </div>
+              <div style={styles.bottomButtons}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.deleteButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={() => {
+                    setPendingDelete(selectedAdmin);
+                    setConfirmDeleteVisible(true);
+                  }}
+                  disabled={isProcessing}
+                >
+                  Delete Admin
+                </button>
               </div>
             </div>
           </div>
@@ -1834,7 +1869,7 @@ const Admins = () => {
         {confirmAddVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
               <p style={styles.modalText}>Are you sure you want to add this admin?</p>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
@@ -1844,8 +1879,9 @@ const Admins = () => {
                     color: '#fff'
                   }} 
                   onClick={handleAddAdmin}
+                  disabled={actionInProgress}
                 >
-                  Yes
+                  {actionInProgress ? 'Processing...' : 'Yes'}
                 </button>
                 <button 
                   style={{
@@ -1854,6 +1890,7 @@ const Admins = () => {
                     color: '#fff'
                   }} 
                   onClick={() => setConfirmAddVisible(false)}
+                  disabled={actionInProgress}
                 >
                   No
                 </button>
@@ -1865,7 +1902,7 @@ const Admins = () => {
         {confirmDeleteVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
               <p style={styles.modalText}>Are you sure you want to delete this admin?</p>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
@@ -1875,8 +1912,9 @@ const Admins = () => {
                     color: '#fff'
                   }} 
                   onClick={handleDeleteAdmin}
+                  disabled={actionInProgress}
                 >
-                  Yes
+                  {actionInProgress ? 'Processing...' : 'Yes'}
                 </button>
                 <button 
                   style={{
@@ -1885,6 +1923,7 @@ const Admins = () => {
                     color: '#fff'
                   }} 
                   onClick={() => setConfirmDeleteVisible(false)}
+                  disabled={actionInProgress}
                 >
                   No
                 </button>
@@ -1949,7 +1988,6 @@ const Admins = () => {
               <button 
                 style={{ ...styles.imageViewerNav, ...styles.prevButton }}
                 onClick={() => navigateImages('prev')}
-                onFocus={(e) => e.target.style.outline = 'none'}
               >
                 <FaChevronLeft />
               </button>
@@ -1961,7 +1999,6 @@ const Admins = () => {
               <button 
                 style={{ ...styles.imageViewerNav, ...styles.nextButton }}
                 onClick={() => navigateImages('next')}
-                onFocus={(e) => e.target.style.outline = 'none'}
               >
                 <FaChevronRight />
               </button>
@@ -1969,7 +2006,6 @@ const Admins = () => {
                 style={styles.imageViewerClose} 
                 onClick={closeImageViewer}
                 aria-label="Close image viewer"
-                onFocus={(e) => e.target.style.outline = 'none'}
               >
                 <FaTimes />
               </button>

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { FaCheckCircle, FaImage, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import React, { useState } from 'react';
+import { FaCheckCircle, FaTimes, FaImage, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const styles = {
   container: {
@@ -55,7 +55,7 @@ const styles = {
   },
   noDataMessage: {
     textAlign: 'center',
-    marginTop: '20px',
+    marginTop: '50px',
     fontSize: '16px',
     color: 'gray'
   },
@@ -73,7 +73,7 @@ const styles = {
   },
   modalCard: {
     width: '40%',
-    maxWidth: '800px',
+    maxWidth: '900px',
     backgroundColor: 'white',
     borderRadius: '8px',
     padding: '20px',
@@ -81,6 +81,19 @@ const styles = {
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     maxHeight: '90vh',
     height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalCardSingleColumn: {
+    width: '40%',
+    maxWidth: '600px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: 'auto',
     display: 'flex',
     flexDirection: 'column'
   },
@@ -118,11 +131,16 @@ const styles = {
     wordBreak: 'break-word',
     lineHeight: '1.3'
   },
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    marginBottom: '12px',
+    gap: '10px'
+  },
   imageBlock: {
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'flex-start',
-    marginBottom: '12px'
+    alignItems: 'flex-start'
   },
   imageLabel: {
     fontSize: '13px',
@@ -134,8 +152,8 @@ const styles = {
     paddingLeft: 0
   },
   imageThumbnail: {
-    width: '100%',
-    height: '200px',
+    width: '90%',
+    height: '120px',
     borderRadius: '4px',
     border: '1px solid #ddd',
     objectFit: 'cover',
@@ -235,7 +253,7 @@ const styles = {
   imageViewerClose: {
     position: 'absolute',
     top: '-40px',
-    right: '0',
+    right: '80px',
     color: 'white',
     fontSize: '24px',
     cursor: 'pointer',
@@ -246,16 +264,6 @@ const styles = {
     '&:focus': {
       outline: 'none'
     }
-  },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'left',
-    width: '100%'
   },
   imageViewerNav: {
     position: 'absolute',
@@ -280,6 +288,20 @@ const styles = {
   },
   nextButton: { 
     right: '50px'
+  },
+  sectionTitle: {
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    margin: '12px 0 8px 0',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #eee'
+  },
+  noDocumentsMessage: {
+    textAlign: 'center',
+    margin: '20px 0',
+    color: '#666',
+    fontStyle: 'italic'
   }
 };
 
@@ -289,13 +311,34 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [availableImages, setAvailableImages] = useState([]);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
       style: 'currency',
       currency: 'PHP',
       minimumFractionDigits: 2,
-    }).format(amount);
+    }).format(amount || 0);
+
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    
+    return `${hours}:${minutes}:${seconds} ${ampm}`;
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
 
   const openModal = (withdraw) => {
     setSelectedWithdraw(withdraw);
@@ -306,7 +349,17 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
     setModalVisible(false);
   };
 
-  const openImageViewer = (url, label, index = 0) => {
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (url) {
+      images.push({ 
+        url, 
+        label 
+      });
+    }
+
+    setAvailableImages(images);
     setCurrentImage({ url, label });
     setCurrentImageIndex(index);
     setImageViewerVisible(true);
@@ -314,22 +367,26 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
 
   const closeImageViewer = () => {
     setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
   };
 
   const navigateImages = (direction) => {
-    const images = [
-      { url: selectedWithdraw?.proofOfWithdrawalUrl, label: 'Proof of Withdrawal' }
-    ].filter(img => img.url);
+    if (availableImages.length === 0) return;
 
+    let newIndex;
     if (direction === 'prev') {
-      const newIndex = (currentImageIndex - 1 + images.length) % images.length;
-      setCurrentImage(images[newIndex]);
-      setCurrentImageIndex(newIndex);
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
     } else {
-      const newIndex = (currentImageIndex + 1) % images.length;
-      setCurrentImage(images[newIndex]);
-      setCurrentImageIndex(newIndex);
+      newIndex = (currentImageIndex + 1) % availableImages.length;
     }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
+  };
+
+  const hasDocuments = (withdraw) => {
+    return withdraw.proofOfWithdrawalUrl;
   };
 
   if (!withdraws.length) {
@@ -346,36 +403,39 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Account Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Account Number</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Proof</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Bank Details</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Approved</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {withdraws.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
+                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountWithdrawn)}</td>
-                <td style={styles.tableCell}>{item.accountName}</td>
-                <td style={styles.tableCell}>{item.accountNumber}</td>
-                <td style={styles.tableCell}>
-                  {item.proofOfWithdrawalUrl && (
-                    <span 
-                      style={styles.viewText}
-                      onClick={() => openImageViewer(item.proofOfWithdrawalUrl, 'Proof of Withdrawal', 0)}
-                      onFocus={(e) => e.target.style.outline = 'none'}
-                    >
-                      <FaImage /> View
-                    </span>
-                  )}
+                <td style={styles.tableCell}>{`${item.accountName} (${item.accountNumber})`}</td>
+                <td style={styles.tableCell}>{item.dateApproved}</td>
+                <td style={{
+                  ...styles.tableCell,
+                  ...styles.statusApproved
+                }}>
+                  approved
                 </td>
-                <td style={{...styles.tableCell, ...styles.statusApproved}}>
-                  <FaCheckCircle /> Approved
+                <td style={styles.tableCell}>
+                  <span 
+                    style={styles.viewText} 
+                    onClick={() => openModal(item)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    View
+                  </span>
                 </td>
               </tr>
             ))}
@@ -383,10 +443,9 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
         </table>
       </div>
 
-      {/* View Details Modal */}
-      {modalVisible && (
+      {modalVisible && selectedWithdraw && (
         <div style={styles.centeredModal}>
-          <div style={styles.modalCard}>
+          <div style={hasDocuments(selectedWithdraw) ? styles.modalCard : styles.modalCardSingleColumn}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -399,72 +458,138 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
               <h2 style={styles.modalTitle}>Withdrawal Details</h2>
             </div>
             <div style={styles.modalContent}>
-              <div style={styles.columns}>
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Transaction Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.id || 'N/A'}</span>
+              {hasDocuments(selectedWithdraw) ? (
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+                    <div style={styles.sectionTitle}>Member Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Member ID:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.id || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Name:</span>
+                      <span style={styles.fieldValue}>{`${selectedWithdraw.firstName || ''} ${selectedWithdraw.lastName || ''}`}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Email:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.email || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Contact:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.phoneNumber || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Withdrawal Details</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Transaction ID:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Amount:</span>
+                      <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Bank Name:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.bankName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Account Name:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.accountName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Account Number:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Applied:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.dateApplied || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Approval Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Approved:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.dateApproved}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Time Approved:</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.timeApproved}</span>
+                    </div>
                   </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Transaction ID:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.transactionId || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Amount:</span>
-                    <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw?.amountWithdrawn) || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.accountName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.accountNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Applied:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.dateApplied || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Approved:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.dateApproved || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Time Approved:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.timeApproved || 'N/A'}</span>
+                  <div style={styles.rightColumn}>
+                    <div style={styles.sectionTitle}>Proof of Withdrawal</div>
+                    <div style={styles.imageGrid}>
+                      {selectedWithdraw.proofOfWithdrawalUrl && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Proof of Withdrawal</p>
+                          <img
+                            src={selectedWithdraw.proofOfWithdrawalUrl}
+                            alt="Proof of Withdrawal"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedWithdraw.proofOfWithdrawalUrl, 'Proof of Withdrawal', 0)}
+                            onFocus={(e) => e.target.style.outline = 'none'}
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-                <div style={styles.rightColumn}>
+              ) : (
+                <div style={styles.leftColumn}>
                   <div style={styles.sectionTitle}>Member Information</div>
                   <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Member ID:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.id || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Name:</span>
-                    <span style={styles.fieldValue}>{`${selectedWithdraw?.firstName || ''} ${selectedWithdraw?.lastName || ''}`}</span>
+                    <span style={styles.fieldValue}>{`${selectedWithdraw.firstName || ''} ${selectedWithdraw.lastName || ''}`}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.email || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.email || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw?.phoneNumber || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.phoneNumber || 'N/A'}</span>
                   </div>
 
-                  <div style={styles.sectionTitle}>Proof of Withdrawal</div>
-                  {selectedWithdraw?.proofOfWithdrawalUrl && (
-                    <div style={styles.imageBlock}>
-                      <p style={styles.imageLabel}>Proof of Withdrawal</p>
-                      <img
-                        src={selectedWithdraw.proofOfWithdrawalUrl}
-                        alt="Proof of Withdrawal"
-                        style={styles.imageThumbnail}
-                        onClick={() => openImageViewer(selectedWithdraw.proofOfWithdrawalUrl, 'Proof of Withdrawal', 0)}
-                        onFocus={(e) => e.target.style.outline = 'none'}
-                      />
-                    </div>
-                  )}
+                  <div style={styles.sectionTitle}>Withdrawal Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Transaction ID:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Amount:</span>
+                    <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Bank Name:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.bankName || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Account Name:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.accountName || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Account Number:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Applied:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.dateApplied || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.sectionTitle}>Approval Information</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Approved:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.dateApproved}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Time Approved:</span>
+                    <span style={styles.fieldValue}>{selectedWithdraw.timeApproved}</span>
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           </div>
         </div>

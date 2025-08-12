@@ -327,7 +327,7 @@ const styles = {
   imageViewerClose: {
     position: 'absolute',
     top: '-40px',
-    right: '80px',
+    right: '0',
     color: 'white',
     fontSize: '24px',
     cursor: 'pointer',
@@ -338,30 +338,6 @@ const styles = {
     '&:focus': {
       outline: 'none'
     }
-  },
-  imageViewerNav: {
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    color: 'white',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '16px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    outline: 'none',
-    '&:hover': {
-      color: '#2D5783'
-    },
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  prevButton: {
-    left: '50px'
-  },
-  nextButton: { 
-    right: '50px'
   },
   sectionTitle: {
     fontSize: '14px',
@@ -780,26 +756,14 @@ const ApplyDeposits = ({
     refreshData();
   };
 
-  const openImageViewer = (url, label, index) => {
-    const images = [];
-    
-    if (url) {
-      images.push({ 
-        url, 
-        label 
-      });
-    }
-
-    setAvailableImages(images);
+  const openImageViewer = (url, label) => {
     setCurrentImage({ url, label });
-    setCurrentImageIndex(index);
     setImageViewerVisible(true);
   };
 
   const closeImageViewer = () => {
     setImageViewerVisible(false);
     setCurrentImage({ url: '', label: '' });
-    setCurrentImageIndex(0);
   };
 
   const navigateImages = (direction) => {
@@ -1174,28 +1138,15 @@ const ApplyDeposits = ({
       )}
 
       {/* Image Viewer Modal */}
+ {/* Image Viewer Modal */}
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
-              onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronLeft />
-            </button>
             <img
               src={currentImage.url}
               alt={currentImage.label}
               style={styles.largeImage}
             />
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
-              onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronRight />
-            </button>
             <button 
               style={styles.imageViewerClose} 
               onClick={closeImageViewer}

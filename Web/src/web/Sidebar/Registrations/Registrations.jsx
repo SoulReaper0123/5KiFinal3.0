@@ -876,105 +876,53 @@ const Registrations = ({
   };
 
 const processDatabaseApprove = async (reg) => {
-    try {
-      const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
-      let userId = null;
-      
-      const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
-      
-      if (samePersonCheck.exists) {
-        // If user already exists, update their data but don't create new auth account
-        const now = new Date();
-        const approvedDate = formatDate(now);
-        const approvedTime = formatTime(now);
-        
-        const updateData = {};
-        
-        Object.keys(rest).forEach(key => {
-          if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
-            updateData[key] = rest[key];
-          }
-        });
-        
-        // Add registration fee to existing balance
-        const currentBalance = samePersonCheck.data.balance || 0;
-        updateData.balance = currentBalance + parseFloat(registrationFee);
-        
-        updateData.dateApproved = approvedDate;
-        updateData.approvedTime = approvedTime;
-        updateData.status = 'active';
-        
-        await database.ref(`Members/${samePersonCheck.id}`).update(updateData);
-        await updateFunds(registrationFee);
-        
-        await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
-          firstName,
-          lastName,
-          ...rest,
-          email,
-          dateApproved: approvedDate,
-          approvedTime: approvedTime,
-          memberId: parseInt(samePersonCheck.id),
-          status: 'approved'
-        });
-        
-        return parseInt(samePersonCheck.id);
-      }
-
-      const emailExists = await checkIfEmailExistsInDatabase(email);
-      if (emailExists) {
-        throw new Error('This email is already registered to a different member.');
-      }
-
-      // Create Firebase Auth account with email and password
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        userId = userCredential.user.uid;
-      } catch (authError) {
-        if (authError.code === 'auth/email-already-in-use') {
-          // Handle case where email exists in auth but not in our database
-          throw new Error('This email is already in use by another account.');
-        } else {
-          throw authError;
-        }
-      }
-
-      const membersSnap = await database.ref('Members').once('value');
-      const members = membersSnap.val() || {};
-      
-      let newId = 5001;
-      const existingIds = Object.keys(members).map(Number).sort((a, b) => a - b);
-      
-      for (const id of existingIds) {
-        if (id === newId) newId++;
-        else if (id > newId) break;
-      }
-      
+  try {
+    const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
+    let userId = null;
+    
+    const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
+    
+    if (samePersonCheck.exists) {
+      // If user already exists, update their data but don't create new auth account
       const now = new Date();
       const approvedDate = formatDate(now);
       const approvedTime = formatTime(now);
       
-      // Set initial balance to the registration fee
-      const initialBalance = parseFloat(registrationFee) || 0;
+      const updateData = {};
       
-      // Create member record in database
-      await database.ref(`Members/${newId}`).set({
-        id: newId,
-        uid: userId,
+      Object.keys(rest).forEach(key => {
+        if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
+          updateData[key] = rest[key];
+        }
+      });
+      
+      // Add registration fee to existing balance
+      const currentBalance = samePersonCheck.data.balance || 0;
+      updateData.balance = currentBalance + parseFloat(registrationFee);
+      
+      updateData.dateApproved = approvedDate;
+      updateData.approvedTime = approvedTime;
+      updateData.status = 'active';
+      
+      // Create transaction record
+      const transactionData = {
+        type: 'registration',
+        amount: parseFloat(registrationFee),
+        date: approvedDate,
+        time: approvedTime,
+        status: 'completed',
+        memberId: parseInt(samePersonCheck.id),
         firstName,
         lastName,
-        ...rest,
         email,
-        dateApproved: approvedDate,
-        approvedTime: approvedTime,
-        balance: initialBalance,
-        loans: 0.0,
-        status: 'active'
-      });
-
+        transactionId: `REG-${Date.now()}`,
+        description: 'Registration fee payment'
+      };
+      
+      await database.ref(`Transactions/Registrations/${samePersonCheck.id}/${transactionData.transactionId}`).set(transactionData);
+      await database.ref(`Members/${samePersonCheck.id}`).update(updateData);
       await updateFunds(registrationFee);
       
-      // Add to approved registrations
       await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
         firstName,
         lastName,
@@ -982,16 +930,100 @@ const processDatabaseApprove = async (reg) => {
         email,
         dateApproved: approvedDate,
         approvedTime: approvedTime,
-        memberId: newId,
+        memberId: parseInt(samePersonCheck.id),
         status: 'approved'
       });
       
-      return newId;
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve registration');
+      return parseInt(samePersonCheck.id);
     }
-  };
+
+    const emailExists = await checkIfEmailExistsInDatabase(email);
+    if (emailExists) {
+      throw new Error('This email is already registered to a different member.');
+    }
+
+    // Create Firebase Auth account with email and password
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      userId = userCredential.user.uid;
+    } catch (authError) {
+      if (authError.code === 'auth/email-already-in-use') {
+        throw new Error('This email is already in use by another account.');
+      } else {
+        throw authError;
+      }
+    }
+
+    const membersSnap = await database.ref('Members').once('value');
+    const members = membersSnap.val() || {};
+    
+    let newId = 5001;
+    const existingIds = Object.keys(members).map(Number).sort((a, b) => a - b);
+    
+    for (const id of existingIds) {
+      if (id === newId) newId++;
+      else if (id > newId) break;
+    }
+    
+    const now = new Date();
+    const approvedDate = formatDate(now);
+    const approvedTime = formatTime(now);
+    
+    // Set initial balance to the registration fee
+    const initialBalance = parseFloat(registrationFee) || 0;
+    
+    // Create transaction record
+    const transactionData = {
+      type: 'registration',
+      amount: parseFloat(registrationFee),
+      date: approvedDate,
+      time: approvedTime,
+      status: 'completed',
+      memberId: newId,
+      firstName,
+      lastName,
+      email,
+      transactionId: `REG-${Date.now()}`,
+      description: 'Registration fee payment'
+    };
+
+    // Create member record in database
+    await database.ref(`Members/${newId}`).set({
+      id: newId,
+      uid: userId,
+      firstName,
+      lastName,
+      ...rest,
+      email,
+      dateApproved: approvedDate,
+      approvedTime: approvedTime,
+      balance: initialBalance,
+      loans: 0.0,
+      status: 'active'
+    });
+
+    // Save transaction record
+    await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+    await updateFunds(registrationFee);
+    
+    // Add to approved registrations
+    await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
+      firstName,
+      lastName,
+      ...rest,
+      email,
+      dateApproved: approvedDate,
+      approvedTime: approvedTime,
+      memberId: newId,
+      status: 'approved'
+    });
+    
+    return newId;
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve registration');
+  }
+};
   
   const processDatabaseReject = async (reg, rejectionReason) => {
     try {

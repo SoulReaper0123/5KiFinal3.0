@@ -545,9 +545,7 @@ const PayLoans = () => {
 
         {!noMatch && filteredData.length > 0 && (
           <div className="pagination-container">
-            <span className="pagination-info">
-              Showing {currentPage * pageSize + 1}-{Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length}
-            </span>
+              <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
               disabled={currentPage === 0}

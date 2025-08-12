@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { database } from '../../../../../Database/firebaseConfig';
-//import { ApproveWithdrawals, RejectWithdrawals } from '../../../../../Server/api';
+import { database, auth } from '../../../../../Database/firebaseConfig';
+import { ApprovePermanentWithdraws, RejectPermanentWithdraws } from '../../../../../Server/api';
 import { FaCheckCircle, FaTimes, FaExclamationCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const styles = {
@@ -77,28 +77,55 @@ const styles = {
     zIndex: 1000
   },
   modalCardSmall: {
-    width: '250px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
+    width: '300px',
+    height: '200px',
+    backgroundColor: '#fff',
+    borderRadius: '10px',
     padding: '20px',
-    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
+    justifyContent: 'center',
     alignItems: 'center',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
     textAlign: 'center'
   },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
+  confirmIcon: {
+    alignSelf: 'center',
+    marginBottom: '10px',
+    fontSize: '30px'
   },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '20px',
+    textAlign: 'center'
+  },
+  cancelBtn: {
+    backgroundColor: '#f44336',
+    width: '100px',
+    height: '40px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: '5px',
+    margin: '0 10px',
+    border: 'none',
+    color: 'white',
+    fontWeight: 'bold',
+    cursor: 'pointer'
+  },
+  confirmBtn: {
+    backgroundColor: '#4CAF50',
+    width: '100px',
+    height: '40px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: '5px',
+    margin: '0 10px',
+    border: 'none',
+    color: 'white',
+    fontWeight: 'bold',
+    cursor: 'pointer'
   },
   actionText: {
     fontSize: '14px',
@@ -117,54 +144,6 @@ const styles = {
   rejectHover: {
     color: '#f44336',
     textDecoration: 'underline'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  approveButton: {
-    backgroundColor: '#4CAF50',
-    color: '#FFF',
-    '&:hover': {
-      backgroundColor: '#3e8e41'
-    }
-  },
-  rejectButton: {
-    backgroundColor: '#f44336',
-    color: '#FFF',
-    '&:hover': {
-      backgroundColor: '#d32f2f'
-    }
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-    opacity: '0.7'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
   },
   rejectionModal: {
     position: 'fixed',
@@ -208,7 +187,7 @@ const styles = {
     marginRight: '10px'
   },
   reasonText: {
-    flex: 1
+    flex: '1'
   },
   customReasonInput: {
     width: '100%',
@@ -223,23 +202,17 @@ const styles = {
     marginTop: '20px',
     gap: '10px'
   },
-  cancelButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    backgroundColor: 'white',
-    cursor: 'pointer'
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderLeftColor: '#001F3F',
+    animation: 'spin 1s linear infinite'
   },
-  confirmRejectButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    backgroundColor: '#f44336',
-    color: 'white',
-    cursor: 'pointer',
-    '&:hover': {
-      backgroundColor: '#d32f2f'
-    }
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
   }
 };
 
@@ -267,6 +240,13 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
   const [actionInProgress, setActionInProgress] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
 
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+    }).format(amount);
+
   const handleHover = (transactionId, type, isHovering) => {
     setHoverStates(prev => ({
       ...prev,
@@ -276,13 +256,6 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
       }
     }));
   };
-
-  const formatCurrency = (amount) =>
-    new Intl.NumberFormat('en-PH', {
-      style: 'currency',
-      currency: 'PHP',
-      minimumFractionDigits: 2,
-    }).format(amount);
 
   const handleApproveClick = (withdrawal) => {
     setSelectedWithdrawal(withdrawal);
@@ -369,6 +342,26 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
     }
   };
 
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    
+    return `${hours}:${minutes}:${seconds} ${ampm}`;
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
   const processDatabaseApprove = async (withdrawal) => {
     try {
       const now = new Date();
@@ -376,10 +369,22 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
       const approvalTime = formatTime(now);
       const status = 'approved';
 
+      // Database references
       const approvedRef = database.ref(`MembershipWithdrawal/ApprovedWithdrawals/${withdrawal.memberId}/${withdrawal.transactionId}`);
       const memberRef = database.ref(`Members/${withdrawal.memberId}`);
       const pendingRef = database.ref(`MembershipWithdrawal/PendingWithdrawals/${withdrawal.memberId}/${withdrawal.transactionId}`);
+      const fundsRef = database.ref('Settings/Funds');
+      const authUserRef = auth.currentUser;
 
+      // Fetch current funds
+      const fundsSnap = await fundsRef.once('value');
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+
+      // Calculate new funds (subtract member's balance)
+      const memberBalance = parseFloat(withdrawal.balance) || 0;
+      const newFunds = currentFunds - memberBalance;
+
+      // Prepare approved withdrawal data
       const approvedWithdrawal = { 
         ...withdrawal, 
         dateApproved: approvalDate,
@@ -387,14 +392,26 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
         status
       };
 
-      // Save to approved
-      await approvedRef.set(approvedWithdrawal);
-      
-      // Update member status to inactive
-      await memberRef.update({ status: 'inactive' });
-
-      // Remove from pending
-      await pendingRef.remove();
+      // Execute all database operations
+      await Promise.all([
+        // Save to approved
+        approvedRef.set(approvedWithdrawal),
+        
+        // Update funds
+        fundsRef.set(newFunds),
+        
+        // Remove from pending
+        pendingRef.remove(),
+        
+        // Update member status to inactive
+        memberRef.update({ status: 'inactive' }),
+        
+        // Delete auth user if exists
+        authUserRef && authUserRef.delete().catch(error => {
+          console.error('Error deleting auth user:', error);
+          // Continue even if auth deletion fails
+        })
+      ]);
 
     } catch (err) {
       console.error('Approval DB error:', err);
@@ -420,36 +437,16 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
         rejectionReason: rejectionReason || 'Rejected by admin'
       };
 
-      // Save to rejected
-      await rejectedRef.set(rejectedWithdrawal);
-      
-      // Remove from pending
-      await pendingRef.remove();
+      // Save to rejected and remove from pending
+      await Promise.all([
+        rejectedRef.set(rejectedWithdrawal),
+        pendingRef.remove()
+      ]);
 
     } catch (err) {
       console.error('Rejection DB error:', err);
       throw new Error(err.message || 'Failed to reject membership withdrawal');
     }
-  };
-
-  const formatTime = (date) => {
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    
-    return `${hours}:${minutes}:${seconds} ${ampm}`;
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
   };
 
   const handleSuccessOk = async () => {
@@ -473,7 +470,7 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
   const callApiApprove = async (withdrawal) => {
     try {
       const now = new Date();
-      const response = await ApproveWithdrawals({
+      const response = await ApprovePermanentWithdraws({
         memberId: withdrawal.memberId,
         transactionId: withdrawal.transactionId,
         email: withdrawal.email,
@@ -498,7 +495,7 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
   const callApiReject = async (withdrawal) => {
     try {
       const now = new Date();
-      const response = await RejectWithdrawals({
+      const response = await RejectPermanentWithdraws({
         memberId: withdrawal.memberId,
         transactionId: withdrawal.transactionId,
         email: withdrawal.email,
@@ -595,9 +592,8 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
+                  ...styles.confirmBtn,
+                  ...(actionInProgress ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {})
                 }} 
                 onClick={confirmApprove}
                 disabled={actionInProgress}
@@ -605,11 +601,7 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
                 {actionInProgress ? 'Processing...' : 'Yes'}
               </button>
               <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
-                }} 
+                style={styles.cancelBtn} 
                 onClick={() => setShowApproveConfirmation(false)}
                 disabled={actionInProgress}
               >
@@ -629,9 +621,8 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
+                  ...styles.confirmBtn,
+                  ...(actionInProgress ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {})
                 }} 
                 onClick={confirmRejectFinal}
                 disabled={actionInProgress}
@@ -639,11 +630,7 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
                 {actionInProgress ? 'Processing...' : 'Yes'}
               </button>
               <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
-                }} 
+                style={styles.cancelBtn} 
                 onClick={() => setShowRejectConfirmation(false)}
                 disabled={actionInProgress}
               >
@@ -710,13 +697,8 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
             />
             <p style={styles.modalText}>{errorMessage}</p>
             <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
+              style={styles.cancelBtn} 
               onClick={() => setErrorModalVisible(false)}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               OK
             </button>
@@ -742,13 +724,8 @@ const PermanentWithdraws = ({ withdrawals, currentPage, totalPages, onPageChange
             )}
             <p style={styles.modalText}>{successMessage}</p>
             <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
+              style={styles.confirmBtn} 
               onClick={handleSuccessOk}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               OK
             </button>
