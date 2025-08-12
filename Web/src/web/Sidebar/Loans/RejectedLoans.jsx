@@ -224,7 +224,7 @@ const RejectedLoans = ({ loans }) => {
                 <td style={styles.tableCell}>{item.disbursement}</td>
                 <td style={styles.tableCell}>{item.dateRejected}</td>
                 <td style={{...styles.tableCell, ...styles.statusRejected}}>
-                  <FaTimesCircle /> Rejected
+                  <FaTimesCircle /> rejected
                 </td>
               </tr>
             ))}

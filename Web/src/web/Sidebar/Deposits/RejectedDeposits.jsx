@@ -385,7 +385,7 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
                   ...styles.tableCell,
                   ...styles.statusRejected
                 }}>
-                  Rejected
+                  rejected
                 </td>
                 <td style={styles.tableCell}>
                   <span 

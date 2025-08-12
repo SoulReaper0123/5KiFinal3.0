@@ -84,8 +84,21 @@ const styles = {
     padding: '20px',
     position: 'relative',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
+    maxHeight: '80vh',
     height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalCardSingleColumn: {
+    width: '40%',
+    maxWidth: '600px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: 'auto',
     display: 'flex',
     flexDirection: 'column'
   },
@@ -292,26 +305,6 @@ const styles = {
     color: '#333',
     fontSize: '13px'
   },
-  imageViewerModal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2000
-  },
-  imageViewerContent: {
-    position: 'relative',
-    width: '90%',
-    maxWidth: '800px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center'
-  },
   largeImage: {
     maxWidth: '100%',
     maxHeight: '70vh',
@@ -338,40 +331,6 @@ const styles = {
     '&:focus': {
       outline: 'none'
     }
-  },
-  imageViewerNav: {
-    position: 'absolute',
-    top: '50%',
-    transform: 'translateY(-50%)',
-    color: 'white',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '16px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    outline: 'none',
-    '&:hover': {
-      color: '#2D5783'
-    },
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  prevButton: {
-    left: '50px'
-  },
-  nextButton: { 
-    right: '50px'
-  },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'left',
-    width: '100%'
   },
   rejectionModal: {
     position: 'fixed',
@@ -465,6 +424,12 @@ const styles = {
   rejectHover: {
     color: '#f44336',
     textDecoration: 'underline'
+  },
+  noDocumentsMessage: {
+    textAlign: 'center',
+    margin: '20px 0',
+    color: '#666',
+    fontStyle: 'italic'
   }
 };
 
@@ -938,6 +903,10 @@ We recommend settling outstanding balances first before reapplying. Once cleared
     setCurrentImage(availableImages[newIndex]);
   };
 
+  const hasDocuments = (loan) => {
+    return loan.proofOfIncomeUrl || loan.proofOfIdentityUrl;
+  };
+
   if (!loans.length) {
     return (
       <div style={styles.loadingView}>
@@ -997,7 +966,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
       {modalVisible && selectedLoan && (
         <div style={styles.centeredModal}>
-          <div style={styles.modalCard}>
+          <div style={hasDocuments(selectedLoan) ? styles.modalCard : styles.modalCardSingleColumn}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -1010,7 +979,112 @@ We recommend settling outstanding balances first before reapplying. Once cleared
               <h2 style={styles.modalTitle}>Loan Application Details</h2>
             </div>
             <div style={styles.modalContent}>
-              <div style={styles.columns}>
+              {hasDocuments(selectedLoan) ? (
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+                    <div style={styles.sectionTitle}>Member Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Member ID:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Name:</span>
+                      <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Email:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Loan Details</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Transaction ID:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Loan Amount:</span>
+                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Term:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.term} months</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Disbursement:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Account Name:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Account Number:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Applied:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
+                    </div>
+
+                    {selectedLoan.dateApproved && (
+                      <>
+                        <div style={styles.sectionTitle}>Approval Information</div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Date Approved:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Time Approved:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.timeApproved}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Interest Rate:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.interestRate || 'N/A'}%</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Monthly Payment:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.monthlyPayment)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Total Term Payment:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.totalTermPayment)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Release Amount:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.releaseAmount)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Processing Fee:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.processingFee)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Due Date:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.dueDate || 'N/A'}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {selectedLoan.dateRejected && (
+                      <>
+                        <div style={styles.sectionTitle}>Rejection Information</div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Date Rejected:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Time Rejected:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.timeRejected}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Rejection Reason:</span>
+                          <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  
+                </div>
+              ) : (
                 <div style={styles.leftColumn}>
                   <div style={styles.sectionTitle}>Member Information</div>
                   <div style={styles.compactField}>
@@ -1112,36 +1186,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                     </>
                   )}
                 </div>
-                <div style={styles.rightColumn}>
-                  <div style={styles.sectionTitle}>Proof of Documents</div>
-                  <div style={styles.imageGrid}>
-                    {selectedLoan.proofOfIncomeUrl && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Proof of Income</p>
-                        <img
-                          src={selectedLoan.proofOfIncomeUrl}
-                          alt="Proof of Income"
-                          style={styles.imageThumbnail}
-                          onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                    {selectedLoan.proofOfIdentityUrl && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Proof of Identity</p>
-                        <img
-                          src={selectedLoan.proofOfIdentityUrl}
-                          alt="Proof of Identity"
-                          style={styles.imageThumbnail}
-                          onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              )}
             </div>
             {selectedLoan?.status !== 'approved' && selectedLoan?.status !== 'rejected' && (
               <div style={styles.bottomButtons}>
@@ -1341,42 +1386,6 @@ We recommend settling outstanding balances first before reapplying. Once cleared
             >
               OK
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* Image Viewer Modal */}
-      {imageViewerVisible && (
-        <div style={styles.imageViewerModal}>
-          <div style={styles.imageViewerContent}>
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
-              onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronLeft />
-            </button>
-            <img
-              src={currentImage.url}
-              alt={currentImage.label}
-              style={styles.largeImage}
-            />
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
-              onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronRight />
-            </button>
-            <button 
-              style={styles.imageViewerClose} 
-              onClick={closeImageViewer}
-              aria-label="Close image viewer"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
-            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
           </div>
         </div>
       )}

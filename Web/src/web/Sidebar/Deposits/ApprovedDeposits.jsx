@@ -385,7 +385,7 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
                   ...styles.tableCell,
                   ...styles.statusApproved
                 }}>
-                  Approved
+                  approved
                 </td>
                 <td style={styles.tableCell}>
                   <span 

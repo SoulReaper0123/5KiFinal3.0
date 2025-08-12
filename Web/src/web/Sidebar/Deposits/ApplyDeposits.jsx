@@ -84,7 +84,7 @@ const styles = {
     padding: '20px',
     position: 'relative',
     boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
+    maxHeight: '80vh',
     height: '80vh',
     display: 'flex',
     flexDirection: 'column'
