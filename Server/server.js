@@ -9,37 +9,6 @@ console.log('GMAIL_USER:', process.env.GMAIL_USER);
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ==============================================
-// API ENDPOINT REFERENCE TABLE
-// ==============================================
-/*
-|--------------------------------------------------------------------------
-| EMAIL NOTIFICATION API ENDPOINTS
-|--------------------------------------------------------------------------
-| METHOD | ENDPOINT                     | DESCRIPTION
-|--------|------------------------------|-----------------------------------
-| POST   | /send-admin-email            | Send admin creation emails
-| POST   | /send-delete-admin-email     | Send admin deletion emails
-| POST   | /register                    | Send registration emails
-| POST   | /approveRegistrations        | Send registration approval email
-| POST   | /rejectRegistrations         | Send registration rejection email
-| POST   | /send-verification-code      | Send 2FA verification code
-| POST   | /deposit                     | Send deposit notification emails
-| POST   | /approveDeposits             | Send deposit approval email
-| POST   | /rejectDeposits              | Send deposit rejection email
-| POST   | /withdraw                    | Send withdrawal notification emails
-| POST   | /approveWithdraws            | Send withdrawal approval email
-| POST   | /rejectWithdraws             | Send withdrawal rejection email
-| POST   | /applyLoan                   | Send loan application emails
-| POST   | /approveLoans                | Send loan approval email
-| POST   | /rejectLoans                 | Send loan rejection email
-| POST   | /payment                     | Send payment confirmation emails
-| POST   | /approvePayments             | Send payment approval email
-| POST   | /rejectPayments              | Send payment rejection email
-| POST   | /membershipWithdrawal        | Send membership withdrawal emails
-|--------|------------------------------|-----------------------------------
-*/
-
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
@@ -2096,6 +2065,226 @@ app.post('/membershipWithdrawal', async (req, res) => {
         console.error('[NOTIFICATION ERROR] Error sending membership withdrawal emails:', error);
         res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
+});
+
+// Add these endpoints to your server.js
+app.post('/membershipWithdrawal', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating membership withdrawal emails', req.body);
+  const { email, firstName, lastName, date, reason } = req.body;
+  const fullName = `${firstName} ${lastName}`;
+
+  if (!email || !firstName || !lastName || !date) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for membership withdrawal');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
+    await transporter.sendMail({
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: process.env.GMAIL_USER,
+      subject: 'Membership Withdrawal Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request
+          </h2>
+          
+          <p>Dear Admin,</p>
+          
+          <p>A new permanent membership withdrawal request has been received:</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Request Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Requested</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+            </tr>
+            ${reason ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${reason}</td>
+            </tr>
+            ` : ''}
+          </table>
+          
+          <p>Kindly update the records and confirm in the system.</p>
+          
+          <p>
+            <a href="${DASHBOARD_LINK}" 
+               style="display: inline-block; background-color: #3498db; color: white; 
+                      padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+              View in Dashboard
+            </a>
+          </p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            5KI Financial Services &copy; ${new Date().getFullYear()}
+          </p>
+        </div>
+      `
+    });
+
+    console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
+    await transporter.sendMail({
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Membership Withdrawal Request Received',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request Received
+          </h2>
+          
+          <p>Hi ${firstName},</p>
+          
+          <p>We have received your membership withdrawal request on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.</p>
+          
+          ${reason ? `
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Your Reason:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${reason}</td>
+            </tr>
+          </table>
+          ` : ''}
+          
+          <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Best regards,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    });
+
+    console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
+    res.status(200).json({ message: 'Emails sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending membership withdrawal emails:', error);
+    res.status(500).json({ message: 'Failed to send emails', error: error.message });
+  }
+});
+
+app.post('/approveMembershipWithdrawal', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating membership withdrawal approval email', req.body);
+  const { email, firstName, lastName, dateApproved } = req.body;
+
+  if (!email || !firstName || !lastName || !dateApproved) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for membership withdrawal approval');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending membership withdrawal approval to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Membership Withdrawal Approved',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
+            Membership Withdrawal Approved
+          </h2>
+          
+          <p>Dear ${firstName},</p>
+          
+          <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
+            <p style="font-weight: bold; color: #27ae60; margin: 0;">
+              Your membership withdrawal request has been approved on ${dateApproved}.
+            </p>
+          </div>
+          
+          <p>Your membership with 5KI Financial Services has been officially terminated as of ${dateApproved}. All associated accounts and records have been closed.</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Information:</h3>
+          <ul style="margin-bottom: 20px;">
+            <li>Your account balance has been settled</li>
+            <li>All membership privileges have been revoked</li>
+            <li>This action is permanent and cannot be undone</li>
+          </ul>
+          
+          <p>If you wish to rejoin in the future, you will need to submit a new membership application.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Best regards,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Membership withdrawal approval email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending membership withdrawal approval email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
+});
+
+app.post('/rejectMembershipWithdrawal', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating membership withdrawal rejection email', req.body);
+  const { email, firstName, lastName, dateRejected, rejectionReason } = req.body;
+
+  if (!email || !firstName || !lastName || !dateRejected) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for membership withdrawal rejection');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending membership withdrawal rejection to user');
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Membership Withdrawal Request Status',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request Update
+          </h2>
+          
+          <p>Dear ${firstName},</p>
+          
+          <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+            <p style="font-weight: bold; color: #e74c3c; margin: 0;">
+              We regret to inform you that your membership withdrawal request has not been approved.
+            </p>
+          </div>
+          
+          <p>After careful review, we regret to inform you that your membership withdrawal request submitted on ${dateRejected} has not been approved.</p>
+          
+          ${rejectionReason ? `
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Reason:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${rejectionReason}</td>
+            </tr>
+          </table>
+          ` : ''}
+          
+          <p>For any questions or to appeal this decision, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Best regards,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Membership withdrawal rejection email sent successfully');
+    res.status(200).json({ message: 'Email sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending membership withdrawal rejection email:', error);
+    res.status(500).json({ message: 'Failed to send email', error: error.message });
+  }
 });
 
 // ==============================================

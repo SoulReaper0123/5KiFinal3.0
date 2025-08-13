@@ -18,6 +18,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ref as dbRef, get, set } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
 import { KeyboardAvoidingView, Platform } from 'react-native';
+import { MemberWithdrawMembership } from '../../api';
 
 export default function WithdrawMembership() {
   const navigation = useNavigation();
@@ -41,6 +42,7 @@ export default function WithdrawMembership() {
   const [balance, setBalance] = useState(0);
   const [hasExistingLoan, setHasExistingLoan] = useState(false);
   const [showOtherReasonInput, setShowOtherReasonInput] = useState(false);
+  const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false);
 
   useEffect(() => {
     const handleBackPress = () => {
@@ -51,6 +53,18 @@ export default function WithdrawMembership() {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     return () => backHandler.remove();
   }, [navigation]);
+
+  const checkPendingWithdrawal = async (userId) => {
+    try {
+      const withdrawalRef = dbRef(database, `MembershipWithdrawal/PendingWithdrawals/${userId}`);
+      const snapshot = await get(withdrawalRef);
+      setHasPendingWithdrawal(snapshot.exists());
+      return snapshot.exists();
+    } catch (error) {
+      console.error('Error checking pending withdrawal:', error);
+      return false;
+    }
+  };
 
   const checkExistingLoans = async (userId) => {
     try {
@@ -104,14 +118,20 @@ export default function WithdrawMembership() {
           setMemberId(member.id);
           setBalance(member.balance || 0);
           await checkExistingLoans(member.id);
-          setForm(prev => ({
-            ...prev,
-            firstName: member.firstName || '',
-            lastName: member.lastName || '',
-            joined: member.dateApproved || '',
-            address: member.address || '',
-            contact: member.contact || ''
-          }));
+          const hasPending = await checkPendingWithdrawal(member.id);
+          
+          if (hasPending) {
+            setEmailError('You already have a pending withdrawal request');
+          } else {
+            setForm(prev => ({
+              ...prev,
+              firstName: member.firstName || '',
+              lastName: member.lastName || '',
+              joined: member.dateApproved || '',
+              address: member.address || '',
+              contact: member.contact || ''
+            }));
+          }
         } else {
           setEmailError('No member found with this email');
           resetMemberData();
@@ -133,6 +153,7 @@ export default function WithdrawMembership() {
     setMemberId('');
     setBalance(0);
     setHasExistingLoan(false);
+    setHasPendingWithdrawal(false);
     setForm(prev => ({
       ...prev,
       firstName: '',
@@ -149,10 +170,13 @@ export default function WithdrawMembership() {
   const handleEmailChange = (text) => {
     setForm({...form, email: text});
     setEmailError('');
+    if (text === '') {
+      resetMemberData();
+      return;
+    }
+    
     if (text.includes('@') && text.length > 5) {
       fetchMemberData(text);
-    } else if (text === '') {
-      resetMemberData();
     }
   };
 
@@ -168,6 +192,15 @@ export default function WithdrawMembership() {
   const handleSubmit = async () => {
     if (!memberId) {
       Alert.alert('Error', 'Please enter a valid member email first');
+      return;
+    }
+
+    if (hasPendingWithdrawal) {
+      Alert.alert(
+        'Pending Withdrawal',
+        'You already have a pending withdrawal request. Please wait for it to be processed.',
+        [{ text: 'OK' }]
+      );
       return;
     }
 
@@ -189,7 +222,7 @@ export default function WithdrawMembership() {
 
     Alert.alert(
       'Confirm Membership Withdrawal',
-      `You are about to submit a membership withdrawal request. This action cannot be undone.\n\nMember: ${form.firstName} ${form.lastName}\nBalance: ₱${balance.toFixed(2)}\nReason: ${finalReason}`,
+      `You are about to submit a membership withdrawal request...`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -197,10 +230,10 @@ export default function WithdrawMembership() {
           onPress: async () => {
             setIsSubmitting(true);
             try {
-              const withdrawalRef = dbRef(database, `MembershipWithdrawal/${memberId}`);
               const transactionId = generateTransactionId();
+              const currentDate = new Date().toISOString();
               
-              await set(withdrawalRef, {
+              const withdrawalData = {
                 transactionId,
                 memberId,
                 firstName: form.firstName,
@@ -211,6 +244,14 @@ export default function WithdrawMembership() {
                 dateJoined: form.joined,
                 reason: finalReason,
                 balance: balance,
+                date: currentDate,
+                hasExistingLoan
+              };
+
+              // Save to Firebase
+              const withdrawalRef = dbRef(database, `MembershipWithdrawal/PendingWithdrawals/${memberId}`);
+              await set(withdrawalRef, {
+                ...withdrawalData,
                 dateSubmitted: new Date().toLocaleString('en-US', {
                   month: 'long',
                   day: '2-digit',
@@ -221,9 +262,11 @@ export default function WithdrawMembership() {
                 }).replace(',', '')
                   .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
                   .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
-                status: 'Pending',
-                hasExistingLoan: hasExistingLoan
+                status: 'Pending'
               });
+
+              // Send email notification
+              await MemberWithdrawMembership(withdrawalData);
               
               setModalVisible(true);
               resetForm();
@@ -261,13 +304,15 @@ export default function WithdrawMembership() {
     setBalance(0);
     setHasExistingLoan(false);
     setShowOtherReasonInput(false);
+    setHasPendingWithdrawal(false);
   };
 
   const isSubmitDisabled = !memberId || 
                          !form.reason || 
                          (form.reason === 'Others' && !form.otherReason) || 
                          !agreed ||
-                         hasExistingLoan;
+                         hasExistingLoan ||
+                         hasPendingWithdrawal;
 
   return (
     <KeyboardAvoidingView
@@ -298,7 +343,7 @@ export default function WithdrawMembership() {
             </View>
             {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
 
-            {memberId && (
+            {memberId && !hasPendingWithdrawal && (
               <>
                 <Text style={styles.balanceText}>Balance: ₱{balance.toFixed(2)}</Text>
 
@@ -394,25 +439,29 @@ export default function WithdrawMembership() {
               </>
             )}
 
+            {hasPendingWithdrawal && (
+              <View style={styles.pendingWarning}>
+                <MaterialIcons name="warning" size={24} color="#FFA000" />
+                <Text style={styles.pendingText}>
+                  You already have a pending withdrawal request. Please wait for it to be processed.
+                </Text>
+              </View>
+            )}
+
             <TouchableOpacity 
               style={[
                 styles.submitButton, 
                 isSubmitDisabled && styles.submitButtonDisabled,
-                hasExistingLoan && styles.blockedButton
+                (hasExistingLoan || hasPendingWithdrawal) && styles.blockedButton
               ]} 
               onPress={handleSubmit}
-              disabled={isSubmitDisabled}
+              disabled={isSubmitting || isSubmitDisabled}
             >
               {isSubmitting ? (
                 <ActivityIndicator color="white" />
               ) : (
                 <Text style={styles.submitText}>
-                  {!memberId ? 'Enter Valid Email First' : 
-                  !form.reason ? 'Select Reason' : 
-                  (form.reason === 'Others' && !form.otherReason) ? 'Specify Reason' :
-                  !agreed ? 'Agree to Terms' : 
-                  hasExistingLoan ? 'Cannot Withdraw (Existing Loan)' :
-                  'Submit Withdrawal Request'}
+                  Submit Withdrawal Request
                 </Text>
               )}
             </TouchableOpacity>
@@ -441,6 +490,13 @@ export default function WithdrawMembership() {
                   <Text style={styles.okButtonText}>OK</Text>
                 </Pressable>
               </View>
+            </View>
+          </Modal>
+
+          <Modal transparent={true} visible={isSubmitting}>
+            <View style={styles.loadingModalContainer}>
+              <ActivityIndicator size="large" color="#2D5783" />
+              <Text style={styles.loadingModalText}>Submitting your request...</Text>
             </View>
           </Modal>
         </SafeAreaView>
@@ -627,5 +683,29 @@ const styles = StyleSheet.create({
   },
   warningIcon: {
     marginLeft: 10,
+  },
+  pendingWarning: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFF8E1',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  pendingText: {
+    marginLeft: 10,
+    color: '#5D4037',
+    flex: 1,
+  },
+  loadingModalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  loadingModalText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: 'white',
   },
 });

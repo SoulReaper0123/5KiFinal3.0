@@ -283,3 +283,45 @@ export const RejectWithdraws = async (rejectWithdrawApplication) => {
     throw error;
   }
 };
+
+export const MemberWithdrawMembership = async (withdrawalData) => {
+  try {
+    const response = await axios.post(`${API_URL}/membershipWithdrawal`, {
+      ...withdrawalData,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error submitting membership withdrawal:', error);
+    throw error;
+  }
+};
+
+export const ApproveMembershipWithdrawal = async (approvalData) => {
+  try {
+    const response = await axios.post(`${API_URL}/approveMembershipWithdrawal`, {
+      ...approvalData,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error approving membership withdrawal:', error);
+    throw error;
+  }
+};
+
+export const RejectMembershipWithdrawal = async (rejectionData) => {
+  try {
+    const response = await axios.post(`${API_URL}/rejectMembershipWithdrawal`, {
+      ...rejectionData,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error rejecting membership withdrawal:', error);
+    throw error;
+  }
+};

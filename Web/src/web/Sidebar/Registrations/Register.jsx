@@ -20,7 +20,7 @@ import Registrations from './Registrations';
 import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
-//import PermanentWithdrawals from './PermanentWithdrawals';
+import PermanentWithdrawals from '../Withdraws/PermanentWithdraws';
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -475,7 +475,7 @@ const Register = () => {
         database.ref('Registrations/RejectedRegistrations').once('value'),
         database.ref('Registrations/ApprovedRegistrations').once('value'),
         database.ref('Members').once('value'),
-        database.ref('Withdrawals/PermanentWithdrawals').once('value'),
+        database.ref('MembershipWithdrawal').once('value'),
       ]);
 
       const regData = regSnap.val() || {};
