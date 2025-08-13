@@ -4,20 +4,48 @@ import {
   FaDownload, 
   FaFilter, 
   FaChevronLeft, 
-  FaChevronRight, 
-  FaChevronUp,
-  FaChevronDown,
-  FaPlusCircle,
+  FaChevronRight,
+  FaPlus,
   FaCheckCircle,
-  FaTimesCircle
+  FaTimes,
+  FaExclamationCircle
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
-import { database } from '../../../../../Database/firebaseConfig';
+import { database, storage } from '../../../../../Database/firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import ApplyDeposits from './ApplyDeposits';
 import ApprovedDeposits from './ApprovedDeposits';
 import RejectedDeposits from './RejectedDeposits';
+import { ApproveDeposits } from '../../../../../Server/api';
+
+// Constants
+const depositOptions = [
+  { key: 'Bank', label: 'Bank' },
+  { key: 'GCash', label: 'GCash' }
+];
+
+const pageSize = 10; // Added missing pageSize constant
+
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(amount);
+};
+
+const formatDate = (date) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+const formatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
 
 const Deposits = () => {
   const [activeSection, setActiveSection] = useState('applyDeposits');
@@ -33,7 +61,25 @@ const Deposits = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const pageSize = 10;
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [formData, setFormData] = useState({
+    memberId: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    depositOption: '',
+    accountName: '',
+    accountNumber: '',
+    amount: '',
+  });
+  const [proofOfDepositFile, setProofOfDepositFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [depositAccounts, setDepositAccounts] = useState({
+    Bank: { accountName: '', accountNumber: '' },
+    GCash: { accountName: '', accountNumber: '' }
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -93,57 +139,6 @@ const Deposits = () => {
         align-items: center;
         flex-wrap: wrap;
         gap: 10px;
-      }
-      .filter-container {
-        position: relative;
-        z-index: 10;
-      }
-      .filter-dropdown-button {
-        display: flex;
-        align-items: center;
-        background-color: #fff;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        padding: 0 12px;
-        height: 40px;
-        min-width: 120px;
-        cursor: pointer;
-      }
-      .filter-dropdown-text {
-        margin: 0 8px;
-        color: #2D5783;
-        font-size: 14px;
-      }
-      .filter-dropdown-menu {
-        position: absolute;
-        bottom: 45px;
-        left: 0;
-        background-color: #fff;
-        border-radius: 5px;
-        border: 1px solid #ccc;
-        min-width: 150px;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-      }
-      .filter-dropdown-item {
-        padding: 10px 12px;
-        border-bottom: 1px solid #eee;
-        cursor: pointer;
-        background: none;
-        border: none;
-        width: 100%;
-        text-align: left;
-      }
-      .filter-text {
-        color: #333;
-        font-size: 14px;
-      }
-      .active-filter-item {
-        background-color: #f0f7ff;
-      }
-      .active-filter-text {
-        color: #2D5783;
-        font-weight: bold;
-        font-size: 14px;
       }
       .search-bar {
         display: flex;
@@ -227,23 +222,107 @@ const Deposits = () => {
         font-size: 16px;
         color: #666;
       }
-      .loading-container {
+      .plus-button {
+        position: fixed;
+        right: 30px;
+        bottom: 30px;
+        background-color: #2D5783;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        border: none;
+        width: 60px;
+        height: 60px;
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
+        cursor: pointer;
+        color: white;
+        z-index: 100;
       }
-      .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        border-left-color: #001F3F;
-        animation: spin 1s linear infinite;
+      .plus-icon {
+        font-size: 24px;
       }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.4);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .modal-container {
+        background-color: #f9f9f9;
+        padding: 24px;
+        border-radius: 10px;
+        width: 40%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      .modal-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 16px;
+        color: #2D5783;
+        text-align: center;
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      .form-label {
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #333;
+        display: block;
+      }
+      .required {
+        color: red;
+      }
+      .form-input {
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 10px;
+        background-color: #fff;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .form-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-sizing: border-box;
+        background-color: white;
+      }
+      .modal-button-container {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 24px;
+      }
+      .modal-submit-button {
+        background-color: #2D5783;
+        padding: 12px;
+        border-radius: 8px;
+        width: 48%;
+        text-align: center;
+        border: none;
+        cursor: pointer;
+        color: white;
+        font-weight: bold;
+      }
+      .modal-cancel-button {
+        background-color: #ccc;
+        padding: 12px;
+        border-radius: 8px;
+        width: 48%;
+        text-align: center;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
       }
       .centered-modal {
         position: fixed;
@@ -256,6 +335,12 @@ const Deposits = () => {
         justify-content: center;
         align-items: center;
         z-index: 1000;
+      }
+      .confirm-modal-card {
+        width: 300px;
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 20px;
       }
       .small-modal-card {
         width: 300px;
@@ -278,19 +363,10 @@ const Deposits = () => {
         margin-bottom: 20px;
         text-align: center;
       }
-      .cancel-btn {
-        background-color: #f44336;
-        width: 100px;
-        height: 40px;
+      .bottom-buttons {
         display: flex;
         justify-content: center;
-        align-items: center;
-        border-radius: 5px;
-        margin: 0 10px;
-        border: none;
-        color: white;
-        font-weight: bold;
-        cursor: pointer;
+        margin-top: 10px;
       }
       .confirm-btn {
         background-color: #4CAF50;
@@ -306,6 +382,113 @@ const Deposits = () => {
         font-weight: bold;
         cursor: pointer;
       }
+      .cancel-btn {
+        background-color: #f44336;
+        width: 100px;
+        height: 40px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 5px;
+        margin: 0 10px;
+        border: none;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+        padding: 5px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #666;
+      }
+      .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border-left-color: #2D5783;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .file-input-label {
+        display: block;
+        padding: 10px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: 5px;
+      }
+      .file-input {
+        display: none;
+      }
+      .file-name {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        min-width: 800px;
+      }
+      .table-header {
+        background-color: #2D5783;
+        color: #fff;
+        height: 50px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 16px;
+      }
+      .table-header-cell {
+        white-space: nowrap;
+      }
+      .table-row {
+        height: 50px;
+      }
+      .table-row:nth-child(even) {
+        background-color: #f5f5f5;
+      }
+      .table-row:nth-child(odd) {
+        background-color: #ddd;
+      }
+      .table-cell {
+        text-align: center;
+        font-size: 14px;
+        border-bottom: 1px solid #ddd;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .status-approved {
+        color: green;
+      }
+      .status-rejected {
+        color: red;
+      }
+      .view-text {
+        color: #2D5783;
+        font-size: 14px;
+        text-decoration: underline;
+        cursor: pointer;
+        font-weight: 500;
+      }
     `;
     document.head.appendChild(styleElement);
 
@@ -314,40 +497,58 @@ const Deposits = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true);
-      try {
-        const [pSnap, aSnap, rSnap] = await Promise.all([
-          database.ref('Deposits/DepositApplications').once('value'),
-          database.ref('Deposits/ApprovedDeposits').once('value'),
-          database.ref('Deposits/RejectedDeposits').once('value'),
-        ]);
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [pSnap, aSnap, rSnap, settingsSnap] = await Promise.all([
+        database.ref('Deposits/DepositApplications').once('value'),
+        database.ref('Deposits/ApprovedDeposits').once('value'),
+        database.ref('Deposits/RejectedDeposits').once('value'),
+        database.ref('Settings/Accounts').once('value')
+      ]);
 
-        const toArray = snap => {
-          const val = snap.val() || {};
-          const all = [];
-          Object.entries(val).forEach(([uid, data]) => {
-            Object.entries(data).forEach(([txId, record]) => {
-              all.push({ id: uid, transactionId: txId, ...record });
-            });
+      const toArray = snap => {
+        const val = snap.val() || {};
+        const all = [];
+        Object.entries(val).forEach(([uid, data]) => {
+          Object.entries(data).forEach(([txId, record]) => {
+            all.push({ id: uid, transactionId: txId, ...record });
           });
-          return all;
-        };
+        });
+        return all;
+      };
 
-        setPending(toArray(pSnap));
-        setApproved(toArray(aSnap));
-        setRejected(toArray(rSnap));
-        setFilteredData(toArray(pSnap));
-      } catch (error) {
-        console.error('Error fetching deposits:', error);
-        setErrorMessage('Failed to fetch deposit data');
-        setErrorModalVisible(true);
-      } finally {
-        setLoading(false);
+      setPending(toArray(pSnap));
+      setApproved(toArray(aSnap));
+      setRejected(toArray(rSnap));
+      
+      if (settingsSnap.exists()) {
+        setDepositAccounts(settingsSnap.val());
+      } else {
+        // Fallback to old path if Accounts doesn't exist
+        const oldSettingsSnap = await database.ref('Settings/DepositAccounts').once('value');
+        if (oldSettingsSnap.exists()) {
+          setDepositAccounts(oldSettingsSnap.val());
+        }
       }
-    };
+      
+      // Update filtered data based on active section
+      const newFilteredData = 
+        activeSection === 'applyDeposits' ? toArray(pSnap) :
+        activeSection === 'approvedDeposits' ? toArray(aSnap) :
+        toArray(rSnap);
+      
+      setFilteredData(newFilteredData);
+    } catch (error) {
+      console.error('Error fetching deposits:', error);
+      setErrorMessage('Failed to fetch deposit data');
+      setErrorModalVisible(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchAllData();
   }, []);
 
@@ -444,16 +645,228 @@ const Deposits = () => {
     setNoMatch(false);
   };
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
-  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const openAddModal = () => {
+    setAddModalVisible(true);
+  };
 
-if (loading) {
-  return (
-    <div className="loading-container">
-      <div className="spinner"></div>
-    </div>
-  );
-}
+  const closeAddModal = () => {
+    setAddModalVisible(false);
+    setFormData({
+      memberId: '',
+      firstName: '',
+      lastName: '',
+      email: '',
+      depositOption: '',
+      accountName: '',
+      accountNumber: '',
+      amount: '',
+    });
+    setProofOfDepositFile(null);
+  };
+
+  const handleInputChange = (name, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    if (name === 'depositOption' && value) {
+      const selectedAccount = depositAccounts[value];
+      setFormData(prev => ({
+        ...prev,
+        accountName: selectedAccount.accountName || '',
+        accountNumber: selectedAccount.accountNumber || ''
+      }));
+    }
+  };
+
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
+  };
+
+  const validateFields = () => {
+    if (!formData.memberId) {
+      setErrorMessage('Member ID is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.firstName) {
+      setErrorMessage('First name is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.lastName) {
+      setErrorMessage('Last name is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.email) {
+      setErrorMessage('Email is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.depositOption) {
+      setErrorMessage('Deposit option is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.amount || isNaN(formData.amount) || parseFloat(formData.amount) <= 0) {
+      setErrorMessage('Please enter a valid amount');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!proofOfDepositFile) {
+      setErrorMessage('Proof of deposit is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmitConfirmation = () => {
+    if (!validateFields()) return;
+    setConfirmModalVisible(true);
+  };
+
+  const uploadImageToStorage = async (file, path) => {
+    try {
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file);
+      const downloadURL = await getDownloadURL(fileRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
+  const submitDeposit = async () => {
+    setConfirmModalVisible(false);
+    setUploading(true);
+    setIsProcessing(true);
+
+    try {
+      // Upload proof of deposit
+      const proofOfDepositUrl = await uploadImageToStorage(
+        proofOfDepositFile, 
+        `proofsOfDeposit/${formData.memberId}_${Date.now()}`
+      );
+
+      const transactionId = generateTransactionId();
+      const now = new Date();
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+      const amount = parseFloat(formData.amount);
+
+      // Create deposit record
+      const depositData = {
+        transactionId,
+        id: formData.memberId,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        depositOption: formData.depositOption,
+        accountName: formData.accountName,
+        accountNumber: formData.accountNumber,
+        amountToBeDeposited: amount,
+        proofOfDepositUrl,
+        dateApplied: approvalDate,
+        timeApplied: approvalTime,
+        dateApproved: approvalDate,
+        timeApproved: approvalTime,
+        status: 'approved'
+      };
+
+      // Get references to all needed paths
+      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${formData.memberId}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Deposits/${formData.memberId}/${transactionId}`);
+      const memberRef = database.ref(`Members/${formData.memberId}`);
+      const fundsRef = database.ref('Settings/Funds');
+
+      const memberSnap = await memberRef.once('value');
+
+      if (memberSnap.exists()) {
+        const member = memberSnap.val();
+
+        // Execute all operations in sequence
+        await approvedRef.set(depositData);
+        await transactionRef.set(depositData);
+
+        // Update member balance
+        const newBalance = parseFloat(member.balance || 0) + amount;
+        await memberRef.update({ balance: newBalance });
+
+        // Update funds
+        const fundSnap = await fundsRef.once('value');
+        const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
+        await fundsRef.set(updatedFund);
+
+        // Call API to send email
+        await callApiApprove(depositData);
+
+        setSuccessMessage('Deposit added and approved successfully!');
+        setSuccessModalVisible(true);
+        closeAddModal();
+
+        // Refresh data after successful addition
+        await fetchAllData();
+      } else {
+        throw new Error('Member not found');
+      }
+    } catch (error) {
+      console.error('Error adding deposit:', error);
+      setErrorMessage(error.message || 'Failed to add deposit');
+      setErrorModalVisible(true);
+    } finally {
+      setUploading(false);
+      setIsProcessing(false);
+    }
+  };
+
+  const generateTransactionId = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  const callApiApprove = async (depositData) => {
+    try {
+      const response = await ApproveDeposits({
+        memberId: depositData.id,
+        transactionId: depositData.transactionId,
+        amount: depositData.amountToBeDeposited,
+        dateApproved: depositData.dateApproved,
+        timeApproved: depositData.timeApproved,
+        email: depositData.email,
+        firstName: depositData.firstName,
+        lastName: depositData.lastName,
+        status: 'approved'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send approval email');
+      }
+    } catch (error) {
+      console.error('API error:', error);
+      throw error;
+    }
+  };
+
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+  };
+
+  if (loading) {
+    return (
+      <div className="loading-container">
+        <div className="spinner"></div>
+      </div>
+    );
+  }
+
+  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
     <div className="safe-area-view">
@@ -538,6 +951,7 @@ if (loading) {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   onPageChange={setCurrentPage}
+                  refreshData={fetchAllData}
                 />
               )}
               {activeSection === 'approvedDeposits' && (
@@ -560,16 +974,197 @@ if (loading) {
           )}
         </div>
 
+        {/* Add Deposit Button - Only show on Approved Deposits */}
+        {activeSection === 'approvedDeposits' && (
+          <button 
+            className="plus-button" 
+            onClick={openAddModal}
+          >
+            <FaPlus className="plus-icon" />
+          </button>
+        )}
+
+        {/* Add Deposit Modal */}
+        {addModalVisible && (
+          <div className="modal-overlay">
+            <div className="modal-container">
+              <button onClick={closeAddModal} className="close-button">
+                <AiOutlineClose />
+              </button>
+              <h3 className="modal-title">Add Deposit</h3>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Member ID<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Member ID"
+                  value={formData.memberId}
+                  onChange={(e) => handleInputChange('memberId', e.target.value)}
+                  className="form-input"
+                  type="text"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  First Name<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="First Name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Last Name<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Last Name"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Email<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="form-input"
+                  type="email"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Deposit Option<span className="required"> *</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formData.depositOption}
+                  onChange={(e) => handleInputChange('depositOption', e.target.value)}
+                >
+                  <option value="">Select Deposit Option</option>
+                  {depositOptions.map(option => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Account Name</label>
+                <input
+                  placeholder="Account Name"
+                  value={formData.accountName}
+                  onChange={(e) => handleInputChange('accountName', e.target.value)}
+                  className="form-input"
+                  readOnly
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Account Number</label>
+                <input
+                  placeholder="Account Number"
+                  value={formData.accountNumber}
+                  onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                  className="form-input"
+                  readOnly
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Amount<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Amount"
+                  value={formData.amount}
+                  onChange={(e) => handleInputChange('amount', e.target.value)}
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Proof of Deposit<span className="required"> *</span>
+                </label>
+                <label className="file-input-label">
+                  {proofOfDepositFile ? proofOfDepositFile.name : 'Click to upload Proof of Deposit'}
+                  <input
+                    type="file"
+                    className="file-input"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setProofOfDepositFile)}
+                  />
+                </label>
+              </div>
+              
+              <div className="modal-button-container">
+                <button
+                  className="modal-submit-button"
+                  onClick={handleSubmitConfirmation}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <div className="spinner"></div>
+                  ) : (
+                    'Add Deposit'
+                  )}
+                </button>
+                <button 
+                  className="modal-cancel-button" 
+                  onClick={closeAddModal}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmModalVisible && (
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Are you sure you want to add this deposit?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
+                  onClick={submitDeposit}
+                >
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setConfirmModalVisible(false)}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success Modal */}
         {successModalVisible && (
           <div className="centered-modal">
             <div className="small-modal-card">
-              <FaCheckCircle className="confirm-icon" style={{ color: '#4CAF50' }} />
+              <FaCheckCircle className="confirm-icon" />
               <p className="modal-text">{successMessage}</p>
-              <button 
-                className="confirm-btn" 
-                onClick={() => setSuccessModalVisible(false)}
-              >
+              <button className="confirm-btn" onClick={handleSuccessOk}>
                 OK
               </button>
             </div>
@@ -580,15 +1175,19 @@ if (loading) {
         {errorModalVisible && (
           <div className="centered-modal">
             <div className="small-modal-card">
-              <FiAlertCircle className="confirm-icon" style={{ color: '#f44336' }} />
+              <FiAlertCircle className="confirm-icon" />
               <p className="modal-text">{errorMessage}</p>
-              <button 
-                className="cancel-btn" 
-                onClick={() => setErrorModalVisible(false)}
-              >
+              <button className="cancel-btn" onClick={() => setErrorModalVisible(false)}>
                 OK
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Processing Modal */}
+        {isProcessing && (
+          <div className="centered-modal">
+            <div className="spinner"></div>
           </div>
         )}
       </div>

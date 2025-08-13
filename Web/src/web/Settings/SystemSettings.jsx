@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo } from 'react-icons/fa';
+import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes } from 'react-icons/fa';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('accounts');
@@ -327,629 +327,668 @@ const SystemSettings = () => {
   };
 
   if (loading) return (
-    <div className="loading-container">
-      <div className="spinner"></div>
+    <div style={styles.loadingContainer}>
+      <div style={styles.spinner}></div>
     </div>
   );
 
   return (
-    <div className="system-settings-container">
+    <div style={styles.container}>
       {/* Sidebar */}
-      <div className="sidebar">
+      <div style={styles.sidebar}>
         <button
-          className={`sidebar-button ${activeSection === 'accounts' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'accounts' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('accounts')}
         >
-          <span className="sidebar-button-text">Accounts</span>
+          <span style={styles.sidebarButtonText}>Accounts</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'financial' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'financial' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('financial')}
         >
-          <span className="sidebar-button-text">Financial</span>
+          <span style={styles.sidebarButtonText}>Financial</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'orientation' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'orientation' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('orientation')}
         >
-          <span className="sidebar-button-text">Orientation</span>
+          <span style={styles.sidebarButtonText}>Orientation</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'interest' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'interest' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('interest')}
         >
-          <span className="sidebar-button-text">Interest Rates</span>
+          <span style={styles.sidebarButtonText}>Interest Rates</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'loan' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'loan' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('loan')}
         >
-          <span className="sidebar-button-text">Loan Settings</span>
+          <span style={styles.sidebarButtonText}>Loan Settings</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'dividend' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'dividend' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('dividend')}
         >
-          <span className="sidebar-button-text">Dividend</span>
+          <span style={styles.sidebarButtonText}>Dividend</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'terms' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'terms' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('terms')}
         >
-          <span className="sidebar-button-text">Terms</span>
+          <span style={styles.sidebarButtonText}>Terms</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'privacy' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'privacy' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('privacy')}
         >
-          <span className="sidebar-button-text">Privacy</span>
+          <span style={styles.sidebarButtonText}>Privacy</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'about' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'about' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('about')}
         >
-          <span className="sidebar-button-text">About Us</span>
+          <span style={styles.sidebarButtonText}>About Us</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'contact' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'contact' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('contact')}
         >
-          <span className="sidebar-button-text">Contact Us</span>
+          <span style={styles.sidebarButtonText}>Contact Us</span>
         </button>
       </div>
 
       {/* Main Content */}
-      <div className="content-area">
-        {/* Accounts Section */}
-        {activeSection === 'accounts' && (
-          <div className="section">
-            <h2 className="section-title">Accounts</h2>
-            
-            <div className="account-row">
-              <div className="account-card">
-                <h3 className="account-title">Bank Account</h3>
-                <InputRow
-                  label="Account Name"
-                  value={settings.Accounts.Bank.accountName}
-                  onChange={(text) => handleAccountChange('Bank', 'accountName', text)}
-                  editable={editMode}
-                />
-                <InputRow
-                  label="Account Number"
-                  value={settings.Accounts.Bank.accountNumber}
-                  onChange={(text) => handleAccountChange('Bank', 'accountNumber', text)}
-                  editable={editMode}
-                />
-              </div>
+      <div style={styles.contentArea}>
+        {/* Only show the active section */}
+        <div style={styles.sectionContainer}>
+          {/* Accounts Section */}
+          {activeSection === 'accounts' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Accounts</h2>
               
-              <div className="account-card">
-                <h3 className="account-title">GCash Account</h3>
-                <InputRow
-                  label="Account Name"
-                  value={settings.Accounts.GCash.accountName}
-                  onChange={(text) => handleAccountChange('GCash', 'accountName', text)}
-                  editable={editMode}
-                />
-                <InputRow
-                  label="Account Number"
-                  value={settings.Accounts.GCash.accountNumber}
-                  onChange={(text) => handleAccountChange('GCash', 'accountNumber', text)}
-                  editable={editMode}
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Financial Settings */}
-        {activeSection === 'financial' && (
-          <div className="section">
-            <h2 className="section-title">Financial Settings</h2>
-            
-            <InputRow
-              label="Loanable Amount Percentage"
-              value={settings.LoanPercentage}
-              onChange={(text) => handleInputChange('LoanPercentage', text)}
-              editable={editMode}
-              suffix="%"
-            />
-            
-            <div className="input-row">
-              <label className="label">Available Funds (₱)</label>
-              <input 
-                className="static-input" 
-                value={settings.Funds} 
-                readOnly 
-              />
-            </div>
-
-            <div className="input-row">
-              <label className="label">Savings (₱)</label>
-              {editMode ? (
-                <div className="savings-input-container">
-                  <input
-                    className="static-input"
-                    value={settings.Savings}
-                    readOnly
+              <div style={styles.accountRow}>
+                <div style={styles.accountCard}>
+                  <h3 style={styles.accountTitle}>Bank Account</h3>
+                  <InputRow
+                    label="Account Name"
+                    value={settings.Accounts.Bank.accountName}
+                    onChange={(text) => handleAccountChange('Bank', 'accountName', text)}
+                    editable={editMode}
                   />
-                  <button 
-                    className="action-btn add-funds-btn"
-                    onClick={handleAddSavings}
-                  >
-                    <FaPlus /> Add
-                  </button>
+                  <InputRow
+                    label="Account Number"
+                    value={settings.Accounts.Bank.accountNumber}
+                    onChange={(text) => handleAccountChange('Bank', 'accountNumber', text)}
+                    editable={editMode}
+                  />
                 </div>
-              ) : (
-                <span className="static-text">₱{settings.Savings}</span>
-              )}
-            </div>
-
-            {editMode && (
-              <div className="funds-actions">
-                <button 
-                  className="action-btn add-funds-btn"
-                  onClick={() => handleFundsAction('add')}
-                  disabled={!settings.Savings || parseFloat(settings.Savings) <= 0}
-                >
-                  <FaExchangeAlt /> Add to Funds
-                </button>
-                <button 
-                  className="action-btn withdraw-funds-btn"
-                  onClick={() => handleFundsAction('withdraw')}
-                  disabled={!settings.Funds || parseFloat(settings.Funds) <= 0}
-                >
-                  <FaExchangeAlt /> Withdraw to Savings
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Orientation Code */}
-        {activeSection === 'orientation' && (
-          <div className="section">
-            <h2 className="section-title">Orientation Registration Code</h2>
-            <div className="orientation-code-container">
-              <div className="orientation-code-title">Orientation Attendance Code</div>
-              <div className="orientation-code-row">
-                <div className="orientation-code-value">
-                  {settings.OrientationCode || 'Not set'}
+                
+                <div style={styles.accountCard}>
+                  <h3 style={styles.accountTitle}>GCash Account</h3>
+                  <InputRow
+                    label="Account Name"
+                    value={settings.Accounts.GCash.accountName}
+                    onChange={(text) => handleAccountChange('GCash', 'accountName', text)}
+                    editable={editMode}
+                  />
+                  <InputRow
+                    label="Account Number"
+                    value={settings.Accounts.GCash.accountNumber}
+                    onChange={(text) => handleAccountChange('GCash', 'accountNumber', text)}
+                    editable={editMode}
+                  />
                 </div>
-                {settings.OrientationCode && (
-                  <button 
-                    className="copy-btn"
-                    onClick={() => copyToClipboard(settings.OrientationCode)}
-                    aria-label="Copy orientation code"
-                  >
-                    <FaCopy />
-                  </button>
-                )}
-                {orientationCopied && <span className="copied-text">Copied!</span>}
               </div>
-              {editMode && (
-                <button 
-                  className="generate-btn"
-                  onClick={handleGenerateOrientationCode}
-                >
-                  <FaRedo /> Generate New Code
-                </button>
-              )}
-              <p className="orientation-code-description">
-                This code is used for registration when attending the orientation. Share this code with attendees.
-              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Interest Rates */}
-        {activeSection === 'interest' && (
-          <div className="section">
-            <h2 className="section-title">Interest Rates</h2>
-            {Object.entries(settings.InterestRate).map(([term, rate]) => (
-              <div key={term} className="rate-row">
-                <span className="term-text">{term} months</span>
+          {/* Financial Settings */}
+          {activeSection === 'financial' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Financial Settings</h2>
+              
+              <InputRow
+                label="Loanable Amount Percentage"
+                value={settings.LoanPercentage}
+                onChange={(text) => handleInputChange('LoanPercentage', text)}
+                editable={editMode}
+                suffix="%"
+              />
+              
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Available Funds (₱)</label>
+                <input 
+                  style={styles.staticInput} 
+                  value={settings.Funds} 
+                  readOnly 
+                />
+              </div>
+
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Savings (₱)</label>
                 {editMode ? (
-                  <div className="edit-rate-row">
+                  <div style={styles.savingsInputContainer}>
                     <input
-                      className="mini-input"
-                      value={rate}
-                      onChange={(e) => handleInterestChange(term, e.target.value)}
-                      type="number"
+                      style={styles.staticInput}
+                      value={settings.Savings}
+                      readOnly
                     />
-                    <span>%</span>
                     <button 
-                      className="delete-term-btn"
-                      onClick={() => requestDeleteTerm(term)}
+                      style={styles.actionBtnAddFunds}
+                      onClick={handleAddSavings}
                     >
-                      <FaTrashAlt />
+                      <FaPlus style={styles.buttonIcon} /> Add
                     </button>
                   </div>
                 ) : (
-                  <span className="static-text">{rate}%</span>
+                  <span style={styles.staticText}>₱{settings.Savings}</span>
                 )}
               </div>
-            ))}
-            {editMode && (
-              <div className="input-row">
-                <input
-                  className="input"
-                  placeholder="New Term (e.g. 6)"
-                  value={newTerm}
-                  onChange={(e) => setNewTerm(e.target.value)}
-                  type="number"
-                />
-                <input
-                  className="input"
-                  placeholder="Interest Rate (%)"
-                  value={newRate}
-                  onChange={(e) => setNewRate(e.target.value)}
-                  type="number"
-                />
-                <button className="add-term-btn" onClick={requestAddTerm}>
-                  <FaPlus /> Add
-                </button>
-              </div>
-            )}
-          </div>
-        )}
 
-        {/* Loan Settings */}
-        {activeSection === 'loan' && (
-          <div className="section">
-            <h2 className="section-title">Loan Settings</h2>
-            
-            <div className="input-row">
-              <label className="label">Advanced Payments</label>
-              <label className="switch">
-                <input
-                  type="checkbox"
-                  checked={settings.AdvancedPayments}
-                  onChange={(e) => setSettings({ ...settings, AdvancedPayments: e.target.checked })}
-                  disabled={!editMode}
-                  className="switch-input"
-                />
-                <span className={`slider ${settings.AdvancedPayments ? 'checked' : ''}`}>
-                  <span className="slider-before"></span>
-                </span>
-              </label>
+              {editMode && (
+                <div style={styles.fundsActions}>
+                  <button 
+                    style={styles.actionBtnAddFunds}
+                    onClick={() => handleFundsAction('add')}
+                    disabled={!settings.Savings || parseFloat(settings.Savings) <= 0}
+                  >
+                    <FaExchangeAlt style={styles.buttonIcon} /> Add to Funds
+                  </button>
+                  <button 
+                    style={styles.actionBtnWithdrawFunds}
+                    onClick={() => handleFundsAction('withdraw')}
+                    disabled={!settings.Funds || parseFloat(settings.Funds) <= 0}
+                  >
+                    <FaExchangeAlt style={styles.buttonIcon} /> Withdraw to Savings
+                  </button>
+                </div>
+              )}
             </div>
-            
-            <InputRow
-              label="Penalty Value"
-              value={settings.PenaltyValue}
-              onChange={(text) => handleInputChange('PenaltyValue', text)}
-              editable={editMode}
-              suffix={settings.PenaltyType === 'percentage' ? '%' : '₱'}
-            />
-          </div>
-        )}
+          )}
 
-        {/* Dividend Date */}
-        {activeSection === 'dividend' && (
-          <div className="section">
-            <h2 className="section-title">Dividend Settings</h2>
-            <label className="label">Dividend Date</label>
-            {editMode ? (
-              <>
-                <button 
-                  className="date-button"
-                  onClick={() => setShowCalendar(!showCalendar)}
-                >
+          {/* Orientation Code */}
+          {activeSection === 'orientation' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Orientation Registration Code</h2>
+              <div style={styles.orientationCodeContainer}>
+                <div style={styles.orientationCodeTitle}>Orientation Attendance Code</div>
+                <div style={styles.orientationCodeRow}>
+                  <div style={styles.orientationCodeValue}>
+                    {settings.OrientationCode || 'Not set'}
+                  </div>
+                  {settings.OrientationCode && (
+                    <button 
+                      style={styles.copyBtn}
+                      onClick={() => copyToClipboard(settings.OrientationCode)}
+                      aria-label="Copy orientation code"
+                    >
+                      <FaCopy style={styles.buttonIcon} />
+                    </button>
+                  )}
+                  {orientationCopied && <span style={styles.copiedText}>Copied!</span>}
+                </div>
+                {editMode && (
+                  <button 
+                    style={styles.generateBtn}
+                    onClick={handleGenerateOrientationCode}
+                  >
+                    <FaRedo style={styles.buttonIcon} /> Generate New Code
+                  </button>
+                )}
+                <p style={styles.orientationCodeDescription}>
+                  This code is used for registration when attending the orientation. Share this code with attendees.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Interest Rates */}
+          {activeSection === 'interest' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Interest Rates</h2>
+              {Object.entries(settings.InterestRate).map(([term, rate]) => (
+                <div key={term} style={styles.rateRow}>
+                  <span style={styles.termText}>{term} months</span>
+                  {editMode ? (
+                    <div style={styles.editRateRow}>
+                      <input
+                        style={styles.miniInput}
+                        value={rate}
+                        onChange={(e) => handleInterestChange(term, e.target.value)}
+                        type="number"
+                      />
+                      <span>%</span>
+                      <button 
+                        style={styles.deleteTermBtn}
+                        onClick={() => requestDeleteTerm(term)}
+                      >
+                        <FaTrashAlt style={styles.buttonIcon} />
+                      </button>
+                    </div>
+                  ) : (
+                    <span style={styles.staticText}>{rate}%</span>
+                  )}
+                </div>
+              ))}
+              {editMode && (
+                <div style={styles.inputRow}>
+                  <input
+                    style={styles.input}
+                    placeholder="New Term (e.g. 6)"
+                    value={newTerm}
+                    onChange={(e) => setNewTerm(e.target.value)}
+                    type="number"
+                  />
+                  <input
+                    style={styles.input}
+                    placeholder="Interest Rate (%)"
+                    value={newRate}
+                    onChange={(e) => setNewRate(e.target.value)}
+                    type="number"
+                  />
+                  <button style={styles.addTermBtn} onClick={requestAddTerm}>
+                    <FaPlus style={styles.buttonIcon} /> Add
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Loan Settings */}
+          {activeSection === 'loan' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Loan Settings</h2>
+              
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Advanced Payments</label>
+                <label style={styles.switch}>
+                  <input
+                    type="checkbox"
+                    checked={settings.AdvancedPayments}
+                    onChange={(e) => setSettings({ ...settings, AdvancedPayments: e.target.checked })}
+                    disabled={!editMode}
+                    style={styles.switchInput}
+                  />
+                  <span style={{
+                    ...styles.slider,
+                    ...(settings.AdvancedPayments ? styles.sliderChecked : {})
+                  }}>
+                    <span style={styles.sliderBefore}></span>
+                  </span>
+                </label>
+              </div>
+              
+              <InputRow
+                label="Penalty Value"
+                value={settings.PenaltyValue}
+                onChange={(text) => handleInputChange('PenaltyValue', text)}
+                editable={editMode}
+                suffix={settings.PenaltyType === 'percentage' ? '%' : '₱'}
+              />
+            </div>
+          )}
+
+          {/* Dividend Date */}
+          {activeSection === 'dividend' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Dividend Settings</h2>
+              <label style={styles.label}>Dividend Date</label>
+              {editMode ? (
+                <>
+                  <button 
+                    style={styles.dateButton}
+                    onClick={() => setShowCalendar(!showCalendar)}
+                  >
+                    {settings.DividendDate
+                      ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                        })
+                      : 'Select a date'}
+                  </button>
+                  {showCalendar && (
+                    <div style={styles.calendarContainer}>
+                      <Calendar
+                        onChange={handleDateChange}
+                        value={settings.DividendDate ? new Date(settings.DividendDate) : new Date()}
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <span style={styles.staticText}>
                   {settings.DividendDate
                     ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
                         year: 'numeric',
                         month: 'long',
                         day: 'numeric',
                       })
-                    : 'Select a date'}
-                </button>
-                {showCalendar && (
-                  <div className="calendar-container">
-                    <Calendar
-                      onChange={handleDateChange}
-                      value={settings.DividendDate ? new Date(settings.DividendDate) : new Date()}
+                    : 'Not set'}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Terms and Conditions Section */}
+          {activeSection === 'terms' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Terms and Conditions</h2>
+              {editMode && editTerms ? (
+                <div style={styles.editSection}>
+                  <div style={styles.inputContainer}>
+                    <label>Title</label>
+                    <input
+                      style={styles.input}
+                      value={settings.TermsAndConditions.title}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        TermsAndConditions: {
+                          ...settings.TermsAndConditions,
+                          title: e.target.value
+                        }
+                      })}
                     />
                   </div>
-                )}
-              </>
-            ) : (
-              <span className="static-text">
-                {settings.DividendDate
-                  ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                    })
-                  : 'Not set'}
-              </span>
-            )}
-          </div>
-        )}
+                  <div style={styles.inputContainer}>
+                    <label>Content</label>
+                    <textarea
+                      style={styles.textarea}
+                      value={settings.TermsAndConditions.content}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        TermsAndConditions: {
+                          ...settings.TermsAndConditions,
+                          content: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.editButtons}>
+                    <button 
+                      style={styles.saveBtnSuccess}
+                      onClick={() => setEditTerms(false)}
+                    >
+                      <FaCheck style={styles.buttonIcon} /> Save Terms
+                    </button>
+                    <button 
+                      style={styles.saveBtnError}
+                      onClick={() => setEditTerms(false)}
+                    >
+                      <FaTimes style={styles.buttonIcon} /> Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div>
+                  <div style={styles.textContent}>
+                    <h3 style={styles.contentTitle}>{settings.TermsAndConditions.title}</h3>
+                    <div style={styles.contentText}>{settings.TermsAndConditions.content}</div>
+                  </div>
+                  {editMode && (
+                    <button 
+                      style={styles.saveBtnPrimary}
+                      onClick={() => setEditTerms(true)}
+                    >
+                      Edit Terms
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* Terms and Conditions Section */}
-        {activeSection === 'terms' && (
-          <div className="section">
-            <h2 className="section-title">Terms and Conditions</h2>
-            {editMode && editTerms ? (
-              <div className="edit-section">
-                <div className="input-container">
-                  <label>Title</label>
-                  <input
-                    className="input"
-                    value={settings.TermsAndConditions.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      TermsAndConditions: {
-                        ...settings.TermsAndConditions,
-                        title: e.target.value
-                      }
-                    })}
-                  />
+          {/* Privacy Policy Section */}
+          {activeSection === 'privacy' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Privacy Policy</h2>
+              {editMode && editPrivacy ? (
+                <div style={styles.editSection}>
+                  <div style={styles.inputContainer}>
+                    <label>Title</label>
+                    <input
+                      style={styles.input}
+                      value={settings.PrivacyPolicy.title}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        PrivacyPolicy: {
+                          ...settings.PrivacyPolicy,
+                          title: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.inputContainer}>
+                    <label>Content</label>
+                    <textarea
+                      style={styles.textarea}
+                      value={settings.PrivacyPolicy.content}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        PrivacyPolicy: {
+                          ...settings.PrivacyPolicy,
+                          content: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.editButtons}>
+                    <button 
+                      style={styles.saveBtnSuccess}
+                      onClick={() => setEditPrivacy(false)}
+                    >
+                      <FaCheck style={styles.buttonIcon} /> Save Privacy Policy
+                    </button>
+                    <button 
+                      style={styles.saveBtnError}
+                      onClick={() => setEditPrivacy(false)}
+                    >
+                      <FaTimes style={styles.buttonIcon} /> Cancel
+                    </button>
+                  </div>
                 </div>
-                <div className="input-container">
-                  <label>Content</label>
-                  <textarea
-                    className="textarea"
-                    value={settings.TermsAndConditions.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      TermsAndConditions: {
-                        ...settings.TermsAndConditions,
-                        content: e.target.value
-                      }
-                    })}
-                  />
+              ) : (
+                <div>
+                  <div style={styles.textContent}>
+                    <h3 style={styles.contentTitle}>{settings.PrivacyPolicy.title}</h3>
+                    <div style={styles.contentText}>{settings.PrivacyPolicy.content}</div>
+                  </div>
+                  {editMode && (
+                    <button 
+                      style={styles.saveBtnPrimary}
+                      onClick={() => setEditPrivacy(true)}
+                    >
+                      Edit Privacy Policy
+                    </button>
+                  )}
                 </div>
-                <div className="edit-buttons">
-                  <button 
-                    className="save-btn success"
-                    onClick={() => setEditTerms(false)}
-                  >
-                    Save Terms
-                  </button>
-                  <button 
-                    className="save-btn error"
-                    onClick={() => setEditTerms(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-content">
-                  <h3>{settings.TermsAndConditions.title}</h3>
-                  <p>{settings.TermsAndConditions.content}</p>
-                </div>
-                {editMode && (
-                  <button 
-                    className="save-btn primary"
-                    onClick={() => setEditTerms(true)}
-                  >
-                    Edit Terms
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
-        {/* Privacy Policy Section */}
-        {activeSection === 'privacy' && (
-          <div className="section">
-            <h2 className="section-title">Privacy Policy</h2>
-            {editMode && editPrivacy ? (
-              <div className="edit-section">
-                <div className="input-container">
-                  <label>Title</label>
-                  <input
-                    className="input"
-                    value={settings.PrivacyPolicy.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      PrivacyPolicy: {
-                        ...settings.PrivacyPolicy,
-                        title: e.target.value
-                      }
-                    })}
-                  />
+          {/* About Us Section */}
+          {activeSection === 'about' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>About Us</h2>
+              {editMode && editAboutUs ? (
+                <div style={styles.editSection}>
+                  <div style={styles.inputContainer}>
+                    <label>Title</label>
+                    <input
+                      style={styles.input}
+                      value={settings.AboutUs.title}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        AboutUs: {
+                          ...settings.AboutUs,
+                          title: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.inputContainer}>
+                    <label>Content</label>
+                    <textarea
+                      style={styles.textarea}
+                      value={settings.AboutUs.content}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        AboutUs: {
+                          ...settings.AboutUs,
+                          content: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.editButtons}>
+                    <button 
+                      style={styles.saveBtnSuccess}
+                      onClick={() => setEditAboutUs(false)}
+                    >
+                      <FaCheck style={styles.buttonIcon} /> Save About Us
+                    </button>
+                    <button 
+                      style={styles.saveBtnError}
+                      onClick={() => setEditAboutUs(false)}
+                    >
+                      <FaTimes style={styles.buttonIcon} /> Cancel
+                    </button>
+                  </div>
                 </div>
-                <div className="input-container">
-                  <label>Content</label>
-                  <textarea
-                    className="textarea"
-                    value={settings.PrivacyPolicy.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      PrivacyPolicy: {
-                        ...settings.PrivacyPolicy,
-                        content: e.target.value
-                      }
-                    })}
-                  />
+              ) : (
+                <div>
+                  <div style={styles.textContent}>
+                    <h3 style={styles.contentTitle}>{settings.AboutUs.title}</h3>
+                    <div style={styles.contentText}>{settings.AboutUs.content}</div>
+                  </div>
+                  {editMode && (
+                    <button 
+                      style={styles.saveBtnPrimary}
+                      onClick={() => setEditAboutUs(true)}
+                    >
+                      Edit About Us
+                    </button>
+                  )}
                 </div>
-                <div className="edit-buttons">
-                  <button 
-                    className="save-btn success"
-                    onClick={() => setEditPrivacy(false)}
-                  >
-                    Save Privacy Policy
-                  </button>
-                  <button 
-                    className="save-btn error"
-                    onClick={() => setEditPrivacy(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-content">
-                  <h3>{settings.PrivacyPolicy.title}</h3>
-                  <p>{settings.PrivacyPolicy.content}</p>
-                </div>
-                {editMode && (
-                  <button 
-                    className="save-btn primary"
-                    onClick={() => setEditPrivacy(true)}
-                  >
-                    Edit Privacy Policy
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
 
-        {/* About Us Section */}
-        {activeSection === 'about' && (
-          <div className="section">
-            <h2 className="section-title">About Us</h2>
-            {editMode && editAboutUs ? (
-              <div className="edit-section">
-                <div className="input-container">
-                  <label>Title</label>
-                  <input
-                    className="input"
-                    value={settings.AboutUs.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      AboutUs: {
-                        ...settings.AboutUs,
-                        title: e.target.value
-                      }
-                    })}
-                  />
+          {/* Contact Us Section */}
+          {activeSection === 'contact' && (
+            <div style={styles.section}>
+              <h2 style={styles.sectionTitle}>Contact Us</h2>
+              {editMode && editContactUs ? (
+                <div style={styles.editSection}>
+                  <div style={styles.inputContainer}>
+                    <label>Title</label>
+                    <input
+                      style={styles.input}
+                      value={settings.ContactUs.title}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        ContactUs: {
+                          ...settings.ContactUs,
+                          title: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.inputContainer}>
+                    <label>Content</label>
+                    <textarea
+                      style={styles.textarea}
+                      value={settings.ContactUs.content}
+                      onChange={(e) => setSettings({
+                        ...settings,
+                        ContactUs: {
+                          ...settings.ContactUs,
+                          content: e.target.value
+                        }
+                      })}
+                    />
+                  </div>
+                  <div style={styles.editButtons}>
+                    <button 
+                      style={styles.saveBtnSuccess}
+                      onClick={() => setEditContactUs(false)}
+                    >
+                      <FaCheck style={styles.buttonIcon} /> Save Contact Us
+                    </button>
+                    <button 
+                      style={styles.saveBtnError}
+                      onClick={() => setEditContactUs(false)}
+                    >
+                      <FaTimes style={styles.buttonIcon} /> Cancel
+                    </button>
+                  </div>
                 </div>
-                <div className="input-container">
-                  <label>Content</label>
-                  <textarea
-                    className="textarea"
-                    value={settings.AboutUs.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      AboutUs: {
-                        ...settings.AboutUs,
-                        content: e.target.value
-                      }
-                    })}
-                  />
+              ) : (
+                <div>
+                  <div style={styles.textContent}>
+                    <h3 style={styles.contentTitle}>{settings.ContactUs.title}</h3>
+                    <div style={styles.contentText}>{settings.ContactUs.content}</div>
+                  </div>
+                  {editMode && (
+                    <button 
+                      style={styles.saveBtnPrimary}
+                      onClick={() => setEditContactUs(true)}
+                    >
+                      Edit Contact Us
+                    </button>
+                  )}
                 </div>
-                <div className="edit-buttons">
-                  <button 
-                    className="save-btn success"
-                    onClick={() => setEditAboutUs(false)}
-                  >
-                    Save About Us
-                  </button>
-                  <button 
-                    className="save-btn error"
-                    onClick={() => setEditAboutUs(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-content">
-                  <h3>{settings.AboutUs.title}</h3>
-                  <p>{settings.AboutUs.content}</p>
-                </div>
-                {editMode && (
-                  <button 
-                    className="save-btn primary"
-                    onClick={() => setEditAboutUs(true)}
-                  >
-                    Edit About Us
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Contact Us Section */}
-        {activeSection === 'contact' && (
-          <div className="section">
-            <h2 className="section-title">Contact Us</h2>
-            {editMode && editContactUs ? (
-              <div className="edit-section">
-                <div className="input-container">
-                  <label>Title</label>
-                  <input
-                    className="input"
-                    value={settings.ContactUs.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      ContactUs: {
-                        ...settings.ContactUs,
-                        title: e.target.value
-                      }
-                    })}
-                  />
-                </div>
-                <div className="input-container">
-                  <label>Content</label>
-                  <textarea
-                    className="textarea"
-                    value={settings.ContactUs.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      ContactUs: {
-                        ...settings.ContactUs,
-                        content: e.target.value
-                      }
-                    })}
-                  />
-                </div>
-                <div className="edit-buttons">
-                  <button 
-                    className="save-btn success"
-                    onClick={() => setEditContactUs(false)}
-                  >
-                    Save Contact Us
-                  </button>
-                  <button 
-                    className="save-btn error"
-                    onClick={() => setEditContactUs(false)}
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="text-content">
-                  <h3>{settings.ContactUs.title}</h3>
-                  <p>{settings.ContactUs.content}</p>
-                </div>
-                {editMode && (
-                  <button 
-                    className="save-btn primary"
-                    onClick={() => setEditContactUs(true)}
-                  >
-                    Edit Contact Us
-                  </button>
-                )}
-              </div>
-            )}
-          </div>
-        )}
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Save/Edit Button */}
         <button 
-          className={`save-btn ${editMode ? 'save-mode' : ''}`}
+          style={{
+            ...styles.saveBtn,
+            ...(editMode ? styles.saveBtnSaveMode : {})
+          }}
           onClick={editMode ? handleSave : () => setEditMode(true)}
         >
           {editMode ? 'Save Settings' : 'Edit Settings'}
@@ -957,19 +996,19 @@ const SystemSettings = () => {
 
         {/* Save Confirmation Modal */}
         {confirmationModalVisible && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">Confirm Changes</h3>
-              <p className="modal-text">Are you sure you want to save these settings changes?</p>
-              <div className="modal-buttons">
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>Confirm Changes</h3>
+              <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
+              <div style={styles.modalButtons}>
                 <button 
-                  className="modal-btn cancel"
+                  style={styles.modalBtnCancel}
                   onClick={() => setConfirmationModalVisible(false)}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="modal-btn confirm"
+                  style={styles.modalBtnConfirm}
                   onClick={confirmSave}
                 >
                   Save Changes
@@ -981,21 +1020,21 @@ const SystemSettings = () => {
 
         {/* Add Interest Term Modal */}
         {addModalVisible && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">Add Interest Rate</h3>
-              <p className="modal-text">
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>Add Interest Rate</h3>
+              <p style={styles.modalText}>
                 Add {newTerm} months at {newRate}% interest?
               </p>
-              <div className="modal-buttons">
+              <div style={styles.modalButtons}>
                 <button 
-                  className="modal-btn cancel"
+                  style={styles.modalBtnCancel}
                   onClick={() => setAddModalVisible(false)}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="modal-btn confirm"
+                  style={styles.modalBtnConfirm}
                   onClick={confirmAddTerm}
                 >
                   Add Rate
@@ -1007,21 +1046,21 @@ const SystemSettings = () => {
 
         {/* Delete Interest Term Modal */}
         {deleteModalVisible && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">Delete Interest Rate</h3>
-              <p className="modal-text">
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>Delete Interest Rate</h3>
+              <p style={styles.modalText}>
                 Are you sure you want to delete the {termToDelete} month interest rate?
               </p>
-              <div className="modal-buttons">
+              <div style={styles.modalButtons}>
                 <button 
-                  className="modal-btn cancel"
+                  style={styles.modalBtnCancel}
                   onClick={() => setDeleteModalVisible(false)}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="modal-btn confirm"
+                  style={styles.modalBtnConfirm}
                   onClick={confirmDeleteTerm}
                 >
                   Delete Rate
@@ -1033,12 +1072,12 @@ const SystemSettings = () => {
 
         {/* Add Savings Modal */}
         {savingsModalVisible && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">Add to Savings</h3>
-              <p className="modal-text">Enter amount to add to savings:</p>
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>Add to Savings</h3>
+              <p style={styles.modalText}>Enter amount to add to savings:</p>
               <input
-                className="modal-input"
+                style={styles.modalInput}
                 value={actionAmount}
                 onChange={(e) => setActionAmount(e.target.value)}
                 type="number"
@@ -1046,15 +1085,15 @@ const SystemSettings = () => {
                 min="0"
                 step="0.01"
               />
-              <div className="modal-buttons">
+              <div style={styles.modalButtons}>
                 <button 
-                  className="modal-btn cancel"
+                  style={styles.modalBtnCancel}
                   onClick={() => setSavingsModalVisible(false)}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="modal-btn confirm"
+                  style={styles.modalBtnConfirm}
                   onClick={confirmAddSavings}
                 >
                   Add Savings
@@ -1066,18 +1105,18 @@ const SystemSettings = () => {
 
         {/* Funds Action Modal */}
         {fundsActionModal && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>
                 {fundsActionModal === 'add' ? 'Add to Funds' : 'Withdraw to Savings'}
               </h3>
-              <p className="modal-text">
+              <p style={styles.modalText}>
                 {fundsActionModal === 'add' ? 
                   `Available Savings: ₱${settings.Savings}` : 
                   `Available Funds: ₱${settings.Funds}`}
               </p>
               <input
-                className="modal-input"
+                style={styles.modalInput}
                 value={actionAmount}
                 onChange={(e) => setActionAmount(e.target.value)}
                 type="number"
@@ -1085,15 +1124,15 @@ const SystemSettings = () => {
                 min="0"
                 step="0.01"
               />
-              <div className="modal-buttons">
+              <div style={styles.modalButtons}>
                 <button 
-                  className="modal-btn cancel"
+                  style={styles.modalBtnCancel}
                   onClick={() => setFundsActionModal(null)}
                 >
                   Cancel
                 </button>
                 <button 
-                  className="modal-btn confirm"
+                  style={styles.modalBtnConfirm}
                   onClick={confirmFundsAction}
                 >
                   {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
@@ -1105,13 +1144,16 @@ const SystemSettings = () => {
 
         {/* Message Modal */}
         {messageModal.visible && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h3 className="modal-title">{messageModal.title}</h3>
-              <p className="modal-text">{messageModal.message}</p>
-              <div className="modal-buttons">
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>{messageModal.title}</h3>
+              <p style={styles.modalText}>{messageModal.message}</p>
+              <div style={styles.modalButtons}>
                 <button 
-                  className={`modal-btn ${messageModal.isError ? 'error' : 'success'}`}
+                  style={{
+                    ...styles.modalBtn,
+                    ...(messageModal.isError ? styles.modalBtnError : styles.modalBtnSuccess)
+                  }}
                   onClick={() => setMessageModal({ ...messageModal, visible: false })}
                 >
                   OK
@@ -1121,669 +1163,17 @@ const SystemSettings = () => {
           </div>
         )}
       </div>
-
-      {/* CSS Styles */}
-      <style jsx>{`
-        .system-settings-container {
-          display: flex;
-          min-height: 100vh;
-          background-color: #eef1f5;
-        }
-
-        .sidebar {
-          width: 150px;
-          background-color: #dfe4ea;
-          padding-top: 20px;
-        }
-
-        .sidebar-button {
-          display: block;
-          width: 100%;
-          padding: 12px 10px;
-          border: none;
-          background: none;
-          text-align: left;
-          cursor: pointer;
-        }
-
-        .sidebar-button.active {
-          background-color: #2ecc71;
-          border-top-right-radius: 10px;
-          border-bottom-right-radius: 10px;
-        }
-
-        .sidebar-button-text {
-          font-size: 13px;
-          color: #333;
-        }
-
-        .sidebar-button.active .sidebar-button-text {
-          color: #fff;
-          font-weight: bold;
-        }
-
-        .content-area {
-          flex-grow: 1;
-          padding: 20px;
-          overflow-y: auto;
-        }
-
-        .section {
-          background-color: #fff;
-          border-radius: 8px;
-          padding: 15px;
-          margin-bottom: 20px;
-        }
-
-        .section-title {
-          font-size: 16px;
-          font-weight: bold;
-          margin-bottom: 15px;
-        }
-
-        .input-row {
-          display: flex;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        .label {
-          font-size: 13px;
-          margin-left: 10px;
-        }
-
-        .input {
-          flex: 1;
-          border: 1px solid #ccc;
-          border-radius: 5px;
-          padding: 8px 10px;
-          font-size: 13px;
-          margin-left: 10px;
-        }
-
-        .static-input {
-          flex: 1;
-          border: 1px solid #e2e8f0;
-          border-radius: 5px;
-          padding: 8px 10px;
-          font-size: 13px;
-          background-color: #f8fafc;
-          color: #64748b;
-        }
-
-        .static-text {
-          font-size: 13px;
-          color: #334155;
-          padding: 8px 0;
-        }
-
-        .account-row {
-          display: flex;
-          gap: 15px;
-          margin-bottom: 15px;
-        }
-
-        .account-card {
-          flex: 1;
-          padding: 15px;
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          background-color: #f8fafc;
-        }
-
-        .account-title {
-          font-size: 14px;
-          font-weight: 600;
-          margin-bottom: 10px;
-          color: #1e293b;
-        }
-
-        .savings-input-container {
-          flex: 1;
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .funds-actions {
-          display: flex;
-          gap: 10px;
-          margin-top: 15px;
-        }
-
-        .action-btn {
-          padding: 10px 16px;
-          border-radius: 8px;
-          border: none;
-          cursor: pointer;
-          font-weight: 500;
-          font-size: 14px;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          transition: all 0.2s;
-        }
-
-        .action-btn:hover {
-          opacity: 0.9;
-          transform: translateY(-1px);
-        }
-
-        .action-btn:active {
-          transform: translateY(0);
-        }
-
-        .add-funds-btn {
-          background-color: #10b981;
-          color: white;
-        }
-
-        .withdraw-funds-btn {
-          background-color: #f97316;
-          color: white;
-        }
-
-        .orientation-code-container {
-          margin-top: 20px;
-          padding: 15px;
-          background-color: #f0f9ff;
-          border-radius: 8px;
-          border: 1px solid #bae6fd;
-        }
-
-        .orientation-code-title {
-          font-size: 14px;
-          font-weight: 600;
-          color: #0369a1;
-          margin-bottom: 10px;
-        }
-
-        .orientation-code-row {
-          display: flex;
-          align-items: center;
-          gap: 10px;
-        }
-
-        .orientation-code-value {
-          font-size: 14px;
-          font-weight: 600;
-          color: #075985;
-          background-color: #e0f2fe;
-          padding: 8px 12px;
-          border-radius: 6px;
-        }
-
-        .copy-btn {
-          background-color: #dbeafe;
-          color: #2563eb;
-          border: none;
-          border-radius: 6px;
-          padding: 6px;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          transition: all 0.2s;
-        }
-
-        .copy-btn:hover {
-          background-color: #bfdbfe;
-        }
-
-        .copied-text {
-          font-size: 12px;
-          color: #10b981;
-          margin-left: 10px;
-          font-weight: 500;
-        }
-
-        .orientation-code-description {
-          font-size: 12px;
-          color: #64748b;
-          margin-top: 8px;
-        }
-
-        .generate-btn {
-          background-color: #2563eb;
-          color: white;
-          padding: 10px 16px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          transition: all 0.2s;
-          margin-top: 10px;
-        }
-
-        .generate-btn:hover {
-          background-color: #1d4ed8;
-        }
-
-        .rate-row {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 12px;
-          padding: 12px;
-          background-color: #f8fafc;
-          border-radius: 8px;
-          transition: background-color 0.2s;
-        }
-
-        .rate-row:hover {
-          background-color: #f1f5f9;
-        }
-
-        .term-text {
-          font-size: 13px;
-          color: #334155;
-          font-weight: 500;
-        }
-
-        .edit-rate-row {
-          display: flex;
-          align-items: center;
-          gap: 12px;
-        }
-
-        .mini-input {
-          width: 80px;
-          border: 1px solid #cbd5e1;
-          border-radius: 5px;
-          padding: 8px;
-          font-size: 13px;
-          text-align: center;
-        }
-
-        .delete-term-btn {
-          background: none;
-          border: none;
-          color: #ef4444;
-          cursor: pointer;
-          font-size: 13px;
-          padding: 6px;
-          border-radius: 4px;
-          transition: background-color 0.2s;
-        }
-
-        .delete-term-btn:hover {
-          background-color: #fee2e2;
-        }
-
-        .add-term-btn {
-          background-color: #10b981;
-          color: white;
-          padding: 10px 16px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          transition: background-color 0.2s;
-        }
-
-        .add-term-btn:hover {
-          background-color: #059669;
-        }
-
-        .switch {
-          position: relative;
-          display: inline-block;
-          width: 50px;
-          height: 24px;
-        }
-
-        .switch-input {
-          opacity: 0;
-          width: 0;
-          height: 0;
-        }
-
-        .slider {
-          position: absolute;
-          cursor: pointer;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: #ccc;
-          transition: .4s;
-          border-radius: 24px;
-        }
-
-        .slider.checked {
-          background-color: #10b981;
-        }
-
-        .slider-before {
-          position: absolute;
-          content: "";
-          height: 16px;
-          width: 16px;
-          left: 4px;
-          bottom: 4px;
-          background-color: white;
-          transition: .4s;
-          border-radius: 50%;
-        }
-
-        .slider.checked .slider-before {
-          transform: translateX(26px);
-        }
-
-        .date-button {
-          color: #2563eb;
-          margin-bottom: 10px;
-          background: none;
-          border: none;
-          cursor: pointer;
-          font-size: 13px;
-          text-align: left;
-          padding: 8px 0;
-          font-weight: 500;
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          transition: color 0.2s;
-        }
-
-        .date-button:hover {
-          color: #1d4ed8;
-        }
-
-        .calendar-container {
-          margin-top: 10px;
-          border: 1px solid #e2e8f0;
-          border-radius: 8px;
-          overflow: hidden;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .edit-section {
-          display: flex;
-          flex-direction: column;
-          gap: 20px;
-        }
-
-        .input-container {
-          flex: 1;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-        }
-
-        .textarea {
-          border: 1px solid #cbd5e1;
-          border-radius: 8px;
-          padding: 12px;
-          font-size: 13px;
-          background-color: #fff;
-          box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.05);
-          transition: border-color 0.2s;
-          min-height: 300px;
-          resize: vertical;
-          width: 100%;
-        }
-
-        .textarea:focus {
-          border-color: #2563eb;
-          outline: none;
-        }
-
-        .text-content {
-          white-space: pre-line;
-          margin-bottom: 20px;
-        }
-
-        .text-content h3 {
-          font-size: 14px;
-          font-weight: 600;
-          margin-bottom: 10px;
-          color: #1e293b;
-        }
-
-        .text-content p {
-          font-size: 13px;
-          color: #334155;
-        }
-
-        .edit-buttons {
-          display: flex;
-          gap: 10px;
-          margin-top: 15px;
-        }
-
-        .save-btn {
-          background-color: #2563eb;
-          color: white;
-          padding: 12px;
-          border: none;
-          border-radius: 8px;
-          cursor: pointer;
-          font-size: 14px;
-          font-weight: 600;
-          width: 100%;
-          margin-top: 20px;
-          transition: all 0.2s;
-        }
-
-        .save-btn:hover {
-          background-color: #1d4ed8;
-          transform: translateY(-1px);
-        }
-
-        .save-btn:active {
-          transform: translateY(0);
-        }
-
-        .save-btn.primary {
-          background-color: #3b82f6;
-        }
-
-        .save-btn.success {
-          background-color: #10b981;
-        }
-
-        .save-btn.error {
-          background-color: #ef4444;
-        }
-
-        .save-mode {
-          background-color: #1d4ed8;
-          box-shadow: 0 4px 6px rgba(29, 78, 216, 0.3);
-        }
-
-        .modal-overlay {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: rgba(0,0,0,0.5);
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          z-index: 1000;
-        }
-
-        .modal-content {
-          background-color: #fff;
-          padding: 24px;
-          border-radius: 12px;
-          width: 90%;
-          max-width: 400px;
-          box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-          animation: fadeIn 0.3s ease;
-        }
-
-        @keyframes fadeIn {
-          from { opacity: 0; transform: translateY(-20px); }
-          to { opacity: 1; transform: translateY(0); }
-        }
-
-        .modal-title {
-          font-size: 16px;
-          font-weight: 600;
-          margin-bottom: 15px;
-          color: #1e293b;
-          text-align: center;
-        }
-
-        .modal-text {
-          font-size: 13px;
-          margin-bottom: 20px;
-          color: #64748b;
-          text-align: center;
-          line-height: 1.5;
-        }
-
-        .modal-input {
-          width: 100%;
-          padding: 12px;
-          border: 1px solid #cbd5e1;
-          border-radius: 8px;
-          font-size: 13px;
-          margin-bottom: 20px;
-          box-sizing: border-box;
-        }
-
-        .modal-input:focus {
-          border-color: #2563eb;
-          outline: none;
-        }
-
-        .modal-buttons {
-          display: flex;
-          justify-content: center;
-          gap: 12px;
-        }
-
-        .modal-btn {
-          padding: 12px 24px;
-          border-radius: 8px;
-          border: none;
-          cursor: pointer;
-          font-weight: 600;
-          font-size: 13px;
-          flex: 1;
-          transition: all 0.2s;
-        }
-
-        .modal-btn:hover {
-          opacity: 0.9;
-          transform: translateY(-1px);
-        }
-
-        .modal-btn:active {
-          transform: translateY(0);
-        }
-
-        .modal-btn.cancel {
-          background-color: #f1f5f9;
-          color: #64748b;
-        }
-
-        .modal-btn.confirm {
-          background-color: #2563eb;
-          color: white;
-        }
-
-        .modal-btn.success {
-          background-color: #10b981;
-          color: white;
-        }
-
-        .modal-btn.error {
-          background-color: #ef4444;
-          color: white;
-        }
-
-        .loading-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-        }
-
-        .spinner {
-          border: 4px solid rgba(0, 0, 0, 0.1);
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border-left-color: #001F3F;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 768px) {
-          .system-settings-container {
-            flex-direction: column;
-          }
-
-          .sidebar {
-            width: 100%;
-            display: flex;
-            overflow-x: auto;
-            padding-top: 0;
-          }
-
-          .sidebar-button {
-            text-align: center;
-            padding: 10px;
-            white-space: nowrap;
-          }
-
-          .sidebar-button.active {
-            border-radius: 0;
-          }
-
-          .content-area {
-            padding: 15px;
-          }
-
-          .account-row {
-            flex-direction: column;
-          }
-
-          .input-row {
-            flex-wrap: wrap;
-          }
-
-          .input, .static-input {
-            margin-left: 0;
-            margin-top: 5px;
-            width: 100%;
-          }
-
-          .funds-actions {
-            flex-direction: column;
-          }
-
-          .modal-content {
-            width: 95%;
-            padding: 15px;
-          }
-        }
-      `}</style>
     </div>
   );
 };
 
 const InputRow = ({ label, value, onChange, editable, suffix }) => (
-  <div className="input-row">
-    <label className="label">{label}</label>
+  <div style={styles.inputRow}>
+    <label style={styles.label}>{label}</label>
     {editable ? (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <input 
-          className="input" 
+          style={styles.input} 
           value={value} 
           onChange={(e) => onChange(e.target.value)} 
         />
@@ -1791,11 +1181,533 @@ const InputRow = ({ label, value, onChange, editable, suffix }) => (
       </div>
     ) : (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span className="static-text">{value}</span>
+        <span style={styles.staticText}>{value}</span>
         {suffix && <span>{suffix}</span>}
       </div>
     )}
   </div>
 );
+
+const styles = {
+  container: {
+    display: 'flex',
+    minHeight: '100vh',
+    backgroundColor: '#f5f7fa',
+  },
+  sidebar: {
+    width: '200px',
+    backgroundColor: '#2D5783',
+    paddingTop: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    position: 'fixed',
+    height: '100vh',
+    overflowY: 'auto',
+  },
+  sidebarButton: {
+    display: 'block',
+    width: '100%',
+    padding: '12px 16px',
+    border: 'none',
+    background: 'none',
+    textAlign: 'left',
+    cursor: 'pointer',
+    transition: 'all 0.2s',
+  },
+  sidebarButtonActive: {
+    backgroundColor: '#3a6ea5',
+    borderLeft: '4px solid #4CAF50',
+  },
+  sidebarButtonText: {
+    fontSize: '14px',
+    color: '#fff',
+    fontWeight: '500',
+  },
+  contentArea: {
+    flexGrow: 1,
+    padding: '20px',
+    marginLeft: '200px',
+    overflowY: 'auto',
+    minHeight: '100vh',
+  },
+  sectionContainer: {
+    maxWidth: '1000px',
+    margin: '0 auto',
+  },
+  section: {
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    padding: '20px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
+  },
+  sectionTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '20px',
+    color: '#2D5783',
+    borderBottom: '1px solid #eee',
+    paddingBottom: '10px',
+  },
+  inputRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '15px',
+  },
+  label: {
+    fontSize: '14px',
+    color: '#555',
+    width: '200px',
+    fontWeight: '500',
+  },
+  input: {
+    flex: 1,
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: '14px',
+    transition: 'border-color 0.2s',
+  },
+  inputFocus: {
+    borderColor: '#2D5783',
+    outline: 'none',
+  },
+  staticInput: {
+    flex: 1,
+    border: '1px solid #eee',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: '14px',
+    backgroundColor: '#f9f9f9',
+    color: '#555',
+  },
+  staticText: {
+    fontSize: '14px',
+    color: '#333',
+  },
+  accountRow: {
+    display: 'flex',
+    gap: '20px',
+    marginBottom: '20px',
+  },
+  accountCard: {
+    flex: 1,
+    padding: '20px',
+    border: '1px solid #eee',
+    borderRadius: '8px',
+    backgroundColor: '#f9f9f9',
+  },
+  accountTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#2D5783',
+  },
+  savingsInputContainer: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  fundsActions: {
+    display: 'flex',
+    gap: '15px',
+    marginTop: '20px',
+  },
+  actionBtn: {
+    padding: '12px 16px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s',
+  },
+  actionBtnAddFunds: {
+    backgroundColor: '#4CAF50',
+    color: 'white',
+  },
+  actionBtnWithdrawFunds: {
+    backgroundColor: '#f44336',
+    color: 'white',
+  },
+  buttonIcon: {
+    fontSize: '14px',
+  },
+  orientationCodeContainer: {
+    marginTop: '20px',
+    padding: '20px',
+    backgroundColor: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #bae6fd',
+  },
+  orientationCodeTitle: {
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#0369a1',
+    marginBottom: '10px',
+  },
+  orientationCodeRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px',
+  },
+  orientationCodeValue: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#075985',
+    backgroundColor: '#e0f2fe',
+    padding: '10px 15px',
+    borderRadius: '6px',
+  },
+  copyBtn: {
+    backgroundColor: '#dbeafe',
+    color: '#2563eb',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.2s',
+  },
+  copiedText: {
+    fontSize: '13px',
+    color: '#10b981',
+    marginLeft: '10px',
+    fontWeight: '500',
+  },
+  orientationCodeDescription: {
+    fontSize: '13px',
+    color: '#64748b',
+    marginTop: '10px',
+    lineHeight: '1.5',
+  },
+  generateBtn: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '12px 16px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s',
+    marginTop: '15px',
+  },
+  rateRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+    padding: '12px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+    transition: 'background-color 0.2s',
+  },
+  termText: {
+    fontSize: '14px',
+    color: '#334155',
+    fontWeight: '500',
+  },
+  editRateRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+  },
+  miniInput: {
+    width: '80px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    padding: '8px 10px',
+    fontSize: '14px',
+    textAlign: 'center',
+  },
+  deleteTermBtn: {
+    background: 'none',
+    border: 'none',
+    color: '#ef4444',
+    cursor: 'pointer',
+    fontSize: '14px',
+    padding: '6px',
+    borderRadius: '4px',
+    transition: 'background-color 0.2s',
+  },
+  addTermBtn: {
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    padding: '12px 16px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'background-color 0.2s',
+  },
+  switch: {
+    position: 'relative',
+    display: 'inline-block',
+    width: '50px',
+    height: '24px',
+  },
+  switchInput: {
+    opacity: '0',
+    width: '0',
+    height: '0',
+  },
+  slider: {
+    position: 'absolute',
+    cursor: 'pointer',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    backgroundColor: '#ccc',
+    transition: '.4s',
+    borderRadius: '24px',
+  },
+  sliderChecked: {
+    backgroundColor: '#4CAF50',
+  },
+  sliderBefore: {
+    position: 'absolute',
+    content: '""',
+    height: '16px',
+    width: '16px',
+    left: '4px',
+    bottom: '4px',
+    backgroundColor: 'white',
+    transition: '.4s',
+    borderRadius: '50%',
+  },
+  dateButton: {
+    color: '#2D5783',
+    marginBottom: '10px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    textAlign: 'left',
+    padding: '8px 0',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'color 0.2s',
+  },
+  calendarContainer: {
+    marginTop: '10px',
+    border: '1px solid #eee',
+    borderRadius: '8px',
+    overflow: 'hidden',
+    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+  },
+  editSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  inputContainer: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  textarea: {
+    border: '1px solid #ddd',
+    borderRadius: '8px',
+    padding: '12px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    minHeight: '200px',
+    resize: 'vertical',
+    width: '100%',
+    lineHeight: '1.5',
+  },
+  textContent: {
+    whiteSpace: 'pre-line',
+    marginBottom: '20px',
+  },
+  contentTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#2D5783',
+  },
+  contentText: {
+    fontSize: '14px',
+    lineHeight: '1.6',
+    color: '#333',
+    whiteSpace: 'pre-line',
+  },
+  editButtons: {
+    display: 'flex',
+    gap: '15px',
+    marginTop: '20px',
+  },
+  saveBtn: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '12px 24px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: '600',
+    width: '100%',
+    marginTop: '20px',
+    transition: 'all 0.2s',
+    maxWidth: '1000px',
+    marginLeft: 'auto',
+    marginRight: 'auto',
+    display: 'block',
+  },
+  saveBtnPrimary: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '12px 24px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'all 0.2s',
+  },
+  saveBtnSuccess: {
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    padding: '12px 24px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s',
+    flex: 1,
+  },
+  saveBtnError: {
+    backgroundColor: '#f44336',
+    color: 'white',
+    padding: '12px 24px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    transition: 'all 0.2s',
+    flex: 1,
+  },
+  saveBtnSaveMode: {
+    backgroundColor: '#1a3d66',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: '1000',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: '24px',
+    borderRadius: '12px',
+    width: '90%',
+    maxWidth: '400px',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#2D5783',
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '20px',
+    color: '#555',
+    textAlign: 'center',
+    lineHeight: '1.5',
+  },
+  modalInput: {
+    width: '100%',
+    padding: '12px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    fontSize: '14px',
+    marginBottom: '20px',
+    boxSizing: 'border-box',
+  },
+  modalButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '15px',
+  },
+  modalBtn: {
+    padding: '12px 24px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+    fontSize: '14px',
+    flex: '1',
+    transition: 'all 0.2s',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#f1f5f9',
+    color: '#555',
+  },
+  modalBtnConfirm: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+  },
+  modalBtnSuccess: {
+    backgroundColor: '#4CAF50',
+    color: 'white',
+  },
+  modalBtnError: {
+    backgroundColor: '#f44336',
+    color: 'white',
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderLeftColor: '#2D5783',
+    animation: 'spin 1s linear infinite',
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' },
+  },
+};
 
 export default SystemSettings;

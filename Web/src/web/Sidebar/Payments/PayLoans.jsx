@@ -4,20 +4,53 @@ import {
   FaDownload, 
   FaChevronLeft, 
   FaChevronRight,
-  FaCheckCircle
+  FaPlus,
+  FaCheckCircle,
+  FaTimes,
+  FaExclamationCircle
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
+import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
+import { database, storage } from '../../../../../Database/firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import PendingPayments from './PaymentApplications';
 import CompletedPayments from './ApprovedPayments';
 import FailedPayments from './RejectedPayments';
-import { database } from '../../../../../Database/firebaseConfig';
+import { ApprovePayments } from '../../../../../Server/api';
+
+// Constants
+const paymentOptions = [
+  { key: 'Bank', label: 'Bank' },
+  { key: 'GCash', label: 'GCash' }
+];
+
+const pageSize = 10;
+
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(amount);
+};
+
+const formatDate = (date) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+const formatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
 
 const PayLoans = () => {
   const [activeSection, setActiveSection] = useState('pendingPayments');
-  const [pendingPayments, setPendingPayments] = useState([]);
-  const [completedPayments, setCompletedPayments] = useState([]);
-  const [failedPayments, setFailedPayments] = useState([]);
+  const [pending, setPending] = useState([]);
+  const [completed, setCompleted] = useState([]);
+  const [failed, setFailed] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -27,7 +60,25 @@ const PayLoans = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const pageSize = 10;
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [formData, setFormData] = useState({
+    memberId: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    paymentOption: '',
+    accountName: '',
+    accountNumber: '',
+    amount: '',
+  });
+  const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [paymentAccounts, setPaymentAccounts] = useState({
+    Bank: { accountName: '', accountNumber: '' },
+    GCash: { accountName: '', accountNumber: '' }
+  });
+  const [isProcessing, setIsProcessing] = useState(false);
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -170,23 +221,107 @@ const PayLoans = () => {
         font-size: 16px;
         color: #666;
       }
-      .loading-container {
+      .plus-button {
+        position: fixed;
+        right: 30px;
+        bottom: 30px;
+        background-color: #2D5783;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        border: none;
+        width: 60px;
+        height: 60px;
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
+        cursor: pointer;
+        color: white;
+        z-index: 100;
       }
-      .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        border-left-color: #001F3F;
-        animation: spin 1s linear infinite;
+      .plus-icon {
+        font-size: 24px;
       }
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+      .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.4);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+      .modal-container {
+        background-color: #f9f9f9;
+        padding: 24px;
+        border-radius: 10px;
+        width: 40%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+      }
+      .modal-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 16px;
+        color: #2D5783;
+        text-align: center;
+      }
+      .form-group {
+        margin-bottom: 12px;
+      }
+      .form-label {
+        font-weight: 600;
+        margin-bottom: 4px;
+        color: #333;
+        display: block;
+      }
+      .required {
+        color: red;
+      }
+      .form-input {
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        padding: 10px;
+        background-color: #fff;
+        width: 100%;
+        box-sizing: border-box;
+      }
+      .form-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-sizing: border-box;
+        background-color: white;
+      }
+      .modal-button-container {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 24px;
+      }
+      .modal-submit-button {
+        background-color: #2D5783;
+        padding: 12px;
+        border-radius: 8px;
+        width: 48%;
+        text-align: center;
+        border: none;
+        cursor: pointer;
+        color: white;
+        font-weight: bold;
+      }
+      .modal-cancel-button {
+        background-color: #ccc;
+        padding: 12px;
+        border-radius: 8px;
+        width: 48%;
+        text-align: center;
+        border: none;
+        cursor: pointer;
+        font-weight: bold;
       }
       .centered-modal {
         position: fixed;
@@ -199,6 +334,12 @@ const PayLoans = () => {
         justify-content: center;
         align-items: center;
         z-index: 1000;
+      }
+      .confirm-modal-card {
+        width: 300px;
+        background-color: #fff;
+        border-radius: 10px;
+        padding: 20px;
       }
       .small-modal-card {
         width: 300px;
@@ -221,19 +362,10 @@ const PayLoans = () => {
         margin-bottom: 20px;
         text-align: center;
       }
-      .cancel-btn {
-        background-color: #f44336;
-        width: 100px;
-        height: 40px;
+      .bottom-buttons {
         display: flex;
         justify-content: center;
-        align-items: center;
-        border-radius: 5px;
-        margin: 0 10px;
-        border: none;
-        color: white;
-        font-weight: bold;
-        cursor: pointer;
+        margin-top: 10px;
       }
       .confirm-btn {
         background-color: #4CAF50;
@@ -249,6 +381,113 @@ const PayLoans = () => {
         font-weight: bold;
         cursor: pointer;
       }
+      .cancel-btn {
+        background-color: #f44336;
+        width: 100px;
+        height: 40px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        border-radius: 5px;
+        margin: 0 10px;
+        border: none;
+        color: white;
+        font-weight: bold;
+        cursor: pointer;
+      }
+      .close-button {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 10;
+        padding: 5px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        color: #666;
+      }
+      .loading-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+      }
+      .spinner {
+        border: 4px solid rgba(0, 0, 0, 0.1);
+        width: 36px;
+        height: 36px;
+        border-radius: 50%;
+        border-left-color: #2D5783;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+      .file-input-label {
+        display: block;
+        padding: 10px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: 5px;
+      }
+      .file-input {
+        display: none;
+      }
+      .file-name {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+        min-width: 800px;
+      }
+      .table-header {
+        background-color: #2D5783;
+        color: #fff;
+        height: 50px;
+        text-align: center;
+        font-weight: bold;
+        font-size: 16px;
+      }
+      .table-header-cell {
+        white-space: nowrap;
+      }
+      .table-row {
+        height: 50px;
+      }
+      .table-row:nth-child(even) {
+        background-color: #f5f5f5;
+      }
+      .table-row:nth-child(odd) {
+        background-color: #ddd;
+      }
+      .table-cell {
+        text-align: center;
+        font-size: 14px;
+        border-bottom: 1px solid #ddd;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .status-approved {
+        color: green;
+      }
+      .status-rejected {
+        color: red;
+      }
+      .view-text {
+        color: #2D5783;
+        font-size: 14px;
+        text-decoration: underline;
+        cursor: pointer;
+        font-weight: 500;
+      }
     `;
     document.head.appendChild(styleElement);
 
@@ -257,53 +496,58 @@ const PayLoans = () => {
     };
   }, []);
 
-  useEffect(() => {
-    const fetchAllData = async () => {
-      setLoading(true);
-      try {
-        const [pendingSnap, completedSnap, failedSnap] = await Promise.all([
-          database.ref('Payments/PaymentApplications').once('value'),
-          database.ref('Payments/ApprovedPayments').once('value'),
-          database.ref('Payments/RejectedPayments').once('value'),
-        ]);
+  const fetchAllData = async () => {
+    setLoading(true);
+    try {
+      const [pSnap, cSnap, fSnap, settingsSnap] = await Promise.all([
+        database.ref('Payments/PaymentApplications').once('value'),
+        database.ref('Payments/ApprovedPayments').once('value'),
+        database.ref('Payments/RejectedPayments').once('value'),
+        database.ref('Settings/Accounts').once('value')
+      ]);
 
-        const flatten = (val) => {
-          if (!val) return [];
-          const arr = [];
-          Object.entries(val).forEach(([uid, userData]) => {
-            Object.entries(userData || {}).forEach(([txId, record]) => {
-              arr.push({ 
-                id: uid, 
-                transactionId: txId, 
-                ...record,
-                firstName: record.firstName || '',
-                lastName: record.lastName || '',
-                amountToBePaid: record.amountToBePaid || 0,
-                paymentOption: record.paymentOption || 'Unknown',
-                dateApplied: record.dateApplied || new Date().toLocaleDateString()
-              });
-            });
+      const toArray = snap => {
+        const val = snap.val() || {};
+        const all = [];
+        Object.entries(val).forEach(([uid, data]) => {
+          Object.entries(data).forEach(([txId, record]) => {
+            all.push({ id: uid, transactionId: txId, ...record });
           });
-          return arr;
-        };
+        });
+        return all;
+      };
 
-        const pending = flatten(pendingSnap.val());
-        const completed = flatten(completedSnap.val());
-        const failed = flatten(failedSnap.val());
-
-        setPendingPayments(pending);
-        setCompletedPayments(completed);
-        setFailedPayments(failed);
-        setFilteredData(pending);
-      } catch (error) {
-        console.error('Fetch error:', error);
-        setErrorMessage('Failed to fetch payment data: ' + error.message);
-        setErrorModalVisible(true);
-      } finally {
-        setLoading(false);
+      setPending(toArray(pSnap));
+      setCompleted(toArray(cSnap));
+      setFailed(toArray(fSnap));
+      
+      if (settingsSnap.exists()) {
+        setPaymentAccounts(settingsSnap.val());
+      } else {
+        // Fallback to old path if Accounts doesn't exist
+        const oldSettingsSnap = await database.ref('Settings/PaymentAccounts').once('value');
+        if (oldSettingsSnap.exists()) {
+          setPaymentAccounts(oldSettingsSnap.val());
+        }
       }
-    };
+      
+      // Update filtered data based on active section
+      const newFilteredData = 
+        activeSection === 'pendingPayments' ? toArray(pSnap) :
+        activeSection === 'completedPayments' ? toArray(cSnap) :
+        toArray(fSnap);
+      
+      setFilteredData(newFilteredData);
+    } catch (error) {
+      console.error('Error fetching payments:', error);
+      setErrorMessage('Failed to fetch payment data');
+      setErrorModalVisible(true);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchAllData();
   }, []);
 
@@ -311,86 +555,57 @@ const PayLoans = () => {
     setSearchQuery(text);
     setCurrentPage(0);
 
-    const base =
+    const currentData =
       activeSection === 'pendingPayments'
-        ? pendingPayments
+        ? pending
         : activeSection === 'completedPayments'
-        ? completedPayments
-        : failedPayments;
+        ? completed
+        : failed;
 
-    const filtered = base.filter(item => {
-      const fullName = `${item.firstName || ''} ${item.lastName || ''}`.toLowerCase();
-      const searchLower = text.toLowerCase();
+    const filtered = currentData.filter(item => {
+      const memberId = item.id?.toString() || '';
+      const transactionId = item.transactionId?.toString() || '';
+      const firstName = item.firstName?.toLowerCase() || '';
+      const lastName = item.lastName?.toLowerCase() || '';
+      const query = text.toLowerCase();
+      
       return (
-        fullName.includes(searchLower) ||
-        (item.id && item.id.toLowerCase().includes(searchLower)) ||
-        (item.transactionId && item.transactionId.toLowerCase().includes(searchLower)
-      ));
+        memberId.includes(query) ||
+        transactionId.includes(query) ||
+        firstName.includes(query) ||
+        lastName.includes(query)
+      );
     });
 
+    setNoMatch(filtered.length === 0);
     setFilteredData(filtered);
-    setNoMatch(filtered.length === 0 && text !== '');
   };
 
   const handleDownload = async () => {
     try {
-      let dataToExport;
-      let fileName;
-      
-      if (activeSection === 'pendingPayments') {
-        dataToExport = pendingPayments;
-        fileName = 'PendingPayments';
-      } else if (activeSection === 'completedPayments') {
-        dataToExport = completedPayments;
-        fileName = 'CompletedPayments';
-      } else {
-        dataToExport = failedPayments;
-        fileName = 'FailedPayments';
-      }
+      let dataToDownload = filteredData;
+      let fileName =
+        activeSection === 'pendingPayments'
+          ? 'PendingPayments'
+          : activeSection === 'completedPayments'
+          ? 'ApprovedPayments'
+          : 'RejectedPayments';
 
-      if (!dataToExport.length) {
+      if (dataToDownload.length === 0) {
         setErrorMessage('No data to export');
         setErrorModalVisible(true);
         return;
       }
 
       const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Payments');
+      const worksheet = workbook.addWorksheet(fileName);
 
-      // Add headers
-      const headers = [
-        'Member ID',
-        'Transaction ID',
-        'Name',
-        'Amount',
-        'Payment Method',
-        'Date Applied',
-        'Status',
-        ...(activeSection === 'completedPayments' ? ['Date Approved'] : []),
-        ...(activeSection === 'failedPayments' ? ['Date Rejected', 'Rejection Reason'] : [])
-      ];
+      const headers = Object.keys(dataToDownload[0]);
       worksheet.addRow(headers);
 
-      // Add data rows
-      dataToExport.forEach(item => {
-        const row = [
-          item.id,
-          item.transactionId,
-          `${item.firstName} ${item.lastName}`,
-          item.amountToBePaid,
-          item.paymentOption,
-          item.dateApplied,
-          activeSection === 'pendingPayments' ? 'Pending' : 
-          activeSection === 'completedPayments' ? 'Approved' : 'Rejected',
-          ...(activeSection === 'completedPayments' ? [item.dateApproved] : []),
-          ...(activeSection === 'failedPayments' ? [item.dateRejected, item.rejectionReason] : [])
-        ];
+      dataToDownload.forEach(item => {
+        const row = headers.map(header => item[header]);
         worksheet.addRow(row);
-      });
-
-      // Format columns
-      worksheet.columns.forEach(column => {
-        column.width = 20;
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -400,7 +615,7 @@ const PayLoans = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${fileName}_${new Date().toISOString().split('T')[0]}.xlsx`;
+      link.download = `${fileName}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -408,9 +623,9 @@ const PayLoans = () => {
       
       setSuccessMessage('Data exported successfully!');
       setSuccessModalVisible(true);
-    } catch (err) {
-      console.error('Download error:', err);
-      setErrorMessage('Failed to export data: ' + err.message);
+    } catch (error) {
+      console.error('Error downloading data:', error);
+      setErrorMessage('Failed to export data');
       setErrorModalVisible(true);
     }
   };
@@ -419,77 +634,238 @@ const PayLoans = () => {
     setActiveSection(section);
     setSearchQuery('');
     setCurrentPage(0);
-
     const defaultData =
       section === 'pendingPayments'
-        ? pendingPayments
+        ? pending
         : section === 'completedPayments'
-        ? completedPayments
-        : failedPayments;
-
+        ? completed
+        : failed;
     setFilteredData(defaultData);
     setNoMatch(false);
   };
 
-  const refreshData = async () => {
-    setLoading(true);
-    try {
-      const [pendingSnap, completedSnap, failedSnap] = await Promise.all([
-        database.ref('Payments/PaymentApplications').once('value'),
-        database.ref('Payments/ApprovedPayments').once('value'),
-        database.ref('Payments/RejectedPayments').once('value'),
-      ]);
+  const openAddModal = () => {
+    setAddModalVisible(true);
+  };
 
-      const flatten = (val) => {
-        if (!val) return [];
-        const arr = [];
-        Object.entries(val).forEach(([uid, userData]) => {
-          Object.entries(userData || {}).forEach(([txId, record]) => {
-            arr.push({ 
-              id: uid, 
-              transactionId: txId, 
-              ...record,
-              firstName: record.firstName || '',
-              lastName: record.lastName || '',
-              amountToBePaid: record.amountToBePaid || 0,
-              paymentOption: record.paymentOption || 'Unknown',
-              dateApplied: record.dateApplied || new Date().toLocaleDateString()
-            });
-          });
-        });
-        return arr;
-      };
+  const closeAddModal = () => {
+    setAddModalVisible(false);
+    setFormData({
+      memberId: '',
+      firstName: '',
+      lastName: '',
+      email: '',
+      paymentOption: '',
+      accountName: '',
+      accountNumber: '',
+      amount: '',
+    });
+    setProofOfPaymentFile(null);
+  };
 
-      const pending = flatten(pendingSnap.val());
-      const completed = flatten(completedSnap.val());
-      const failed = flatten(failedSnap.val());
+  const handleInputChange = (name, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
 
-      setPendingPayments(pending);
-      setCompletedPayments(completed);
-      setFailedPayments(failed);
-      setFilteredData(
-        activeSection === 'pendingPayments' ? pending :
-        activeSection === 'completedPayments' ? completed : failed
-      );
-    } catch (error) {
-      console.error('Refresh error:', error);
-      setErrorMessage('Failed to refresh data: ' + error.message);
-      setErrorModalVisible(true);
-    } finally {
-      setLoading(false);
+    if (name === 'paymentOption' && value) {
+      const selectedAccount = paymentAccounts[value];
+      setFormData(prev => ({
+        ...prev,
+        accountName: selectedAccount.accountName || '',
+        accountNumber: selectedAccount.accountNumber || ''
+      }));
     }
   };
 
-  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
+  };
 
-  if (loading && pendingPayments.length === 0 && completedPayments.length === 0 && failedPayments.length === 0) {
+  const validateFields = () => {
+    if (!formData.memberId) {
+      setErrorMessage('Member ID is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.firstName) {
+      setErrorMessage('First name is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.lastName) {
+      setErrorMessage('Last name is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.email) {
+      setErrorMessage('Email is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.paymentOption) {
+      setErrorMessage('Payment option is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.amount || isNaN(formData.amount) || parseFloat(formData.amount) <= 0) {
+      setErrorMessage('Please enter a valid amount');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!proofOfPaymentFile) {
+      setErrorMessage('Proof of payment is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    return true;
+  };
+
+  const handleSubmitConfirmation = () => {
+    if (!validateFields()) return;
+    setConfirmModalVisible(true);
+  };
+
+  const uploadImageToStorage = async (file, path) => {
+    try {
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file);
+      const downloadURL = await getDownloadURL(fileRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
+  const submitPayment = async () => {
+    setConfirmModalVisible(false);
+    setUploading(true);
+    setIsProcessing(true);
+
+    try {
+      // Upload proof of payment
+      const proofOfPaymentUrl = await uploadImageToStorage(
+        proofOfPaymentFile, 
+        `proofsOfPayment/${formData.memberId}_${Date.now()}`
+      );
+
+      const transactionId = generateTransactionId();
+      const now = new Date();
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+      const amount = parseFloat(formData.amount);
+
+      // Create payment record
+      const paymentData = {
+        transactionId,
+        id: formData.memberId,
+        email: formData.email,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        paymentOption: formData.paymentOption,
+        accountName: formData.accountName,
+        accountNumber: formData.accountNumber,
+        amountToBePaid: amount,
+        proofOfPaymentUrl,
+        dateApplied: approvalDate,
+        timeApplied: approvalTime,
+        dateApproved: approvalDate,
+        timeApproved: approvalTime,
+        status: 'approved'
+      };
+
+      // Get references to all needed paths
+      const approvedRef = database.ref(`Payments/ApprovedPayments/${formData.memberId}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${formData.memberId}/${transactionId}`);
+      const memberRef = database.ref(`Members/${formData.memberId}`);
+      const fundsRef = database.ref('Settings/Funds');
+
+      const memberSnap = await memberRef.once('value');
+
+      if (memberSnap.exists()) {
+        const member = memberSnap.val();
+
+        // Execute all operations in sequence
+        await approvedRef.set(paymentData);
+        await transactionRef.set(paymentData);
+
+        // Update member balance (for loan payments, this would be different)
+        const newBalance = parseFloat(member.balance || 0) + amount;
+        await memberRef.update({ balance: newBalance });
+
+        // Update funds
+        const fundSnap = await fundsRef.once('value');
+        const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
+        await fundsRef.set(updatedFund);
+
+        // Call API to send email
+        await callApiApprove(paymentData);
+
+        setSuccessMessage('Payment added and approved successfully!');
+        setSuccessModalVisible(true);
+        closeAddModal();
+
+        // Refresh data after successful addition
+        await fetchAllData();
+      } else {
+        throw new Error('Member not found');
+      }
+    } catch (error) {
+      console.error('Error adding payment:', error);
+      setErrorMessage(error.message || 'Failed to add payment');
+      setErrorModalVisible(true);
+    } finally {
+      setUploading(false);
+      setIsProcessing(false);
+    }
+  };
+
+  const generateTransactionId = () => {
+    return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+
+  const callApiApprove = async (paymentData) => {
+    try {
+      const response = await ApprovePayments({
+        memberId: paymentData.id,
+        transactionId: paymentData.transactionId,
+        amount: paymentData.amountToBePaid,
+        dateApproved: paymentData.dateApproved,
+        timeApproved: paymentData.timeApproved,
+        email: paymentData.email,
+        firstName: paymentData.firstName,
+        lastName: paymentData.lastName,
+        status: 'approved'
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to send approval email');
+      }
+    } catch (error) {
+      console.error('API error:', error);
+      throw error;
+    }
+  };
+
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+  };
+
+  if (loading) {
     return (
       <div className="loading-container">
         <div className="spinner"></div>
       </div>
     );
   }
+
+  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
     <div className="safe-area-view">
@@ -529,7 +905,7 @@ const PayLoans = () => {
             <div className="search-bar">
               <input
                 className="search-input"
-                placeholder="Search by name, ID or transaction"
+                placeholder="Search..."
                 value={searchQuery}
                 onChange={(e) => handleSearch(e.target.value)}
               />
@@ -545,7 +921,7 @@ const PayLoans = () => {
 
         {!noMatch && filteredData.length > 0 && (
           <div className="pagination-container">
-              <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
+            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
             <button
               onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
               disabled={currentPage === 0}
@@ -564,12 +940,8 @@ const PayLoans = () => {
         )}
 
         <div className="data-container">
-          {loading ? (
-            <div style={{ display: 'flex', justifyContent: 'center', padding: '20px' }}>
-              <div className="spinner"></div>
-            </div>
-          ) : noMatch ? (
-            <span className="no-match-text">No payments match your search criteria</span>
+          {noMatch ? (
+            <span className="no-match-text">No Matches Found</span>
           ) : (
             <>
               {activeSection === 'pendingPayments' && (
@@ -578,29 +950,220 @@ const PayLoans = () => {
                   currentPage={currentPage}
                   totalPages={totalPages}
                   onPageChange={setCurrentPage}
-                  refreshData={refreshData}
+                  refreshData={fetchAllData}
                 />
               )}
               {activeSection === 'completedPayments' && (
-                <CompletedPayments payments={paginatedData} />
+                <CompletedPayments 
+                  payments={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
               )}
               {activeSection === 'failedPayments' && (
-                <FailedPayments payments={paginatedData} />
+                <FailedPayments 
+                  payments={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                />
               )}
             </>
           )}
         </div>
 
+        {/* Add Payment Button - Only show on Approved Payments */}
+        {activeSection === 'completedPayments' && (
+          <button 
+            className="plus-button" 
+            onClick={openAddModal}
+          >
+            <FaPlus className="plus-icon" />
+          </button>
+        )}
+
+        {/* Add Payment Modal */}
+        {addModalVisible && (
+          <div className="modal-overlay">
+            <div className="modal-container">
+              <button onClick={closeAddModal} className="close-button">
+                <AiOutlineClose />
+              </button>
+              <h3 className="modal-title">Add Payment</h3>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Member ID<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Member ID"
+                  value={formData.memberId}
+                  onChange={(e) => handleInputChange('memberId', e.target.value)}
+                  className="form-input"
+                  type="text"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  First Name<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="First Name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Last Name<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Last Name"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Email<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="form-input"
+                  type="email"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Payment Option<span className="required"> *</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formData.paymentOption}
+                  onChange={(e) => handleInputChange('paymentOption', e.target.value)}
+                >
+                  <option value="">Select Payment Option</option>
+                  {paymentOptions.map(option => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Account Name</label>
+                <input
+                  placeholder="Account Name"
+                  value={formData.accountName}
+                  onChange={(e) => handleInputChange('accountName', e.target.value)}
+                  className="form-input"
+                  readOnly
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Account Number</label>
+                <input
+                  placeholder="Account Number"
+                  value={formData.accountNumber}
+                  onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                  className="form-input"
+                  readOnly
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Amount<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Amount"
+                  value={formData.amount}
+                  onChange={(e) => handleInputChange('amount', e.target.value)}
+                  className="form-input"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Proof of Payment<span className="required"> *</span>
+                </label>
+                <label className="file-input-label">
+                  {proofOfPaymentFile ? proofOfPaymentFile.name : 'Click to upload Proof of Payment'}
+                  <input
+                    type="file"
+                    className="file-input"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                  />
+                </label>
+              </div>
+              
+              <div className="modal-button-container">
+                <button
+                  className="modal-submit-button"
+                  onClick={handleSubmitConfirmation}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <div className="spinner"></div>
+                  ) : (
+                    'Add Payment'
+                  )}
+                </button>
+                <button 
+                  className="modal-cancel-button" 
+                  onClick={closeAddModal}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirmation Modal */}
+        {confirmModalVisible && (
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Are you sure you want to add this payment?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
+                  onClick={submitPayment}
+                >
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setConfirmModalVisible(false)}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success Modal */}
         {successModalVisible && (
           <div className="centered-modal">
             <div className="small-modal-card">
-              <FaCheckCircle className="confirm-icon" style={{ color: '#4CAF50' }} />
+              <FaCheckCircle className="confirm-icon" />
               <p className="modal-text">{successMessage}</p>
-              <button 
-                className="confirm-btn" 
-                onClick={() => setSuccessModalVisible(false)}
-              >
+              <button className="confirm-btn" onClick={handleSuccessOk}>
                 OK
               </button>
             </div>
@@ -611,15 +1174,19 @@ const PayLoans = () => {
         {errorModalVisible && (
           <div className="centered-modal">
             <div className="small-modal-card">
-              <FiAlertCircle className="confirm-icon" style={{ color: '#f44336' }} />
+              <FiAlertCircle className="confirm-icon" />
               <p className="modal-text">{errorMessage}</p>
-              <button 
-                className="cancel-btn" 
-                onClick={() => setErrorModalVisible(false)}
-              >
+              <button className="cancel-btn" onClick={() => setErrorModalVisible(false)}>
                 OK
               </button>
             </div>
+          </div>
+        )}
+
+        {/* Processing Modal */}
+        {isProcessing && (
+          <div className="centered-modal">
+            <div className="spinner"></div>
           </div>
         )}
       </div>
