@@ -5,14 +5,17 @@ import {
   FaFilter, 
   FaChevronLeft, 
   FaChevronRight,
-  FaPlusCircle,
-  FaCheckCircle
+  FaPlus,
+  FaCheckCircle,
+  FaTimes,
+  FaExclamationCircle
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
-import { database, auth } from '../../../../../Database/firebaseConfig';
+import { database, auth, storage } from '../../../../../Database/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendMemberCredentialsEmail } from '../../../../../Server/api';
 
 // Import your components
@@ -21,6 +24,25 @@ import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
 import PermanentWithdrawals from '../Withdraws/PermanentWithdraws';
+
+const genderOptions = [
+  { key: 'Male', label: 'Male' },
+  { key: 'Female', label: 'Female' }
+];
+
+const civilStatusOptions = [
+  { key: 'Single', label: 'Single' },
+  { key: 'Married', label: 'Married' },
+  { key: 'Widowed', label: 'Widowed' },
+  { key: 'Separated', label: 'Separated' }
+];
+
+const governmentIdOptions = [
+  { key: 'national', label: 'National ID (PhilSys)' },
+  { key: 'sss', label: 'SSS ID' },
+  { key: 'philhealth', label: 'PhilHealth ID' },
+  { key: 'drivers_license', label: 'Drivers License' }
+];
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -32,6 +54,17 @@ const generateRandomPassword = () => {
     return generateRandomPassword();
   }
   return pwd;
+};
+
+const formatDate = (date) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+const formatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 };
 
 const Register = () => {
@@ -64,7 +97,12 @@ const Register = () => {
     dateOfBirth: '',
     placeOfBirth: '',
     address: '',
+    governmentId: ''
   });
+  const [validIdFrontFile, setValidIdFrontFile] = useState(null);
+  const [validIdBackFile, setValidIdBackFile] = useState(null);
+  const [selfieFile, setSelfieFile] = useState(null);
+  const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -72,6 +110,10 @@ const Register = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [pendingAdd, setPendingAdd] = useState(null);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [availableImages, setAvailableImages] = useState([]);
 
   // Create style element and append to head
   useEffect(() => {
@@ -266,19 +308,23 @@ const Register = () => {
       }
       .plus-button {
         position: fixed;
-        right: 20px;
-        bottom: 20px;
-        background-color: white;
-        border-radius: 30px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        right: 30px;
+        bottom: 30px;
+        background-color: #2D5783;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
         border: none;
-        width: 40px;
-        height: 40px;
+        width: 60px;
+        height: 60px;
         display: flex;
         justify-content: center;
         align-items: center;
         cursor: pointer;
-        color: #2D5783;
+        color: white;
+        z-index: 100;
+      }
+      .plus-icon {
+        font-size: 24px;
       }
       .modal-overlay {
         position: fixed;
@@ -293,19 +339,19 @@ const Register = () => {
         z-index: 1000;
       }
       .modal-container {
-        max-height: 80vh;
         background-color: #f9f9f9;
         padding: 24px;
         border-radius: 10px;
-        width: 35%;
+        width: 40%;
         max-width: 600px;
+        max-height: 80vh;
         overflow-y: auto;
       }
       .modal-title {
         font-size: 20px;
         font-weight: bold;
         margin-bottom: 16px;
-        color: #001F3F;
+        color: #2D5783;
         text-align: center;
       }
       .form-group {
@@ -314,8 +360,11 @@ const Register = () => {
       .form-label {
         font-weight: 600;
         margin-bottom: 4px;
-        color: #001F3F;
+        color: #333;
         display: block;
+      }
+      .required {
+        color: red;
       }
       .form-input {
         border: 1px solid #ccc;
@@ -325,23 +374,18 @@ const Register = () => {
         width: 100%;
         box-sizing: border-box;
       }
-      .required {
-        color: red;
+      .form-select {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 6px;
+        box-sizing: border-box;
+        background-color: white;
       }
       .modal-button-container {
         display: flex;
         justify-content: space-between;
         margin-top: 24px;
-      }
-      .modal-cancel-button {
-        background-color: #ccc;
-        padding: 12px;
-        border-radius: 8px;
-        width: 48%;
-        text-align: center;
-        border: none;
-        cursor: pointer;
-        font-weight: bold;
       }
       .modal-submit-button {
         background-color: #2D5783;
@@ -352,6 +396,16 @@ const Register = () => {
         border: none;
         cursor: pointer;
         color: white;
+        font-weight: bold;
+      }
+      .modal-cancel-button {
+        background-color: #ccc;
+        padding: 12px;
+        border-radius: 8px;
+        width: 48%;
+        text-align: center;
+        border: none;
+        cursor: pointer;
         font-weight: bold;
       }
       .centered-modal {
@@ -448,16 +502,91 @@ const Register = () => {
         width: 36px;
         height: 36px;
         border-radius: 50%;
-        border-left-color: #001F3F;
+        border-left-color: #2D5783;
         animation: spin 1s linear infinite;
       }
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
-      .modal-scroll {
-        max-height: 60vh;
-        overflow-y: auto;
+      .file-input-label {
+        display: block;
+        padding: 10px;
+        border: 1px dashed #ccc;
+        border-radius: 5px;
+        text-align: center;
+        cursor: pointer;
+        margin-bottom: 5px;
+      }
+      .file-input {
+        display: none;
+      }
+      .file-name {
+        font-size: 12px;
+        color: #666;
+        margin-top: 5px;
+      }
+      .image-viewer-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0,0,0,0.9);
+        display: flex;
+        justify-content: center;
+        alignItems: center;
+        z-index: 2000;
+      }
+      .image-viewer-content {
+        position: relative;
+        width: 90%;
+        max-width: 800px;
+        display: flex;
+        flex-direction: column;
+        alignItems: center;
+      }
+      .large-image {
+        max-width: 100%;
+        max-height: 70vh;
+        object-fit: contain;
+        border-radius: 4px;
+      }
+      .image-viewer-label {
+        color: white;
+        font-size: 18px;
+        margin-top: 16px;
+        text-align: center;
+      }
+      .image-viewer-close {
+        position: absolute;
+        top: -40px;
+        right: 0;
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 8px;
+        background-color: transparent;
+        border: none;
+        outline: none;
+      }
+      .image-viewer-nav {
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+        color: white;
+        font-size: 24px;
+        cursor: pointer;
+        padding: 16px;
+        background-color: transparent;
+        border: none;
+        outline: none;
+      }
+      .prev-button {
+        left: 50px;
+      }
+      .next-button {
+        right: 50px;
       }
     `;
     document.head.appendChild(styleElement);
@@ -653,7 +782,12 @@ const Register = () => {
       dateOfBirth: '',
       placeOfBirth: '',
       address: '',
+      governmentId: ''
     });
+    setValidIdFrontFile(null);
+    setValidIdBackFile(null);
+    setSelfieFile(null);
+    setSelfieWithIdFile(null);
   };
 
   const handleInputChange = (name, value) => {
@@ -661,6 +795,13 @@ const Register = () => {
       ...prev,
       [name]: value
     }));
+  };
+
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
   };
 
   const validateFields = () => {
@@ -679,6 +820,41 @@ const Register = () => {
       setErrorModalVisible(true);
       return false;
     }
+    if (!formData.phoneNumber) {
+      setErrorMessage('Phone number is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.gender) {
+      setErrorMessage('Gender is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.civilStatus) {
+      setErrorMessage('Civil status is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.placeOfBirth) {
+      setErrorMessage('Place of birth is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.address) {
+      setErrorMessage('Address is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.governmentId) {
+      setErrorMessage('Government ID is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!validIdFrontFile || !validIdBackFile || !selfieFile || !selfieWithIdFile) {
+      setErrorMessage('All image uploads are required');
+      setErrorModalVisible(true);
+      return false;
+    }
     return true;
   };
 
@@ -686,6 +862,18 @@ const Register = () => {
     if (!validateFields()) return;
     setPendingAdd({ ...formData });
     setConfirmModalVisible(true);
+  };
+
+  const uploadImageToStorage = async (file, path) => {
+    try {
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file);
+      const downloadURL = await getDownloadURL(fileRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
   };
 
   const submitManualMember = async () => {
@@ -722,19 +910,41 @@ const Register = () => {
         hour12: true
       });
 
+      // Upload images
+      const validIdFrontUrl = await uploadImageToStorage(
+        validIdFrontFile, 
+        `member_docs/${newId}/valid_id_front_${Date.now()}`
+      );
+      const validIdBackUrl = await uploadImageToStorage(
+        validIdBackFile, 
+        `member_docs/${newId}/valid_id_back_${Date.now()}`
+      );
+      const selfieUrl = await uploadImageToStorage(
+        selfieFile, 
+        `member_docs/${newId}/selfie_${Date.now()}`
+      );
+      const selfieWithIdUrl = await uploadImageToStorage(
+        selfieWithIdFile, 
+        `member_docs/${newId}/selfie_with_id_${Date.now()}`
+      );
+
       const memberData = {
         id: newId,
         authUid: userId,
         email,
         firstName,
-        middleName,
+        middleName: middleName || '',
         lastName,
         ...rest,
         dateAdded,
         timeAdded,
         status: 'active',
         balance: 0.0,
-        loans: 0.0
+        loans: 0.0,
+        validIdFront: validIdFrontUrl,
+        validIdBack: validIdBackUrl,
+        selfie: selfieUrl,
+        selfieWithId: selfieWithIdUrl
       };
 
       await database.ref(`Members/${newId}`).set(memberData);
@@ -783,13 +993,59 @@ const Register = () => {
     }
   };
 
-  const handleRegistrationActionComplete = () => {
-    // This will be passed to Registrations component to refresh data after approval/rejection
-    fetchAllData();
+  const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (pendingAdd?.validIdFront) {
+      images.push({ 
+        url: pendingAdd.validIdFront, 
+        label: 'Valid ID Front' 
+      });
+    }
+    if (pendingAdd?.validIdBack) {
+      images.push({ 
+        url: pendingAdd.validIdBack, 
+        label: 'Valid ID Back' 
+      });
+    }
+    if (pendingAdd?.selfie) {
+      images.push({ 
+        url: pendingAdd.selfie, 
+        label: 'Selfie' 
+      });
+    }
+    if (pendingAdd?.selfieWithId) {
+      images.push({ 
+        url: pendingAdd.selfieWithId, 
+        label: 'Selfie with ID' 
+      });
+    }
+
+    setAvailableImages(images);
+    setCurrentImage({ url, label });
+    setCurrentImageIndex(index);
+    setImageViewerVisible(true);
   };
 
-  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
+  };
+
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
+  };
 
   const renderMemberFilter = () => {
     if (activeSection !== 'members') return null;
@@ -845,6 +1101,9 @@ const Register = () => {
       </div>
     );
   }
+
+  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
     <div className="safe-area-view">
@@ -948,7 +1207,7 @@ const Register = () => {
                     className="plus-button" 
                     onClick={openAddModal}
                   >
-                    <FaPlusCircle />
+                    <FaPlus className="plus-icon" />
                   </button>
                 </>
               )}
@@ -968,147 +1227,239 @@ const Register = () => {
               </button>
               <h3 className="modal-title">New Member</h3>
               
-              <div className="modal-scroll">
-                <div className="form-group">
-                  <label className="form-label">
-                    Email<span className="required"> *</span>
-                  </label>
+              <div className="form-group">
+                <label className="form-label">
+                  Email<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Email"
+                  value={formData.email}
+                  onChange={(e) => handleInputChange('email', e.target.value)}
+                  className="form-input"
+                  type="email"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Phone Number<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Phone Number"
+                  value={formData.phoneNumber}
+                  onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                  className="form-input"
+                  type="tel"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  First Name<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="First Name"
+                  value={formData.firstName}
+                  onChange={(e) => handleInputChange('firstName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Middle Name</label>
+                <input
+                  placeholder="Middle Name"
+                  value={formData.middleName}
+                  onChange={(e) => handleInputChange('middleName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Last Name<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Last Name"
+                  value={formData.lastName}
+                  onChange={(e) => handleInputChange('lastName', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Gender<span className="required"> *</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formData.gender}
+                  onChange={(e) => handleInputChange('gender', e.target.value)}
+                >
+                  <option value="">Select Gender</option>
+                  {genderOptions.map(option => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Civil Status<span className="required"> *</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formData.civilStatus}
+                  onChange={(e) => handleInputChange('civilStatus', e.target.value)}
+                >
+                  <option value="">Select Civil Status</option>
+                  {civilStatusOptions.map(option => (
+                    <option key={option.key} value={option.key}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Age</label>
+                <input
+                  placeholder="Age"
+                  value={formData.age}
+                  onChange={(e) => handleInputChange('age', e.target.value)}
+                  className="form-input"
+                  type="number"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">Date of Birth</label>
+                <input
+                  placeholder="Date of Birth"
+                  value={formData.dateOfBirth}
+                  onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                  className="form-input"
+                  type="date"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Birth Place<span className="required"> *</span>
+                </label>
+                <input
+                  placeholder="Birth Place"
+                  value={formData.placeOfBirth}
+                  onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
+                  className="form-input"
+                />
+              </div>
+              
+              <div className="form-group">
+                <label className="form-label">
+                  Address<span className="required"> *</span>
+                </label>
+                <textarea
+                  placeholder="Address"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange('address', e.target.value)}
+                  className="form-input"
+                  rows="3"
+                />
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Government ID<span className="required"> *</span>
+                </label>
+                <select
+                  className="form-select"
+                  value={formData.governmentId}
+                  onChange={(e) => handleInputChange('governmentId', e.target.value)}
+                >
+                  <option value="">Select Government ID</option>
+                  {governmentIdOptions.map(option => (
+                    <option key={option.key} value={option.label}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Valid ID Front<span className="required"> *</span>
+                </label>
+                <label className="file-input-label">
+                  {validIdFrontFile ? validIdFrontFile.name : 'Click to upload ID Front'}
                   <input
-                    placeholder="Email"
-                    value={formData.email}
-                    onChange={(e) => handleInputChange('email', e.target.value)}
-                    className="form-input"
-                    type="email"
+                    type="file"
+                    className="file-input"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
                   />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Phone Number</label>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Valid ID Back<span className="required"> *</span>
+                </label>
+                <label className="file-input-label">
+                  {validIdBackFile ? validIdBackFile.name : 'Click to upload ID Back'}
                   <input
-                    placeholder="Phone Number"
-                    value={formData.phoneNumber}
-                    onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                    className="form-input"
-                    type="tel"
+                    type="file"
+                    className="file-input"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setValidIdBackFile)}
                   />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">
-                    First Name<span className="required"> *</span>
-                  </label>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Selfie<span className="required"> *</span>
+                </label>
+                <label className="file-input-label">
+                  {selfieFile ? selfieFile.name : 'Click to upload Selfie'}
                   <input
-                    placeholder="First Name"
-                    value={formData.firstName}
-                    onChange={(e) => handleInputChange('firstName', e.target.value)}
-                    className="form-input"
+                    type="file"
+                    className="file-input"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setSelfieFile)}
                   />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Middle Name</label>
+                </label>
+              </div>
+
+              <div className="form-group">
+                <label className="form-label">
+                  Selfie with ID<span className="required"> *</span>
+                </label>
+                <label className="file-input-label">
+                  {selfieWithIdFile ? selfieWithIdFile.name : 'Click to upload Selfie with ID'}
                   <input
-                    placeholder="Middle Name"
-                    value={formData.middleName}
-                    onChange={(e) => handleInputChange('middleName', e.target.value)}
-                    className="form-input"
+                    type="file"
+                    className="file-input"
+                    accept="image/*"
+                    onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
                   />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">
-                    Last Name<span className="required"> *</span>
-                  </label>
-                  <input
-                    placeholder="Last Name"
-                    value={formData.lastName}
-                    onChange={(e) => handleInputChange('lastName', e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Gender</label>
-                  <input
-                    placeholder="Gender"
-                    value={formData.gender}
-                    onChange={(e) => handleInputChange('gender', e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Civil Status</label>
-                  <input
-                    placeholder="Civil Status"
-                    value={formData.civilStatus}
-                    onChange={(e) => handleInputChange('civilStatus', e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Age</label>
-                  <input
-                    placeholder="Age"
-                    value={formData.age}
-                    onChange={(e) => handleInputChange('age', e.target.value)}
-                    className="form-input"
-                    type="number"
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Date of Birth</label>
-                  <input
-                    placeholder="Date of Birth"
-                    value={formData.dateOfBirth}
-                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                    className="form-input"
-                    type="date"
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Birth Place</label>
-                  <input
-                    placeholder="Birth Place"
-                    value={formData.placeOfBirth}
-                    onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-                
-                <div className="form-group">
-                  <label className="form-label">Address</label>
-                  <textarea
-                    placeholder="Address"
-                    value={formData.address}
-                    onChange={(e) => handleInputChange('address', e.target.value)}
-                    className="form-input"
-                    rows="3"
-                  />
-                </div>
-                
-                <div className="modal-button-container">
-                  <button
-                    className="modal-submit-button"
-                    onClick={handleSubmitConfirmation}
-                    disabled={uploading}
-                  >
-                    {uploading ? (
-                      <div className="spinner"></div>
-                    ) : (
-                      'Add Member'
-                    )}
-                  </button>
-                  <button 
-                    className="modal-cancel-button" 
-                    onClick={closeAddModal}
-                  >
-                    Cancel
-                  </button>
-                </div>
+                </label>
+              </div>
+              
+              <div className="modal-button-container">
+                <button
+                  className="modal-submit-button"
+                  onClick={handleSubmitConfirmation}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <div className="spinner"></div>
+                  ) : (
+                    'Add Member'
+                  )}
+                </button>
+                <button 
+                  className="modal-cancel-button" 
+                  onClick={closeAddModal}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
           </div>
@@ -1160,6 +1511,38 @@ const Register = () => {
               <button className="cancel-btn" onClick={() => setErrorModalVisible(false)}>
                 OK
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Image Viewer Modal */}
+        {imageViewerVisible && (
+          <div className="image-viewer-modal">
+            <div className="image-viewer-content">
+              <button 
+                className="image-viewer-nav prev-button"
+                onClick={() => navigateImages('prev')}
+              >
+                <FaChevronLeft />
+              </button>
+              <img
+                src={currentImage.url}
+                alt={currentImage.label}
+                className="large-image"
+              />
+              <button 
+                className="image-viewer-nav next-button"
+                onClick={() => navigateImages('next')}
+              >
+                <FaChevronRight />
+              </button>
+              <button 
+                className="image-viewer-close" 
+                onClick={closeImageViewer}
+              >
+                <FaTimes />
+              </button>
+              <p className="image-viewer-label">{currentImage.label}</p>
             </div>
           </div>
         )}

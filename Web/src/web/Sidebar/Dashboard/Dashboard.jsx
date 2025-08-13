@@ -26,6 +26,7 @@ const Dashboard = () => {
     totalReceivables: 0,
     fiveKISavings: 0,
     activeBorrowers: 0,
+    totalMembers: 0,
     savingsHistory: []
   });
   const [loanData, setLoanData] = useState([]);
@@ -52,123 +53,140 @@ const Dashboard = () => {
     return new Date();
   };
 
-  const fetchDashboardData = async () => {
-    try {
-      setLoading(true);
-      
-      // Fetch funds data
-      const fundsRef = database.ref('Settings/Funds');
-      const fundsSnapshot = await fundsRef.once('value');
-      const availableFunds = fundsSnapshot.val() || 0;
+const fetchDashboardData = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch funds data
+    const fundsRef = database.ref('Settings/Funds');
+    const fundsSnapshot = await fundsRef.once('value');
+    const availableFunds = fundsSnapshot.val() || 0;
 
-      // Fetch 5KI Savings data and history
-      const fiveKIRef = database.ref('Settings/Savings');
-      const fiveKISnapshot = await fiveKIRef.once('value');
-      const fiveKISavings = fiveKISnapshot.val() || 0;
+    // Fetch 5KI Savings data and history
+    const fiveKIRef = database.ref('Settings/Savings');
+    const fiveKISnapshot = await fiveKIRef.once('value');
+    const fiveKISavings = fiveKISnapshot.val() || 0;
 
-      // Fetch savings history
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-      const savingsHistorySnapshot = await savingsHistoryRef.once('value');
-      const savingsHistoryData = savingsHistorySnapshot.val() || {};
-      const savingsHistory = Object.entries(savingsHistoryData).map(([date, amount]) => ({
-        date,
-        amount: parseFloat(amount) || 0
-      }));
+    // Fetch savings history
+    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+    const savingsHistorySnapshot = await savingsHistoryRef.once('value');
+    const savingsHistoryData = savingsHistorySnapshot.val() || {};
+    const savingsHistory = Object.entries(savingsHistoryData).map(([date, amount]) => ({
+      date,
+      amount: parseFloat(amount) || 0
+    }));
 
-      // Fetch loans data
-      const loansRef = database.ref('Loans/ApprovedLoans');
-      const loansSnapshot = await loansRef.once('value');
-      const loansData = loansSnapshot.val() || {};
-      
-      let totalLoans = 0;
-      let totalReceivables = 0;
-      let activeBorrowers = 0;
-      const loanItems = [];
-      const borrowerSet = new Set();
-      
-      Object.entries(loansData).forEach(([memberId, loans]) => {
-        Object.entries(loans).forEach(([transactionId, loan]) => {
-          const loanAmount = parseFloat(loan.loanAmount) || 0;
-          const term = loan.term || 'N/A';
-          const interest = parseFloat(loan.interest) || 0;
-          const monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
-          const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
-          const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
-          const dueDate = loan.dueDate || 'N/A';
-          const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
-          const isOverdue = dueDateObj && new Date() > dueDateObj;
-          
-          totalLoans += loanAmount;
-          totalReceivables += totalTermPayment;
-          borrowerSet.add(memberId);
-          
-          loanItems.push({
-            memberId,
-            transactionId,
-            loanAmount,
-            term,
-            interest,
-            monthlyPayment,
-            totalMonthlyPayment,
-            totalTermPayment,
-            dueDate,
-            isOverdue
-          });
+    // Fetch total members count
+    const membersRef = database.ref('Members');
+    const membersSnapshot = await membersRef.once('value');
+    const membersData = membersSnapshot.val() || {};
+    const totalMembers = Object.keys(membersData).length;
+
+    // Fetch current loans data (active loans)
+    const currentLoansRef = database.ref('Loans/CurrentLoans');
+    const currentLoansSnapshot = await currentLoansRef.once('value');
+    const currentLoansData = currentLoansSnapshot.val() || {};
+
+    // Fetch approved loans to get original amounts
+    const approvedLoansRef = database.ref('Loans/ApprovedLoans');
+    const approvedLoansSnapshot = await approvedLoansRef.once('value');
+    const approvedLoansData = approvedLoansSnapshot.val() || {};
+
+    // Fetch payments data for earnings
+    const paymentsRef = database.ref('Payments/ApprovedPayments');
+    const paymentsSnapshot = await paymentsRef.once('value');
+    const paymentsData = paymentsSnapshot.val() || {};
+    
+    let totalLoans = 0;
+    let totalReceivables = 0;
+    let activeBorrowers = 0;
+    const loanItems = [];
+    const borrowerSet = new Set();
+    const monthlyEarnings = Array(12).fill(0);
+
+    // Process current loans
+    Object.entries(currentLoansData).forEach(([memberId, loans]) => {
+      Object.entries(loans).forEach(([transactionId, loan]) => {
+        const outstandingBalance = parseFloat(loan.loanAmount) || 0; // Current outstanding
+        const originalLoan = approvedLoansData[memberId]?.[transactionId];
+        const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
+        
+        const term = loan.term || 'N/A';
+        const interest = parseFloat(loan.interest) || 0;
+        const monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
+        const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
+        const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
+        const dueDate = loan.dueDate || 'N/A';
+        const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
+        const isOverdue = dueDateObj && new Date() > dueDateObj;
+        
+        totalLoans += originalAmount;
+        totalReceivables += outstandingBalance;
+        borrowerSet.add(memberId);
+        
+        loanItems.push({
+          memberId,
+          transactionId,
+          loanAmount: originalAmount,
+          outstandingBalance,
+          term,
+          interest,
+          monthlyPayment,
+          totalMonthlyPayment,
+          totalTermPayment,
+          dueDate,
+          isOverdue
         });
       });
+    });
 
-      activeBorrowers = borrowerSet.size;
+    activeBorrowers = borrowerSet.size;
 
-      // Fetch payments data for earnings
-      const paymentsRef = database.ref('Payments/ApprovedPayments');
-      const paymentsSnapshot = await paymentsRef.once('value');
-      const paymentsData = paymentsSnapshot.val() || {};
-      
-      const monthlyEarnings = Array(12).fill(0);
-      
-      Object.values(paymentsData).forEach(payment => {
-        if (payment.dateApproved) {
-          const date = parseCustomDate(payment.dateApproved);
-          if (date && date.getFullYear() === parseInt(selectedYear)) {
-            const month = date.getMonth();
-            monthlyEarnings[month] += parseFloat(payment.interestPaid || 0);
-          }
+    // Process payments for earnings
+    Object.values(paymentsData).forEach(payment => {
+      if (payment.dateApproved) {
+        const date = parseCustomDate(payment.dateApproved);
+        if (date && date.getFullYear() === parseInt(selectedYear)) {
+          const month = date.getMonth();
+          monthlyEarnings[month] += parseFloat(payment.interestPaid || 0);
         }
-      });
+      }
+    });
 
-      // Format earnings data
-      const formattedEarnings = [
-        { month: 'Jan', earnings: monthlyEarnings[0] },
-        { month: 'Feb', earnings: monthlyEarnings[1] },
-        { month: 'Mar', earnings: monthlyEarnings[2] },
-        { month: 'Apr', earnings: monthlyEarnings[3] },
-        { month: 'May', earnings: monthlyEarnings[4] },
-        { month: 'Jun', earnings: monthlyEarnings[5] },
-        { month: 'Jul', earnings: monthlyEarnings[6] },
-        { month: 'Aug', earnings: monthlyEarnings[7] },
-        { month: 'Sep', earnings: monthlyEarnings[8] },
-        { month: 'Oct', earnings: monthlyEarnings[9] },
-        { month: 'Nov', earnings: monthlyEarnings[10] },
-        { month: 'Dec', earnings: monthlyEarnings[11] },
-      ];
+    // Format earnings data
+    const formattedEarnings = [
+      { month: 'Jan', earnings: monthlyEarnings[0] },
+      { month: 'Feb', earnings: monthlyEarnings[1] },
+      { month: 'Mar', earnings: monthlyEarnings[2] },
+      { month: 'Apr', earnings: monthlyEarnings[3] },
+      { month: 'May', earnings: monthlyEarnings[4] },
+      { month: 'Jun', earnings: monthlyEarnings[5] },
+      { month: 'Jul', earnings: monthlyEarnings[6] },
+      { month: 'Aug', earnings: monthlyEarnings[7] },
+      { month: 'Sep', earnings: monthlyEarnings[8] },
+      { month: 'Oct', earnings: monthlyEarnings[9] },
+      { month: 'Nov', earnings: monthlyEarnings[10] },
+      { month: 'Dec', earnings: monthlyEarnings[11] },
+    ];
 
-      setFundsData({
-        availableFunds,
-        totalLoans,
-        totalReceivables,
-        fiveKISavings,
-        activeBorrowers,
-        savingsHistory
-      });
-      
-      setLoanData(loanItems);
-      setEarningsData(formattedEarnings);
-      setLoading(false);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setLoading(false);
-    }
-  };
+    setFundsData({
+      availableFunds,
+      totalLoans,
+      totalReceivables,
+      fiveKISavings,
+      activeBorrowers,
+      totalMembers,
+      savingsHistory
+    });
+    
+    setLoanData(loanItems);
+    setEarningsData(formattedEarnings);
+    setLoading(false);
+  } catch (error) {
+    console.error('Error fetching dashboard data:', error);
+    setLoading(false);
+  }
+};
 
   const healthStatus = fundsData.availableFunds > fundsData.totalLoans * 1.5 
     ? 'Excellent' 
@@ -318,63 +336,6 @@ const Dashboard = () => {
     loan.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const renderLoanDetails = (loan) => (
-    <div className="modal-content">
-      <div className="modal-header">
-        <h3 className="modal-title">Loan Details</h3>
-        <button className="close-button" onClick={() => setModalVisible(false)}>
-          &times;
-        </button>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Member ID:</span>
-        <span className="detail-value">{loan.memberId}</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Transaction ID:</span>
-        <span className="detail-value">{loan.transactionId}</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Loan Amount:</span>
-        <span className="detail-value">₱{formatCurrency(loan.loanAmount)}</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Term:</span>
-        <span className="detail-value">{loan.term} months</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Interest:</span>
-        <span className="detail-value">{loan.interest}%</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Monthly Payment:</span>
-        <span className="detail-value">₱{formatCurrency(loan.monthlyPayment)}</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Total Monthly Payment:</span>
-        <span className="detail-value">₱{formatCurrency(loan.totalMonthlyPayment)}</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Total Payment:</span>
-        <span className="detail-value">₱{formatCurrency(loan.totalTermPayment)}</span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Due Date:</span>
-        <span className={`detail-value ${loan.isOverdue ? 'overdue' : ''}`}>
-          {loan.dueDate}
-          {loan.isOverdue && <span className="overdue-badge">Overdue</span>}
-        </span>
-      </div>
-      <div className="detail-row">
-        <span className="detail-label">Status:</span>
-        <span className="detail-value">
-          <span className={`status-badge ${loan.isOverdue ? 'overdue' : 'active'}`}>
-            {loan.isOverdue ? 'Overdue' : 'Active'}
-          </span>
-        </span>
-      </div>
-    </div>
-  );
 
   return (
     <div className="dashboard-container">
@@ -400,6 +361,14 @@ const Dashboard = () => {
 
         <div className="metric-card">
           <div className="metric-content">
+            <h3>Total Members</h3>
+            <div className="metric-value">{fundsData.totalMembers}</div>
+            <div className="metric-description">Registered members</div>
+          </div>
+        </div>
+
+        <div className="metric-card">
+          <div className="metric-content">
             <h3>Total Loans</h3>
             <div className="metric-value">₱{formatCurrency(fundsData.totalLoans)}</div>
             <div className="metric-description">Active loan principal</div>
@@ -410,7 +379,7 @@ const Dashboard = () => {
           <div className="metric-content">
             <h3>Total Receivables</h3>
             <div className="metric-value">₱{formatCurrency(fundsData.totalReceivables)}</div>
-            <div className="metric-description">Including principal and interest</div>
+            <div className="metric-description">Outstanding balances</div>
           </div>
         </div>
 
@@ -501,32 +470,26 @@ const Dashboard = () => {
                 <th className="text-center">Member ID</th>
                 <th className="text-center">Transaction ID</th>
                 <th className="text-center">Amount</th>
+                <th className="text-center">Outstanding</th>
                 <th className="text-center">Term</th>
                 <th className="text-center">Interest</th>
                 <th className="text-center">Monthly</th>
                 <th className="text-center">Total Monthly</th>
-                <th className="text-center">Total</th>
                 <th className="text-center">Due Date</th>
               </tr>
             </thead>
             <tbody>
               {filteredLoans.length > 0 ? (
                 filteredLoans.map((loan, index) => (
-                  <tr 
-                    key={index}
-                    onClick={() => {
-                      setSelectedLoan(loan);
-                      setModalVisible(true);
-                    }}
-                  >
+                  <tr>
                     <td className="text-center">{loan.memberId}</td>
                     <td className="text-center">{loan.transactionId}</td>
                     <td className="text-center">₱{formatCurrency(loan.loanAmount)}</td>
+                    <td className="text-center">₱{formatCurrency(loan.outstandingBalance)}</td>
                     <td className="text-center">{loan.term}</td>
                     <td className="text-center">{loan.interest}</td>
                     <td className="text-center">₱{formatCurrency(loan.monthlyPayment)}</td>
                     <td className="text-center">₱{formatCurrency(loan.totalMonthlyPayment)}</td>
-                    <td className="text-center">₱{formatCurrency(loan.totalTermPayment)}</td>
                     <td className={`text-center ${loan.isOverdue ? 'overdue' : ''}`}>
                       {loan.dueDate}
                       {loan.isOverdue && <span className="overdue-badge">Overdue</span>}
@@ -542,15 +505,6 @@ const Dashboard = () => {
           </table>
         </div>
       </div>
-
-      {/* Loan Details Modal */}
-      {modalVisible && (
-        <div className="modal-overlay">
-          <div className="modal">
-            {selectedLoan && renderLoanDetails(selectedLoan)}
-          </div>
-        </div>
-      )}
 
       <style jsx>{`
         :root {
