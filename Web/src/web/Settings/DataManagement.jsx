@@ -238,87 +238,101 @@ const DataManagement = () => {
 
   if (error) {
     return (
-      <div className="error-container">
-        <h2>Error loading data</h2>
-        <p>{error}</p>
-        <button onClick={() => window.location.reload()}>Retry</button>
+      <div style={styles.errorContainer}>
+        <h2 style={styles.errorHeading}>Error loading data</h2>
+        <p style={styles.errorText}>{error}</p>
+        <button style={styles.retryButton} onClick={() => window.location.reload()}>
+          Retry
+        </button>
       </div>
     );
   }
 
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="spinner"></div>
+      <div style={styles.loadingContainer}>
+        <div style={styles.spinner}></div>
       </div>
     );
   }
 
   return (
-    <div className="data-management-container">
+    <div style={styles.container}>
       {/* Sidebar */}
-      <div className="sidebar">
+      <div style={styles.sidebar}>
         <button
-          className={`sidebar-button ${activeSection === 'archiving' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'archiving' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('archiving')}
         >
-          <span className="sidebar-button-text">Data Archiving</span>
+          <span style={styles.sidebarButtonText}>Data Archiving</span>
         </button>
 
         <button
-          className={`sidebar-button ${activeSection === 'archived' ? 'active' : ''}`}
+          style={{
+            ...styles.sidebarButton,
+            ...(activeSection === 'archived' ? styles.sidebarButtonActive : {})
+          }}
           onClick={() => setActiveSection('archived')}
         >
-          <span className="sidebar-button-text">Archived Data</span>
+          <span style={styles.sidebarButtonText}>Archived Data</span>
         </button>
       </div>
 
       {/* Main Content */}
-      <div className="content-area">
+      <div style={styles.contentArea}>
         {activeSection === 'archiving' && (
-          <div className="section">
-            <h2 className="section-title">Data Archiving</h2>
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Data Archiving</h2>
 
-            <div className="form-row">
-              <label className="switch">
+            <div style={styles.formRow}>
+              <label style={styles.switch}>
                 <input 
                   type="checkbox" 
                   checked={autoArchive} 
                   onChange={(e) => setAutoArchive(e.target.checked)} 
+                  style={styles.switchInput}
                 />
-                <span className="slider round"></span>
+                <span style={{
+                  ...styles.slider,
+                  ...(autoArchive ? styles.sliderChecked : {})
+                }}>
+                  <span style={styles.sliderBefore}></span>
+                </span>
               </label>
-              <span className="label">Enable Automatic Archiving</span>
+              <span style={styles.label}>Enable Automatic Archiving</span>
             </div>
 
-            <div className="form-row">
-              <span className="label">Archive Every</span>
+            <div style={styles.formRow}>
+              <span style={styles.label}>Archive Every</span>
               <input
                 type="number"
                 placeholder="Days"
-                className="input"
+                style={styles.input}
                 value={archiveInterval}
                 onChange={(e) => setArchiveInterval(e.target.value)}
                 min="0"
               />
-              <span className="label">days (0 = archive now)</span>
+              <span style={styles.label}>days (0 = archive now)</span>
             </div>
 
             {lastArchiveDate && (
-              <div className="form-row">
-                <span className="label">Last Archive:</span>
-                <span className="label">
+              <div style={styles.formRow}>
+                <span style={styles.label}>Last Archive:</span>
+                <span style={styles.label}>
                   {new Date(lastArchiveDate).toLocaleString()}
                 </span>
               </div>
             )}
 
             <button 
-              className="save-button"
+              style={styles.saveButton}
               onClick={handleSaveSettings}
               disabled={loading}
             >
-              <span className="save-button-text">
+              <span style={styles.saveButtonText}>
                 {loading ? 'Processing...' : 'Save Settings'}
               </span>
             </button>
@@ -326,19 +340,19 @@ const DataManagement = () => {
         )}
 
         {activeSection === 'archived' && (
-          <div className="section">
-            <h2 className="section-title">Archived Data</h2>
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>Archived Data</h2>
 
-            <div className="search-row">
+            <div style={styles.searchRow}>
               <input 
                 type="text" 
                 placeholder="Search archives..." 
-                className="search-input"
+                style={styles.searchInput}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
               <button 
-                className="export-button"
+                style={styles.exportButton}
                 onClick={() => {
                   // Export list of archives
                   const workbook = new ExcelJS.Workbook();
@@ -373,48 +387,48 @@ const DataManagement = () => {
                   });
                 }}
               >
-                <FaDownload className="export-icon" />
+                <FaDownload style={styles.exportIcon} />
               </button>
             </div>
 
-            <div className="table-header">
-              <span className="table-header-text">Data type</span>
-              <span className="table-header-text">Date Archived</span>
-              <span className="table-header-text">Status</span>
-              <span className="table-header-text">Counts</span>
-              <span className="table-header-text">Actions</span>
+            <div style={styles.tableHeader}>
+              <span style={styles.tableHeaderText}>Data type</span>
+              <span style={styles.tableHeaderText}>Date Archived</span>
+              <span style={styles.tableHeaderText}>Status</span>
+              <span style={styles.tableHeaderText}>Counts</span>
+              <span style={styles.tableHeaderText}>Actions</span>
             </div>
 
             {filteredArchives.length === 0 ? (
-              <div className="no-data-message">No archived data found</div>
+              <div style={styles.noDataMessage}>No archived data found</div>
             ) : (
               filteredArchives.map(item => (
-                <div key={item.id} className="table-row">
-                  <span className="table-cell">{item.type || 'Full Archive'}</span>
-                  <span className="table-cell">
+                <div key={item.id} style={styles.tableRow}>
+                  <span style={styles.tableCell}>{item.type || 'Full Archive'}</span>
+                  <span style={styles.tableCell}>
                     {new Date(item.date).toLocaleDateString()}
                   </span>
-                  <span className="table-cell archived-status">{item.status}</span>
-                  <span className="table-cell">
+                  <span style={{...styles.tableCell, ...styles.archivedStatus}}>{item.status}</span>
+                  <span style={styles.tableCell}>
                     {item.counts ? (
                       `D:${item.counts.deposits || 0} L:${item.counts.loans || 0} R:${item.counts.registrations || 0}`
                     ) : 'N/A'}
                   </span>
-                  <div className="actions">
+                  <div style={styles.actions}>
                     <button 
-                      className="restore-button"
+                      style={styles.restoreButton}
                       onClick={() => {
                         // Implement restore functionality if needed
                         console.log('Restore archive:', item.id);
                       }}
                     >
-                      <FaUndo className="action-icon" />
+                      <FaUndo style={styles.actionIcon} />
                     </button>
                     <button 
-                      className="delete-button"
+                      style={styles.deleteButton}
                       onClick={() => handleDeleteArchive(item.id)}
                     >
-                      <FaTrashAlt className="action-icon" />
+                      <FaTrashAlt style={styles.actionIcon} />
                     </button>
                   </div>
                 </div>
@@ -423,337 +437,268 @@ const DataManagement = () => {
           </div>
         )}
       </div>
-
-      {/* CSS Styles */}
-      <style>{`
-        .data-management-container {
-          display: flex;
-          min-height: 100vh;
-          background-color: #eef1f5;
-        }
-
-        .sidebar {
-          width: 150px;
-          background-color: #dfe4ea;
-          padding-top: 20px;
-        }
-
-        .sidebar-button {
-          display: block;
-          width: 100%;
-          padding: 12px 10px;
-          border: none;
-          background: none;
-          text-align: left;
-          cursor: pointer;
-        }
-
-        .sidebar-button.active {
-          background-color: #2ecc71;
-          border-top-right-radius: 10px;
-          border-bottom-right-radius: 10px;
-        }
-
-        .sidebar-button-text {
-          font-size: 13px;
-          color: #333;
-        }
-
-        .sidebar-button.active .sidebar-button-text {
-          color: #fff;
-          font-weight: bold;
-        }
-
-        .content-area {
-          flex-grow: 1;
-          padding: 20px;
-          overflow-y: auto;
-        }
-
-        .section {
-          background-color: #fff;
-          border-radius: 8px;
-          padding: 15px;
-          margin-bottom: 20px;
-        }
-
-        .section-title {
-          font-size: 16px;
-          font-weight: bold;
-          margin-bottom: 15px;
-        }
-
-        .form-row {
-          display: flex;
-          align-items: center;
-          margin-bottom: 12px;
-        }
-
-        /* Custom switch styling */
-        .switch {
-          position: relative;
-          display: inline-block;
-          width: 50px;
-          height: 24px;
-        }
-
-        .switch input {
-          opacity: 0;
-          width: 0;
-          height: 0;
-        }
-
-        .slider {
-          position: absolute;
-          cursor: pointer;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          background-color: #ccc;
-          transition: .4s;
-        }
-
-        .slider:before {
-          position: absolute;
-          content: "";
-          height: 16px;
-          width: 16px;
-          left: 4px;
-          bottom: 4px;
-          background-color: white;
-          transition: .4s;
-        }
-
-        input:checked + .slider {
-          background-color: #2ecc71;
-        }
-
-        input:checked + .slider:before {
-          transform: translateX(26px);
-        }
-
-        .slider.round {
-          border-radius: 24px;
-        }
-
-        .slider.round:before {
-          border-radius: 50%;
-        }
-
-        .label {
-          font-size: 13px;
-          margin-left: 10px;
-        }
-
-        .input {
-          border: 1px solid #ccc;
-          border-radius: 5px;
-          padding: 8px 10px;
-          width: 80px;
-          font-size: 13px;
-          margin-left: 10px;
-        }
-
-        .save-button {
-          background-color: green;
-          padding: 8px 0;
-          border-radius: 5px;
-          border: none;
-          width: 100%;
-          cursor: pointer;
-        }
-
-        .save-button:disabled {
-          background-color: #ccc;
-          cursor: not-allowed;
-        }
-
-        .save-button-text {
-          color: #fff;
-          font-weight: 600;
-        }
-
-        .search-row {
-          display: flex;
-          align-items: center;
-          margin-bottom: 10px;
-        }
-
-        .search-input {
-          flex: 1;
-          border: 1px solid #ccc;
-          border-radius: 5px;
-          padding: 8px 10px;
-          font-size: 13px;
-        }
-
-        .export-button {
-          margin-left: 10px;
-          background-color: #ddd;
-          padding: 8px;
-          border-radius: 5px;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .export-icon {
-          font-size: 16px;
-        }
-
-        .table-header {
-          display: flex;
-          margin-bottom: 8px;
-          font-weight: bold;
-          padding: 8px 0;
-          border-bottom: 1px solid #eee;
-        }
-
-        .table-header-text {
-          font-size: 12px;
-          flex: 1;
-        }
-
-        .table-row {
-          display: flex;
-          align-items: center;
-          margin-bottom: 8px;
-          padding: 8px 0;
-          border-bottom: 1px solid #f5f5f5;
-        }
-
-        .table-cell {
-          font-size: 12px;
-          flex: 1;
-        }
-
-        .archived-status {
-          color: orange;
-          font-weight: bold;
-        }
-
-        .actions {
-          display: flex;
-          flex: 1;
-          justify-content: flex-end;
-          gap: 5px;
-        }
-
-        .restore-button {
-          background-color: #00C851;
-          padding: 6px;
-          border-radius: 4px;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .delete-button {
-          background-color: #ff4444;
-          padding: 6px;
-          border-radius: 4px;
-          border: none;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .action-icon {
-          color: #fff;
-          font-size: 12px;
-        }
-
-        .no-data-message {
-          text-align: center;
-          padding: 20px;
-          color: #666;
-          font-size: 14px;
-        }
-
-        .error-container {
-          padding: 20px;
-          text-align: center;
-          color: #ff4444;
-        }
-
-        .loading-container {
-          display: flex;
-          justify-content: center;
-          align-items: center;
-          height: 100vh;
-        }
-
-        .spinner {
-          border: 4px solid rgba(0, 0, 0, 0.1);
-          width: 36px;
-          height: 36px;
-          border-radius: 50%;
-          border-left-color: #001F3F;
-          animation: spin 1s linear infinite;
-        }
-
-        @keyframes spin {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
-
-        @media (max-width: 768px) {
-          .data-management-container {
-            flex-direction: column;
-          }
-
-          .sidebar {
-            width: 100%;
-            display: flex;
-            padding-top: 0;
-          }
-
-          .sidebar-button {
-            text-align: center;
-            padding: 10px;
-          }
-
-          .sidebar-button.active {
-            border-radius: 0;
-          }
-
-          .content-area {
-            padding: 15px;
-          }
-
-          .form-row {
-            flex-wrap: wrap;
-          }
-
-          .input {
-            margin-left: 0;
-            margin-top: 5px;
-            width: 100%;
-          }
-
-          .table-header, .table-row {
-            flex-wrap: wrap;
-          }
-
-          .table-header-text, .table-cell {
-            width: 100%;
-            margin-bottom: 5px;
-          }
-
-          .actions {
-            width: 100%;
-            justify-content: flex-start;
-          }
-        }
-      `}</style>
     </div>
   );
+};
+
+const styles = {
+  container: {
+    display: 'flex',
+    minHeight: '100vh',
+    backgroundColor: '#f5f7fa',
+  },
+  sidebar: {
+    width: '250px',
+    backgroundColor: '#fff',
+    padding: '20px',
+    borderRight: '1px solid #e0e0e0',
+    boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
+  },
+  sidebarButton: {
+    display: 'block',
+    width: '100%',
+    padding: '12px 15px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontSize: '14px',
+    color: '#555',
+    borderRadius: '4px',
+    transition: 'all 0.2s',
+  },
+  sidebarButtonActive: {
+    backgroundColor: '#f0f7ff',
+    color: '#2D5783',
+    fontWeight: '500',
+    borderLeft: '3px solid #2D5783',
+  },
+  sidebarButtonText: {
+    fontSize: '14px',
+  },
+  contentArea: {
+    flex: 1,
+    padding: '30px',
+    backgroundColor: '#fff',
+  },
+  section: {
+    marginBottom: '30px',
+  },
+  sectionTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '20px',
+    color: '#2D5783',
+    borderBottom: '1px solid #eee',
+    paddingBottom: '10px',
+  },
+  formRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '15px',
+  },
+  switch: {
+    position: 'relative',
+    display: 'inline-block',
+    width: '50px',
+    height: '24px',
+  },
+  switchInput: {
+    opacity: '0',
+    width: '0',
+    height: '0',
+  },
+  slider: {
+    position: 'absolute',
+    cursor: 'pointer',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    backgroundColor: '#ccc',
+    transition: '.4s',
+    borderRadius: '24px',
+  },
+  sliderChecked: {
+    backgroundColor: '#4CAF50',
+  },
+  sliderBefore: {
+    position: 'absolute',
+    content: '""',
+    height: '16px',
+    width: '16px',
+    left: '4px',
+    bottom: '4px',
+    backgroundColor: 'white',
+    transition: '.4s',
+    borderRadius: '50%',
+  },
+  label: {
+    fontSize: '14px',
+    color: '#555',
+    marginLeft: '10px',
+  },
+  input: {
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: '14px',
+    width: '80px',
+    marginLeft: '10px',
+    transition: 'border-color 0.2s',
+  },
+  saveButton: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '12px 24px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    marginTop: '20px',
+    transition: 'all 0.2s',
+  },
+  saveButtonText: {
+    color: 'white',
+  },
+  searchRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '15px',
+  },
+  searchInput: {
+    flex: 1,
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: '14px',
+  },
+  exportButton: {
+    marginLeft: '10px',
+    backgroundColor: '#f8f9fa',
+    padding: '10px',
+    border: 'none',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s',
+  },
+  exportIcon: {
+    fontSize: '16px',
+    color: '#555',
+  },
+  tableHeader: {
+    display: 'flex',
+    marginBottom: '10px',
+    padding: '10px 0',
+    borderBottom: '1px solid #eee',
+    fontWeight: '600',
+  },
+  tableHeaderText: {
+    fontSize: '14px',
+    flex: 1,
+    color: '#333',
+  },
+  tableRow: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '12px 0',
+    borderBottom: '1px solid #f5f5f5',
+  },
+  tableCell: {
+    fontSize: '14px',
+    flex: 1,
+    color: '#333',
+  },
+  archivedStatus: {
+    color: '#28a745',
+    fontWeight: '500',
+  },
+  actions: {
+    display: 'flex',
+    flex: 1,
+    justifyContent: 'flex-end',
+    gap: '8px',
+  },
+  restoreButton: {
+    backgroundColor: '#17a2b8',
+    padding: '8px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteButton: {
+    backgroundColor: '#dc3545',
+    padding: '8px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionIcon: {
+    color: 'white',
+    fontSize: '14px',
+  },
+  noDataMessage: {
+    textAlign: 'center',
+    padding: '20px',
+    color: '#6c757d',
+    fontSize: '14px',
+  },
+  errorContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: '100vh',
+    padding: '20px',
+    textAlign: 'center',
+  },
+  errorHeading: {
+    fontSize: '18px',
+    color: '#dc3545',
+    marginBottom: '10px',
+  },
+  errorText: {
+    fontSize: '14px',
+    color: '#6c757d',
+    marginBottom: '20px',
+  },
+  retryButton: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '10px 20px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderLeftColor: '#2D5783',
+    animation: 'spin 1s linear infinite',
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' },
+  },
 };
 
 export default DataManagement;

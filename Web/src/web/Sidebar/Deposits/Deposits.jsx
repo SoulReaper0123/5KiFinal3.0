@@ -23,10 +23,11 @@ import { ApproveDeposits } from '../../../../../Server/api';
 // Constants
 const depositOptions = [
   { key: 'Bank', label: 'Bank' },
-  { key: 'GCash', label: 'GCash' }
+  { key: 'GCash', label: 'GCash' },
+  { key: 'Cash', label: 'Cash on Hand' }
 ];
 
-const pageSize = 10; // Added missing pageSize constant
+const pageSize = 10;
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-PH', {
@@ -525,14 +526,12 @@ const Deposits = () => {
       if (settingsSnap.exists()) {
         setDepositAccounts(settingsSnap.val());
       } else {
-        // Fallback to old path if Accounts doesn't exist
         const oldSettingsSnap = await database.ref('Settings/DepositAccounts').once('value');
         if (oldSettingsSnap.exists()) {
           setDepositAccounts(oldSettingsSnap.val());
         }
       }
       
-      // Update filtered data based on active section
       const newFilteredData = 
         activeSection === 'applyDeposits' ? toArray(pSnap) :
         activeSection === 'approvedDeposits' ? toArray(aSnap) :
@@ -670,12 +669,18 @@ const Deposits = () => {
       [name]: value
     }));
 
-    if (name === 'depositOption' && value) {
+    if (name === 'depositOption' && value && value !== 'Cash') {
       const selectedAccount = depositAccounts[value];
       setFormData(prev => ({
         ...prev,
         accountName: selectedAccount.accountName || '',
         accountNumber: selectedAccount.accountNumber || ''
+      }));
+    } else if (name === 'depositOption' && value === 'Cash') {
+      setFormData(prev => ({
+        ...prev,
+        accountName: 'Cash on Hand',
+        accountNumber: 'N/A'
       }));
     }
   };
@@ -718,7 +723,7 @@ const Deposits = () => {
       setErrorModalVisible(true);
       return false;
     }
-    if (!proofOfDepositFile) {
+    if (formData.depositOption !== 'Cash' && !proofOfDepositFile) {
       setErrorMessage('Proof of deposit is required');
       setErrorModalVisible(true);
       return false;
@@ -749,11 +754,14 @@ const Deposits = () => {
     setIsProcessing(true);
 
     try {
-      // Upload proof of deposit
-      const proofOfDepositUrl = await uploadImageToStorage(
-        proofOfDepositFile, 
-        `proofsOfDeposit/${formData.memberId}_${Date.now()}`
-      );
+      let proofOfDepositUrl = '';
+      
+      if (formData.depositOption !== 'Cash') {
+        proofOfDepositUrl = await uploadImageToStorage(
+          proofOfDepositFile, 
+          `proofsOfDeposit/${formData.memberId}_${Date.now()}`
+        );
+      }
 
       const transactionId = generateTransactionId();
       const now = new Date();
@@ -761,7 +769,6 @@ const Deposits = () => {
       const approvalTime = formatTime(now);
       const amount = parseFloat(formData.amount);
 
-      // Create deposit record
       const depositData = {
         transactionId,
         id: formData.memberId,
@@ -772,7 +779,6 @@ const Deposits = () => {
         accountName: formData.accountName,
         accountNumber: formData.accountNumber,
         amountToBeDeposited: amount,
-        proofOfDepositUrl,
         dateApplied: approvalDate,
         timeApplied: approvalTime,
         dateApproved: approvalDate,
@@ -780,7 +786,10 @@ const Deposits = () => {
         status: 'approved'
       };
 
-      // Get references to all needed paths
+      if (proofOfDepositUrl) {
+        depositData.proofOfDepositUrl = proofOfDepositUrl;
+      }
+
       const approvedRef = database.ref(`Deposits/ApprovedDeposits/${formData.memberId}/${transactionId}`);
       const transactionRef = database.ref(`Transactions/Deposits/${formData.memberId}/${transactionId}`);
       const memberRef = database.ref(`Members/${formData.memberId}`);
@@ -791,27 +800,24 @@ const Deposits = () => {
       if (memberSnap.exists()) {
         const member = memberSnap.val();
 
-        // Execute all operations in sequence
         await approvedRef.set(depositData);
         await transactionRef.set(depositData);
 
-        // Update member balance
         const newBalance = parseFloat(member.balance || 0) + amount;
         await memberRef.update({ balance: newBalance });
 
-        // Update funds
-        const fundSnap = await fundsRef.once('value');
-        const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
-        await fundsRef.set(updatedFund);
+        if (formData.depositOption !== 'Cash') {
+          const fundSnap = await fundsRef.once('value');
+          const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
+          await fundsRef.set(updatedFund);
+        }
 
-        // Call API to send email
         await callApiApprove(depositData);
 
         setSuccessMessage('Deposit added and approved successfully!');
         setSuccessModalVisible(true);
         closeAddModal();
 
-        // Refresh data after successful addition
         await fetchAllData();
       } else {
         throw new Error('Member not found');
@@ -974,7 +980,6 @@ const Deposits = () => {
           )}
         </div>
 
-        {/* Add Deposit Button - Only show on Approved Deposits */}
         {activeSection === 'approvedDeposits' && (
           <button 
             className="plus-button" 
@@ -984,7 +989,6 @@ const Deposits = () => {
           </button>
         )}
 
-        {/* Add Deposit Modal */}
         {addModalVisible && (
           <div className="modal-overlay">
             <div className="modal-container">
@@ -1096,20 +1100,22 @@ const Deposits = () => {
                 />
               </div>
               
-              <div className="form-group">
-                <label className="form-label">
-                  Proof of Deposit<span className="required"> *</span>
-                </label>
-                <label className="file-input-label">
-                  {proofOfDepositFile ? proofOfDepositFile.name : 'Click to upload Proof of Deposit'}
-                  <input
-                    type="file"
-                    className="file-input"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, setProofOfDepositFile)}
-                  />
-                </label>
-              </div>
+              {formData.depositOption !== 'Cash' && (
+                <div className="form-group">
+                  <label className="form-label">
+                    Proof of Deposit<span className="required"> *</span>
+                  </label>
+                  <label className="file-input-label">
+                    {proofOfDepositFile ? proofOfDepositFile.name : 'Click to upload Proof of Deposit'}
+                    <input
+                      type="file"
+                      className="file-input"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, setProofOfDepositFile)}
+                    />
+                  </label>
+                </div>
+              )}
               
               <div className="modal-button-container">
                 <button
@@ -1134,7 +1140,6 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Confirmation Modal */}
         {confirmModalVisible && (
           <div className="centered-modal">
             <div className="confirm-modal-card">
@@ -1158,7 +1163,6 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Success Modal */}
         {successModalVisible && (
           <div className="centered-modal">
             <div className="small-modal-card">
@@ -1171,7 +1175,6 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Error Modal */}
         {errorModalVisible && (
           <div className="centered-modal">
             <div className="small-modal-card">
@@ -1184,7 +1187,6 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Processing Modal */}
         {isProcessing && (
           <div className="centered-modal">
             <div className="spinner"></div>

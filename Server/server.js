@@ -2287,6 +2287,81 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
   }
 });
 
+// Add this with your other email endpoints
+app.post('/send-loan-reminder', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating loan reminder email', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    dueDate,
+    loanAmount,
+    outstandingBalance,
+    memberId,
+    transactionId,
+    websiteLink,
+    facebookLink
+  } = req.body;
+
+  if (!email || !firstName || !lastName || !dueDate) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for loan reminder');
+    return res.status(400).json({ 
+      success: false,
+      message: 'Missing required fields'
+    });
+  }
+
+  try {
+    const formattedDueDate = formatDisplayDate(dueDate);
+    const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+    
+    // Format amounts safely
+    const formattedLoanAmount = parseFloat(loanAmount || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+    
+    const formattedOutstanding = parseFloat(outstandingBalance || loanAmount || 0).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+
+    const mailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: `Reminder: Loan Payment Due in ${daysUntilDue} Days`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <!-- ... other email content ... -->
+          <tr>
+            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Original Amount</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">₱${formattedLoanAmount}</td>
+          </tr>
+          <tr>
+            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Outstanding Balance</td>
+            <td style="padding: 8px; border: 1px solid #ddd;">₱${formattedOutstanding}</td>
+          </tr>
+          <!-- ... rest of email template ... -->
+        </div>
+      `
+    };
+
+    await transporter.sendMail(mailOptions);
+    console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
+    res.status(200).json({ 
+      success: true,
+      message: 'Loan reminder email sent successfully'
+    });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending loan reminder email:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to send loan reminder email',
+      error: error.message
+    });
+  }
+});
+
 // ==============================================
 // SERVER INITIALIZATION
 // ==============================================
