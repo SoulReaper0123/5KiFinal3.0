@@ -1032,14 +1032,7 @@ const styles = {
     padding: '30px',
     backgroundColor: '#fff',
   },
-  contentTitle: {
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: '25px',
-    paddingBottom: '10px',
-    borderBottom: '1px solid #eee',
-  },
+
   section: {
     marginBottom: '30px',
   },

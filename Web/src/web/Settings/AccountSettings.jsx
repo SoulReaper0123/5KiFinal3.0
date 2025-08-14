@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaEye, FaEyeSlash, FaCheckCircle, FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaCheckCircle } from 'react-icons/fa';
 import { AiOutlineClose } from 'react-icons/ai';
 import { getDatabase, ref, get, update } from 'firebase/database';
 import { getAuth, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
@@ -154,7 +154,7 @@ const AccountSettings = () => {
         <h2 className="header-text">Account Settings</h2>
 
         <div style={styles.container}>
-          {/* Sidebar Navigation */}
+          {/* Sidebar Navigation - Updated to match SystemSettings */}
           <div style={styles.sidebar}>
             <div style={styles.sidebarMenu}>
               <button
@@ -178,7 +178,7 @@ const AccountSettings = () => {
             </div>
           </div>
 
-          {/* Main Content Area */}
+          {/* Main Content Area - Updated to match SystemSettings */}
           <div style={styles.contentArea}>
             <h2 style={styles.contentTitle}>
               {activeSection === 'account' && 'Account Information'}
@@ -188,7 +188,7 @@ const AccountSettings = () => {
             {/* Account Information Section */}
             {activeSection === 'account' && (
               <div style={styles.section}>
-                {formError && <p style={styles.formError}>{formError}</p>}
+                {formError !== '' && <p style={styles.formError}>{formError}</p>}
 
                 <div style={styles.inputRow}>
                   <label style={styles.label}>Name:</label>
@@ -225,7 +225,7 @@ const AccountSettings = () => {
                   {isEditing ? (
                     <>
                       <button 
-                        style={styles.cancelBtn}
+                        style={styles.cancelBtn} 
                         onClick={() => {
                           setIsEditing(false);
                           setEditableData({
@@ -254,7 +254,7 @@ const AccountSettings = () => {
             {activeSection === 'security' && (
               <div style={styles.section}>
                 <button 
-                  style={styles.changePassBtn}
+                  style={styles.changePassBtn} 
                   onClick={() => setChangePasswordVisible(true)}
                 >
                   Change Password
@@ -284,11 +284,11 @@ const AccountSettings = () => {
             {renderPasswordField('New Password', newPassword, setNewPassword, 'new')}
             {renderPasswordField('Confirm Password', confirmPassword, setConfirmPassword, 'confirm')}
             
-            {passwordError && <p style={styles.formError}>{passwordError}</p>}
+            {passwordError !== '' && <p style={styles.formError}>{passwordError}</p>}
 
             <div style={styles.modalButtons}>
               <button 
-                style={styles.modalBtnCancel}
+                style={styles.modalBtnCancel} 
                 onClick={() => {
                   setChangePasswordVisible(false);
                   setPasswordError('');
@@ -297,7 +297,7 @@ const AccountSettings = () => {
                 Cancel
               </button>
               <button 
-                style={styles.modalBtnConfirm}
+                style={styles.modalBtnConfirm} 
                 onClick={handleChangePassword}
               >
                 Update Password
@@ -402,11 +402,6 @@ const styles = {
     fontSize: '14px',
     color: '#333',
   },
-  formError: {
-    color: 'red',
-    margin: '10px 0',
-    textAlign: 'center',
-  },
   buttonRow: {
     display: 'flex',
     justifyContent: 'flex-end',
@@ -443,12 +438,28 @@ const styles = {
   changePassBtn: {
     backgroundColor: '#F59E0B',
     color: 'white',
-    padding: '12px 24px',
+    padding: '10px 20px',
     borderRadius: '6px',
     border: 'none',
     cursor: 'pointer',
     fontWeight: 'bold',
-    fontSize: '15px',
+  },
+  formError: {
+    color: 'red',
+    margin: '10px 0',
+    textAlign: 'center',
+  },
+  errorBox: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: '1rem',
+    textAlign: 'center',
   },
   passwordField: {
     display: 'flex',
@@ -470,19 +481,18 @@ const styles = {
     left: '0',
     right: '0',
     bottom: '0',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.4)',
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: '1000',
   },
   modalContent: {
-    backgroundColor: '#fff',
-    padding: '24px',
-    borderRadius: '12px',
-    width: '90%',
-    maxWidth: '400px',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#f9f9f9',
+    borderRadius: '10px',
+    padding: '20px',
+    width: '35%',
+    maxWidth: '500px',
     position: 'relative',
   },
   modalTitle: {
@@ -494,8 +504,8 @@ const styles = {
   },
   modalButtons: {
     display: 'flex',
-    justifyContent: 'center',
-    gap: '15px',
+    justifyContent: 'space-between',
+    marginTop: '20px',
   },
   modalBtnCancel: {
     backgroundColor: '#f1f5f9',
@@ -568,22 +578,10 @@ const styles = {
     borderLeftColor: '#2D5783',
     animation: 'spin 1s linear infinite',
   },
-  errorBox: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '20px',
-  },
-  errorText: {
-    color: 'red',
-    fontSize: '1rem',
-    textAlign: 'center',
-  },
   '@keyframes spin': {
     '0%': { transform: 'rotate(0deg)' },
     '100%': { transform: 'rotate(360deg)' },
-  },
+  }
 };
 
 export default AccountSettings;
