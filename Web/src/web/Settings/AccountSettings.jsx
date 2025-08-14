@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { FaEye, FaEyeSlash, FaCheckCircle } from 'react-icons/fa';
+import { FaEye, FaEyeSlash, FaCheckCircle, FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes } from 'react-icons/fa';
 import { AiOutlineClose } from 'react-icons/ai';
 import { getDatabase, ref, get, update } from 'firebase/database';
 import { getAuth, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
@@ -107,16 +107,16 @@ const AccountSettings = () => {
   };
 
   const renderPasswordField = (label, value, setter, toggleKey) => (
-    <div className="password-field">
+    <div style={styles.passwordField}>
       <input
         type={showPassword[toggleKey] ? "text" : "password"}
-        className="input"
+        style={styles.input}
         placeholder={label}
         value={value}
         onChange={(e) => setter(e.target.value)}
       />
       <button
-        className="eye-icon"
+        style={styles.eyeIcon}
         onClick={() => setShowPassword(prev => ({ ...prev, [toggleKey]: !prev[toggleKey] }))}
       >
         {showPassword[toggleKey] ? <FaEye /> : <FaEyeSlash />}
@@ -126,94 +126,106 @@ const AccountSettings = () => {
 
   if (loading) {
     return (
-      <div className="loading-view">
-        <div className="spinner"></div>
+      <div style={styles.loadingContainer}>
+        <div style={styles.spinner}></div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="error-box">
-        <p className="error-text">Error: {String(error)}</p>
+      <div style={styles.errorBox}>
+        <p style={styles.errorText}>Error: {String(error)}</p>
       </div>
     );
   }
 
   if (!adminData) {
     return (
-      <div className="error-box">
-        <p className="error-text">Failed to load admin data.</p>
+      <div style={styles.errorBox}>
+        <p style={styles.errorText}>Failed to load admin data.</p>
       </div>
     );
   }
 
   return (
-    <div className="account-settings">
+    <div className="safe-area-view">
       <div className="main-container">
-        <h1 className="header-text">Account Settings</h1>
+        <h2 className="header-text">Account Settings</h2>
 
-        <div className="content-container">
-          {/* Sidebar */}
-          <div className="sidebar">
-            <button
-              className={`sidebar-button ${activeSection === 'account' ? 'active' : ''}`}
-              onClick={() => setActiveSection('account')}
-            >
-              <span className="sidebar-button-text">Account Information</span>
-            </button>
-
-            <button
-              className={`sidebar-button ${activeSection === 'security' ? 'active' : ''}`}
-              onClick={() => setActiveSection('security')}
-            >
-              <span className="sidebar-button-text">Security Settings</span>
-            </button>
+        <div style={styles.container}>
+          {/* Sidebar Navigation */}
+          <div style={styles.sidebar}>
+            <div style={styles.sidebarMenu}>
+              <button
+                style={{
+                  ...styles.sidebarButton,
+                  ...(activeSection === 'account' ? styles.sidebarButtonActive : {})
+                }}
+                onClick={() => setActiveSection('account')}
+              >
+                Account Information
+              </button>
+              <button
+                style={{
+                  ...styles.sidebarButton,
+                  ...(activeSection === 'security' ? styles.sidebarButtonActive : {})
+                }}
+                onClick={() => setActiveSection('security')}
+              >
+                Security Settings
+              </button>
+            </div>
           </div>
 
-          {/* Content */}
-          <div className="content-area">
-            {activeSection === 'account' && (
-              <div className="section-container">
-                <h2 className="section-header">Account Information</h2>
-                {formError !== '' && <p className="form-error">{formError}</p>}
+          {/* Main Content Area */}
+          <div style={styles.contentArea}>
+            <h2 style={styles.contentTitle}>
+              {activeSection === 'account' && 'Account Information'}
+              {activeSection === 'security' && 'Security Settings'}
+            </h2>
 
-                <div className="card">
-                  <label className="label">Name:</label>
+            {/* Account Information Section */}
+            {activeSection === 'account' && (
+              <div style={styles.section}>
+                {formError && <p style={styles.formError}>{formError}</p>}
+
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>Name:</label>
                   {isEditing ? (
                     <input
-                      className="input"
+                      style={styles.input}
                       value={editableData.name}
                       onChange={(e) => handleEditChange('name', e.target.value)}
                     />
                   ) : (
-                    <p className="value-text">{adminData.name}</p>
+                    <span style={styles.staticText}>{adminData.name}</span>
                   )}
                 </div>
 
-                <div className="card">
-                  <label className="label">Email:</label>
-                  <p className="value-text">{adminData.email}</p>
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>Email:</label>
+                  <span style={styles.staticText}>{adminData.email}</span>
                 </div>
 
-                <div className="card">
-                  <label className="label">Contact Number:</label>
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>Contact Number:</label>
                   {isEditing ? (
                     <input
-                      className="input"
+                      style={styles.input}
                       value={editableData.contactNumber}
                       onChange={(e) => handleEditChange('contactNumber', e.target.value)}
                     />
                   ) : (
-                    <p className="value-text">{adminData.contactNumber}</p>
+                    <span style={styles.staticText}>{adminData.contactNumber}</span>
                   )}
                 </div>
 
-                <div className="button-row">
+                <div style={styles.buttonRow}>
                   {isEditing ? (
                     <>
                       <button 
-                        className="cancel-btn" 
+                        style={styles.cancelBtn}
                         onClick={() => {
                           setIsEditing(false);
                           setEditableData({
@@ -223,29 +235,29 @@ const AccountSettings = () => {
                           setFormError('');
                         }}
                       >
-                        <span className="btn-text">Cancel</span>
+                        Cancel
                       </button>
-                      <button className="save-btn" onClick={handleSaveChanges}>
-                        <span className="btn-text">Save Changes</span>
+                      <button style={styles.saveBtn} onClick={handleSaveChanges}>
+                        Save Changes
                       </button>
                     </>
                   ) : (
-                    <button className="edit-btn" onClick={() => setIsEditing(true)}>
-                      <span className="btn-text">Edit Information</span>
+                    <button style={styles.editBtn} onClick={() => setIsEditing(true)}>
+                      Edit Information
                     </button>
                   )}
                 </div>
               </div>
             )}
 
+            {/* Security Settings Section */}
             {activeSection === 'security' && (
-              <div className="section-container">
-                <h2 className="section-header">Security Settings</h2>
+              <div style={styles.section}>
                 <button 
-                  className="change-pass-btn" 
+                  style={styles.changePassBtn}
                   onClick={() => setChangePasswordVisible(true)}
                 >
-                  <span className="btn-text">Change Password</span>
+                  Change Password
                 </button>
               </div>
             )}
@@ -255,40 +267,40 @@ const AccountSettings = () => {
 
       {/* Password Change Modal */}
       {changePasswordVisible && (
-        <div className="modal-overlay">
-          <div className="modal-container">
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
             <button 
               onClick={() => {
                 setChangePasswordVisible(false);
                 setPasswordError('');
               }} 
-              className="close-button"
+              style={styles.closeButton}
             >
               <AiOutlineClose />
             </button>
-            <h2 className="modal-title">Change Password</h2>
+            <h3 style={styles.modalTitle}>Change Password</h3>
             
             {renderPasswordField('Current Password', currentPassword, setCurrentPassword, 'current')}
             {renderPasswordField('New Password', newPassword, setNewPassword, 'new')}
             {renderPasswordField('Confirm Password', confirmPassword, setConfirmPassword, 'confirm')}
             
-            {passwordError !== '' && <p className="form-error">{passwordError}</p>}
+            {passwordError && <p style={styles.formError}>{passwordError}</p>}
 
-            <div className="modal-button-container">
+            <div style={styles.modalButtons}>
               <button 
-                className="cancel-button" 
+                style={styles.modalBtnCancel}
                 onClick={() => {
                   setChangePasswordVisible(false);
                   setPasswordError('');
                 }}
               >
-                <span className="cancel-button-text">Cancel</span>
+                Cancel
               </button>
               <button 
-                className="confirm-button" 
+                style={styles.modalBtnConfirm}
                 onClick={handleChangePassword}
               >
-                <span className="confirm-button-text">Update Password</span>
+                Update Password
               </button>
             </div>
           </div>
@@ -297,15 +309,15 @@ const AccountSettings = () => {
 
       {/* Success Modal */}
       {successModalVisible && (
-        <div className="modal-overlay">
-          <div className="modal-card-small">
-            <FaCheckCircle className="confirm-icon" />
-            <p className="modal-text">{successMessage}</p>
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCardSmall}>
+            <FaCheckCircle style={styles.confirmIcon} />
+            <p style={styles.modalText}>{successMessage}</p>
             <button
-              className="confirm-btn"
+              style={styles.confirmBtn}
               onClick={() => setSuccessModalVisible(false)}
             >
-              <span className="button-text">OK</span>
+              OK
             </button>
           </div>
         </div>
@@ -314,339 +326,264 @@ const AccountSettings = () => {
   );
 };
 
-// CSS Styles
-const styles = `
-  .account-settings {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-    background-color: #F5F5F5;
-  }
-
-  .main-container {
-    flex: 1;
-    padding: 10px;
-    margin-top: 70px;
-  }
-
-  .header-text {
-    font-weight: bold;
-    font-size: 2.5rem;
-    margin-bottom: 10px;
-    margin-left: 25px;
-    margin-right: 25px;
-  }
-
-  .content-container {
-    display: flex;
-    flex: 1;
-    margin: 0 25px;
-  }
-
-  .sidebar {
-    width: 200px;
-    background-color: #D9D9D9;
-    border-radius: 10px;
-    padding: 10px;
-    margin-right: 20px;
-  }
-
-  .sidebar-button {
-    padding: 15px 10px;
-    border-radius: 5px;
-    margin-bottom: 5px;
-    width: 100%;
-    border: none;
-    background: none;
-    text-align: left;
-    cursor: pointer;
-  }
-
-  .sidebar-button.active {
-    background-color: #2D5783;
-  }
-
-  .sidebar-button-text {
-    font-size: 1rem;
-    color: #333;
-  }
-
-  .sidebar-button.active .sidebar-button-text {
-    color: #fff;
-    font-weight: bold;
-  }
-
-  .content-area {
-    flex: 1;
-    padding-bottom: 20px;
-    overflow-y: auto;
-  }
-
-  .section-container {
-    background-color: #fff;
-    border-radius: 10px;
-    padding: 20px;
-    margin-bottom: 20px;
-  }
-
-  .section-header {
-    font-size: 1.375rem;
-    font-weight: bold;
-    margin-bottom: 20px;
-    color: #001F3F;
-  }
-
-  .card {
-    margin-bottom: 15px;
-  }
-
-  .label {
-    font-weight: bold;
-    margin-bottom: 5px;
-    color: #001F3F;
-    display: block;
-  }
-
-  .value-text {
-    font-size: 1rem;
-    padding: 8px 0;
-  }
-
-  .input {
-    border: 1px solid #ccc;
-    border-radius: 6px;
-    padding: 10px;
-    margin-top: 5px;
-    background-color: #fff;
-    width: 100%;
-    box-sizing: border-box;
-  }
-
-  .input:disabled {
-    background-color: #f5f5f5;
-    color: #666;
-  }
-
-  .button-row {
-    display: flex;
-    justify-content: flex-end;
-    margin-top: 20px;
-    gap: 10px;
-  }
-
-  .edit-btn, .save-btn, .change-pass-btn, .cancel-btn {
-    padding: 10px 20px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-  }
-
-  .edit-btn {
-    background-color: #2D5783;
-  }
-
-  .save-btn {
-    background-color: #4CAF50;
-  }
-
-  .cancel-btn {
-    background-color: #ccc;
-  }
-
-  .change-pass-btn {
-    background-color: #F59E0B;
-  }
-
-  .btn-text {
-    color: #fff;
-    text-align: center;
-    font-weight: bold;
-    font-size: 0.875rem;
-  }
-
-  .form-error {
-    color: red;
-    margin: 10px 0;
-    text-align: center;
-  }
-
-  .error-box {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 20px;
-  }
-
-  .error-text {
-    color: red;
-    font-size: 1rem;
-    text-align: center;
-  }
-
-  .password-field {
-    display: flex;
-    align-items: center;
-    margin-bottom: 15px;
-    position: relative;
-  }
-
-  .eye-icon {
-    position: absolute;
-    right: 10px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: #555;
-  }
-
-  .modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(0,0,0,0.4);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 1000;
-  }
-
-  .modal-container {
-    background-color: #f9f9f9;
-    border-radius: 10px;
-    padding: 20px;
-    width: 35%;
-    max-width: 500px;
-    position: relative;
-  }
-
-  .modal-title {
-    font-size: 1.25rem;
-    font-weight: bold;
-    margin-bottom: 20px;
-    color: #001F3F;
-    text-align: center;
-  }
-
-  .modal-description {
-    margin-bottom: 20px;
-    text-align: center;
-    color: #333;
-  }
-
-  .modal-button-container {
-    display: flex;
-    justify-content: space-between;
-    margin-top: 20px;
-  }
-
-  .cancel-button, .confirm-button {
-    padding: 12px;
-    border-radius: 8px;
-    width: 48%;
-    text-align: center;
-    border: none;
-    cursor: pointer;
-    font-weight: bold;
-  }
-
-  .cancel-button {
-    background-color: #ccc;
-  }
-
-  .confirm-button {
-    background-color: #2D5783;
-    color: #fff;
-  }
-
-  .close-button {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    z-index: 10;
-    padding: 5px;
-    background: none;
-    border: none;
-    cursor: pointer;
-  }
-
-  .modal-card-small {
-    background-color: #D9D9D9;
-    border-radius: 10px;
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 35%;
-    max-width: 400px;
-  }
-
-  .confirm-icon {
-    margin-bottom: 15px;
-    font-size: 30px;
-    color: #4CAF50;
-  }
-
-  .modal-text {
-    font-size: 1rem;
-    margin-bottom: 20px;
-    text-align: center;
-  }
-
-  .confirm-btn {
-    background-color: #2D5783;
-    padding: 10px 20px;
-    border-radius: 6px;
-    border: none;
-    cursor: pointer;
-    color: #fff;
-    font-weight: bold;
-  }
-
-  .loading-view {
-    flex: 1;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-  }
-
-  .spinner {
-    border: 4px solid rgba(0, 31, 63, 0.1);
-    border-radius: 50%;
-    border-top: 4px solid #001F3F;
-    width: 40px;
-    height: 40px;
-    animation: spin 1s linear infinite;
-  }
-
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-
-  @media (max-width: 800px) {
-    .content-container {
-      flex-direction: column;
-    }
-
-    .sidebar {
-      width: 100%;
-      margin-right: 0;
-      margin-bottom: 20px;
-    }
-
-    .modal-container, .modal-card-small {
-      width: 90%;
-    }
-  }
-`;
-
-// Add styles to the document
-const styleElement = document.createElement('style');
-styleElement.innerHTML = styles;
-document.head.appendChild(styleElement);
+const styles = {
+  container: {
+    display: 'flex',
+    minHeight: '100vh',
+    backgroundColor: '#f5f7fa',
+  },
+  sidebar: {
+    width: '250px',
+    backgroundColor: '#fff',
+    padding: '20px',
+    borderRight: '1px solid #e0e0e0',
+    boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
+  },
+  sidebarMenu: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px',
+  },
+  sidebarButton: {
+    display: 'block',
+    width: '100%',
+    padding: '12px 15px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontSize: '14px',
+    color: '#555',
+    borderRadius: '4px',
+    transition: 'all 0.2s',
+  },
+  sidebarButtonActive: {
+    backgroundColor: '#f0f7ff',
+    color: '#2D5783',
+    fontWeight: '500',
+    borderLeft: '3px solid #2D5783',
+  },
+  contentArea: {
+    flex: 1,
+    padding: '30px',
+    backgroundColor: '#fff',
+  },
+  contentTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: '25px',
+    paddingBottom: '10px',
+    borderBottom: '1px solid #eee',
+  },
+  section: {
+    marginBottom: '30px',
+  },
+  inputRow: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '15px',
+  },
+  label: {
+    fontSize: '14px',
+    color: '#555',
+    width: '200px',
+    fontWeight: '500',
+  },
+  input: {
+    flex: 1,
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    padding: '10px 12px',
+    fontSize: '14px',
+    transition: 'border-color 0.2s',
+  },
+  staticText: {
+    fontSize: '14px',
+    color: '#333',
+  },
+  formError: {
+    color: 'red',
+    margin: '10px 0',
+    textAlign: 'center',
+  },
+  buttonRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: '20px',
+    gap: '10px',
+  },
+  editBtn: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  saveBtn: {
+    backgroundColor: '#4CAF50',
+    color: 'white',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  cancelBtn: {
+    backgroundColor: '#ccc',
+    color: '#333',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+  },
+  changePassBtn: {
+    backgroundColor: '#F59E0B',
+    color: 'white',
+    padding: '12px 24px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '15px',
+  },
+  passwordField: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '15px',
+    position: 'relative',
+  },
+  eyeIcon: {
+    position: 'absolute',
+    right: '10px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#555',
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: '0',
+    left: '0',
+    right: '0',
+    bottom: '0',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: '1000',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    padding: '24px',
+    borderRadius: '12px',
+    width: '90%',
+    maxWidth: '400px',
+    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    position: 'relative',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#2D5783',
+    textAlign: 'center',
+  },
+  modalButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '15px',
+  },
+  modalBtnCancel: {
+    backgroundColor: '#f1f5f9',
+    color: '#555',
+    padding: '12px 24px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+  },
+  modalBtnConfirm: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '12px 24px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '500',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    zIndex: '10',
+    padding: '5px',
+    background: 'none',
+    border: 'none',
+    cursor: 'pointer',
+  },
+  modalCardSmall: {
+    backgroundColor: '#D9D9D9',
+    borderRadius: '10px',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    width: '35%',
+    maxWidth: '400px',
+  },
+  confirmIcon: {
+    marginBottom: '15px',
+    fontSize: '30px',
+    color: '#4CAF50',
+  },
+  modalText: {
+    fontSize: '1rem',
+    marginBottom: '20px',
+    textAlign: 'center',
+  },
+  confirmBtn: {
+    backgroundColor: '#2D5783',
+    padding: '10px 20px',
+    borderRadius: '6px',
+    border: 'none',
+    cursor: 'pointer',
+    color: '#fff',
+    fontWeight: 'bold',
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100vh',
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    width: '36px',
+    height: '36px',
+    borderRadius: '50%',
+    borderLeftColor: '#2D5783',
+    animation: 'spin 1s linear infinite',
+  },
+  errorBox: {
+    flex: 1,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '20px',
+  },
+  errorText: {
+    color: 'red',
+    fontSize: '1rem',
+    textAlign: 'center',
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' },
+  },
+};
 
 export default AccountSettings;
