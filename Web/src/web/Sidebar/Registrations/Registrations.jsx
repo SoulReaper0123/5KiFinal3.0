@@ -479,6 +479,34 @@ const styles = {
   unpaidStatus: {
     backgroundColor: '#f44336',
     color: 'white'
+  },
+  verifyButton: {
+    padding: '8px 16px',
+    backgroundColor: '#2D5783',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    marginTop: '10px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '5px',
+    '&:hover': {
+      backgroundColor: '#1a3d66'
+    },
+    '&:disabled': {
+      backgroundColor: '#ccc',
+      cursor: 'not-allowed'
+    }
+  },
+  imageViewerHeader: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    marginBottom: '20px'
   }
 };
 
@@ -523,19 +551,139 @@ const Registrations = ({
   useEffect(() => {
     const loadModels = async () => {
       try {
+        console.log('Loading face-api.js models...');
+        
+        // Load models individually with better error handling
+        console.log('Loading TinyFaceDetector...');
         await faceapi.nets.tinyFaceDetector.loadFromUri('/models');
+        console.log('TinyFaceDetector loaded successfully');
+        
+        console.log('Loading FaceLandmark68Net...');
         await faceapi.nets.faceLandmark68Net.loadFromUri('/models');
+        console.log('FaceLandmark68Net loaded successfully');
+        
+        console.log('Loading FaceRecognitionNet...');
         await faceapi.nets.faceRecognitionNet.loadFromUri('/models');
+        console.log('FaceRecognitionNet loaded successfully');
+        
+        console.log('All face-api.js models loaded successfully');
         setModelsLoaded(true);
       } catch (err) {
         console.error('Failed to load face-api.js models:', err);
+        console.error('Error details:', err.message);
+        console.error('Make sure model files are in the /public/models directory');
+        console.error('Current location should be: /public/models/');
+        
+        // Try to provide more specific error information
+        if (err.message.includes('404')) {
+          console.error('Model files not found. Check if files exist in /public/models/');
+        } else if (err.message.includes('CORS')) {
+          console.error('CORS error loading models. Check server configuration.');
+        }
+        
+        // Set models as not loaded but allow manual verification
+        setModelsLoaded(false);
+        console.warn('Face verification will use manual validation mode');
       }
     };
 
     loadModels();
   }, []);
 
+  const loadImageWithCORS = async (imageUrl) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      
+      // Try multiple CORS strategies
+      const tryLoadImage = (corsMode, useProxy = false) => {
+        const newImg = new Image();
+        if (corsMode) {
+          newImg.crossOrigin = corsMode;
+        }
+        
+        // Use proxy for CORS issues if needed
+        const finalUrl = useProxy ? 
+          `https://cors-anywhere.herokuapp.com/${imageUrl}` : 
+          imageUrl;
+        
+        newImg.onload = () => {
+          console.log(`Image loaded successfully with CORS mode: ${corsMode || 'none'}${useProxy ? ' (via proxy)' : ''}`);
+          resolve(newImg);
+        };
+        
+        newImg.onerror = (error) => {
+          console.warn(`Failed to load image with CORS mode: ${corsMode || 'none'}${useProxy ? ' (via proxy)' : ''}`, error);
+          
+          if (corsMode === 'anonymous' && !useProxy) {
+            // Try with use-credentials
+            tryLoadImage('use-credentials', false);
+          } else if (corsMode === 'use-credentials' && !useProxy) {
+            // Try without CORS
+            tryLoadImage(null, false);
+          } else if (!corsMode && !useProxy) {
+            // Try with proxy as last resort
+            console.log('Attempting to load image via CORS proxy...');
+            tryLoadImage('anonymous', true);
+          } else {
+            // All methods failed - but still resolve with a basic image for manual verification
+            console.warn('All image loading methods failed, creating placeholder for manual verification');
+            const placeholderImg = new Image();
+            placeholderImg.width = 300;
+            placeholderImg.height = 200;
+            resolve(placeholderImg);
+          }
+        };
+        
+        newImg.src = finalUrl;
+      };
+      
+      // Start with anonymous CORS
+      tryLoadImage('anonymous');
+    });
+  };
+
+  const manualVerifyID = async (imageUrl, label) => {
+    setIsValidating(true);
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Manual ID verification...' }
+    }));
+
+    try {
+      // Load image to verify it's accessible
+      const loadedImg = await loadImageWithCORS(imageUrl);
+      console.log('Image loaded for manual ID verification');
+      
+      // Since face-api.js models failed, provide manual verification option
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { 
+          status: 'manual', 
+          message: 'Manual ID verification required',
+          details: 'OCR and face detection models unavailable. Please verify manually that this is a valid ID document.'
+        }
+      }));
+    } catch (error) {
+      console.error('Manual ID verification failed:', error);
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { 
+          status: 'error', 
+          message: 'Image loading failed', 
+          details: error.message 
+        }
+      }));
+    } finally {
+      setIsValidating(false);
+    }
+  };
+
   const verifyID = async (imageUrl, label) => {
+    if (!modelsLoaded) {
+      console.warn('Models not loaded, using manual ID verification');
+      return manualVerifyID(imageUrl, label);
+    }
+
     setIsValidating(true);
     setValidationStatus(prev => ({
       ...prev,
@@ -543,23 +691,72 @@ const Registrations = ({
     }));
 
     try {
-      // Face detection
-      const img = await faceapi.fetchImage(imageUrl);
-      const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions())
-        .withFaceLandmarks()
-        .withFaceDescriptors();
+      console.log(`Starting ID verification for: ${label}`);
+      console.log(`Image URL: ${imageUrl}`);
 
-      // OCR text recognition
-      const { data: { text } } = await Tesseract.recognize(
-        imageUrl,
-        'eng',
-        { logger: m => console.log(m) }
-      );
+      // Load image with CORS handling
+      const loadedImg = await loadImageWithCORS(imageUrl);
+      console.log('Image loaded successfully');
+
+      // Face detection with better error handling and multiple attempts
+      let detections = [];
+      try {
+        // First try with more sensitive options
+        const options = new faceapi.TinyFaceDetectorOptions({
+          inputSize: 416,
+          scoreThreshold: 0.3
+        });
+        detections = await faceapi.detectAllFaces(loadedImg, options)
+          .withFaceLandmarks()
+          .withFaceDescriptors();
+        console.log(`Face detection completed. Found ${detections.length} faces`);
+        
+        // If no faces found, try with more sensitive settings
+        if (detections.length === 0) {
+          const sensitiveOptions = new faceapi.TinyFaceDetectorOptions({
+            inputSize: 320,
+            scoreThreshold: 0.2
+          });
+          detections = await faceapi.detectAllFaces(loadedImg, sensitiveOptions)
+            .withFaceLandmarks()
+            .withFaceDescriptors();
+          console.log(`Sensitive detection: Found ${detections.length} faces`);
+        }
+      } catch (faceError) {
+        console.error('Face detection error:', faceError);
+        // Continue with OCR even if face detection fails
+      }
+
+      // OCR text recognition with better error handling
+      let text = '';
+      try {
+        console.log('Starting OCR...');
+        const { data: { text: ocrText } } = await Tesseract.recognize(
+          imageUrl,
+          'eng',
+          { 
+            logger: m => console.log('OCR:', m),
+            errorHandler: err => console.error('OCR Error:', err)
+          }
+        );
+        text = ocrText;
+        console.log('OCR completed:', text.substring(0, 100));
+      } catch (ocrError) {
+        console.error('OCR failed:', ocrError);
+        text = 'OCR failed';
+      }
 
       // Check for ID features
-      const hasDate = /\d{2}\/\d{2}\/\d{4}/.test(text);
+      const hasDate = /\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}/.test(text);
       const hasIDNumber = /[A-Za-z0-9]{8,}/.test(text);
       const hasName = /[A-Z][a-z]+ [A-Z][a-z]+/.test(text);
+
+      console.log('ID validation results:', { 
+        faces: detections.length, 
+        hasDate, 
+        hasIDNumber, 
+        hasName 
+      });
 
       if (detections.length > 0 && hasDate && hasIDNumber && hasName) {
         setValidationStatus(prev => ({
@@ -590,51 +787,197 @@ const Registrations = ({
       console.error('ID verification failed:', error);
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { status: 'error', message: 'Verification failed', details: error.message }
+        [label]: { 
+          status: 'error', 
+          message: 'Verification failed', 
+          details: error.message 
+        }
       }));
     } finally {
       setIsValidating(false);
     }
   };
 
+  const manualVerifyFace = async (imageUrl, label) => {
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Manual verification triggered...' }
+    }));
+
+    try {
+      // Load image to verify it's accessible
+      const loadedImg = await loadImageWithCORS(imageUrl);
+      console.log('Image loaded for manual verification');
+      
+      // Since face-api.js models failed, provide manual verification option
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { 
+          status: 'manual', 
+          message: 'Manual verification required',
+          details: 'Face detection models unavailable. Please verify manually that this is a clear selfie with ID.'
+        }
+      }));
+    } catch (error) {
+      console.error('Manual face verification failed:', error);
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { 
+          status: 'error', 
+          message: 'Image loading failed', 
+          details: error.message 
+        }
+      }));
+    }
+  };
+
   const verifyFace = async (imageUrl, label) => {
+    if (!modelsLoaded) {
+      console.warn('Models not loaded, using manual verification');
+      return manualVerifyFace(imageUrl, label);
+    }
+
     setValidationStatus(prev => ({
       ...prev,
       [label]: { status: 'verifying', message: 'Verifying face...' }
     }));
 
     try {
-      const img = await faceapi.fetchImage(imageUrl);
-      const detections = await faceapi.detectAllFaces(img, new faceapi.TinyFaceDetectorOptions());
+      console.log(`Starting face verification for: ${label}`);
+      console.log(`Image URL: ${imageUrl}`);
+
+      // Load image with CORS handling
+      const loadedImg = await loadImageWithCORS(imageUrl);
+      console.log('Image loaded successfully');
+      console.log('Image dimensions:', loadedImg.width, 'x', loadedImg.height);
+
+      // Try multiple detection options for better accuracy
+      let detections = [];
+      
+      // First try with more sensitive options
+      try {
+        const options = new faceapi.TinyFaceDetectorOptions({
+          inputSize: 416,  // Higher input size for better detection
+          scoreThreshold: 0.3  // Lower threshold for more sensitive detection
+        });
+        detections = await faceapi.detectAllFaces(loadedImg, options);
+        console.log(`First attempt: Found ${detections.length} faces with sensitive options`);
+      } catch (error) {
+        console.warn('First detection attempt failed:', error);
+      }
+
+      // If no faces found, try with even more sensitive settings
+      if (detections.length === 0) {
+        try {
+          const options = new faceapi.TinyFaceDetectorOptions({
+            inputSize: 320,
+            scoreThreshold: 0.2  // Even lower threshold
+          });
+          detections = await faceapi.detectAllFaces(loadedImg, options);
+          console.log(`Second attempt: Found ${detections.length} faces with very sensitive options`);
+        } catch (error) {
+          console.warn('Second detection attempt failed:', error);
+        }
+      }
+
+      // If still no faces, try default options as fallback
+      if (detections.length === 0) {
+        try {
+          detections = await faceapi.detectAllFaces(loadedImg, new faceapi.TinyFaceDetectorOptions());
+          console.log(`Fallback attempt: Found ${detections.length} faces with default options`);
+        } catch (error) {
+          console.warn('Fallback detection attempt failed:', error);
+        }
+      }
+
+      console.log(`Face detection completed. Found ${detections.length} faces`);
+      
+      // Log detection details for debugging
+      if (detections.length > 0) {
+        detections.forEach((detection, index) => {
+          console.log(`Face ${index + 1}:`, {
+            score: detection.score,
+            box: detection.box,
+            dimensions: `${detection.box.width}x${detection.box.height}`
+          });
+        });
+      }
 
       if (detections.length > 0) {
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { status: 'valid', message: 'Face detected' }
+          [label]: { 
+            status: 'valid', 
+            message: `Face detected (${detections.length} face${detections.length > 1 ? 's' : ''})`,
+            details: `Detection confidence: ${Math.round(detections[0].score * 100)}%`
+          }
         }));
       } else {
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { status: 'invalid', message: 'No faces detected' }
+          [label]: { 
+            status: 'invalid', 
+            message: 'No faces detected',
+            details: 'Try ensuring good lighting and face is clearly visible'
+          }
         }));
       }
     } catch (error) {
       console.error('Face verification failed:', error);
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { status: 'error', message: 'Verification failed' }
+        [label]: { 
+          status: 'error', 
+          message: 'Verification failed', 
+          details: error.message 
+        }
       }));
     }
   };
 
   const handleImageClick = (url, label) => {
+    
+    // First open the image viewer
+    setCurrentImage({ url, label });
+    setImageViewerVisible(true);
+ 
+    if (modelsLoaded) {
+      if (label.includes('ID')) {
+        verifyID(url, label);
+      } else if (label.includes('Selfie')) {
+        verifyFace(url, label);
+      }
+    } else {
+      console.warn('Face-api.js models not loaded yet');
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Models not loaded yet' }
+      }));
+    }
+  
+  };
+
+  const handleManualVerification = () => {
+    const { url, label } = currentImage;
+    
+    if (!modelsLoaded) {
+      console.warn('Face-api.js models not loaded yet');
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Models not loaded yet' }
+      }));
+      return;
+    }
+
+    console.log('Manual verification triggered for:', label);
+    console.log('Models loaded:', modelsLoaded);
+    console.log('Image URL:', url);
+
     if (label.includes('ID')) {
       verifyID(url, label);
     } else if (label.includes('Selfie')) {
       verifyFace(url, label);
     }
-    setCurrentImage({ url, label });
-    setImageViewerVisible(true);
   };
 
   const formatTime = (date) => {
@@ -1163,11 +1506,25 @@ const processDatabaseApprove = async (reg) => {
       statusStyle = styles.validText;
     } else if (status.status === 'invalid' || status.status === 'error') {
       statusStyle = styles.invalidText;
+    } else if (status.status === 'manual') {
+      statusStyle = { ...styles.verifyingText, color: '#FF9800' }; // Orange for manual verification
     }
 
     return (
-      <div style={{ ...styles.validationText, ...statusStyle }}>
-        {status.message}
+      <div>
+        <div style={{ ...styles.validationText, ...statusStyle }}>
+          {status.message}
+        </div>
+        {status.details && (
+          <div style={{ 
+            ...styles.validationText, 
+            fontSize: '10px', 
+            marginTop: '4px',
+            opacity: 0.8 
+          }}>
+            {status.details}
+          </div>
+        )}
       </div>
     );
   };
@@ -1650,8 +2007,27 @@ const processDatabaseApprove = async (reg) => {
             >
               <FaTimes />
             </button>
-            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
-            {getValidationText(currentImage.label)}
+            <div style={styles.imageViewerHeader}>
+              <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+              <button
+                style={styles.verifyButton}
+                onClick={handleManualVerification}
+                disabled={!modelsLoaded || isValidating}
+                onFocus={(e) => e.target.style.outline = 'none'}
+              >
+                {isValidating ? (
+                  <>
+                    <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+                    Verifying...
+                  </>
+                ) : (
+                  <>
+                    {currentImage.label?.includes('ID') ? 'Verify ID' : 'Verify Face'}
+                  </>
+                )}
+              </button>
+              {getValidationText(currentImage.label)}
+            </div>
           </div>
         </div>
       )}

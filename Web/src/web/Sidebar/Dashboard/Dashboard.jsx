@@ -3,6 +3,7 @@ import { database } from '../../../../../Database/firebaseConfig';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 import { SendLoanReminder } from '../../../../../Server/api';
+import { FaTimes, FaCheckCircle, FaExclamationCircle, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
 
 // Register Chart.js components
 Chart.register(
@@ -33,9 +34,14 @@ const Dashboard = () => {
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
   const [selectedChart, setSelectedChart] = useState('loans');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedLoan, setSelectedLoan] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [showResendConfirmation, setShowResendConfirmation] = useState(false);
+  const [selectedLoan, setSelectedLoan] = useState(null);
+  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   const checkDueDates = async () => {
     try {
@@ -104,51 +110,65 @@ const Dashboard = () => {
     }
   };
 
-const handleResendReminder = async (loan) => {
-  try {
-    const membersRef = database.ref(`Members/${loan.memberId}`);
-    const membersSnapshot = await membersRef.once('value');
-    const member = membersSnapshot.val();
+  const handleResendClick = (loan) => {
+    setSelectedLoan(loan);
+    setShowResendConfirmation(true);
+  };
 
-    if (member && member.email) {
-      await SendLoanReminder({
-        memberId: loan.memberId,
-        transactionId: loan.transactionId,
-        dueDate: loan.dueDate,
-        email: member.email,
-        firstName: member.firstName,
-        lastName: member.lastName,
-        loanAmount: loan.loanAmount,
-        outstandingBalance: loan.outstandingBalance
-      });
+  const confirmResendReminder = async () => {
+    setShowResendConfirmation(false);
+    setActionInProgress(true);
+    
+    try {
+      const membersRef = database.ref(`Members/${selectedLoan.memberId}`);
+      const membersSnapshot = await membersRef.once('value');
+      const member = membersSnapshot.val();
 
-      // Update the notification record
-      const notificationKey = `${loan.memberId}_${loan.transactionId}`;
-      const updates = {
-        resentAt: new Date().toISOString()
-      };
-      
-      // Check if database.ServerValue exists or use alternative increment method
-      if (database.ServerValue && database.ServerValue.increment) {
-        updates.resendCount = database.ServerValue.increment(1);
+      if (member && member.email) {
+        await SendLoanReminder({
+          memberId: selectedLoan.memberId,
+          transactionId: selectedLoan.transactionId,
+          dueDate: selectedLoan.dueDate,
+          email: member.email,
+          firstName: member.firstName,
+          lastName: member.lastName,
+          loanAmount: selectedLoan.loanAmount,
+          outstandingBalance: selectedLoan.outstandingBalance
+        });
+
+        // Update the notification record
+        const notificationKey = `${selectedLoan.memberId}_${selectedLoan.transactionId}`;
+        const updates = {
+          resentAt: new Date().toISOString()
+        };
+        
+        // Check if database.ServerValue exists or use alternative increment method
+        if (database.ServerValue && database.ServerValue.increment) {
+          updates.resendCount = database.ServerValue.increment(1);
+        } else {
+          // Fallback method if ServerValue.increment isn't available
+          const notificationRef = database.ref(`LoanNotifications/${notificationKey}`);
+          const notificationSnap = await notificationRef.once('value');
+          const currentCount = notificationSnap.val()?.resendCount || 0;
+          updates.resendCount = currentCount + 1;
+        }
+
+        await database.ref(`LoanNotifications/${notificationKey}`).update(updates);
+        
+        setSuccessMessage('Reminder resent successfully!');
+        setSuccessMessageModalVisible(true);
       } else {
-        // Fallback method if ServerValue.increment isn't available
-        const notificationRef = database.ref(`LoanNotifications/${notificationKey}`);
-        const notificationSnap = await notificationRef.once('value');
-        const currentCount = notificationSnap.val()?.resendCount || 0;
-        updates.resendCount = currentCount + 1;
+        setErrorMessage('Member email not found');
+        setErrorModalVisible(true);
       }
-
-      await database.ref(`LoanNotifications/${notificationKey}`).update(updates);
-      alert('Reminder resent successfully!');
-    } else {
-      alert('Member email not found');
+    } catch (error) {
+      console.error('Error resending reminder:', error);
+      setErrorMessage('Failed to resend reminder');
+      setErrorModalVisible(true);
+    } finally {
+      setActionInProgress(false);
     }
-  } catch (error) {
-    console.error('Error resending reminder:', error);
-    alert('Failed to resend reminder');
-  }
-};
+  };
 
   useEffect(() => {
     // Run check immediately when component mounts
@@ -446,6 +466,76 @@ const handleResendReminder = async (loan) => {
     loan.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Modal styles matching your Registrations component
+  const modalStyles = {
+    centeredModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000
+    },
+    modalCardSmall: {
+      width: '250px',
+      backgroundColor: 'white',
+      borderRadius: '8px',
+      padding: '20px',
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      textAlign: 'center'
+    },
+    confirmIcon: {
+      marginBottom: '12px',
+      fontSize: '32px'
+    },
+    modalText: {
+      fontSize: '14px',
+      marginBottom: '16px',
+      textAlign: 'center',
+      color: '#333',
+      lineHeight: '1.4'
+    },
+    actionButton: {
+      padding: '8px 16px',
+      borderRadius: '4px',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: 'bold',
+      fontSize: '14px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      transition: 'all 0.2s',
+      minWidth: '100px',
+      outline: 'none',
+      '&:focus': {
+        outline: 'none',
+        boxShadow: 'none'
+      }
+    },
+    spinner: {
+      border: '4px solid rgba(0, 0, 0, 0.1)',
+      borderLeftColor: '#2D5783',
+      borderRadius: '50%',
+      width: '36px',
+      height: '36px',
+      animation: 'spin 1s linear infinite'
+    },
+    '@keyframes spin': {
+      '0%': { transform: 'rotate(0deg)' },
+      '100%': { transform: 'rotate(360deg)' }
+    }
+  };
+
   return (
     <div className="dashboard-container">
       <div className="dashboard-header">
@@ -602,7 +692,7 @@ const handleResendReminder = async (loan) => {
                     </td>
                     <td className="text-center">
                       <button 
-                        onClick={() => handleResendReminder(loan)}
+                        onClick={() => handleResendClick(loan)}
                         className="resend-button"
                       >
                         Resend Reminder
@@ -619,6 +709,87 @@ const handleResendReminder = async (loan) => {
           </table>
         </div>
       </div>
+
+      {/* Resend Confirmation Modal */}
+      {showResendConfirmation && (
+        <div style={modalStyles.centeredModal}>
+          <div style={modalStyles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...modalStyles.confirmIcon, color: '#2D5783' }} />
+            <p style={modalStyles.modalText}>Are you sure you want to resend the payment reminder?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...modalStyles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmResendReminder}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...modalStyles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowResendConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {successMessageModalVisible && (
+        <div style={modalStyles.centeredModal}>
+          <div style={modalStyles.modalCardSmall}>
+            <FaCheckCircle style={{ ...modalStyles.confirmIcon, color: '#4CAF50' }} />
+            <p style={modalStyles.modalText}>{successMessage}</p>
+            <button 
+              style={{
+                ...modalStyles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setSuccessMessageModalVisible(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {errorModalVisible && (
+        <div style={modalStyles.centeredModal}>
+          <div style={modalStyles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...modalStyles.confirmIcon, color: '#f44336' }} />
+            <p style={modalStyles.modalText}>{errorMessage}</p>
+            <button 
+              style={{
+                ...modalStyles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setErrorModalVisible(false)}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Loading Spinner */}
+      {actionInProgress && (
+        <div style={modalStyles.centeredModal}>
+          <div style={modalStyles.spinner}></div>
+        </div>
+      )}
 
       <style jsx>{`
         :root {
