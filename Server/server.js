@@ -42,6 +42,15 @@ const formatDisplayDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', options);
 };
 
+// Helper function to format amounts for display
+const formatAmount = (amount) => {
+    if (!amount && amount !== 0) return '0.00';
+    return parseFloat(amount).toLocaleString(undefined, {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2
+    });
+};
+
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -860,7 +869,7 @@ app.post('/deposit', async (req, res) => {
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amountToBeDeposited}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amountToBeDeposited)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Method</td>
@@ -919,7 +928,7 @@ app.post('/deposit', async (req, res) => {
                     
                     <p>Hi ${firstName},</p>
                     
-                    <p>We have received your deposit application for <strong>₱${amountToBeDeposited}</strong> via <strong>${depositOption}</strong>.</p>
+                    <p>We have received your deposit application for <strong>₱${formatAmount(amountToBeDeposited)}</strong> via <strong>${depositOption}</strong>.</p>
                     
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Application Details:</h3>
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -993,7 +1002,7 @@ app.post('/approveDeposits', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            We are pleased to inform you that your deposit of ₱${amount} has been approved on ${dateApproved}.
+                            We are pleased to inform you that your deposit of ₱${formatAmount(amount)} has been approved on ${dateApproved}.
                         </p>
                     </div>
                     
@@ -1001,7 +1010,7 @@ app.post('/approveDeposits', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td>
@@ -1069,7 +1078,7 @@ app.post('/rejectDeposits', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         ${rejectionReason ? `
                         <tr>
@@ -1134,7 +1143,7 @@ app.post('/withdraw', async (req, res) => {
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date</td>
@@ -1180,7 +1189,7 @@ app.post('/withdraw', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            Your withdrawal request for ₱${amount} has been processed on ${formatDisplayDate(date)}.
+                            Your withdrawal request for ₱${formatAmount(amount)} has been processed on ${formatDisplayDate(date)}.
                         </p>
                     </div>
                     
@@ -1188,7 +1197,7 @@ app.post('/withdraw', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Recipient Account</td>
@@ -1239,7 +1248,7 @@ app.post('/approveWithdraws', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            Your withdrawal of ₱${amount} has been approved on ${dateApproved}.
+                            Your withdrawal of ₱${formatAmount(amount)} has been approved on ${dateApproved}.
                         </p>
                     </div>
                     
@@ -1247,7 +1256,7 @@ app.post('/approveWithdraws', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Status</td>

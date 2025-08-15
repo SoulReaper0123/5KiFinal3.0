@@ -91,9 +91,11 @@ const Deposits = () => {
         height: 100%;
         width: 100%;
         overflow: auto;
+       
       }
       .main-container {
         flex: 1;
+    
       }
       .header-text {
         font-weight: bold;
@@ -101,6 +103,7 @@ const Deposits = () => {
         margin-bottom: 10px;
         margin-left: 25px;
         margin-right: 25px;
+        margin-top: 100px;
       }
       .top-controls {
         display: flex;

@@ -49,6 +49,7 @@ const Loans = () => {
         margin-bottom: 10px;
         margin-left: 25px;
         margin-right: 25px;
+        margin-top: 100px;
       }
       .top-controls {
         display: flex;
