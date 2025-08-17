@@ -686,8 +686,10 @@ const Dashboard = () => {
                     <td className="text-center">{loan.interest}</td>
                     <td className="text-center">₱{formatCurrency(loan.monthlyPayment)}</td>
                     <td className="text-center">₱{formatCurrency(loan.totalMonthlyPayment)}</td>
-                    <td className={`text-center ${loan.isOverdue ? 'overdue' : ''}`}>
-                      {loan.dueDate}
+                    <td className="text-center">
+                      <span className={loan.isOverdue ? 'overdue-date' : ''}>
+                        {loan.dueDate}
+                      </span>
                       {loan.isOverdue && <span className="overdue-badge">Overdue</span>}
                     </td>
                     <td className="text-center">
@@ -1074,6 +1076,11 @@ const Dashboard = () => {
         }
 
         .overdue {
+          color: var(--danger);
+          font-weight: 600;
+        }
+
+        .overdue-date {
           color: var(--danger);
           font-weight: 600;
         }

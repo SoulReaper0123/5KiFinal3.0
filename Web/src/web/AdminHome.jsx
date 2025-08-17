@@ -4,7 +4,14 @@ import {
   FaChevronDown, 
   FaChevronUp, 
   FaUserCircle, 
-  FaSignOutAlt
+  FaSignOutAlt,
+  FaRobot,
+  FaPaperPlane,
+  FaTimes,
+  FaPlus,
+  FaHistory,
+  FaTrash,
+  FaComments
 } from 'react-icons/fa';
 import { 
   GoSidebarCollapse,
@@ -21,6 +28,7 @@ import Deposits from './Sidebar/Deposits/Deposits';
 import Dashboard from './Sidebar/Dashboard/Dashboard';
 import Settings from './Settings/Settings';
 import AccountSettings from './Settings/AccountSettings';
+import Members from './Sidebar/Members/Members';
 import { useAuth } from '../web/WebAuth/AuthContext';
 import logo from '../../../assets/logo.png';
 import { 
@@ -34,6 +42,8 @@ import {
   UserGroupIcon
 } from "hugeicons-react";
 import { GrTransaction } from "react-icons/gr";
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { database } from '../../../Database/firebaseConfig';
 
 const AdminHome = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -43,9 +53,43 @@ const AdminHome = () => {
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  
+  // AI Assistant States
+  const [isAIAssistantVisible, setIsAIAssistantVisible] = useState(false);
+  const [aiMessages, setAiMessages] = useState([]);
+  const [aiInput, setAiInput] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  
+  // Chat Management States
+  const [chatSessions, setChatSessions] = useState([]);
+  const [currentChatId, setCurrentChatId] = useState(null);
+  const [showChatHistory, setShowChatHistory] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [chatToDelete, setChatToDelete] = useState(null);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  
   const navigate = useNavigate();
   const { logout } = useAuth();
   const isSmallScreen = windowWidth < 1024;
+
+  // Initialize Gemini AI
+  const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+
+  // Test function to verify AI is working
+  const testAI = async () => {
+    try {
+      console.log('Testing AI connection...');
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      const result = await model.generateContent("Say hello in one word");
+      const response = await result.response;
+      const text = response.text();
+      console.log('AI Test successful:', text);
+      return true;
+    } catch (error) {
+      console.error('AI Test failed:', error);
+      return false;
+    }
+  };
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -53,6 +97,20 @@ const AdminHome = () => {
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
+      }
+      @keyframes pulse {
+        0%, 80%, 100% { opacity: 0.3; }
+        40% { opacity: 1; }
+      }
+      @keyframes slideInRight {
+        0% { 
+          transform: translateX(100%); 
+          opacity: 0; 
+        }
+        100% { 
+          transform: translateX(0); 
+          opacity: 1; 
+        }
       }
     `;
     document.head.appendChild(styleElement);
@@ -78,7 +136,41 @@ const AdminHome = () => {
       }
     };
     loadSection();
+    loadChatSessions();
+    
+    // Test AI connection on component mount
+    testAI();
   }, []);
+
+  // Load chat sessions from localStorage
+  const loadChatSessions = () => {
+    try {
+      const savedChats = localStorage.getItem('aiChatSessions');
+      if (savedChats) {
+        const parsedChats = JSON.parse(savedChats);
+        setChatSessions(parsedChats);
+        
+        // Load the most recent chat if available
+        if (parsedChats.length > 0) {
+          const mostRecent = parsedChats[0];
+          setCurrentChatId(mostRecent.id);
+          setAiMessages(mostRecent.messages || []);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading chat sessions:', error);
+    }
+  };
+
+  // Save chat sessions to localStorage
+  const saveChatSessions = (sessions) => {
+    try {
+      localStorage.setItem('aiChatSessions', JSON.stringify(sessions));
+      setChatSessions(sessions);
+    } catch (error) {
+      console.error('Error saving chat sessions:', error);
+    }
+  };
 
   const handleSectionChange = async (section) => {
     setActiveSection(section);
@@ -126,6 +218,445 @@ const AdminHome = () => {
     handleSectionChange('accountSettings');
   };
 
+  // AI Assistant Functions
+  const toggleAIAssistant = () => {
+    setIsAIAssistantVisible(!isAIAssistantVisible);
+    if (!isAIAssistantVisible && aiMessages.length === 0 && !currentChatId) {
+      startNewChat();
+    }
+  };
+
+  // Chat Management Functions
+  const startNewChat = () => {
+    const newChatId = Date.now().toString();
+    const welcomeMessage = {
+      type: 'ai',
+      content: 'Hello! I\'m your AI Assistant for the Financial Management System. I can help you with:\n\n• Database queries and statistics\n• User and member management\n• Loan applications and approvals\n• Deposit and withdrawal tracking\n• Transaction analysis\n• System navigation and features\n• Troubleshooting and support\n\nFeel free to ask me anything about your system!',
+      timestamp: new Date().toLocaleTimeString()
+    };
+    
+    const newChat = {
+      id: newChatId,
+      title: 'New Chat',
+      messages: [welcomeMessage],
+      createdAt: new Date().toISOString(),
+      lastUpdated: new Date().toISOString()
+    };
+    
+    const updatedSessions = [newChat, ...chatSessions];
+    saveChatSessions(updatedSessions);
+    setCurrentChatId(newChatId);
+    setAiMessages([welcomeMessage]);
+    setShowChatHistory(false);
+  };
+
+  const loadChat = (chatId) => {
+    const chat = chatSessions.find(session => session.id === chatId);
+    if (chat) {
+      setCurrentChatId(chatId);
+      setAiMessages(chat.messages || []);
+      setShowChatHistory(false);
+    }
+  };
+
+  const confirmDeleteChat = (chatId) => {
+    setChatToDelete(chatId);
+    setShowDeleteModal(true);
+  };
+
+  const deleteChat = () => {
+    if (!chatToDelete) return;
+    
+    const updatedSessions = chatSessions.filter(session => session.id !== chatToDelete);
+    saveChatSessions(updatedSessions);
+    
+    if (currentChatId === chatToDelete) {
+      if (updatedSessions.length > 0) {
+        loadChat(updatedSessions[0].id);
+      } else {
+        setCurrentChatId(null);
+        setAiMessages([]);
+        startNewChat();
+      }
+    }
+    
+    setShowDeleteModal(false);
+    setChatToDelete(null);
+    
+    // Show success message
+    setShowSuccessMessage(true);
+    setTimeout(() => {
+      setShowSuccessMessage(false);
+    }, 3000);
+  };
+
+  const cancelDeleteChat = () => {
+    setShowDeleteModal(false);
+    setChatToDelete(null);
+  };
+
+  const updateCurrentChat = (messages) => {
+    if (!currentChatId) return;
+    
+    const updatedSessions = chatSessions.map(session => {
+      if (session.id === currentChatId) {
+        // Update title based on first user message
+        let title = session.title;
+        if (title === 'New Chat' && messages.length > 1) {
+          const firstUserMessage = messages.find(msg => msg.type === 'user');
+          if (firstUserMessage) {
+            title = firstUserMessage.content.substring(0, 30) + (firstUserMessage.content.length > 30 ? '...' : '');
+          }
+        }
+        
+        return {
+          ...session,
+          title,
+          messages,
+          lastUpdated: new Date().toISOString()
+        };
+      }
+      return session;
+    });
+    
+    // Sort by last updated (most recent first)
+    updatedSessions.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+    saveChatSessions(updatedSessions);
+  };
+
+  const getProjectContext = () => {
+    return `
+You are an AI assistant for a financial management system with the following structure:
+
+DATABASE COLLECTIONS (Firebase Realtime Database):
+- users: User registrations and profiles
+- loans: Loan applications and approvals
+- deposits: Deposit applications and records
+- withdraws: Withdrawal requests and approvals
+- payments: Payment records and applications
+- transactions: All financial transactions
+- admins: Admin user management
+
+MAIN SECTIONS:
+- Dashboard: Analytics and overview
+- Registrations: User membership management
+- Deposits: Deposit applications and approvals
+- Loans: Loan applications and management
+- Payments: Payment processing
+- Withdrawals: Withdrawal requests
+- Transactions: Transaction history
+- Co-Admins: Admin user management
+- Settings: System configuration
+
+CURRENT ACTIVE SECTION: ${activeSection}
+
+The system uses React.js frontend with Firebase backend. All data is stored in Firebase Realtime Database.
+`;
+  };
+
+  // Fallback responses for common queries when AI fails
+  const getFallbackResponse = (userMessage) => {
+    const message = userMessage.toLowerCase();
+    
+    if (message.includes('how many') || message.includes('count') || message.includes('total')) {
+      return `I'd be happy to help you get counts and statistics! However, I'm currently unable to access the live database. 
+
+To get this information, you can:
+• Check the Dashboard section for overview statistics
+• Go to the specific sections (Members, Loans, Deposits, etc.) to see current data
+• Use the browser's developer console to check for any connection issues
+
+Common queries I can help with:
+• System structure and navigation
+• Feature explanations
+• Troubleshooting steps
+• Code-related questions`;
+    }
+    
+    if (message.includes('member') || message.includes('user')) {
+      return `For member/user information:
+
+• Members Section: View all registered users, their profiles, and membership status
+• Registrations: Handle new membership applications
+• Dashboard: See member statistics and overview
+
+The users are stored in the 'users' collection in Firebase with fields like:
+- Personal information (name, email, phone)
+- Membership status
+- Registration date
+- Profile details
+
+Would you like me to explain any specific aspect of user management?`;
+    }
+    
+    if (message.includes('loan')) {
+      return `For loan information:
+
+• Loans Section: View all loan applications and their status
+• Payments Section: Handle loan payments and repayments
+• Dashboard: See loan statistics
+
+Loan statuses typically include:
+- Pending: Awaiting approval
+- Approved: Loan has been approved
+- Rejected: Application was declined
+- Active: Currently being repaid
+
+Would you like me to explain the loan approval process or payment handling?`;
+    }
+    
+    if (message.includes('deposit')) {
+      return `For deposit information:
+
+• Deposits Section: View all deposit applications and records
+• Dashboard: See deposit statistics and trends
+
+Deposit types and statuses:
+- Pending deposits awaiting processing
+- Approved deposits that have been confirmed
+- Various deposit categories and amounts
+
+The system tracks deposit history, amounts, and processing status.`;
+    }
+    
+    return `I'm here to help! While I'm currently unable to access live data, I can assist with:
+
+• System Navigation: How to use different sections
+• Feature Explanations: What each section does
+• Data Structure: How information is organized
+• Troubleshooting: Common issues and solutions
+
+What specific aspect of the system would you like to know about?`;
+  };
+
+  const queryFirebaseData = async (collection, filters = {}) => {
+    try {
+      console.log(`Querying Firebase collection: ${collection}`);
+      const ref = database.ref(collection);
+      
+      // Add timeout to prevent hanging
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Firebase query timeout')), 10000)
+      );
+      
+      const dataPromise = ref.once('value');
+      const snapshot = await Promise.race([dataPromise, timeoutPromise]);
+      const data = snapshot.val();
+      
+      console.log(`Firebase data for ${collection}:`, data ? 'Data found' : 'No data');
+      
+      if (!data) return [];
+      
+      // Convert to array and apply basic filters
+      const dataArray = Object.keys(data).map(key => ({
+        id: key,
+        ...data[key]
+      }));
+      
+      console.log(`Converted ${collection} to array:`, dataArray.length, 'items');
+      return dataArray;
+    } catch (error) {
+      console.error(`Firebase query error for ${collection}:`, error);
+      throw error; // Re-throw to handle in calling function
+    }
+  };
+
+  const handleAIQuery = async (userMessage) => {
+    if (!userMessage.trim()) return;
+
+    // Add user message
+    const newUserMessage = {
+      type: 'user',
+      content: userMessage,
+      timestamp: new Date().toLocaleTimeString()
+    };
+
+    const updatedMessages = [...aiMessages, newUserMessage];
+    setAiMessages(updatedMessages);
+    setAiInput('');
+    setAiLoading(true);
+
+    try {
+      // Check if Gemini API key is available
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      console.log('API Key available:', !!apiKey);
+      console.log('API Key length:', apiKey ? apiKey.length : 0);
+      
+      if (!apiKey || apiKey.trim() === '') {
+        throw new Error('Gemini API key not configured');
+      }
+
+      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+      
+      // Check if query needs database data
+      const needsData = userMessage.toLowerCase().includes('show') || 
+                       userMessage.toLowerCase().includes('count') ||
+                       userMessage.toLowerCase().includes('list') ||
+                       userMessage.toLowerCase().includes('how many') ||
+                       userMessage.toLowerCase().includes('total') ||
+                       userMessage.toLowerCase().includes('pending') ||
+                       userMessage.toLowerCase().includes('approved') ||
+                       userMessage.toLowerCase().includes('rejected') ||
+                       userMessage.toLowerCase().includes('member') ||
+                       userMessage.toLowerCase().includes('user') ||
+                       userMessage.toLowerCase().includes('loan') ||
+                       userMessage.toLowerCase().includes('deposit') ||
+                       userMessage.toLowerCase().includes('withdraw') ||
+                       userMessage.toLowerCase().includes('transaction');
+
+      let contextData = '';
+      let dataFetchErrors = [];
+      
+      if (needsData) {
+        console.log('Fetching database data for AI query...');
+        
+        // Fetch relevant data based on query
+        const dataQueries = [];
+        
+        if (userMessage.toLowerCase().includes('user') || userMessage.toLowerCase().includes('member')) {
+          dataQueries.push({ collection: 'users', label: 'USERS' });
+        }
+        if (userMessage.toLowerCase().includes('loan')) {
+          dataQueries.push({ collection: 'loans', label: 'LOANS' });
+        }
+        if (userMessage.toLowerCase().includes('deposit')) {
+          dataQueries.push({ collection: 'deposits', label: 'DEPOSITS' });
+        }
+        if (userMessage.toLowerCase().includes('withdraw')) {
+          dataQueries.push({ collection: 'withdraws', label: 'WITHDRAWS' });
+        }
+        if (userMessage.toLowerCase().includes('transaction')) {
+          dataQueries.push({ collection: 'transactions', label: 'TRANSACTIONS' });
+        }
+
+        // If no specific collection mentioned, try to fetch all
+        if (dataQueries.length === 0 && needsData) {
+          dataQueries.push(
+            { collection: 'users', label: 'USERS' },
+            { collection: 'loans', label: 'LOANS' },
+            { collection: 'deposits', label: 'DEPOSITS' }
+          );
+        }
+
+        for (const query of dataQueries) {
+          try {
+            const data = await queryFirebaseData(query.collection);
+            if (data && data.length > 0) {
+              // Provide summary statistics instead of raw data
+              contextData += `\n${query.label} SUMMARY:`;
+              contextData += `\n- Total count: ${data.length}`;
+              
+              if (query.collection === 'users') {
+                contextData += `\n- Sample user fields: ${Object.keys(data[0] || {}).join(', ')}`;
+              } else if (query.collection === 'loans') {
+                const pending = data.filter(item => item.status === 'pending').length;
+                const approved = data.filter(item => item.status === 'approved').length;
+                const rejected = data.filter(item => item.status === 'rejected').length;
+                contextData += `\n- Pending: ${pending}, Approved: ${approved}, Rejected: ${rejected}`;
+              } else if (query.collection === 'deposits') {
+                const pending = data.filter(item => item.status === 'pending').length;
+                const approved = data.filter(item => item.status === 'approved').length;
+                contextData += `\n- Pending: ${pending}, Approved: ${approved}`;
+              }
+              
+              // Include a few sample records (limited data)
+              contextData += `\n- Sample records: ${JSON.stringify(data.slice(0, 3).map(item => ({
+                id: item.id,
+                ...Object.fromEntries(Object.entries(item).slice(0, 4))
+              })))}`;
+            } else {
+              contextData += `\n${query.label}: No data found`;
+            }
+          } catch (error) {
+            console.error(`Error fetching ${query.collection}:`, error);
+            dataFetchErrors.push(query.collection);
+            contextData += `\n${query.label}: Error fetching data (${error.message})`;
+          }
+        }
+        
+        if (dataFetchErrors.length > 0) {
+          contextData += `\n\nNote: Some data could not be fetched due to: ${dataFetchErrors.join(', ')}`;
+        }
+      }
+
+      const prompt = `${getProjectContext()}${contextData}
+
+User Question: ${userMessage}
+
+Instructions:
+- Provide a helpful, accurate response based on the available data
+- If showing statistics, format them clearly with bullet points or simple lists
+- If data couldn't be fetched, explain what information would typically be available
+- Be specific about numbers and counts when data is available
+- If you need additional data that wasn't provided, mention what specific data would help
+- Keep responses concise but informative
+- DO NOT use markdown formatting like **bold** or *italic* - use plain text only
+- Use simple bullet points with • or - for lists
+- Use clear, readable plain text formatting
+
+Please respond in a friendly, professional manner using plain text only.`;
+
+      console.log('Sending prompt to Gemini AI...');
+      console.log('Prompt length:', prompt.length);
+      
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      const aiResponse = response.text();
+      
+      console.log('AI Response received:', aiResponse.substring(0, 100) + '...');
+
+      const newAIMessage = {
+        type: 'ai',
+        content: aiResponse,
+        timestamp: new Date().toLocaleTimeString()
+      };
+
+      const finalMessages = [...updatedMessages, newAIMessage];
+      setAiMessages(finalMessages);
+      updateCurrentChat(finalMessages);
+      
+    } catch (error) {
+      console.error('AI Error:', error);
+      
+      let errorContent = '';
+      
+      if (error.message.includes('API key') || error.message.includes('GEMINI_API_KEY')) {
+        errorContent = 'AI service is not properly configured. Please check the API key configuration.';
+      } else if (error.message.includes('quota') || error.message.includes('limit') || error.message.includes('QUOTA_EXCEEDED')) {
+        errorContent = 'AI service quota exceeded. Please try again later or contact your administrator.';
+      } else if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
+        errorContent = 'Request timed out. Please try again with a simpler question.';
+      } else if (error.message.includes('BLOCKED') || error.message.includes('SAFETY')) {
+        errorContent = 'Your request was blocked by safety filters. Please rephrase your question.';
+      } else if (error.message.includes('INVALID_ARGUMENT')) {
+        errorContent = 'Invalid request format. Please try rephrasing your question.';
+      } else if (error.message.includes('Firebase') || error.message.includes('database')) {
+        errorContent = 'Unable to access database at the moment. I can still help with general questions about your system structure and features.';
+      } else {
+        // For network or other technical errors, provide a more specific message
+        console.log('Unexpected AI error:', error.message);
+        errorContent = `I encountered a technical issue: ${error.message}. Please try again or rephrase your question.`;
+      }
+      
+      const errorMessage = {
+        type: 'ai',
+        content: errorContent,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      
+      const finalMessages = [...updatedMessages, errorMessage];
+      setAiMessages(finalMessages);
+      updateCurrentChat(finalMessages);
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
+  const handleAIInputSubmit = (e) => {
+    e.preventDefault();
+    handleAIQuery(aiInput);
+  };
+
   // Styles
   const styles = {
     container: {
@@ -154,6 +685,7 @@ const AdminHome = () => {
       alignItems: 'center',
       height: '100%',
       overflowY: 'auto',
+      justifyContent: 'flex-start',
     },
     toggleButton: {
       position: 'absolute',
@@ -199,7 +731,7 @@ const AdminHome = () => {
     },
     activeButton: {
       backgroundColor: '#F5F5F5',
-      borderRadius: '0',
+      borderRadius: '8px',
       border: 'none',
       outline: 'none',
     },
@@ -334,7 +866,7 @@ const AdminHome = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000
+      zIndex: 1300
     },
     modalCardSmall: {
       width: '300px',
@@ -393,6 +925,318 @@ const AdminHome = () => {
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1100
+    },
+    // AI Assistant Styles
+    aiAssistantModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1200,
+      padding: '20px'
+    },
+    aiAssistantContainer: {
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      width: '95%',
+      maxWidth: '1200px',
+      height: '85%',
+      maxHeight: '700px',
+      display: 'flex',
+      flexDirection: 'row',
+      boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
+      overflow: 'hidden'
+    },
+    aiAssistantHeader: {
+      backgroundColor: '#2D5783',
+      color: 'white',
+      padding: '16px 20px',
+      borderRadius: '12px 12px 0 0',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center'
+    },
+    aiAssistantTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    },
+    aiCloseButton: {
+      background: 'none',
+      border: 'none',
+      color: 'white',
+      fontSize: '20px',
+      cursor: 'pointer',
+      padding: '4px'
+    },
+    aiMessagesContainer: {
+      flex: 1,
+      padding: '20px',
+      overflowY: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '16px'
+    },
+    aiMessage: {
+      maxWidth: '80%',
+      padding: '12px 16px',
+      borderRadius: '12px',
+      fontSize: '14px',
+      lineHeight: '1.5'
+    },
+    aiMessageUser: {
+      backgroundColor: '#2D5783',
+      color: 'white',
+      alignSelf: 'flex-end',
+      borderBottomRightRadius: '4px'
+    },
+    aiMessageAI: {
+      backgroundColor: '#f5f5f5',
+      color: '#333',
+      alignSelf: 'flex-start',
+      borderBottomLeftRadius: '4px'
+    },
+    aiMessageTime: {
+      fontSize: '11px',
+      opacity: 0.7,
+      marginTop: '4px'
+    },
+    aiInputContainer: {
+      padding: '16px 20px',
+      borderTop: '1px solid #eee',
+      display: 'flex',
+      gap: '12px',
+      alignItems: 'center'
+    },
+    aiInput: {
+      flex: 1,
+      padding: '12px 16px',
+      border: '1px solid #ddd',
+      borderRadius: '25px',
+      fontSize: '14px',
+      outline: 'none',
+      resize: 'none'
+    },
+    aiSendButton: {
+      backgroundColor: '#2D5783',
+      color: 'white',
+      border: 'none',
+      borderRadius: '50%',
+      width: '44px',
+      height: '44px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      cursor: 'pointer',
+      fontSize: '16px',
+      transition: 'all 0.2s'
+    },
+    aiLoadingDots: {
+      display: 'flex',
+      gap: '4px',
+      alignItems: 'center',
+      padding: '12px 16px'
+    },
+    aiLoadingDot: {
+      width: '8px',
+      height: '8px',
+      borderRadius: '50%',
+      backgroundColor: '#2D5783',
+      animation: 'pulse 1.5s ease-in-out infinite'
+    },
+    // Chat Management Styles - ChatGPT-like Layout
+    aiSidebar: {
+      width: '280px',
+      backgroundColor: '#f7f7f8',
+      borderRight: '1px solid #e5e5e5',
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%'
+    },
+    aiSidebarHeader: {
+      padding: '16px',
+      borderBottom: '1px solid #e5e5e5',
+      backgroundColor: '#f7f7f8'
+    },
+    newChatButton: {
+      width: '100%',
+      padding: '12px 16px',
+      backgroundColor: '#2D5783',
+      color: 'white',
+      border: 'none',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '500',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px',
+      transition: 'background-color 0.2s'
+    },
+    aiSidebarContent: {
+      flex: 1,
+      overflowY: 'auto',
+      padding: '8px'
+    },
+    sidebarSectionTitle: {
+      fontSize: '12px',
+      fontWeight: '600',
+      color: '#666',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px',
+      margin: '16px 8px 8px 8px'
+    },
+    chatHistoryItem: {
+      padding: '12px',
+      margin: '2px 0',
+      borderRadius: '8px',
+      cursor: 'pointer',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      transition: 'background-color 0.2s',
+      position: 'relative',
+      group: true
+    },
+    chatHistoryItemActive: {
+      backgroundColor: '#e3f2fd',
+      borderLeft: '3px solid #2D5783'
+    },
+    chatHistoryItemHover: {
+      backgroundColor: '#f0f0f0'
+    },
+    chatItemContent: {
+      flex: 1,
+      minWidth: 0
+    },
+    chatTitle: {
+      fontSize: '14px',
+      fontWeight: '500',
+      color: '#333',
+      marginBottom: '4px',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      whiteSpace: 'nowrap'
+    },
+    chatDate: {
+      fontSize: '11px',
+      color: '#666'
+    },
+    chatDeleteButton: {
+      background: 'none',
+      border: 'none',
+      color: '#999',
+      fontSize: '12px',
+      cursor: 'pointer',
+      padding: '4px',
+      borderRadius: '4px',
+      opacity: 0,
+      transition: 'all 0.2s',
+      position: 'absolute',
+      right: '8px',
+      top: '50%',
+      transform: 'translateY(-50%)'
+    },
+    aiMainContent: {
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      height: '100%'
+    },
+    aiMainHeader: {
+      backgroundColor: '#2D5783',
+      color: 'white',
+      padding: '16px 20px',
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderBottom: '1px solid #e5e5e5'
+    },
+    aiMainTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '10px'
+    },
+    aiCloseButton: {
+      background: 'none',
+      border: 'none',
+      color: 'white',
+      fontSize: '20px',
+      cursor: 'pointer',
+      padding: '4px',
+      borderRadius: '4px',
+      transition: 'background-color 0.2s'
+    },
+    // Success Message Styles
+    successMessage: {
+      position: 'fixed',
+      top: '20px',
+      right: '20px',
+      backgroundColor: '#4caf50',
+      color: 'white',
+      padding: '12px 20px',
+      borderRadius: '8px',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      zIndex: 2000,
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      fontSize: '14px',
+      fontWeight: '500',
+      animation: 'slideInRight 0.3s ease-out'
+    },
+    // Collapsed Sidebar Styles
+    collapsedContainer: {
+      paddingBottom: '20px',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      height: '100%',
+      overflowY: 'auto',
+      paddingTop: '60px'
+    },
+
+    collapsedButton: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      width: '48px',
+      height: '48px',
+      marginBottom: '8px',
+      background: 'none',
+      border: 'none',
+      cursor: 'pointer',
+      borderRadius: '8px',
+      transition: 'background-color 0.2s ease',
+      ':hover': {
+        backgroundColor: 'rgba(0,0,0,0.1)'
+      }
+    },
+    collapsedIcon: {
+      fontSize: '28px',
+      color: '#00000',
+      display: 'inline-block',
+      fontStyle: 'normal',
+    },
+    collapsedButtonActive: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+      borderRadius: '8px',
+    },
+    collapsedIconActive: {
+      fontSize: '28px',
+      color: '#000000',
+      display: 'inline-block',
+      fontStyle: 'normal',
     }
   };
 
@@ -565,6 +1409,161 @@ const AdminHome = () => {
                 Settings
               </span>
             </button>
+
+            {/* AI Assistant Button in Sidebar */}
+            <button
+              onClick={toggleAIAssistant}
+              style={{
+                ...styles.button,
+                marginTop: 'auto',
+                marginBottom: '20px'
+              }}
+            >
+              <div style={styles.iconContainer}>
+                <FaRobot 
+                  style={styles.icon} 
+                  size={28}
+                />
+              </div>
+              <span style={styles.buttonText}>
+                AI Assistant
+              </span>
+            </button>
+          </div>
+        )}
+
+        {/* Collapsed Sidebar - Show only icons */}
+        {isCollapsed && (
+          <div style={styles.collapsedContainer}>
+            <button
+              onClick={() => handleSectionChange('dashboard')}
+              style={isActive('dashboard') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Dashboard"
+            >
+              <Analytics02Icon 
+                style={isActive('dashboard') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('registrations')}
+              style={isActive('registrations') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Membership"
+            >
+              <UserGroupIcon 
+                style={isActive('registrations') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('deposits')}
+              style={isActive('deposits') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Deposits"
+            >
+              <Payment02Icon 
+                style={isActive('deposits') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('applyLoans')}
+              style={isActive('applyLoans') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Loans"
+            >
+              <MoneyAdd02Icon 
+                style={isActive('applyLoans') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('payLoans')}
+              style={isActive('payLoans') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Payments"
+            >
+              <Payment01Icon 
+                style={isActive('payLoans') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('withdraws')}
+              style={isActive('withdraws') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Withdrawals"
+            >
+              <ReverseWithdrawal01Icon 
+                style={isActive('withdraws') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('transactions')}
+              style={isActive('transactions') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Transactions"
+            >
+              <GrTransaction 
+                style={isActive('transactions') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('coadmins')}
+              style={isActive('coadmins') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Co-Admins"
+            >
+              <ManagerIcon 
+                style={isActive('coadmins') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            <button
+              onClick={() => handleSectionChange('settings')}
+              style={isActive('settings') ? 
+                {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
+                styles.collapsedButton}
+              title="Settings"
+            >
+              <Settings02Icon 
+                style={isActive('settings') ? styles.collapsedIconActive : styles.collapsedIcon} 
+                size={28} 
+              />
+            </button>
+
+            {/* AI Assistant Button - Collapsed */}
+            <button
+              onClick={toggleAIAssistant}
+              style={{
+                ...styles.collapsedButton,
+                marginTop: 'auto',
+                marginBottom: '20px'
+              }}
+              title="AI Assistant"
+            >
+              <FaRobot style={styles.collapsedIcon} size={28} />
+            </button>
           </div>
         )}
       </div>
@@ -637,6 +1636,216 @@ const AdminHome = () => {
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* AI Assistant Modal - ChatGPT Style */}
+      {isAIAssistantVisible && (
+        <div style={styles.aiAssistantModal}>
+          <div style={styles.aiAssistantContainer}>
+            {/* Sidebar */}
+            <div style={styles.aiSidebar}>
+              <div style={styles.aiSidebarHeader}>
+                <button 
+                  style={styles.newChatButton}
+                  onClick={startNewChat}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = '#1e4a6b'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#2D5783'}
+                >
+                  <FaPlus size={14} />
+                  New Chat
+                </button>
+              </div>
+              
+              <div style={styles.aiSidebarContent}>
+                {chatSessions.length > 0 && (
+                  <div style={styles.sidebarSectionTitle}>Recent Chats</div>
+                )}
+                
+                {chatSessions.length === 0 ? (
+                  <div style={{ 
+                    padding: '20px', 
+                    textAlign: 'center', 
+                    color: '#666',
+                    fontSize: '14px'
+                  }}>
+                    No chat history yet.
+                    <br />
+                    Start a conversation!
+                  </div>
+                ) : (
+                  chatSessions.map((chat) => (
+                    <div
+                      key={chat.id}
+                      style={{
+                        ...styles.chatHistoryItem,
+                        ...(currentChatId === chat.id ? styles.chatHistoryItemActive : {})
+                      }}
+                      onClick={() => loadChat(chat.id)}
+                      onMouseEnter={(e) => {
+                        if (currentChatId !== chat.id) {
+                          e.currentTarget.style.backgroundColor = '#f0f0f0';
+                        }
+                        const deleteBtn = e.currentTarget.querySelector('.delete-btn');
+                        if (deleteBtn) deleteBtn.style.opacity = '1';
+                      }}
+                      onMouseLeave={(e) => {
+                        if (currentChatId !== chat.id) {
+                          e.currentTarget.style.backgroundColor = 'transparent';
+                        }
+                        const deleteBtn = e.currentTarget.querySelector('.delete-btn');
+                        if (deleteBtn) deleteBtn.style.opacity = '0';
+                      }}
+                    >
+                      <div style={styles.chatItemContent}>
+                        <div style={styles.chatTitle}>{chat.title}</div>
+                        <div style={styles.chatDate}>
+                          {new Date(chat.lastUpdated).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <button
+                        className="delete-btn"
+                        style={styles.chatDeleteButton}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          confirmDeleteChat(chat.id);
+                        }}
+                        title="Delete Chat"
+                      >
+                        <FaTrash />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            {/* Main Content */}
+            <div style={styles.aiMainContent}>
+              <div style={styles.aiMainHeader}>
+                <div style={styles.aiMainTitle}>
+                  <FaRobot size={20} />
+                  AI Assistant
+                  {currentChatId && (
+                    <span style={{ fontSize: '14px', opacity: 0.8, marginLeft: '8px' }}>
+                      - {chatSessions.find(chat => chat.id === currentChatId)?.title || 'Chat'}
+                    </span>
+                  )}
+                </div>
+                <button 
+                  style={styles.aiCloseButton}
+                  onClick={toggleAIAssistant}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.1)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                >
+                  <FaTimes />
+                </button>
+              </div>
+              
+              <div style={styles.aiMessagesContainer}>
+                {aiMessages.map((message, index) => (
+                  <div 
+                    key={index}
+                    style={{
+                      ...styles.aiMessage,
+                      ...(message.type === 'user' ? styles.aiMessageUser : styles.aiMessageAI)
+                    }}
+                  >
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                    <div style={styles.aiMessageTime}>{message.timestamp}</div>
+                  </div>
+                ))}
+                
+                {aiLoading && (
+                  <div style={{...styles.aiMessage, ...styles.aiMessageAI}}>
+                    <div style={styles.aiLoadingDots}>
+                      <div style={{...styles.aiLoadingDot, animationDelay: '0s'}}></div>
+                      <div style={{...styles.aiLoadingDot, animationDelay: '0.2s'}}></div>
+                      <div style={{...styles.aiLoadingDot, animationDelay: '0.4s'}}></div>
+                      <span style={{ marginLeft: '8px', fontSize: '14px', color: '#666' }}>
+                        AI is thinking...
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <form onSubmit={handleAIInputSubmit} style={styles.aiInputContainer}>
+                <input
+                  type="text"
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                  placeholder="Ask me anything about your system..."
+                  style={styles.aiInput}
+                  disabled={aiLoading}
+                />
+                <button 
+                  type="submit"
+                  style={{
+                    ...styles.aiSendButton,
+                    opacity: aiLoading || !aiInput.trim() ? 0.5 : 1,
+                    cursor: aiLoading || !aiInput.trim() ? 'not-allowed' : 'pointer'
+                  }}
+                  disabled={aiLoading || !aiInput.trim()}
+                  onMouseEnter={(e) => {
+                    if (!aiLoading && aiInput.trim()) {
+                      e.target.style.backgroundColor = '#1e4a6b';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!aiLoading && aiInput.trim()) {
+                      e.target.style.backgroundColor = '#2D5783';
+                    }
+                  }}
+                >
+                  <FaPaperPlane />
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Chat Confirmation Modal */}
+      {showDeleteModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
+            <p style={styles.modalText}>
+              Are you sure you want to delete this chat? This action cannot be undone.
+            </p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={deleteChat}
+              >
+                <FaTrash style={{ marginRight: '6px' }} />
+                Delete
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#6c757d',
+                  color: '#fff'
+                }} 
+                onClick={cancelDeleteChat}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Message */}
+      {showSuccessMessage && (
+        <div style={styles.successMessage}>
+          <FaTrash />
+          Chat deleted successfully!
         </div>
       )}
 
