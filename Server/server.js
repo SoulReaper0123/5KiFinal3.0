@@ -2296,79 +2296,153 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
   }
 });
 
-// Add this with your other email endpoints
 app.post('/send-loan-reminder', async (req, res) => {
-  console.log('[NOTIFICATION] Initiating loan reminder email', req.body);
-  const { 
-    email, 
-    firstName, 
-    lastName, 
-    dueDate,
-    loanAmount,
-    outstandingBalance,
-    memberId,
-    transactionId,
-    websiteLink,
-    facebookLink
-  } = req.body;
+    console.log('[NOTIFICATION] Initiating loan reminder email', req.body);
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        dueDate,
+        loanAmount,
+        outstandingBalance,
+        memberId,
+        transactionId,
+        websiteLink,
+        facebookLink
+    } = req.body;
 
-  if (!email || !firstName || !lastName || !dueDate) {
-    console.log('[NOTIFICATION ERROR] Missing required fields for loan reminder');
-    return res.status(400).json({ 
-      success: false,
-      message: 'Missing required fields'
-    });
-  }
+    // Validate required fields
+    if (!email || !firstName || !lastName || !dueDate) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for loan reminder');
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, lastName, and dueDate are required'
+        });
+    }
 
-  try {
-    const formattedDueDate = formatDisplayDate(dueDate);
-    const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
-    
-    // Format amounts safely
-    const formattedLoanAmount = parseFloat(loanAmount || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-    
-    const formattedOutstanding = parseFloat(outstandingBalance || loanAmount || 0).toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
 
-    const mailOptions = {
-      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-      to: email,
-      subject: `Reminder: Loan Payment Due in ${daysUntilDue} Days`,
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <!-- ... other email content ... -->
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Original Amount</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">₱${formattedLoanAmount}</td>
-          </tr>
-          <tr>
-            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Outstanding Balance</td>
-            <td style="padding: 8px; border: 1px solid #ddd;">₱${formattedOutstanding}</td>
-          </tr>
-          <!-- ... rest of email template ... -->
-        </div>
-      `
-    };
+    try {
+        const formattedDueDate = formatDisplayDate(dueDate);
+        const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
+        
+        const urgencyLevel = daysUntilDue <= 3 ? 'high' : (daysUntilDue <= 7 ? 'medium' : 'low');
+        const borderColor = urgencyLevel === 'high' ? '#e74c3c' : (urgencyLevel === 'medium' ? '#f39c12' : '#3498db');
+        const bgColor = urgencyLevel === 'high' ? '#fdedec' : (urgencyLevel === 'medium' ? '#fff8e1' : '#e8f8f5');
+        
+        const subject = urgencyLevel === 'high' 
+            ? `URGENT: Loan Payment Due in ${daysUntilDue} Day${daysUntilDue === 1 ? '' : 's'}!` 
+            : `Reminder: Loan Payment Due in ${daysUntilDue} Day${daysUntilDue === 1 ? '' : 's'}`;
 
-    await transporter.sendMail(mailOptions);
-    console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
-    res.status(200).json({ 
-      success: true,
-      message: 'Loan reminder email sent successfully'
-    });
-  } catch (error) {
-    console.error('[NOTIFICATION ERROR] Error sending loan reminder email:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to send loan reminder email',
-      error: error.message
-    });
-  }
+        console.log('[NOTIFICATION] Sending loan reminder to user');
+        const mailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: subject,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid ${borderColor}; padding-bottom: 10px;">
+                        Loan Payment Reminder
+                    </h2>
+                    
+                    <p>Hi ${firstName},</p>
+                    
+                    <div style="background-color: ${bgColor}; padding: 15px; border-left: 4px solid ${borderColor}; margin: 20px 0;">
+                        <p style="font-weight: bold; color: ${borderColor}; margin: 0;">
+                            ${urgencyLevel === 'high' ? 'URGENT: ' : ''}Your loan payment is due in ${daysUntilDue} day${daysUntilDue === 1 ? '' : 's'} on ${formattedDueDate}.
+                        </p>
+                    </div>
+                    
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Loan Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Member ID</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${memberId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Reference</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${transactionId || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Original Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(loanAmount)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Outstanding Balance</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(outstandingBalance)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Due Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formattedDueDate}</td>
+                        </tr>
+                    </table>
+                    
+                    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Payment Options:</h3>
+                        <ol>
+                            <li>Online payment through our website</li>
+                            <li>Bank transfer to our official accounts</li>
+                            <li>Cash payment at our office</li>
+                        </ol>
+                    </div>
+                    
+                    <p>
+                        <a href="${websiteLink || WEBSITE_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
+                            Make Payment Now
+                        </a>
+                    </p>
+                    
+                    ${urgencyLevel === 'high' ? `
+                    <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
+                        <h3 style="color: #e74c3c; margin-top: 0;">Important Notice:</h3>
+                        <p>Failure to make payment by the due date may result in late fees and affect your credit standing with 5KI Financial Services.</p>
+                    </div>
+                    ` : ''}
+                    
+                    <p>For any questions about your payment, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+                    
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        Best regards,<br>
+                        <strong>5KI Financial Services Team</strong>
+                    </p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Loan reminder email sent successfully',
+            data: {
+                emailSent: email,
+                daysUntilDue: daysUntilDue,
+                timestamp: new Date().toISOString()
+            }
+        });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending loan reminder email:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send loan reminder email',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
 });
 
 // ==============================================

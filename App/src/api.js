@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.108.45:3000';
+const API_URL = 'http://192.168.254.145:3000';
 const WEBSITE_URL = 'fiveki.onrender.com';
 const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
@@ -322,6 +322,37 @@ export const RejectMembershipWithdrawal = async (rejectionData) => {
     return response.data;
   } catch (error) {
     console.error('Error rejecting membership withdrawal:', error);
+    throw error;
+  }
+};
+
+// Add to your existing API exports
+export const SendLoanReminder = async ({ 
+  memberId, 
+  transactionId, 
+  dueDate, 
+  email, 
+  firstName, 
+  lastName, 
+  loanAmount, 
+  outstandingBalance 
+}) => {
+  try {
+    const response = await axios.post(`${API_URL}/send-loan-reminder`, {
+      memberId,
+      transactionId,
+      dueDate,
+      email,
+      firstName,
+      lastName,
+      loanAmount,
+      outstandingBalance,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending loan reminder:', error);
     throw error;
   }
 };

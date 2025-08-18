@@ -67,29 +67,46 @@ const AdminHome = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [chatToDelete, setChatToDelete] = useState(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const messagesEndRef = React.useRef(null);
+
+  const scrollToBottom = () => {
+  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+};
+
+useEffect(() => {
+  scrollToBottom();
+}, [aiMessages]);
   
   const navigate = useNavigate();
   const { logout } = useAuth();
   const isSmallScreen = windowWidth < 1024;
 
   // Initialize Gemini AI
-  const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+// Replace the current initialization with:
+const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ 
+  model: "gemini-1.5-pro-latest",  // Updated model name
+  apiVersion: "v1"  // Updated API version
+});
 
   // Test function to verify AI is working
-  const testAI = async () => {
-    try {
-      console.log('Testing AI connection...');
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      const result = await model.generateContent("Say hello in one word");
-      const response = await result.response;
-      const text = response.text();
-      console.log('AI Test successful:', text);
-      return true;
-    } catch (error) {
-      console.error('AI Test failed:', error);
-      return false;
-    }
-  };
+const testAI = async () => {
+  try {
+    console.log('Testing AI connection...');
+    const model = genAI.getGenerativeModel({ 
+      model: "gemini-1.5-pro-latest",
+      apiVersion: "v1"
+    });
+    const result = await model.generateContent("Say hello in one word");
+    const response = await result.response;
+    const text = response.text();
+    console.log('AI Test successful:', text);
+    return true;
+  } catch (error) {
+    console.error('AI Test failed:', error);
+    return false;
+  }
+};
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -461,196 +478,146 @@ What specific aspect of the system would you like to know about?`;
     }
   };
 
-  const handleAIQuery = async (userMessage) => {
-    if (!userMessage.trim()) return;
+const handleAIQuery = async (userMessage) => {
+  if (!userMessage.trim()) return;
 
-    // Add user message
-    const newUserMessage = {
-      type: 'user',
-      content: userMessage,
+  // Add user message
+  const newUserMessage = {
+    type: 'user',
+    content: userMessage,
+    timestamp: new Date().toLocaleTimeString()
+  };
+
+  const updatedMessages = [...aiMessages, newUserMessage];
+  setAiMessages(updatedMessages);
+  setAiInput('');
+  setAiLoading(true);
+
+  try {
+    // Check if Gemini API key is available
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey.trim() === '') {
+      throw new Error('API_KEY_MISSING');
+    }
+
+    // Initialize with fallback to older model if needed
+    let model;
+    try {
+      const genAI = new GoogleGenerativeAI(apiKey);
+      model = genAI.getGenerativeModel({ 
+        model: "gemini-1.5-pro-latest",
+        apiVersion: "v1"
+      });
+      
+      // Test model availability
+      await model.generateContent({
+        contents: [{ role: "user", parts: [{ text: "Say hello" }] }],
+      });
+    } catch (modelError) {
+      console.warn('Primary model failed, trying fallback:', modelError);
+      const genAI = new GoogleGenerativeAI(apiKey);
+      model = genAI.getGenerativeModel({ 
+        model: "gemini-pro",
+        apiVersion: "v1beta"
+      });
+    }
+
+    // Get system context
+    const context = getProjectContext();
+    
+    // Try to get fresh data if needed
+    let freshData = '';
+    try {
+      freshData = await fetchRelevantData(userMessage);
+    } catch (dataError) {
+      console.warn('Data fetch failed:', dataError);
+      freshData = '\n[Note: Could not fetch live data]';
+    }
+
+    // Generate response
+    const prompt = `${context}${freshData}\n\nUser Question: ${userMessage}`;
+    
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+    });
+    
+    const response = await result.response;
+    const aiResponse = response.text();
+
+    // Add AI response
+    const newAIMessage = {
+      type: 'ai',
+      content: aiResponse,
       timestamp: new Date().toLocaleTimeString()
     };
 
-    const updatedMessages = [...aiMessages, newUserMessage];
-    setAiMessages(updatedMessages);
-    setAiInput('');
-    setAiLoading(true);
+    const finalMessages = [...updatedMessages, newAIMessage];
+    setAiMessages(finalMessages);
+    updateCurrentChat(finalMessages);
 
-    try {
-      // Check if Gemini API key is available
-      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      console.log('API Key available:', !!apiKey);
-      console.log('API Key length:', apiKey ? apiKey.length : 0);
-      
-      if (!apiKey || apiKey.trim() === '') {
-        throw new Error('Gemini API key not configured');
-      }
+  } catch (error) {
+    console.error('AI processing error:', error);
+    
+    // Use fallback response if AI fails
+    const fallbackResponse = getFallbackResponse(userMessage);
+    
+    const errorMessage = {
+      type: 'ai',
+      content: `I'm having trouble connecting to the AI service. Here's what I can tell you:\n\n${fallbackResponse}`,
+      timestamp: new Date().toLocaleTimeString()
+    };
+    
+    const finalMessages = [...updatedMessages, errorMessage];
+    setAiMessages(finalMessages);
+    updateCurrentChat(finalMessages);
+    
+  } finally {
+    setAiLoading(false);
+  }
+};
 
-      const model = genAI.getGenerativeModel({ model: "gemini-pro" });
-      
-      // Check if query needs database data
-      const needsData = userMessage.toLowerCase().includes('show') || 
-                       userMessage.toLowerCase().includes('count') ||
-                       userMessage.toLowerCase().includes('list') ||
-                       userMessage.toLowerCase().includes('how many') ||
-                       userMessage.toLowerCase().includes('total') ||
-                       userMessage.toLowerCase().includes('pending') ||
-                       userMessage.toLowerCase().includes('approved') ||
-                       userMessage.toLowerCase().includes('rejected') ||
-                       userMessage.toLowerCase().includes('member') ||
-                       userMessage.toLowerCase().includes('user') ||
-                       userMessage.toLowerCase().includes('loan') ||
-                       userMessage.toLowerCase().includes('deposit') ||
-                       userMessage.toLowerCase().includes('withdraw') ||
-                       userMessage.toLowerCase().includes('transaction');
+// Helper function to fetch relevant data
+const fetchRelevantData = async (userMessage) => {
+  if (!userMessage.toLowerCase().includes('data') && 
+      !userMessage.toLowerCase().includes('count') &&
+      !userMessage.toLowerCase().includes('how many')) {
+    return '';
+  }
 
-      let contextData = '';
-      let dataFetchErrors = [];
+  try {
+    const collections = [];
+    if (userMessage.toLowerCase().includes('member')) collections.push('users');
+    if (userMessage.toLowerCase().includes('loan')) collections.push('loans');
+    if (userMessage.toLowerCase().includes('deposit')) collections.push('deposits');
+    
+    if (collections.length === 0) return '';
+    
+    let dataSummary = '\n\nCurrent System Data:';
+    
+    for (const collection of collections) {
+      const snapshot = await database.ref(collection).once('value');
+      const data = snapshot.val();
+      const count = data ? Object.keys(data).length : 0;
       
-      if (needsData) {
-        console.log('Fetching database data for AI query...');
+      dataSummary += `\n- ${collection.toUpperCase()}: ${count} records`;
+      
+      if (count > 0 && collection === 'loans') {
+        const loans = Object.values(data);
+        const statusCounts = loans.reduce((acc, loan) => {
+          acc[loan.status] = (acc[loan.status] || 0) + 1;
+          return acc;
+        }, {});
         
-        // Fetch relevant data based on query
-        const dataQueries = [];
-        
-        if (userMessage.toLowerCase().includes('user') || userMessage.toLowerCase().includes('member')) {
-          dataQueries.push({ collection: 'users', label: 'USERS' });
-        }
-        if (userMessage.toLowerCase().includes('loan')) {
-          dataQueries.push({ collection: 'loans', label: 'LOANS' });
-        }
-        if (userMessage.toLowerCase().includes('deposit')) {
-          dataQueries.push({ collection: 'deposits', label: 'DEPOSITS' });
-        }
-        if (userMessage.toLowerCase().includes('withdraw')) {
-          dataQueries.push({ collection: 'withdraws', label: 'WITHDRAWS' });
-        }
-        if (userMessage.toLowerCase().includes('transaction')) {
-          dataQueries.push({ collection: 'transactions', label: 'TRANSACTIONS' });
-        }
-
-        // If no specific collection mentioned, try to fetch all
-        if (dataQueries.length === 0 && needsData) {
-          dataQueries.push(
-            { collection: 'users', label: 'USERS' },
-            { collection: 'loans', label: 'LOANS' },
-            { collection: 'deposits', label: 'DEPOSITS' }
-          );
-        }
-
-        for (const query of dataQueries) {
-          try {
-            const data = await queryFirebaseData(query.collection);
-            if (data && data.length > 0) {
-              // Provide summary statistics instead of raw data
-              contextData += `\n${query.label} SUMMARY:`;
-              contextData += `\n- Total count: ${data.length}`;
-              
-              if (query.collection === 'users') {
-                contextData += `\n- Sample user fields: ${Object.keys(data[0] || {}).join(', ')}`;
-              } else if (query.collection === 'loans') {
-                const pending = data.filter(item => item.status === 'pending').length;
-                const approved = data.filter(item => item.status === 'approved').length;
-                const rejected = data.filter(item => item.status === 'rejected').length;
-                contextData += `\n- Pending: ${pending}, Approved: ${approved}, Rejected: ${rejected}`;
-              } else if (query.collection === 'deposits') {
-                const pending = data.filter(item => item.status === 'pending').length;
-                const approved = data.filter(item => item.status === 'approved').length;
-                contextData += `\n- Pending: ${pending}, Approved: ${approved}`;
-              }
-              
-              // Include a few sample records (limited data)
-              contextData += `\n- Sample records: ${JSON.stringify(data.slice(0, 3).map(item => ({
-                id: item.id,
-                ...Object.fromEntries(Object.entries(item).slice(0, 4))
-              })))}`;
-            } else {
-              contextData += `\n${query.label}: No data found`;
-            }
-          } catch (error) {
-            console.error(`Error fetching ${query.collection}:`, error);
-            dataFetchErrors.push(query.collection);
-            contextData += `\n${query.label}: Error fetching data (${error.message})`;
-          }
-        }
-        
-        if (dataFetchErrors.length > 0) {
-          contextData += `\n\nNote: Some data could not be fetched due to: ${dataFetchErrors.join(', ')}`;
-        }
+        dataSummary += ` (Pending: ${statusCounts.pending || 0}, Approved: ${statusCounts.approved || 0})`;
       }
-
-      const prompt = `${getProjectContext()}${contextData}
-
-User Question: ${userMessage}
-
-Instructions:
-- Provide a helpful, accurate response based on the available data
-- If showing statistics, format them clearly with bullet points or simple lists
-- If data couldn't be fetched, explain what information would typically be available
-- Be specific about numbers and counts when data is available
-- If you need additional data that wasn't provided, mention what specific data would help
-- Keep responses concise but informative
-- DO NOT use markdown formatting like **bold** or *italic* - use plain text only
-- Use simple bullet points with • or - for lists
-- Use clear, readable plain text formatting
-
-Please respond in a friendly, professional manner using plain text only.`;
-
-      console.log('Sending prompt to Gemini AI...');
-      console.log('Prompt length:', prompt.length);
-      
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      const aiResponse = response.text();
-      
-      console.log('AI Response received:', aiResponse.substring(0, 100) + '...');
-
-      const newAIMessage = {
-        type: 'ai',
-        content: aiResponse,
-        timestamp: new Date().toLocaleTimeString()
-      };
-
-      const finalMessages = [...updatedMessages, newAIMessage];
-      setAiMessages(finalMessages);
-      updateCurrentChat(finalMessages);
-      
-    } catch (error) {
-      console.error('AI Error:', error);
-      
-      let errorContent = '';
-      
-      if (error.message.includes('API key') || error.message.includes('GEMINI_API_KEY')) {
-        errorContent = 'AI service is not properly configured. Please check the API key configuration.';
-      } else if (error.message.includes('quota') || error.message.includes('limit') || error.message.includes('QUOTA_EXCEEDED')) {
-        errorContent = 'AI service quota exceeded. Please try again later or contact your administrator.';
-      } else if (error.message.includes('timeout') || error.message.includes('TIMEOUT')) {
-        errorContent = 'Request timed out. Please try again with a simpler question.';
-      } else if (error.message.includes('BLOCKED') || error.message.includes('SAFETY')) {
-        errorContent = 'Your request was blocked by safety filters. Please rephrase your question.';
-      } else if (error.message.includes('INVALID_ARGUMENT')) {
-        errorContent = 'Invalid request format. Please try rephrasing your question.';
-      } else if (error.message.includes('Firebase') || error.message.includes('database')) {
-        errorContent = 'Unable to access database at the moment. I can still help with general questions about your system structure and features.';
-      } else {
-        // For network or other technical errors, provide a more specific message
-        console.log('Unexpected AI error:', error.message);
-        errorContent = `I encountered a technical issue: ${error.message}. Please try again or rephrase your question.`;
-      }
-      
-      const errorMessage = {
-        type: 'ai',
-        content: errorContent,
-        timestamp: new Date().toLocaleTimeString()
-      };
-      
-      const finalMessages = [...updatedMessages, errorMessage];
-      setAiMessages(finalMessages);
-      updateCurrentChat(finalMessages);
-    } finally {
-      setAiLoading(false);
     }
-  };
+    
+    return dataSummary;
+  } catch (error) {
+    console.error('Data fetch error:', error);
+    throw error;
+  }
+};
 
   const handleAIInputSubmit = (e) => {
     e.preventDefault();
@@ -770,11 +737,13 @@ Please respond in a friendly, professional manner using plain text only.`;
       marginLeft: '5px',
       fontSize: '18px',
     },
-    content: {
-      flex: 1,
-      overflow: 'auto',
-      height: '100vh',
-    },
+content: {
+  flex: 1,
+  overflow: 'auto',
+  height: '100vh',
+  padding: '20px',
+  backgroundColor: '#f5f7fa',
+},
     dropdownWrapper: {
       position: 'absolute',
       top: '40px',
@@ -967,14 +936,6 @@ Please respond in a friendly, professional manner using plain text only.`;
       display: 'flex',
       alignItems: 'center',
       gap: '10px'
-    },
-    aiCloseButton: {
-      background: 'none',
-      border: 'none',
-      color: 'white',
-      fontSize: '20px',
-      cursor: 'pointer',
-      padding: '4px'
     },
     aiMessagesContainer: {
       flex: 1,
@@ -1742,33 +1703,34 @@ Please respond in a friendly, professional manner using plain text only.`;
                 </button>
               </div>
               
-              <div style={styles.aiMessagesContainer}>
-                {aiMessages.map((message, index) => (
-                  <div 
-                    key={index}
-                    style={{
-                      ...styles.aiMessage,
-                      ...(message.type === 'user' ? styles.aiMessageUser : styles.aiMessageAI)
-                    }}
-                  >
-                    <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
-                    <div style={styles.aiMessageTime}>{message.timestamp}</div>
-                  </div>
-                ))}
-                
-                {aiLoading && (
-                  <div style={{...styles.aiMessage, ...styles.aiMessageAI}}>
-                    <div style={styles.aiLoadingDots}>
-                      <div style={{...styles.aiLoadingDot, animationDelay: '0s'}}></div>
-                      <div style={{...styles.aiLoadingDot, animationDelay: '0.2s'}}></div>
-                      <div style={{...styles.aiLoadingDot, animationDelay: '0.4s'}}></div>
-                      <span style={{ marginLeft: '8px', fontSize: '14px', color: '#666' }}>
-                        AI is thinking...
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </div>
+<div style={styles.aiMessagesContainer}>
+  {aiMessages.map((message, index) => (
+    <div 
+      key={index}
+      style={{
+        ...styles.aiMessage,
+        ...(message.type === 'user' ? styles.aiMessageUser : styles.aiMessageAI)
+      }}
+    >
+      <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+      <div style={styles.aiMessageTime}>{message.timestamp}</div>
+    </div>
+  ))}
+  
+  {aiLoading && (
+    <div style={{...styles.aiMessage, ...styles.aiMessageAI}}>
+      <div style={styles.aiLoadingDots}>
+        <div style={{...styles.aiLoadingDot, animationDelay: '0s'}}></div>
+        <div style={{...styles.aiLoadingDot, animationDelay: '0.2s'}}></div>
+        <div style={{...styles.aiLoadingDot, animationDelay: '0.4s'}}></div>
+        <span style={{ marginLeft: '8px', fontSize: '14px', color: '#666' }}>
+          AI is thinking...
+        </span>
+      </div>
+    </div>
+  )}
+  <div ref={messagesEndRef} />
+</div>
               
               <form onSubmit={handleAIInputSubmit} style={styles.aiInputContainer}>
                 <input
