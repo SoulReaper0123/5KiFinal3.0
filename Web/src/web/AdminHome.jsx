@@ -81,29 +81,24 @@ useEffect(() => {
   const { logout } = useAuth();
   const isSmallScreen = windowWidth < 1024;
 
-  // Initialize Gemini AI
-// Replace the current initialization with:
+// Initialize Gemini AI - Updated for free version
 const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+
+// Use the correct model for the free version
 const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-pro-latest",  // Updated model name
-  apiVersion: "v1"  // Updated API version
+  model: "gemini-1.5-flash"
 });
 
   // Test function to verify AI is working
 const testAI = async () => {
-  try {
-    console.log('Testing AI connection...');
-    const model = genAI.getGenerativeModel({ 
-      model: "gemini-1.5-pro-latest",
-      apiVersion: "v1"
-    });
-    const result = await model.generateContent("Say hello in one word");
-    const response = await result.response;
-    const text = response.text();
-    console.log('AI Test successful:', text);
+try {
+    const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const result = await model.generateContent("Hello");
+    console.log(result.response.text());
     return true;
   } catch (error) {
-    console.error('AI Test failed:', error);
+    console.error("Connection test failed:", error);
     return false;
   }
 };
@@ -500,27 +495,9 @@ const handleAIQuery = async (userMessage) => {
       throw new Error('API_KEY_MISSING');
     }
 
-    // Initialize with fallback to older model if needed
-    let model;
-    try {
-      const genAI = new GoogleGenerativeAI(apiKey);
-      model = genAI.getGenerativeModel({ 
-        model: "gemini-1.5-pro-latest",
-        apiVersion: "v1"
-      });
-      
-      // Test model availability
-      await model.generateContent({
-        contents: [{ role: "user", parts: [{ text: "Say hello" }] }],
-      });
-    } catch (modelError) {
-      console.warn('Primary model failed, trying fallback:', modelError);
-      const genAI = new GoogleGenerativeAI(apiKey);
-      model = genAI.getGenerativeModel({ 
-        model: "gemini-pro",
-        apiVersion: "v1beta"
-      });
-    }
+    // Initialize with the correct model for free version
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
     // Get system context
     const context = getProjectContext();
@@ -537,10 +514,8 @@ const handleAIQuery = async (userMessage) => {
     // Generate response
     const prompt = `${context}${freshData}\n\nUser Question: ${userMessage}`;
     
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-    });
-    
+    // Updated generation call for free version
+    const result = await model.generateContent(prompt);
     const response = await result.response;
     const aiResponse = response.text();
 
