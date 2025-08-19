@@ -45,8 +45,15 @@ const Dashboard = () => {
 
   const checkDueDates = async () => {
     try {
+      console.log('Checking due dates for loan reminders...');
       const now = new Date();
       const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      // Format dates for logging
+      const formattedNow = now.toISOString();
+      const formattedOneWeekFromNow = oneWeekFromNow.toISOString();
+      console.log(`Current date: ${formattedNow}`);
+      console.log(`One week from now: ${formattedOneWeekFromNow}`);
       
       const loansRef = database.ref('Loans/CurrentLoans');
       const loansSnapshot = await loansRef.once('value');
@@ -64,19 +71,45 @@ const Dashboard = () => {
       const notificationsSnapshot = await notificationsRef.once('value');
       const notificationsData = notificationsSnapshot.val() || {};
 
+      console.log(`Found ${Object.keys(loansData).length} members with loans`);
+      
+      let remindersSent = 0;
+      let loansChecked = 0;
+
       for (const [memberId, loans] of Object.entries(loansData)) {
         for (const [transactionId, currentLoan] of Object.entries(loans)) {
+          loansChecked++;
+          
+          if (!currentLoan.dueDate) {
+            console.log(`Loan ${transactionId} for member ${memberId} has no due date`);
+            continue;
+          }
+          
+          // Parse the due date properly
           const dueDate = new Date(currentLoan.dueDate);
           
-          if (dueDate <= oneWeekFromNow && dueDate > now) {
+          // Log the due date for debugging
+          console.log(`Loan ${transactionId} for member ${memberId} has due date: ${dueDate.toISOString()}`);
+          
+          // Check if the due date is within the next week
+          const isWithinOneWeek = dueDate <= oneWeekFromNow && dueDate > now;
+          console.log(`Is within one week: ${isWithinOneWeek}`);
+          
+          if (isWithinOneWeek) {
             const notificationKey = `${memberId}_${transactionId}`;
+            const hasBeenNotified = notificationsData && notificationsData[notificationKey];
             
-            if (!notificationsData[notificationKey]) {
+            console.log(`Notification status for ${notificationKey}: ${hasBeenNotified ? 'Already sent' : 'Not sent yet'}`);
+            
+            // Only send if no notification has been sent yet
+            if (!hasBeenNotified) {
               const member = membersData[memberId];
               const approvedLoan = approvedLoansData[memberId]?.[transactionId];
               
               if (member && member.email) {
                 try {
+                  console.log(`Sending reminder to ${member.email} for loan ${transactionId}`);
+                  
                   let outstandingBalance = parseFloat(currentLoan.loanAmount) || 0;
                   const originalAmount = approvedLoan 
                     ? parseFloat(approvedLoan.loanAmount) || 0 
@@ -93,18 +126,26 @@ const Dashboard = () => {
                     outstandingBalance: outstandingBalance
                   });
 
+                  // Record that we've sent a notification
                   await notificationsRef.child(notificationKey).set({
                     sentAt: new Date().toISOString(),
                     dueDate: currentLoan.dueDate
                   });
+                  
+                  remindersSent++;
+                  console.log(`Successfully sent reminder for loan ${transactionId}`);
                 } catch (error) {
                   console.error(`Failed to send reminder for ${memberId}/${transactionId}:`, error);
                 }
+              } else {
+                console.log(`Member ${memberId} has no email or member data not found`);
               }
             }
           }
         }
       }
+      
+      console.log(`Checked ${loansChecked} loans, sent ${remindersSent} reminders`);
     } catch (error) {
       console.error('Error checking due dates:', error);
     }
@@ -168,9 +209,19 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
+    console.log('Setting up loan reminder check system...');
+    // Run immediately when component mounts
     checkDueDates();
-    const dailyCheckInterval = setInterval(checkDueDates, 24 * 60 * 60 * 1000);
-    return () => clearInterval(dailyCheckInterval);
+    
+    // During development, check every 5 minutes instead of once per day
+    // This makes it easier to test and debug
+    const checkInterval = setInterval(checkDueDates, 5 * 60 * 1000); // 5 minutes
+    
+    // Clean up interval when component unmounts
+    return () => {
+      console.log('Clearing loan reminder check interval');
+      clearInterval(checkInterval);
+    };
   }, []);
 
   useEffect(() => {

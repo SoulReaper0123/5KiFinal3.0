@@ -194,8 +194,14 @@ const RegisterPage = () => {
 
     // Orientation code validation if attended
     if (attendedOrientation) {
-      const isValidCode = await validateOrientationCode();
-      if (!isValidCode) return;
+      // Skip validation if code is already known to be valid
+      if (orientationCode === validOrientationCode) {
+        // Code is already valid, continue
+      } else {
+        // Need to validate the code
+        const isValidCode = await validateOrientationCode();
+        if (!isValidCode) return;
+      }
     }
 
     // Show confirmation alert before navigating
@@ -256,39 +262,10 @@ const RegisterPage = () => {
   ];
     
   const governmentIdOptions = [
-    {
-      key: 'message',
-      section: true,
-      label: '',
-      component: (
-        <View
-          style={{
-            paddingVertical: 10,
-            paddingHorizontal: 12,
-            backgroundColor: '#E2ECF8',
-            borderRadius: 8,
-            marginBottom: 8,
-          }}
-        >
-          <Text
-            style={{
-              color: '#1A365D',
-              fontWeight: '600',
-              fontSize: 15,
-              lineHeight: 22,
-            }}
-          >
-            Kindly choose the type of government-issued ID you will be using to proceed with your registration.
-          </Text>
-        </View>
-      ),
-    },
     { key: 'national', label: 'National ID (PhilSys)' },
     { key: 'sss', label: 'SSS ID' },
     { key: 'philhealth', label: 'PhilHealth ID' },
     { key: 'drivers_license', label: 'Drivers License' },
-  
-  
   ];
 
   return (
@@ -358,6 +335,10 @@ const RegisterPage = () => {
               onChange={(option) => setGender(option.key)}
               style={styles.picker}
               selectStyle={styles.pickerWithIcon}
+              optionTextStyle={{ fontSize: 16, color: '#222' }}
+              optionContainerStyle={{ backgroundColor: '#fff' }}
+              modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+              overlayStyle={{ justifyContent: 'flex-end' }}
             >
               <View style={styles.pickerContent}>
                 <Text style={[styles.pickerText, gender ? styles.selectedText : styles.placeholderText]}>
@@ -436,6 +417,10 @@ const RegisterPage = () => {
               onChange={(option) => setCivilStatus(option.key)}
               style={styles.picker}
               selectStyle={styles.pickerWithIcon}
+              optionTextStyle={{ fontSize: 16, color: '#222' }}
+              optionContainerStyle={{ backgroundColor: '#fff' }}
+              modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+              overlayStyle={{ justifyContent: 'flex-end' }}
             >
               <View style={styles.pickerContent}>
                 <Text style={[styles.pickerText, civilStatus ? styles.selectedText : styles.placeholderText]}>
@@ -482,13 +467,13 @@ const RegisterPage = () => {
               data={governmentIdOptions}
               initValue="Select Government ID"
               cancelText="Cancel"
-              onChange={(option) => {
-                if (option.key !== 'message') setGovernmentId(option.label);
-              }}
+              onChange={(option) => setGovernmentId(option.label)}
               style={styles.picker}
               selectStyle={styles.pickerWithIcon}
               optionTextStyle={{ fontSize: 16, color: '#222' }}
               optionContainerStyle={{ backgroundColor: '#fff' }}
+              modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+              overlayStyle={{ justifyContent: 'flex-end' }}
             >
               <View style={styles.pickerContent}>
                 <Text style={[
@@ -522,6 +507,30 @@ const RegisterPage = () => {
                 <Text style={styles.radioOptionText}>No</Text>
               </View>
             </View>
+            
+            {/* Note at the bottom of options */}
+            <View style={styles.orientationNote}>
+              <Text style={styles.orientationNoteText}>
+                <Text style={styles.noteIcon}>ℹ️</Text> Note: Orientation attendance is required to proceed with registration.
+              </Text>
+            </View>
+            
+            {/* Show explanation when "No" is selected */}
+            {attendedOrientation === false && (
+              <View style={styles.noOrientationWarning}>
+                <Text style={styles.warningIcon}>⚠️</Text>
+                <View style={styles.warningTextContainer}>
+                  <Text style={styles.warningTitle}>Cannot Proceed with Registration</Text>
+                  <Text style={styles.warningText}>
+                    You must attend the company orientation before you can complete your registration. 
+                    Please contact the company to schedule your orientation session.
+                  </Text>
+                  <Text style={styles.warningSubText}>
+                    Once you have attended the orientation, you will receive a code that allows you to continue with the registration process.
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
 
           {attendedOrientation && (
@@ -530,11 +539,30 @@ const RegisterPage = () => {
               <TextInput
                 placeholder="Enter Orientation Code"
                 value={orientationCode}
-                onChangeText={setOrientationCode}
-                style={styles.input}
+                onChangeText={(text) => {
+                  setOrientationCode(text);
+                  // Auto-validate when the code matches the length of the valid code
+                  if (text.length === validOrientationCode?.length) {
+                    // If code is valid, show proceed dialog automatically
+                    if (text === validOrientationCode) {
+                      // Small delay to allow the UI to update with the valid indicator
+                      setTimeout(() => {
+                        if (isFormComplete()) {
+                          handleNext();
+                        }
+                      }, 500);
+                    }
+                  }
+                }}
+                style={[
+                  styles.input,
+                  orientationCode && validOrientationCode && orientationCode === validOrientationCode ? 
+                    styles.validInput : 
+                    (orientationCode && validOrientationCode && orientationCode !== validOrientationCode ? 
+                      styles.invalidInput : null)
+                ]}
                 returnKeyType="done"
                 ref={orientationCodeInput}
-                onSubmitEditing={validateOrientationCode}
               />
               {isCheckingCode && <Text style={styles.checkingText}>Verifying code...</Text>}
               {orientationCode && validOrientationCode && orientationCode === validOrientationCode && (
@@ -744,6 +772,68 @@ const styles = StyleSheet.create({
     color: 'red',
     fontSize: 14,
     marginTop: 5,
+  },
+  validInput: {
+    borderColor: 'green',
+    borderWidth: 1.5,
+  },
+  invalidInput: {
+    borderColor: 'red',
+    borderWidth: 1.5,
+  },
+  orientationNote: {
+    marginTop: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    backgroundColor: '#E8F4FD',
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2196F3',
+  },
+  orientationNoteText: {
+    fontSize: 14,
+    color: '#1565C0',
+    lineHeight: 20,
+  },
+  noteIcon: {
+    fontSize: 16,
+    marginRight: 5,
+  },
+  noOrientationWarning: {
+    marginTop: 15,
+    padding: 15,
+    backgroundColor: '#FFF3E0',
+    borderRadius: 10,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FF9800',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  warningIcon: {
+    fontSize: 20,
+    marginRight: 10,
+    marginTop: 2,
+  },
+  warningTextContainer: {
+    flex: 1,
+  },
+  warningTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#E65100',
+    marginBottom: 8,
+  },
+  warningText: {
+    fontSize: 14,
+    color: '#BF360C',
+    lineHeight: 20,
+    marginBottom: 8,
+  },
+  warningSubText: {
+    fontSize: 13,
+    color: '#8D6E63',
+    lineHeight: 18,
+    fontStyle: 'italic',
   },
 });
 

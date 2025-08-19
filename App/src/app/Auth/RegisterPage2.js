@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import { MaterialIcons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -26,6 +27,11 @@ const RegisterPage2 = () => {
     const [showIdBackOptions, setShowIdBackOptions] = useState(false);
     const [showSelfieOptions, setShowSelfieOptions] = useState(false);
     const [showSelfieWithIdOptions, setShowSelfieWithIdOptions] = useState(false);
+    // State for crop options modal
+    const [showCropOptions, setShowCropOptions] = useState(false);
+    const [selectedImageUri, setSelectedImageUri] = useState(null);
+    const [currentImageType, setCurrentImageType] = useState(null);
+    const [currentSetFunction, setCurrentSetFunction] = useState(null);
 
     useEffect(() => {
         if (route.params?.selfieWithId) {
@@ -41,7 +47,24 @@ const RegisterPage2 = () => {
         address, governmentId, age, dateOfBirth,
     } = route.params;
 
-    const handleSelectImage = async (source, setImageFunction) => {
+    const handleSelectImage = async (source, setImageFunction, imageType) => {
+        // First, ensure we have a valid function to set the image
+        if (typeof setImageFunction !== 'function') {
+            console.error('setImageFunction is not a function:', setImageFunction);
+            Alert.alert('Error', 'An internal error occurred. Please try again.');
+            return;
+        }
+        
+        // Close all option modals first
+        setShowIdFrontOptions(false);
+        setShowIdBackOptions(false);
+        setShowSelfieOptions(false);
+        setShowSelfieWithIdOptions(false);
+        
+        // Save the current set function and image type for later use
+        setCurrentSetFunction(() => setImageFunction);
+        setCurrentImageType(imageType);
+        
         const { status } = source === 'camera' 
             ? await ImagePicker.requestCameraPermissionsAsync()
             : await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -52,26 +75,98 @@ const RegisterPage2 = () => {
         }
 
         try {
+            // Launch camera or image library WITHOUT automatic editing
             const result = await (source === 'camera' 
                 ? ImagePicker.launchCameraAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [1, 1],
-                    quality: 0.7,
+                    allowsEditing: false, // Disable automatic editing
+                    quality: 0.8,
                 })
                 : ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [1, 1],
-                    quality: 0.7,
+                    allowsEditing: false, // Disable automatic editing
+                    quality: 0.8,
                 }));
 
             if (!result.canceled && result.assets && result.assets[0]) {
-                setImageFunction(result.assets[0].uri);
+                if (source === 'camera') {
+                    // For camera: automatically use the image as is
+                    setImageFunction(result.assets[0].uri);
+                    // Clean up state
+                    setCurrentSetFunction(null);
+                    setCurrentImageType(null);
+                } else {
+                    // For gallery: show crop options
+                    setSelectedImageUri(result.assets[0].uri);
+                    setShowCropOptions(true);
+                }
             }
         } catch (error) {
             console.error('Error selecting image:', error);
             Alert.alert('Error', 'Failed to select image');
+        }
+    };
+
+    const handleUseAsIs = () => {
+        if (currentSetFunction && selectedImageUri) {
+            currentSetFunction(selectedImageUri);
+            setShowCropOptions(false);
+            setSelectedImageUri(null);
+            setCurrentImageType(null);
+            setCurrentSetFunction(null);
+        }
+    };
+
+    const handleCropImage = async () => {
+        if (!selectedImageUri) return;
+
+        try {
+            setShowCropOptions(false);
+            
+            Alert.alert(
+                'Crop Image',
+                'You can now crop the image with flexible dimensions. Drag the corners to adjust both height and width as needed.',
+                [
+                    {
+                        text: 'Cancel',
+                        style: 'cancel',
+                        onPress: () => setShowCropOptions(true)
+                    },
+                    {
+                        text: 'Continue',
+                        onPress: async () => {
+                            try {
+                                // Use ImagePicker with editing enabled for flexible cropping
+                                const result = await ImagePicker.launchImageLibraryAsync({
+                                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                                    allowsEditing: true,
+                                    // No aspect ratio = free form cropping
+                                    quality: 0.8,
+                                });
+
+                                if (!result.canceled && result.assets && result.assets[0]) {
+                                    if (currentSetFunction) {
+                                        currentSetFunction(result.assets[0].uri);
+                                    }
+                                    // Clean up state
+                                    setSelectedImageUri(null);
+                                    setCurrentImageType(null);
+                                    setCurrentSetFunction(null);
+                                } else {
+                                    setShowCropOptions(true);
+                                }
+                            } catch (error) {
+                                console.error('Error cropping image:', error);
+                                Alert.alert('Error', 'Failed to crop image');
+                                setShowCropOptions(true);
+                            }
+                        },
+                    },
+                ]
+            );
+        } catch (error) {
+            console.error('Error with crop:', error);
+            Alert.alert('Error', 'Failed to crop image');
         }
     };
 
@@ -104,8 +199,12 @@ const RegisterPage2 = () => {
                         <TouchableOpacity 
                             style={[styles.optionButton, !showLibraryOption && styles.fullWidthOption]}
                             onPress={() => {
+                                // First close the modal, then handle the camera press
                                 setVisible(false);
-                                onCameraPress();
+                                // Small delay to ensure modal is closed before proceeding
+                                setTimeout(() => {
+                                    onCameraPress();
+                                }, 300);
                             }}
                         >
                             <Icon name="photo-camera" size={24} color="#2D5783" style={styles.optionIcon} />
@@ -115,8 +214,12 @@ const RegisterPage2 = () => {
                             <TouchableOpacity 
                                 style={styles.optionButton}
                                 onPress={() => {
+                                    // First close the modal, then handle the library press
                                     setVisible(false);
-                                    onLibraryPress();
+                                    // Small delay to ensure modal is closed before proceeding
+                                    setTimeout(() => {
+                                        onLibraryPress();
+                                    }, 300);
                                 }}
                             >
                                 <Icon name="photo-library" size={24} color="#2D5783" style={styles.optionIcon} />
@@ -226,8 +329,8 @@ const RegisterPage2 = () => {
                 {renderOptionsModal(
                     showIdFrontOptions, 
                     setShowIdFrontOptions, 
-                    () => handleSelectImage('camera', setValidIdFront), 
-                    () => handleSelectImage('library', setValidIdFront),
+                    () => handleSelectImage('camera', setValidIdFront, 'validIdFront'), 
+                    () => handleSelectImage('library', setValidIdFront, 'validIdFront'),
                     'Select ID Front Source',
                     true
                 )}
@@ -235,8 +338,8 @@ const RegisterPage2 = () => {
                 {renderOptionsModal(
                     showIdBackOptions, 
                     setShowIdBackOptions, 
-                    () => handleSelectImage('camera', setValidIdBack), 
-                    () => handleSelectImage('library', setValidIdBack),
+                    () => handleSelectImage('camera', setValidIdBack, 'validIdBack'), 
+                    () => handleSelectImage('library', setValidIdBack, 'validIdBack'),
                     'Select ID Back Source',
                     true
                 )}
@@ -244,8 +347,8 @@ const RegisterPage2 = () => {
                 {renderOptionsModal(
                     showSelfieOptions, 
                     setShowSelfieOptions, 
-                    () => handleSelectImage('camera', setSelfie), 
-                    () => handleSelectImage('library', setSelfie),
+                    () => handleSelectImage('camera', setSelfie, 'selfie'), 
+                    () => handleSelectImage('library', setSelfie, 'selfie'),
                     'Take Selfie',
                     false
                 )}
@@ -253,11 +356,61 @@ const RegisterPage2 = () => {
                 {renderOptionsModal(
                     showSelfieWithIdOptions, 
                     setShowSelfieWithIdOptions, 
-                    () => handleSelectImage('camera', setSelfieWithId), 
-                    () => handleSelectImage('library', setSelfieWithId),
+                    () => handleSelectImage('camera', setSelfieWithId, 'selfieWithId'), 
+                    () => handleSelectImage('library', setSelfieWithId, 'selfieWithId'),
                     'Take Selfie with ID',
                     false
                 )}
+
+                {/* Crop Options Modal */}
+                <Modal
+                    transparent={true}
+                    visible={showCropOptions}
+                    onRequestClose={() => setShowCropOptions(false)}
+                    animationType="slide"
+                >
+                    <View style={styles.modalBackground}>
+                        <View style={styles.optionsModal}>
+                            <Text style={styles.modalTitle}>Image Options</Text>
+                            
+                            {selectedImageUri && (
+                                <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
+                            )}
+                            
+                            <Text style={styles.cropInstructions}>
+                                Choose how you want to use this selected image. "Crop Image" will open a cropping interface where you can adjust the size by dragging the corners.
+                            </Text>
+                            
+                            <View style={styles.cropButtonsContainer}>
+                                <TouchableOpacity 
+                                    style={[styles.cropButton, styles.useAsIsButton]}
+                                    onPress={handleUseAsIs}
+                                >
+                                    <Text style={styles.cropButtonText}>Use As Is</Text>
+                                </TouchableOpacity>
+                                
+                                <TouchableOpacity 
+                                    style={styles.cropButton}
+                                    onPress={handleCropImage}
+                                >
+                                    <Text style={styles.cropButtonText}>Crop Image</Text>
+                                </TouchableOpacity>
+                            </View>
+                            
+                            <TouchableOpacity 
+                                style={styles.cancelButton}
+                                onPress={() => {
+                                    setShowCropOptions(false);
+                                    setSelectedImageUri(null);
+                                    setCurrentImageType(null);
+                                    setCurrentSetFunction(null);
+                                }}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
             </View>
         </ScrollView>
     );
@@ -271,6 +424,7 @@ const styles = StyleSheet.create({
         paddingBottom: 30,
         backgroundColor: '#2C5282',
     },
+    // We've removed the custom crop styles since we're using the built-in image picker cropping
     container: {
         flex: 1,
         justifyContent: 'space-between',
@@ -366,6 +520,38 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
+    // New styles for crop options modal
+    previewImage: {
+        width: '100%',
+        height: 200,
+        borderRadius: 8,
+        marginBottom: 20,
+        borderWidth: 1,
+        borderColor: '#ddd',
+    },
+    cropButtonsContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 20,
+        width: '100%',
+    },
+    cropButton: {
+        backgroundColor: '#2D5783',
+        borderRadius: 8,
+        paddingVertical: 12,
+        paddingHorizontal: 20,
+        alignItems: 'center',
+        flex: 1,
+        marginHorizontal: 5,
+    },
+    useAsIsButton: {
+        backgroundColor: '#4FE7AF',
+    },
+    cropButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
     optionButton: {
         flex: 1,
         flexDirection: 'row',
@@ -399,6 +585,13 @@ const styles = StyleSheet.create({
     cancelText: {
         fontSize: 16,
         color: 'red',
+    },
+    cropInstructions: {
+        fontSize: 14,
+        color: '#666',
+        textAlign: 'center',
+        marginBottom: 15,
+        paddingHorizontal: 10,
     },
 });
 

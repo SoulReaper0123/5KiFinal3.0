@@ -11,6 +11,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { get, ref } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
+import * as SecureStore from 'expo-secure-store';
 
 export default function Inbox() {
   const navigation = useNavigation();
