@@ -4,7 +4,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { sendVerificationCode } from '../../api';
 
 export default function TwoFactorEmail({ route, navigation }) {
-  const { email, fromBiometric } = route.params;
+  const { email, password, fromBiometric } = route.params;
 
   const handleSendCode = () => {
     const verificationCode = Math.floor(100000 + Math.random() * 900000).toString();
@@ -12,6 +12,7 @@ export default function TwoFactorEmail({ route, navigation }) {
     // Immediately navigate to next screen
     navigation.navigate('VerifyCode', { 
       email,
+      password,
       verificationCode,
       fromBiometric
     });

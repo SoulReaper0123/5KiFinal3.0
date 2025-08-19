@@ -31,6 +31,7 @@ import WithdrawMembership from '../src/app/HomePage/WithdrawMembership';
 import ChangePassword from '../src/app/Drawer/ChangePassword';
 import AboutUs from '../src/app/Drawer/AboutUs';
 import ContactUs from '../src/app/Drawer/ContactUs';
+import Settings from '../src/app/Drawer/Settings';
 import RegistrationFeePage from '../src/app/Auth/RegistrationFeePage';
 import BiometricSetupScreen from '../src/app/Auth/BiometricSetupScreen';
 
@@ -117,7 +118,7 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
 const DrawerNavigator = ({ route }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
-  const { email } = route.params;
+  const { email, password, shouldPromptBiometric } = route.params;
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -156,12 +157,23 @@ const DrawerNavigator = ({ route }) => {
         drawerStyle: { backgroundColor: 'black' },
       }}
     >
-      <Drawer.Screen name="Home" component={AppHome} initialParams={{ user }} options={{ headerShown: false }} />
+      <Drawer.Screen 
+        name="Home" 
+        component={AppHome} 
+        initialParams={{ 
+          user, 
+          email, 
+          password, 
+          shouldPromptBiometric 
+        }} 
+        options={{ headerShown: false }} 
+      />
       <Drawer.Screen name="Account Management" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
       <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
       <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
       <Drawer.Screen name="About Us" component={AboutUs} options={{ headerShown: false }} />
       <Drawer.Screen name="Contact Us" component={ContactUs} options={{ headerShown: false }} />
+      <Drawer.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
     </Drawer.Navigator>
   );
 };
@@ -192,6 +204,7 @@ const AppNav = () => (
       <Stack.Screen name="ChangePassword" component={ChangePassword} options={{ headerShown: false }} />
       <Stack.Screen name="AboutUs" component={AboutUs} options={{ headerShown: false }} />
       <Stack.Screen name="ContactUs" component={ContactUs} options={{ headerShown: false }} />
+      <Stack.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
       <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} options={{ headerShown: false }} />
       <Stack.Screen 
         name="BiometricSetup" 

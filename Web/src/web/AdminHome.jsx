@@ -262,14 +262,16 @@ try {
     setShowChatHistory(false);
   };
 
-  const loadChat = (chatId) => {
-    const chat = chatSessions.find(session => session.id === chatId);
-    if (chat) {
-      setCurrentChatId(chatId);
-      setAiMessages(chat.messages || []);
-      setShowChatHistory(false);
-    }
-  };
+const loadChat = (chatId) => {
+  const chat = chatSessions.find(session => session.id === chatId);
+  if (chat) {
+    setCurrentChatId(chatId);
+    setAiMessages(chat.messages || []);
+    setShowChatHistory(false);
+    // Scroll to bottom after state updates
+    setTimeout(scrollToBottom, 0);
+  }
+};
 
   const confirmDeleteChat = (chatId) => {
     setChatToDelete(chatId);

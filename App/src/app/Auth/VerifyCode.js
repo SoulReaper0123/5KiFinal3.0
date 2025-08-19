@@ -10,6 +10,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Keychain from 'react-native-keychain';
 import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 export default function VerifyCode({ route, navigation }) {
@@ -23,35 +24,20 @@ export default function VerifyCode({ route, navigation }) {
     inputRefs.current[0]?.focus();
   }, []);
 
-  const promptBiometricSetup = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!hasHardware || !isEnrolled) {
-        nav.navigate('DrawerNav', { email });
-        return;
-      }
-
-      Alert.alert(
-        'Enable Fingerprint Login?',
-        'Do you want to enable fingerprint authentication for faster login next time?',
-        [
-          {
-            text: 'Not Now',
-            onPress: () => nav.navigate('DrawerNav', { email }),
-            style: 'cancel',
-          },
-          {
-            text: 'Enable',
-            onPress: () => nav.navigate('BiometricSetup', { email, password }),
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Biometric check error:', error);
-      nav.navigate('DrawerNav', { email });
-    }
+  // We don't need this function anymore since we're handling biometric setup in AppHome
+  const promptBiometricSetup = () => {
+    // Navigate to DrawerNav with parameters for biometric setup
+    nav.reset({
+      index: 0,
+      routes: [{ 
+        name: 'DrawerNav', 
+        params: { 
+          email, 
+          password, 
+          shouldPromptBiometric: true 
+        } 
+      }],
+    });
   };
 
   const handleChange = (text, index) => {
@@ -85,9 +71,34 @@ export default function VerifyCode({ route, navigation }) {
 
     if (code === verificationCode) {
       if (fromBiometric) {
-        nav.navigate('DrawerNav', { email });
+        // When using biometric login, ensure we pass the email to DrawerNav
+        // We need to pass the same parameters as the regular login to ensure data is loaded
+        console.log('Navigating to DrawerNav from biometric login with email:', email);
+        nav.reset({
+          index: 0,
+          routes: [{ 
+            name: 'DrawerNav', 
+            params: { 
+              email,
+              // Don't pass shouldPromptBiometric since user already has biometrics set up
+            } 
+          }],
+        });
       } else {
-        promptBiometricSetup();
+        // Navigate to DrawerNav with parameters for biometric setup
+        // Make sure we're passing the shouldPromptBiometric flag
+        console.log('Navigating to DrawerNav with shouldPromptBiometric=true');
+        nav.reset({
+          index: 0,
+          routes: [{ 
+            name: 'DrawerNav', 
+            params: { 
+              email, 
+              password, 
+              shouldPromptBiometric: true 
+            } 
+          }],
+        });
       }
     } else {
       Alert.alert('Error', 'Invalid verification code. Please try again.');

@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   SafeAreaView,
   Alert,
+  TextInput,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -16,13 +17,20 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 export default function BiometricSetupScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [inputPassword, setInputPassword] = useState('');
+  const [showPasswordInput, setShowPasswordInput] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
-  const { email, password } = route.params;
+  const { email, password } = route.params || {};
 
   useEffect(() => {
     checkBiometricSupport();
-  }, []);
+    
+    // If no password was provided (coming from Profile screen), show password input
+    if (!password) {
+      setShowPasswordInput(true);
+    }
+  }, [password]);
 
   const checkBiometricSupport = async () => {
     try {
@@ -47,6 +55,17 @@ export default function BiometricSetupScreen() {
   const setupBiometrics = async () => {
     setIsLoading(true);
     setError(null);
+    
+    // If we're showing the password input, use the inputPassword
+    // Otherwise use the password from route params
+    const passwordToStore = showPasswordInput ? inputPassword : password;
+    
+    // Validate password if we're showing the input
+    if (showPasswordInput && !inputPassword.trim()) {
+      setError('Please enter your password');
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const result = await LocalAuthentication.authenticateAsync({
@@ -58,7 +77,7 @@ export default function BiometricSetupScreen() {
       if (result.success) {
         await SecureStore.setItemAsync(
           'biometricCredentials',
-          JSON.stringify({ email, password })
+          JSON.stringify({ email, password: passwordToStore })
         );
         Alert.alert(
           'Success', 
@@ -101,11 +120,24 @@ export default function BiometricSetupScreen() {
             {error}
           </Text>
         )}
+        
+        {/* Password input field - only shown when coming from Profile screen */}
+        {showPasswordInput && (
+          <TextInput
+            style={styles.passwordInput}
+            placeholder="Enter your password"
+            placeholderTextColor="#999"
+            secureTextEntry
+            value={inputPassword}
+            onChangeText={setInputPassword}
+            autoCapitalize="none"
+          />
+        )}
 
         <TouchableOpacity
           style={styles.primaryButton}
           onPress={setupBiometrics}
-          disabled={isLoading}
+          disabled={isLoading || (showPasswordInput && !inputPassword.trim())}
         >
           {isLoading ? (
             <ActivityIndicator color="white" />
@@ -182,6 +214,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+  },
+  passwordInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    padding: 15,
+    width: '100%',
+    marginBottom: 20,
     color: 'white',
     fontSize: 16,
   },

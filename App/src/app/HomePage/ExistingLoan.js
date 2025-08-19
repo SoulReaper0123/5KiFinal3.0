@@ -7,6 +7,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import { ref as dbRef, get } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
+import * as SecureStore from 'expo-secure-store';
 
 const ExistingLoan = () => {
   const navigation = useNavigation();
@@ -82,10 +83,37 @@ const ExistingLoan = () => {
   };
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (user?.email) {
-      fetchUserLoan(user.email);
-    }
+    const loadUserData = async () => {
+      try {
+        // Try to get email from auth
+        const user = auth.currentUser;
+        let userEmail = user?.email;
+        
+        // If not available, try to get from SecureStore (for biometric login)
+        if (!userEmail) {
+          try {
+            const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+            if (storedEmail) {
+              userEmail = storedEmail;
+            }
+          } catch (error) {
+            console.error('Error getting email from SecureStore:', error);
+          }
+        }
+        
+        if (userEmail) {
+          fetchUserLoan(userEmail);
+        } else {
+          setLoading(false);
+          Alert.alert('Error', 'User email not found');
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        setLoading(false);
+      }
+    };
+    
+    loadUserData();
   }, []);
 
   useEffect(() => {

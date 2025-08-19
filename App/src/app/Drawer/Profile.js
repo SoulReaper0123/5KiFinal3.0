@@ -10,11 +10,14 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
-import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { database, storage } from '../../firebaseConfig';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 
 const Profile = () => {
   const navigation = useNavigation();
@@ -27,6 +30,34 @@ const Profile = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [newDetails, setNewDetails] = useState({});
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+
+  // Check if biometrics are available and enabled
+  useEffect(() => {
+    const checkBiometrics = async () => {
+      try {
+        // Check if device supports biometrics
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+        
+        setBiometricsAvailable(hasHardware && isEnrolled);
+        
+        // Check if biometrics are enabled for this user
+        const credentials = await SecureStore.getItemAsync('biometricCredentials');
+        if (credentials) {
+          const storedData = JSON.parse(credentials);
+          if (storedData.email === email) {
+            setBiometricsEnabled(true);
+          }
+        }
+      } catch (error) {
+        console.error('Biometric check error:', error);
+      }
+    };
+    
+    checkBiometrics();
+  }, [email]);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -63,6 +94,72 @@ const Profile = () => {
 
     fetchUserData();
   }, [email]);
+  
+  // Function to enable biometrics
+  const enableBiometrics = async () => {
+    try {
+      // Check if device supports biometrics
+      const hasHardware = await LocalAuthentication.hasHardwareAsync();
+      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      
+      if (!hasHardware || !isEnrolled) {
+        Alert.alert(
+          'Biometrics Not Available', 
+          'Your device does not support biometric authentication or you have not set up fingerprints in your device settings.'
+        );
+        return;
+      }
+      
+      // Use a modal to get the password instead of Alert.prompt (which is iOS-only)
+      Alert.alert(
+        'Enable Fingerprint Login',
+        'To enable fingerprint login, please enter your password in the next screen',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Continue',
+            onPress: () => {
+              // Navigate to BiometricSetup screen with email
+              navigation.navigate('BiometricSetup', { email });
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Enable biometrics error:', error);
+      Alert.alert('Error', 'Could not enable biometric login');
+    }
+  };
+  
+  // Function to disable biometrics
+  const disableBiometrics = async () => {
+    try {
+      Alert.alert(
+        'Disable Biometric Login',
+        'Are you sure you want to disable biometric login?',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel',
+          },
+          {
+            text: 'Disable',
+            onPress: async () => {
+              await SecureStore.deleteItemAsync('biometricCredentials');
+              setBiometricsEnabled(false);
+              Alert.alert('Success', 'Biometric login has been disabled');
+            },
+          },
+        ]
+      );
+    } catch (error) {
+      console.error('Disable biometrics error:', error);
+      Alert.alert('Error', 'Could not disable biometric login');
+    }
+  };
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -189,6 +286,48 @@ const Profile = () => {
           >
             <Text style={styles.editButtonText}>Change Password</Text>
           </TouchableOpacity>
+          
+          {/* Biometric Authentication Section */}
+          <View style={styles.biometricSection}>
+            <Text style={styles.sectionTitle}>Biometric Authentication</Text>
+            
+            <View style={styles.biometricRow}>
+              <View style={styles.biometricInfo}>
+                <Ionicons 
+                  name="finger-print" 
+                  size={24} 
+                  color={biometricsEnabled ? "#4FE7AF" : "#999"} 
+                />
+                <Text style={styles.biometricText}>
+                  {biometricsEnabled ? "Fingerprint Login Enabled" : "Fingerprint Login Disabled"}
+                </Text>
+              </View>
+              
+              {biometricsAvailable ? (
+                <TouchableOpacity
+                  style={[
+                    styles.biometricButton,
+                    { backgroundColor: biometricsEnabled ? '#FF6B6B' : '#4FE7AF' }
+                  ]}
+                  onPress={biometricsEnabled ? disableBiometrics : enableBiometrics}
+                >
+                  <Text style={styles.biometricButtonText}>
+                    {biometricsEnabled ? 'Disable' : 'Enable'}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <Text style={styles.biometricUnavailable}>
+                  Not available on this device
+                </Text>
+              )}
+            </View>
+            
+            <Text style={styles.biometricNote}>
+              {biometricsEnabled 
+                ? "You can use your fingerprint to log in to the app." 
+                : "Enable fingerprint login for faster access to your account."}
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
@@ -455,6 +594,51 @@ buttonContainer: {
   flexDirection: 'row',
   justifyContent: 'space-between',
   marginTop: 20,
+},
+biometricSection: {
+  marginTop: 20,
+  borderTopWidth: 1,
+  borderTopColor: '#eee',
+  paddingTop: 15,
+},
+sectionTitle: {
+  fontSize: 18,
+  fontWeight: 'bold',
+  marginBottom: 15,
+  color: '#2D5783',
+},
+biometricRow: {
+  flexDirection: 'row',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+biometricInfo: {
+  flexDirection: 'row',
+  alignItems: 'center',
+},
+biometricText: {
+  marginLeft: 10,
+  fontSize: 16,
+},
+biometricButton: {
+  paddingVertical: 8,
+  paddingHorizontal: 15,
+  borderRadius: 5,
+},
+biometricButtonText: {
+  color: 'white',
+  fontWeight: 'bold',
+},
+biometricUnavailable: {
+  color: '#999',
+  fontStyle: 'italic',
+},
+biometricNote: {
+  marginTop: 5,
+  color: '#666',
+  fontSize: 12,
+  fontStyle: 'italic',
 },
 });
 

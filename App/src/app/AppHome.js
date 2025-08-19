@@ -13,12 +13,15 @@ import {
   Dimensions,
   SafeAreaView,
   Image,
+  Alert,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
 import { getDatabase, ref, get } from 'firebase/database';
 import { auth } from '../firebaseConfig';
+import * as LocalAuthentication from 'expo-local-authentication';
+import * as SecureStore from 'expo-secure-store';
 
 import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
@@ -32,6 +35,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selfie, setSelfie] = useState(null);
+  const [biometricPromptShown, setBiometricPromptShown] = useState(false);
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -94,16 +98,121 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   };
 
   useEffect(() => {
-    const user = auth.currentUser;
-    const paramEmail = route.params?.user?.email;
-    if (user?.email) {
-      fetchUserData(user.email);
-    } else if (paramEmail) {
-      fetchUserData(paramEmail);
-    } else {
-      setLoading(false);
-    }
-  }, [route.params]);
+    const loadUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const paramEmail = route.params?.user?.email;
+        const routeEmail = route.params?.email;
+        let storedEmail = null;
+        
+        // Try to get email from SecureStore (for biometric login)
+        try {
+          storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+        } catch (error) {
+          console.error('Error getting email from SecureStore:', error);
+        }
+        
+        console.log('AppHome - Loading user data with:', { 
+          authEmail: user?.email, 
+          paramEmail, 
+          routeEmail,
+          storedEmail,
+          email
+        });
+        
+        // First try to use the email passed directly to this component
+        if (email) {
+          console.log('Using email prop:', email);
+          fetchUserData(email);
+        }
+        // Then try the email from SecureStore (for biometric login)
+        else if (storedEmail) {
+          console.log('Using email from SecureStore:', storedEmail);
+          fetchUserData(storedEmail);
+        }
+        // Then try the email from Firebase auth
+        else if (user?.email) {
+          console.log('Using Firebase auth email:', user.email);
+          fetchUserData(user.email);
+        }
+        // Then try the email from route params (user object)
+        else if (paramEmail) {
+          console.log('Using param email from user object:', paramEmail);
+          fetchUserData(paramEmail);
+        }
+        // Finally try the direct email from route params (used in biometric login)
+        else if (routeEmail) {
+          console.log('Using direct route email:', routeEmail);
+          fetchUserData(routeEmail);
+        }
+        else {
+          console.log('No email found, setting loading to false');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error in loadUserData:', error);
+        setLoading(false);
+      }
+    };
+    
+    loadUserData();
+  }, [route.params, email]);
+
+  // Check if biometric setup should be prompted
+  useEffect(() => {
+    const checkBiometricSetup = async () => {
+      if (biometricPromptShown) return;
+      
+      // Get parameters from route
+      const shouldPromptBiometric = route.params?.shouldPromptBiometric;
+      const password = route.params?.password;
+      
+      // Always check if we should show the prompt, even if no password is provided
+      // We'll handle the password input in the BiometricSetupScreen
+      if (!shouldPromptBiometric) return;
+      
+      try {
+        // Check if biometrics are already set up for this user
+        const credentials = await SecureStore.getItemAsync('biometricCredentials');
+        if (credentials) {
+          const storedData = JSON.parse(credentials);
+          if (storedData.email === email) {
+            // Biometrics already set up for this user, skip prompt
+            return;
+          }
+        }
+        
+        console.log('Showing biometric setup prompt');
+        
+        // Show biometric setup prompt
+        Alert.alert(
+          'Enable Fingerprint Login?',
+          'Do you want to enable fingerprint authentication for faster login next time?',
+          [
+            {
+              text: 'Not Now',
+              style: 'cancel',
+            },
+            {
+              text: 'Enable',
+              onPress: () => navigation.navigate('BiometricSetup', { email, password }),
+            },
+          ]
+        );
+        
+        setBiometricPromptShown(true);
+      } catch (error) {
+        console.error('Biometric check error:', error);
+      }
+    };
+    
+    // Wait a bit before showing the prompt to ensure the home screen is fully loaded
+    const timer = setTimeout(() => {
+      checkBiometricSetup();
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }, [route.params, email, navigation, biometricPromptShown]);
 
   useEffect(() => {
     const backAction = () => {
@@ -232,6 +341,16 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 export default function AppHome() {
   const [memberId, setMemberId] = useState(null);
   const [email, setEmail] = useState(null);
+  const route = useRoute();
+  
+  // Initialize email from route params if available
+  useEffect(() => {
+    const routeEmail = route.params?.email;
+    if (routeEmail && !email) {
+      console.log('AppHome - Setting email from route params:', routeEmail);
+      setEmail(routeEmail);
+    }
+  }, [route.params, email]);
 
   return (
     <Tab.Navigator

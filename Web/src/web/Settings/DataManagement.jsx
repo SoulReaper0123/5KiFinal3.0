@@ -12,6 +12,10 @@ const DataManagement = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState(null);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [editMode, setEditMode] = useState(false);
 
   // Fetch settings and archived data
   useEffect(() => {
@@ -88,37 +92,106 @@ const DataManagement = () => {
     try {
       setLoading(true);
       
-      // Fetch approved data from different sections
-      const [depositsSnap, loansSnap, registrationsSnap] = await Promise.all([
+      // Fetch both approved and pending data from different sections, plus members
+      const [
+        approvedDepositsSnap, 
+        pendingDepositsSnap,
+        approvedLoansSnap, 
+        pendingLoansSnap,
+        approvedRegistrationsSnap, 
+        pendingRegistrationsSnap,
+        approvedPaymentsSnap,
+        pendingPaymentsSnap,
+        approvedWithdrawalsSnap,
+        pendingWithdrawalsSnap,
+        membersSnap
+      ] = await Promise.all([
         database.ref('Deposits/ApprovedDeposits').once('value'),
+        database.ref('Deposits/PendingDeposits').once('value'),
         database.ref('Loans/ApprovedLoans').once('value'),
-        database.ref('Registrations/ApprovedRegistrations').once('value')
+        database.ref('Loans/PendingLoans').once('value'),
+        database.ref('Registrations/ApprovedRegistrations').once('value'),
+        database.ref('Registrations/PendingRegistrations').once('value'),
+        database.ref('Payments/ApprovedPayments').once('value'),
+        database.ref('Payments/PendingPayments').once('value'),
+        database.ref('Withdrawals/ApprovedWithdrawals').once('value'),
+        database.ref('Withdrawals/PendingWithdrawals').once('value'),
+        database.ref('Members').once('value')
       ]);
 
       // Process data for archiving
       const archiveDate = new Date().toISOString();
       const archiveTimestamp = Date.now();
       
-      const depositsData = depositsSnap.exists() ? depositsSnap.val() : {};
-      const loansData = loansSnap.exists() ? loansSnap.val() : {};
-      const registrationsData = registrationsSnap.exists() ? registrationsSnap.val() : {};
+      // Extract data from snapshots
+      const approvedDepositsData = approvedDepositsSnap.exists() ? approvedDepositsSnap.val() : {};
+      const pendingDepositsData = pendingDepositsSnap.exists() ? pendingDepositsSnap.val() : {};
+      const approvedLoansData = approvedLoansSnap.exists() ? approvedLoansSnap.val() : {};
+      const pendingLoansData = pendingLoansSnap.exists() ? pendingLoansSnap.val() : {};
+      const approvedRegistrationsData = approvedRegistrationsSnap.exists() ? approvedRegistrationsSnap.val() : {};
+      const pendingRegistrationsData = pendingRegistrationsSnap.exists() ? pendingRegistrationsSnap.val() : {};
+      const approvedPaymentsData = approvedPaymentsSnap.exists() ? approvedPaymentsSnap.val() : {};
+      const pendingPaymentsData = pendingPaymentsSnap.exists() ? pendingPaymentsSnap.val() : {};
+      const approvedWithdrawalsData = approvedWithdrawalsSnap.exists() ? approvedWithdrawalsSnap.val() : {};
+      const pendingWithdrawalsData = pendingWithdrawalsSnap.exists() ? pendingWithdrawalsSnap.val() : {};
+      const membersData = membersSnap.exists() ? membersSnap.val() : {};
 
       // Prepare archive records
       const archiveRecords = {
-        deposits: {
-          data: depositsData,
-          count: Object.keys(depositsData).length,
-          type: 'deposits'
+        approvedDeposits: {
+          data: approvedDepositsData,
+          count: Object.keys(approvedDepositsData).length,
+          type: 'approved deposits'
         },
-        loans: {
-          data: loansData,
-          count: Object.keys(loansData).length,
-          type: 'loans'
+        pendingDeposits: {
+          data: pendingDepositsData,
+          count: Object.keys(pendingDepositsData).length,
+          type: 'pending deposits'
         },
-        registrations: {
-          data: registrationsData,
-          count: Object.keys(registrationsData).length,
-          type: 'registrations'
+        approvedLoans: {
+          data: approvedLoansData,
+          count: Object.keys(approvedLoansData).length,
+          type: 'approved loans'
+        },
+        pendingLoans: {
+          data: pendingLoansData,
+          count: Object.keys(pendingLoansData).length,
+          type: 'pending loans'
+        },
+        approvedRegistrations: {
+          data: approvedRegistrationsData,
+          count: Object.keys(approvedRegistrationsData).length,
+          type: 'approved registrations'
+        },
+        pendingRegistrations: {
+          data: pendingRegistrationsData,
+          count: Object.keys(pendingRegistrationsData).length,
+          type: 'pending registrations'
+        },
+        approvedPayments: {
+          data: approvedPaymentsData,
+          count: Object.keys(approvedPaymentsData).length,
+          type: 'approved payments'
+        },
+        pendingPayments: {
+          data: pendingPaymentsData,
+          count: Object.keys(pendingPaymentsData).length,
+          type: 'pending payments'
+        },
+        approvedWithdrawals: {
+          data: approvedWithdrawalsData,
+          count: Object.keys(approvedWithdrawalsData).length,
+          type: 'approved withdrawals'
+        },
+        pendingWithdrawals: {
+          data: pendingWithdrawalsData,
+          count: Object.keys(pendingWithdrawalsData).length,
+          type: 'pending withdrawals'
+        },
+        members: {
+          data: membersData,
+          count: Object.keys(membersData).length,
+          type: 'members'
         }
       };
 
@@ -127,15 +200,23 @@ const DataManagement = () => {
       await archiveRef.set({
         date: archiveDate,
         counts: {
-          deposits: archiveRecords.deposits.count,
-          loans: archiveRecords.loans.count,
-          registrations: archiveRecords.registrations.count
+          approvedDeposits: archiveRecords.approvedDeposits.count,
+          pendingDeposits: archiveRecords.pendingDeposits.count,
+          approvedLoans: archiveRecords.approvedLoans.count,
+          pendingLoans: archiveRecords.pendingLoans.count,
+          approvedRegistrations: archiveRecords.approvedRegistrations.count,
+          pendingRegistrations: archiveRecords.pendingRegistrations.count,
+          approvedPayments: archiveRecords.approvedPayments.count,
+          pendingPayments: archiveRecords.pendingPayments.count,
+          approvedWithdrawals: archiveRecords.approvedWithdrawals.count,
+          pendingWithdrawals: archiveRecords.pendingWithdrawals.count,
+          members: archiveRecords.members.count
         },
         status: 'archived'
       });
 
-      // Generate and download Excel files
-      await generateExcelFiles(archiveRecords, archiveTimestamp);
+      // Generate and download a single Excel file with multiple sheets
+      await generateExcelFile(archiveRecords, archiveTimestamp);
 
       // Update last archive date
       const settingsRef = database.ref('Settings/DataArchiving');
@@ -150,7 +231,19 @@ const DataManagement = () => {
         date: archiveDate,
         type: 'Full Archive',
         status: 'Archived',
-        counts: archiveRecords.counts
+        counts: {
+          approvedDeposits: archiveRecords.approvedDeposits.count,
+          pendingDeposits: archiveRecords.pendingDeposits.count,
+          approvedLoans: archiveRecords.approvedLoans.count,
+          pendingLoans: archiveRecords.pendingLoans.count,
+          approvedRegistrations: archiveRecords.approvedRegistrations.count,
+          pendingRegistrations: archiveRecords.pendingRegistrations.count,
+          approvedPayments: archiveRecords.approvedPayments.count,
+          pendingPayments: archiveRecords.pendingPayments.count,
+          approvedWithdrawals: archiveRecords.approvedWithdrawals.count,
+          pendingWithdrawals: archiveRecords.pendingWithdrawals.count,
+          members: archiveRecords.members.count
+        }
       }, ...prev]);
 
       setLoading(false);
@@ -160,45 +253,99 @@ const DataManagement = () => {
     }
   };
 
-  const generateExcelFiles = async (archiveRecords, timestamp) => {
+  const generateExcelFile = async (archiveRecords, timestamp) => {
     try {
+      // Create a single workbook with multiple sheets
+      const workbook = new ExcelJS.Workbook();
+      
+      // Add a summary sheet
+      const summarySheet = workbook.addWorksheet('Summary');
+      summarySheet.addRow(['Data Type', 'Record Count']);
+      
+      // Process each data type and add as a separate sheet
       for (const [key, record] of Object.entries(archiveRecords)) {
-        if (record.count === 0) continue;
-
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet(key);
+        // Add to summary
+        summarySheet.addRow([
+          record.type.charAt(0).toUpperCase() + record.type.slice(1), 
+          record.count
+        ]);
         
-        // Add headers
-        const headers = Object.keys(record.data[Object.keys(record.data)[0]]);
-        worksheet.addRow(headers);
-
-        // Add data rows
-        Object.values(record.data).forEach(item => {
-          const row = headers.map(header => item[header]);
-          worksheet.addRow(row);
-        });
-
-        // Generate file and download
-        const buffer = await workbook.xlsx.writeBuffer();
-        const blob = new Blob([buffer], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        });
-        const url = window.URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${key}_archive_${timestamp}.xlsx`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
+        // Skip empty data sets
+        if (record.count === 0) continue;
+        
+        // Create a worksheet for this data type
+        const sheetName = key.charAt(0).toUpperCase() + key.slice(1);
+        const worksheet = workbook.addWorksheet(sheetName);
+        
+        // Get the first record to extract headers
+        const firstRecord = record.data[Object.keys(record.data)[0]];
+        
+        if (firstRecord) {
+          // Add headers
+          const headers = Object.keys(firstRecord);
+          worksheet.addRow(headers);
+          
+          // Add data rows
+          Object.values(record.data).forEach(item => {
+            const row = headers.map(header => item[header]);
+            worksheet.addRow(row);
+          });
+          
+          // Format the worksheet - safely
+          worksheet.columns.forEach(column => {
+            if (column && column.key) {
+              const columnValues = worksheet.getColumn(column.key).values || [];
+              if (columnValues.length > 0) {
+                column.width = Math.max(
+                  15,
+                  ...columnValues
+                    .filter(value => value !== null && value !== undefined)
+                    .map(value => String(value).length)
+                );
+              } else {
+                column.width = 15; // Default width if no values
+              }
+            }
+          });
+        } else {
+          worksheet.addRow(['No data available']);
+        }
       }
+      
+      // Format the summary sheet - safely
+      summarySheet.columns.forEach(column => {
+        if (column) {
+          column.width = 20;
+        }
+      });
+      
+      // Generate file and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { 
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `full_archive_${timestamp}.xlsx`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
     } catch (error) {
-      console.error('Error generating Excel files:', error);
+      console.error('Error generating Excel file:', error);
     }
   };
 
   const handleSaveSettings = async () => {
+    // Show confirmation modal instead of immediately saving
+    setShowConfirmModal(true);
+  };
+
+  const confirmSaveSettings = async () => {
     try {
+      setShowConfirmModal(false);
       setLoading(true);
       const settingsRef = database.ref('Settings/DataArchiving');
       
@@ -211,12 +358,17 @@ const DataManagement = () => {
       // If interval is 0, perform immediate archive
       if (archiveInterval === 0) {
         await performAutoArchive();
+        setSuccessMessage('Settings saved and data archived successfully!');
+      } else {
+        setSuccessMessage('Settings saved successfully!');
       }
 
+      setShowSuccessModal(true);
       setLoading(false);
     } catch (error) {
       console.error('Error saving settings:', error);
       setLoading(false);
+      setError(error.message);
     }
   };
 
@@ -258,6 +410,52 @@ const DataManagement = () => {
 
   return (
     <div style={styles.container}>
+      {/* Confirmation Modal */}
+      {showConfirmModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={styles.modalTitle}>Confirm Action</h3>
+            <p style={styles.modalText}>
+              {archiveInterval === 0 
+                ? 'This will save your settings and immediately archive your data. Continue?' 
+                : 'Save these archiving settings?'}
+            </p>
+            <div style={styles.modalButtons}>
+              <button 
+                style={styles.cancelButton}
+                onClick={() => setShowConfirmModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.confirmButton}
+                onClick={confirmSaveSettings}
+              >
+                Confirm
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3 style={styles.modalTitle}>Success</h3>
+            <p style={styles.modalText}>{successMessage}</p>
+            <div style={styles.modalButtons}>
+              <button 
+                style={styles.confirmButton}
+                onClick={() => setShowSuccessModal(false)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Sidebar */}
       <div style={styles.sidebar}>
         <button
@@ -358,18 +556,62 @@ const DataManagement = () => {
                   const workbook = new ExcelJS.Workbook();
                   const worksheet = workbook.addWorksheet('Archive_List');
                   
-                  worksheet.addRow(['Archive ID', 'Date', 'Type', 'Status', 'Deposits', 'Loans', 'Registrations']);
+                  worksheet.addRow([
+                    'Archive ID', 
+                    'Date', 
+                    'Type', 
+                    'Status', 
+                    'Approved Deposits', 
+                    'Pending Deposits',
+                    'Approved Loans', 
+                    'Pending Loans',
+                    'Approved Registrations', 
+                    'Pending Registrations',
+                    'Approved Payments',
+                    'Pending Payments',
+                    'Approved Withdrawals',
+                    'Pending Withdrawals',
+                    'Members'
+                  ]);
                   
                   archivedData.forEach(item => {
+                    // Handle both old and new data structures
+                    const hasOldStructure = item.counts?.deposits !== undefined;
+                    
                     worksheet.addRow([
                       item.id,
                       item.date,
                       item.type,
                       item.status,
-                      item.counts?.deposits || 0,
-                      item.counts?.loans || 0,
-                      item.counts?.registrations || 0
+                      hasOldStructure ? item.counts?.deposits || 0 : item.counts?.approvedDeposits || 0,
+                      hasOldStructure ? 0 : item.counts?.pendingDeposits || 0,
+                      hasOldStructure ? item.counts?.loans || 0 : item.counts?.approvedLoans || 0,
+                      hasOldStructure ? 0 : item.counts?.pendingLoans || 0,
+                      hasOldStructure ? item.counts?.registrations || 0 : item.counts?.approvedRegistrations || 0,
+                      hasOldStructure ? 0 : item.counts?.pendingRegistrations || 0,
+                      hasOldStructure ? 0 : item.counts?.approvedPayments || 0,
+                      hasOldStructure ? 0 : item.counts?.pendingPayments || 0,
+                      hasOldStructure ? 0 : item.counts?.approvedWithdrawals || 0,
+                      hasOldStructure ? 0 : item.counts?.pendingWithdrawals || 0,
+                      item.counts?.members || 0
                     ]);
+                  });
+                  
+                  // Format the worksheet - safely
+                  worksheet.columns.forEach(column => {
+                    if (column && column.key) {
+                      const columnValues = worksheet.getColumn(column.key).values || [];
+                      if (columnValues.length > 0) {
+                        column.width = Math.max(
+                          15,
+                          ...columnValues
+                            .filter(value => value !== null && value !== undefined)
+                            .map(value => String(value).length)
+                        );
+                      } else {
+                        column.width = 15; // Default width if no values
+                      }
+                    }
                   });
 
                   workbook.xlsx.writeBuffer().then(buffer => {
@@ -411,7 +653,31 @@ const DataManagement = () => {
                   <span style={{...styles.tableCell, ...styles.archivedStatus}}>{item.status}</span>
                   <span style={styles.tableCell}>
                     {item.counts ? (
-                      `D:${item.counts.deposits || 0} L:${item.counts.loans || 0} R:${item.counts.registrations || 0}`
+                      <>
+                        <div>Deposits: {
+                          // Handle both old and new data structure
+                          item.counts.deposits !== undefined ? 
+                            item.counts.deposits : 
+                            (item.counts.approvedDeposits || 0) + (item.counts.pendingDeposits || 0)
+                        }</div>
+                        <div>Loans: {
+                          item.counts.loans !== undefined ? 
+                            item.counts.loans : 
+                            (item.counts.approvedLoans || 0) + (item.counts.pendingLoans || 0)
+                        }</div>
+                        <div>Registrations: {
+                          item.counts.registrations !== undefined ? 
+                            item.counts.registrations : 
+                            (item.counts.approvedRegistrations || 0) + (item.counts.pendingRegistrations || 0)
+                        }</div>
+                        <div>Payments: {
+                          (item.counts.approvedPayments || 0) + (item.counts.pendingPayments || 0)
+                        }</div>
+                        <div>Withdrawals: {
+                          (item.counts.approvedWithdrawals || 0) + (item.counts.pendingWithdrawals || 0)
+                        }</div>
+                        <div>Members: {item.counts.members || 0}</div>
+                      </>
                     ) : 'N/A'}
                   </span>
                   <div style={styles.actions}>
@@ -698,6 +964,61 @@ const styles = {
   '@keyframes spin': {
     '0%': { transform: 'rotate(0deg)' },
     '100%': { transform: 'rotate(360deg)' },
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    padding: '20px',
+    borderRadius: '8px',
+    width: '400px',
+    maxWidth: '90%',
+    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: '600',
+    marginBottom: '15px',
+    color: '#2D5783',
+  },
+  modalText: {
+    fontSize: '14px',
+    color: '#333',
+    marginBottom: '20px',
+    lineHeight: '1.5',
+  },
+  modalButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '10px',
+  },
+  cancelButton: {
+    backgroundColor: '#6c757d',
+    color: 'white',
+    padding: '8px 16px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
+  },
+  confirmButton: {
+    backgroundColor: '#2D5783',
+    color: 'white',
+    padding: '8px 16px',
+    border: 'none',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    fontSize: '14px',
   },
 };
 

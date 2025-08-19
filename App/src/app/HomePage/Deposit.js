@@ -28,6 +28,10 @@ const Deposit = () => {
   const [loading, setLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [depositAccounts, setDepositAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
@@ -128,29 +132,65 @@ const Deposit = () => {
 
   const uploadImageToFirebase = async (uri, folder) => {
     try {
+      // Create a unique filename with timestamp and user ID to avoid collisions
+      const timestamp = new Date().getTime();
+      const uniqueFilename = `${memberId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+      const fileExtension = uri.split('.').pop() || 'jpeg';
+      const filename = `${uniqueFilename}.${fileExtension}`;
+      
+      // Use a user-specific folder path to improve security
+      const userFolder = `users/${memberId}/${folder}`;
+      const imageRef = storageRef(storage, `${userFolder}/${filename}`);
+      
       const response = await fetch(uri);
       const blob = await response.blob();
-      const filename = uri.substring(uri.lastIndexOf('/') + 1);
-      const imageRef = storageRef(storage, `${folder}/${filename}`);
+      
+      // Upload the image
       await uploadBytes(imageRef, blob);
+      
+      // Get the download URL
       const downloadURL = await getDownloadURL(imageRef);
       return downloadURL;
     } catch (error) {
       console.error('Image upload failed:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      
+      // Provide more specific error messages based on the error type
+      if (error.code === 'storage/unauthorized') {
+        setErrorMessage('Permission denied: You do not have permission to upload images. Please contact support.');
+      } else if (error.code === 'storage/canceled') {
+        setErrorMessage('Upload was canceled');
+      } else if (error.code === 'storage/unknown') {
+        setErrorMessage('An unknown error occurred during upload');
+      } else {
+        setErrorMessage('Failed to upload image: ' + error.message);
+      }
+      
       throw error;
     }
   };
 
-  const storeDepositDataInDatabase = async (proofOfDepositUrl) => {
+  const storeDepositDataInDatabase = async (proofOfDepositUrl, transactionId = null) => {
     try {
-      const transactionId = generateTransactionId();
-      const newDepositRef = dbRef(database, `Deposits/DepositApplications/${memberId}/${transactionId}`);
+      // Use provided transaction ID or generate a new one
+      const txnId = transactionId || generateTransactionId();
+      
+      // Create a reference to the deposit application in the database
+      const newDepositRef = dbRef(database, `Deposits/DepositApplications/${memberId}/${txnId}`);
   
+      // Parse the deposit amount
       const depositAmount = parseFloat(amountToBeDeposited);
   
-      await set(newDepositRef, {
-        transactionId,
+      // Format the current date
+      const currentDate = new Date();
+      const formattedDate = currentDate.toLocaleString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      });
+      
+      // Create the deposit data object
+      const depositData = {
+        transactionId: txnId,
         id: memberId,
         email,
         firstName,
@@ -160,84 +200,95 @@ const Deposit = () => {
         accountNumber,
         amountToBeDeposited: depositAmount,
         proofOfDepositUrl,
-        dateApplied: new Date().toLocaleString('en-US', {
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric',
-        }),
+        dateApplied: formattedDate,
+        timestamp: currentDate.getTime(), // Add timestamp for easier sorting
         status: 'pending',
-      });
-
+      };
+      
+      // Store the data in the database
+      await set(newDepositRef, depositData);
+      
+      // Return the transaction ID in case it was generated here
+      return txnId;
     } catch (error) {
       console.error('Failed to store deposit data in Realtime Database:', error);
-      Alert.alert('Error', 'Failed to store deposit data');
+      
+      // Set error message for the modal
+      setErrorMessage('Failed to store deposit data: ' + (error.message || 'Unknown error'));
+      
       throw error;
     }
   };
 
   const handleSubmit = async () => {
     if (!depositOption || !amountToBeDeposited || !proofOfDeposit) {
-      Alert.alert('Error', 'All fields are required');
+      setErrorMessage('All fields are required');
+      setErrorModalVisible(true);
       return;
     }
 
     if (isNaN(amountToBeDeposited) || parseFloat(amountToBeDeposited) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      setErrorMessage('Please enter a valid amount');
+      setErrorModalVisible(true);
       return;
     }
 
-    Alert.alert(
-      'Confirm Deposit',
-      `Balance: ₱${balance}\nDeposit Option: ${depositOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Deposited: ₱${parseFloat(amountToBeDeposited).toFixed(2)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'proofsOfDeposit');
-              await storeDepositDataInDatabase(proofOfDepositUrl);
+    // Show confirmation modal
+    setConfirmModalVisible(true);
+  };
+  
+  const submitDeposit = async () => {
+    setLoading(true);
+    setConfirmModalVisible(false);
+    
+    try {
+      // Generate a single transaction ID to use for both database entries
+      const transactionId = generateTransactionId();
+      
+      // Use 'deposit_proofs' instead of 'proofsOfDeposit' for better naming consistency
+      const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs');
+      
+      // Store in Firebase Realtime Database with the transaction ID
+      await storeDepositDataInDatabase(proofOfDepositUrl, transactionId);
 
-              const depositData = {
-                email,
-                accountName,
-                firstName,
-                lastName,
-                depositOption,
-                accountNumber,
-                amountToBeDeposited: parseFloat(amountToBeDeposited),
-                proofOfDepositUrl,
-                transactionId: generateTransactionId(),
-              };
+      // Prepare data for API call
+      const depositData = {
+        email,
+        accountName,
+        firstName,
+        lastName,
+        depositOption,
+        accountNumber,
+        amountToBeDeposited: parseFloat(amountToBeDeposited),
+        proofOfDepositUrl,
+        transactionId,
+      };
 
-              await MemberDeposit(depositData);
-              
-              Alert.alert(
-                'Success', 
-                'Deposit application submitted successfully',
-                [{ 
-                  text: 'OK', 
-                  onPress: () => {
-                    navigation.goBack();
-                    resetFormFields();
-                  }
-                }]
-              );
-            } catch (error) {
-              console.error('Error during deposit submission:', error);
-              Alert.alert(
-                'Error', 
-                error.response?.data?.message || 
-                'There was an issue processing your deposit. Please try again.'
-              );
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+      // Make API call
+      await MemberDeposit(depositData);
+      
+      // Show success modal
+      setSuccessModalVisible(true);
+    } catch (error) {
+      console.error('Error during deposit submission:', error);
+      
+      // Handle different types of errors
+      if (error.code && error.code.startsWith('storage/')) {
+        // Firebase Storage errors are already handled in uploadImageToFirebase
+        setErrorModalVisible(true);
+      } else if (error.response && error.response.data) {
+        // API errors
+        setErrorMessage(error.response.data.message || 
+          'There was an issue processing your deposit. Please try again.');
+        setErrorModalVisible(true);
+      } else {
+        // Generic errors
+        setErrorMessage('An unexpected error occurred. Please try again later.');
+        setErrorModalVisible(true);
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const resetFormFields = () => {
@@ -273,6 +324,8 @@ const Deposit = () => {
           initValue="Select Deposit Option"
           onChange={handleDepositOptionChange}
           style={styles.picker}
+          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+          overlayStyle={{ justifyContent: 'flex-end' }}
         >
           <TouchableOpacity style={styles.pickerContainer}>
             <Text style={styles.pickerText}>{depositOption || 'Select Deposit Option'}</Text>
@@ -320,10 +373,77 @@ const Deposit = () => {
         </TouchableOpacity>
       </View>
 
+      {/* Loading Modal */}
       <Modal transparent={true} visible={loading}>
         <View style={styles.modalOverlay}>
           <ActivityIndicator size="large" color="#0000ff" />
           <Text style={styles.loadingText}>Please wait...</Text>
+        </View>
+      </Modal>
+
+      {/* Confirmation Modal */}
+      <Modal transparent={true} visible={confirmModalVisible}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Confirm Deposit</Text>
+            <Text style={styles.modalText}>
+              Are you sure you want to submit this deposit request for {formatCurrency(amountToBeDeposited)}?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setConfirmModalVisible(false)}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={submitDeposit}
+              >
+                <Text style={styles.modalButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Success Modal */}
+      <Modal transparent={true} visible={successModalVisible}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <MaterialIcons name="check-circle" size={60} color="#4FE7AF" />
+            <Text style={styles.modalTitle}>Success!</Text>
+            <Text style={styles.modalText}>
+              Your deposit request has been submitted successfully. It will be processed shortly.
+            </Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton, {width: '100%'}]} 
+              onPress={() => {
+                setSuccessModalVisible(false);
+                resetFormFields();
+                navigation.navigate('Home');
+              }}
+            >
+              <Text style={styles.modalButtonText}>Done</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal transparent={true} visible={errorModalVisible}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <MaterialIcons name="error" size={60} color="#FF6B6B" />
+            <Text style={styles.modalTitle}>Error</Text>
+            <Text style={styles.modalText}>{errorMessage}</Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton, {width: '100%', backgroundColor: '#FF6B6B'}]} 
+              onPress={() => setErrorModalVisible(false)}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </Modal>
     </ScrollView>
@@ -442,6 +562,47 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 10,
     color: 'white',
+  },
+  modalContent: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 20,
+    width: '80%',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginVertical: 10,
+    textAlign: 'center',
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#ccc',
+  },
+  confirmButton: {
+    backgroundColor: '#4FE7AF',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
 

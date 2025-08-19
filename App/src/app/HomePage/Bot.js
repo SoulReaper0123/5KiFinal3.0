@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,15 +9,137 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
+  TextInput,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import Constants from 'expo-constants';
+import * as SecureStore from 'expo-secure-store';
+import { auth, database } from '../../firebaseConfig';
+import { ref as dbRef, get } from 'firebase/database';
+
+// Initialize Gemini AI with API key
+// Using a hardcoded API key for now
+const API_KEY = 'AIzaSyDPV6y1cgQMpOyJYKXIHeHXX0m6qIMrMZA';
+
+console.log('API Key available:', API_KEY ? 'Yes' : 'No');
+const genAI = new GoogleGenerativeAI(API_KEY);
+// Use gemini-1.5-flash to match AdminHome implementation
+const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 export default function Bot() {
   const [messages, setMessages] = useState([
-    { id: '1', sender: 'bot', text: 'Hello! How can I help you today?' },
+    { id: '1', sender: 'bot', text: 'Hello! How can I help you today? You can select from the options below or type your own question.' },
   ]);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [useAI, setUseAI] = useState(false);
+  const [shouldAutoScroll, setShouldAutoScroll] = useState(true);
+  const flatListRef = useRef(null);
   const navigation = useNavigation();
+  const route = useRoute();
+  // State for email
+  const [userEmail, setUserEmail] = useState(null);
+  
+  // Get email and load user data from all possible sources
+  useEffect(() => {
+    const getEmailAndLoadData = async () => {
+      try {
+        // Try to get email from different sources
+        const routeEmail = route.params?.email;
+        const parentRouteEmail = navigation.getParent()?.getState()?.routes?.[0]?.params?.email;
+        
+        // Safely get auth email
+        let authEmail = null;
+        try {
+          authEmail = auth?.currentUser?.email;
+        } catch (error) {
+          console.log('Auth not available:', error.message);
+        }
+        
+        // Try to get email from SecureStore (for biometric login)
+        let storedEmail = null;
+        try {
+          storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+        } catch (error) {
+          console.error('Error getting email from SecureStore:', error);
+        }
+        
+        // Use the first available email
+        const email = routeEmail || parentRouteEmail || authEmail || storedEmail || 'Guest User';
+        
+        console.log('Bot - Using email:', email, 'from sources:', { 
+          routeEmail, 
+          parentRouteEmail, 
+          authEmail, 
+          storedEmail 
+        });
+        
+        setUserEmail(email);
+        
+        // Load user loans if we have a valid email
+        if (email && email !== 'Guest User') {
+          loadUserLoans(email);
+        }
+      } catch (error) {
+        console.error('Error getting email in Bot:', error);
+        // Set a default email if there's an error
+        setUserEmail('Guest User');
+      }
+    };
+    
+    getEmailAndLoadData();
+  }, [route.params, navigation]);
+  
+  // Function to load user loans
+  const loadUserLoans = async (email) => {
+    try {
+      const loansRef = dbRef(database, 'Loans/LoanApplications');
+      const snapshot = await get(loansRef);
+      
+      if (snapshot.exists()) {
+        const loansData = snapshot.val();
+        const userLoans = [];
+        
+        // Loop through all loans to find those matching the user's email
+        Object.keys(loansData).forEach(memberId => {
+          const memberLoans = loansData[memberId];
+          if (memberLoans) {
+            Object.keys(memberLoans).forEach(loanId => {
+              const loan = memberLoans[loanId];
+              if (loan && loan.email === email) {
+                userLoans.push({
+                  id: loanId,
+                  ...loan
+                });
+              }
+            });
+          }
+        });
+        
+        // Add user loans to the context for the AI
+        if (userLoans.length > 0) {
+          const loanInfo = userLoans.map(loan => 
+            `Loan ID: ${loan.id}, Amount: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
+          ).join('\n');
+          
+          // Add a message about the loans
+          const botMessage = {
+            id: Date.now().toString() + '-bot-loans',
+            sender: 'bot',
+            text: `I see you have ${userLoans.length} loan(s) in our system. Here are the details:\n\n${loanInfo}`,
+          };
+          
+          setMessages(prev => [...prev, botMessage]);
+        }
+      }
+    } catch (error) {
+      console.log('Error loading user loans:', error);
+    }
+  };
 
   // Predefined options for different stages of conversation
   const initialOptions = [
@@ -52,6 +174,34 @@ export default function Bot() {
   const [currentOptions, setCurrentOptions] = useState(initialOptions);
   const [currentContext, setCurrentContext] = useState('initial');
 
+  // Check if API key is valid
+  useEffect(() => {
+    const checkApiKey = async () => {
+      console.log('Checking API key...');
+      try {
+        console.log('Testing connection to Gemini API...');
+        const result = await model.generateContent("Test connection");
+        const response = await result.response;
+        if (response) {
+          setUseAI(true);
+          console.log('Gemini API connected successfully');
+        }
+      } catch (error) {
+        // Log a simplified error message without the full error details
+        console.log('Gemini API connection check failed - Will try to use AI anyway');
+        
+        // Still set useAI to true to allow the app to try using AI
+        // If it fails later, it will fall back to predefined responses
+        setUseAI(true);
+        
+        // Only log that we're falling back to predefined responses if needed
+        console.log('Will attempt to use AI but may fall back to predefined responses');
+      }
+    };
+    
+    checkApiKey();
+  }, []);
+
   const handleOptionSelect = (option) => {
     // Add user's selection to messages
     const newMessage = {
@@ -62,8 +212,133 @@ export default function Bot() {
 
     setMessages((prev) => [...prev, newMessage]);
     
+    // Always scroll to bottom when user selects an option
+    if (flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current.scrollToEnd({ animated: true });
+      }, 200); // Increased timeout for better reliability
+    }
+    
     // Generate bot response based on selection
     generateBotResponse(option);
+  };
+
+  const handleSendMessage = async () => {
+    if (!inputText.trim()) return;
+    
+    // Add user message
+    const userMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      text: inputText,
+    };
+    
+    setMessages(prev => [...prev, userMessage]);
+    const userQuery = inputText;
+    setInputText('');
+    setIsLoading(true);
+    
+    // Always scroll to bottom when user sends a message
+    if (flatListRef.current) {
+      setTimeout(() => {
+        flatListRef.current.scrollToEnd({ animated: true });
+      }, 200); // Increased timeout for better reliability
+    }
+    
+    if (useAI) {
+      try {
+        console.log('Sending query to Gemini API...');
+        
+        // Get context for the AI
+        const context = `You are a helpful banking assistant for a mobile banking app. 
+        The user's email is ${userEmail || 'not provided'}. 
+        Provide concise, accurate information about banking services, loans, deposits, withdrawals, and account management.
+        If you don't know something specific about the user's account, suggest where they can find that information in the app.
+        Keep responses under 150 words and focus on being helpful.`;
+        
+        // Generate AI response
+        const prompt = `${context}\n\nUser question: ${userQuery}`;
+        
+        // Check if API key is available
+        if (!API_KEY || API_KEY.trim() === '') {
+          throw new Error('API_KEY_MISSING');
+        }
+        
+        // Create a new instance for each request to avoid any potential issues
+        const genAI = new GoogleGenerativeAI(API_KEY);
+        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+        
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        const aiResponse = response.text();
+        
+        console.log('Received response from Gemini API');
+        
+        const botMessage = {
+          id: Date.now().toString() + '-bot',
+          sender: 'bot',
+          text: aiResponse,
+        };
+        
+        // Add a slight delay to make the response feel more natural
+        setTimeout(() => {
+          setMessages(prev => [...prev, botMessage]);
+          
+          // Only scroll to bottom if user hasn't scrolled up
+          if (shouldAutoScroll && flatListRef.current) {
+            setTimeout(() => {
+              flatListRef.current.scrollToEnd({ animated: true });
+            }, 200); // Increased timeout for better reliability
+          }
+          
+          setIsLoading(false);
+        }, 500);
+      } catch (error) {
+        // Log a simplified error message without the full error details
+        console.error('AI error occurred - Using fallback response');
+        
+        // Always use a friendly message regardless of the error
+        // Don't expose technical error details to the user
+        const botMessage = {
+          id: Date.now().toString() + '-bot',
+          sender: 'bot',
+          text: "I've reached my usage limit for the moment. Please try selecting one of the options below or try again later.",
+        };
+        
+        // Add a slight delay to make the response feel more natural
+        setTimeout(() => {
+          setMessages(prev => [...prev, botMessage]);
+          
+          // Only scroll to bottom if user hasn't scrolled up
+          if (shouldAutoScroll && flatListRef.current) {
+            setTimeout(() => {
+              flatListRef.current.scrollToEnd({ animated: true });
+            }, 200); // Increased timeout for better reliability
+          }
+          
+          setIsLoading(false);
+        }, 500);
+      }
+    } else {
+      // Use predefined responses as fallback
+      setTimeout(() => {
+        const botMessage = {
+          id: Date.now().toString() + '-bot',
+          sender: 'bot',
+          text: "I'm not sure I understand. Please select one of the options below for assistance.",
+        };
+        setMessages(prev => [...prev, botMessage]);
+        
+        // Only scroll to bottom if user hasn't scrolled up
+        if (shouldAutoScroll && flatListRef.current) {
+          setTimeout(() => {
+            flatListRef.current.scrollToEnd({ animated: true });
+          }, 200); // Increased timeout for better reliability
+        }
+        
+        setIsLoading(false);
+      }, 500);
+    }
   };
 
   const generateBotResponse = (option) => {
@@ -172,6 +447,13 @@ export default function Bot() {
       setMessages((prev) => [...prev, botMessage]);
       setCurrentOptions(nextOptions);
       setCurrentContext(nextContext);
+      
+      // Only scroll to bottom if user hasn't scrolled up
+      if (shouldAutoScroll && flatListRef.current) {
+        setTimeout(() => {
+          flatListRef.current.scrollToEnd({ animated: true });
+        }, 200); // Increased timeout for better reliability
+      }
     }, 500);
   };
 
@@ -217,25 +499,72 @@ export default function Bot() {
       >
         <View style={styles.chatContainer}>
           <FlatList
+            ref={flatListRef}
             data={messages}
             keyExtractor={(item) => item.id}
             renderItem={renderItem}
-            contentContainerStyle={styles.messageList}
+            contentContainerStyle={[
+              styles.messageList,
+              { paddingBottom: 20 } // Add extra padding at the bottom
+            ]}
             keyboardShouldPersistTaps="handled"
+            onScrollBeginDrag={() => setShouldAutoScroll(false)}
+            onMomentumScrollEnd={(event) => {
+              // Check if user is at the bottom of the list
+              const { layoutMeasurement, contentOffset, contentSize } = event.nativeEvent;
+              const paddingToBottom = 20;
+              const isAtBottom = layoutMeasurement.height + contentOffset.y >= 
+                contentSize.height - paddingToBottom;
+              
+              setShouldAutoScroll(isAtBottom);
+            }}
           />
+          {isLoading && (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#4A90E2" />
+              <Text style={styles.loadingText}>Thinking...</Text>
+            </View>
+          )}
         </View>
 
-        {/* Options - Now displayed vertically */}
-        <View style={styles.optionsContainer}>
-          {currentOptions.map((option) => (
-            <TouchableOpacity
-              key={option.id}
-              style={styles.optionButton}
-              onPress={() => handleOptionSelect(option)}
-            >
-              <Text style={styles.optionText}>{option.text}</Text>
-            </TouchableOpacity>
-          ))}
+        {/* Quick Options */}
+        <View style={styles.floatingOptionsContainer}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.optionsScrollContainer}
+          >
+            {currentOptions.map((option) => (
+              <TouchableOpacity
+                key={option.id}
+                style={styles.floatingOptionButton}
+                onPress={() => handleOptionSelect(option)}
+                disabled={isLoading}
+              >
+                <Text style={styles.floatingOptionText}>{option.text}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Text Input for AI Assistant */}
+        <View style={styles.inputContainer}>
+          <TextInput
+            style={styles.textInput}
+            placeholder="Ask me anything..."
+            value={inputText}
+            onChangeText={setInputText}
+            onSubmitEditing={handleSendMessage}
+            returnKeyType="send"
+            editable={!isLoading}
+          />
+          <TouchableOpacity
+            style={[styles.sendButton, !inputText.trim() && styles.disabledButton]}
+            onPress={handleSendMessage}
+            disabled={!inputText.trim() || isLoading}
+          >
+            <MaterialIcons name="send" size={24} color="white" />
+          </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -266,6 +595,7 @@ const styles = StyleSheet.create({
   },
   chatContainer: {
     flex: 1,
+    paddingBottom: 10, // Add padding to prevent content from being covered
   },
   messageList: {
     padding: 10,
@@ -288,20 +618,72 @@ const styles = StyleSheet.create({
   messageText: {
     fontSize: 15,
   },
-  optionsContainer: {
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#F0F0F0',
+    padding: 10,
+    borderRadius: 15,
+    marginLeft: 10,
+    marginBottom: 10,
+  },
+  loadingText: {
+    marginLeft: 10,
+    color: '#666',
+    fontSize: 14,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    padding: 10,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#ddd',
-    padding: 10,
   },
-  optionButton: {
+  textInput: {
+    flex: 1,
+    backgroundColor: '#F0F0F0',
+    borderRadius: 20,
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    fontSize: 16,
+    marginRight: 10,
+  },
+  sendButton: {
     backgroundColor: '#4A90E2',
-    padding: 12,
-    borderRadius: 8,
-    marginVertical: 5,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  optionText: {
+  disabledButton: {
+    backgroundColor: '#B0C4DE',
+  },
+  floatingOptionsContainer: {
+    backgroundColor: '#F2F2F2',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderTopWidth: 1,
+    borderTopColor: '#ddd',
+  },
+  optionsScrollContainer: {
+    paddingRight: 10, // Add some padding at the end
+  },
+  floatingOptionButton: {
+    backgroundColor: '#4A90E2',
+    paddingHorizontal: 15,
+    paddingVertical: 10,
+    borderRadius: 20,
+    marginRight: 8,
+    marginVertical: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  floatingOptionText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '500',

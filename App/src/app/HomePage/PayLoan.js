@@ -30,6 +30,10 @@ const PayLoan = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const [paymentAccounts, setPaymentAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
@@ -147,7 +151,8 @@ const PayLoan = () => {
       }
     } catch (error) {
       console.error('Error selecting proof of payment:', error);
-      Alert.alert('Error', 'Failed to select proof of payment');
+      setErrorMessage('Failed to select proof of payment');
+      setErrorModalVisible(true);
     }
   };
 
@@ -162,7 +167,8 @@ const PayLoan = () => {
       return downloadURL;
     } catch (error) {
       console.error('Image upload failed:', error);
-      Alert.alert('Error', 'Failed to upload image');
+      setErrorMessage('Failed to upload image');
+      setErrorModalVisible(true);
       throw error;
     }
   };
@@ -196,7 +202,8 @@ const PayLoan = () => {
       });
     } catch (error) {
       console.error('Failed to store payment data in Realtime Database:', error);
-      Alert.alert('Error', 'Failed to store payment data');
+      setErrorMessage('Failed to store payment data');
+      setErrorModalVisible(true);
       throw error;
     }
   };
@@ -207,79 +214,62 @@ const PayLoan = () => {
 
   const handleSubmit = async () => {
     if (!paymentOption || !amountToBePaid || !proofOfPayment) {
-      Alert.alert('Error', 'All fields are required');
+      setErrorMessage('All fields are required');
+      setErrorModalVisible(true);
       return;
     }
 
     if (isNaN(amountToBePaid) || parseFloat(amountToBePaid) <= 0) {
-      Alert.alert('Error', 'Please enter a valid amount');
+      setErrorMessage('Please enter a valid amount');
+      setErrorModalVisible(true);
       return;
     }
 
-    Alert.alert(
-      'Confirm Payment',
-      `Balance: ₱${balance}\nPayment Option: ${paymentOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Paid: ₱${parseFloat(amountToBePaid).toFixed(2)}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            setIsLoading(true);
-            try {
-              const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
-              await storePaymentDataInDatabase(proofOfPaymentUrl);
+    // Show confirmation modal
+    setConfirmModalVisible(true);
+  };
+  
+  const submitPayment = async () => {
+    setIsLoading(true);
+    setConfirmModalVisible(false);
+    
+    try {
+      const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
+      await storePaymentDataInDatabase(proofOfPaymentUrl);
 
-              const paymentData = {
-                email,
-                firstName,
-                lastName,
-                amount: parseFloat(amountToBePaid),
-                paymentMethod: paymentOption,
-                date: new Date().toISOString(),
-                interestPaid: interest,
-                principalPaid: parseFloat(amountToBePaid) - interest,
-                isLoanPayment: true
-              };
+      const paymentData = {
+        email,
+        firstName,
+        lastName,
+        amount: parseFloat(amountToBePaid),
+        paymentMethod: paymentOption,
+        date: new Date().toISOString(),
+        interestPaid: interest,
+        principalPaid: parseFloat(amountToBePaid) - interest,
+        isLoanPayment: true
+      };
 
-              const response = await MemberPayment(paymentData);
-              console.log('Payment API response:', response);
+      const response = await MemberPayment(paymentData);
+      console.log('Payment API response:', response);
 
-              Alert.alert(
-                'Success', 
-                'Payment submitted successfully. You will receive a confirmation email shortly.',
-                [
-                  {
-                    text: 'OK',
-                    onPress: () => {
-                      resetFormFields();
-                      navigation.navigate('Home');
-                    }
-                  }
-                ],
-                { cancelable: false }
-              );
-            } catch (error) {
-              console.error('Error during payment submission:', {
-                error: error.message,
-                stack: error.stack,
-                paymentData: {
-                  email,
-                  amount: amountToBePaid,
-                  paymentOption
-                }
-              });
-              Alert.alert(
-                'Notice',
-                'Payment was recorded but email notification failed. Please check your email later.',
-                [{ text: 'OK' }]
-              );
-            } finally {
-              setIsLoading(false);
-            }
-          },
-        },
-      ]
-    );
+      // Show success modal
+      setSuccessModalVisible(true);
+    } catch (error) {
+      console.error('Error during payment submission:', {
+        error: error.message,
+        stack: error.stack,
+        paymentData: {
+          email,
+          amount: amountToBePaid,
+          paymentOption
+        }
+      });
+      
+      setErrorMessage('Payment was recorded but email notification failed. Please check your email later.');
+      setErrorModalVisible(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const resetFormFields = () => {
@@ -314,6 +304,8 @@ const PayLoan = () => {
             initValue="Select Payment Option"
             onChange={handlePaymentOptionChange}
             style={styles.picker}
+            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+            overlayStyle={{ justifyContent: 'flex-end' }}
           >
             <TouchableOpacity style={styles.pickerContainer}>
               <Text style={styles.pickerText}>{paymentOption || 'Select Payment Option'}</Text>
@@ -369,12 +361,86 @@ const PayLoan = () => {
         </View>
       </ScrollView>
 
-      <Modal transparent={true} visible={isLoading}>
-        <View style={styles.modalContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.modalText}>Please wait...</Text>
+      {/* Confirmation Modal */}
+      <Modal visible={confirmModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="help-outline" size={40} color="#2C5282" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Confirm Payment</Text>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>Balance: {formatCurrency(balance)}</Text>
+              <Text style={styles.modalText}>Payment Option: {paymentOption}</Text>
+              <Text style={styles.modalText}>Account Name: {accountName}</Text>
+              <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+              <Text style={styles.modalText}>Amount to be Paid: {formatCurrency(amountToBePaid)}</Text>
+            </View>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setConfirmModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={submitPayment}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
+      
+      {/* Success Modal */}
+      <Modal visible={successModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Success</Text>
+            <Text style={styles.modalText}>
+              Payment submitted successfully. You will receive a confirmation email shortly.
+            </Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]} 
+              onPress={() => {
+                setSuccessModalVisible(false);
+                resetFormFields();
+                navigation.navigate('Home');
+              }}
+            >
+              <Text style={styles.confirmButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Error Modal */}
+      <Modal visible={errorModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Error</Text>
+            <Text style={styles.modalText}>{errorMessage}</Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]} 
+              onPress={() => setErrorModalVisible(false)}
+            >
+              <Text style={styles.confirmButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
   );
 };
@@ -477,9 +543,89 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
+  centeredModal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#2C5282',
+  },
+  modalContent: {
+    width: '100%',
+    marginBottom: 20,
+  },
   modalText: {
-    color: '#fff',
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#333',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    minWidth: '45%',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  confirmButton: {
+    backgroundColor: '#2C5282',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
     marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2C5282',
   },
   required: {
     color: 'red',

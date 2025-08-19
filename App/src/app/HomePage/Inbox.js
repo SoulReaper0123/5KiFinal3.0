@@ -17,7 +17,45 @@ export default function Inbox() {
   const route = useRoute();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
-  const email = auth.currentUser?.email || route.params?.email;
+  
+  // State for email
+  const [userEmail, setUserEmail] = useState(null);
+  
+  // Get email from all possible sources
+  useEffect(() => {
+    const getEmail = async () => {
+      try {
+        // Try to get email from different sources
+        const routeEmail = route.params?.email;
+        const parentRouteEmail = navigation.getParent()?.getState()?.routes?.[0]?.params?.email;
+        const authEmail = auth.currentUser?.email;
+        
+        // Try to get email from SecureStore (for biometric login)
+        let storedEmail = null;
+        try {
+          storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+        } catch (error) {
+          console.error('Error getting email from SecureStore:', error);
+        }
+        
+        // Use the first available email
+        const email = routeEmail || parentRouteEmail || authEmail || storedEmail;
+        
+        console.log('Inbox - Using email:', email, 'from sources:', { 
+          routeEmail, 
+          parentRouteEmail, 
+          authEmail, 
+          storedEmail 
+        });
+        
+        setUserEmail(email);
+      } catch (error) {
+        console.error('Error getting email in Inbox:', error);
+      }
+    };
+    
+    getEmail();
+  }, [route.params, navigation]);
 
   // Helper functions
   const getRawDateFromFirebase = (dateObj) => {
@@ -167,7 +205,7 @@ export default function Inbox() {
         const parsedMessages = parseMessages(data);
 
         const filteredMessages = parsedMessages.filter(
-          message => message.email?.toLowerCase() === email?.toLowerCase()
+          message => message.email?.toLowerCase() === userEmail?.toLowerCase()
         );
 
         filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
@@ -184,10 +222,11 @@ export default function Inbox() {
   };
 
   useEffect(() => {
-    if (email) {
+    if (userEmail) {
+      console.log('Fetching messages for email:', userEmail);
       fetchMessages();
     }
-  }, [email]);
+  }, [userEmail]);
 
   const renderItem = ({ item }) => (
   <View style={[styles.card, { borderLeftWidth: 5, borderLeftColor: item.color }]}>

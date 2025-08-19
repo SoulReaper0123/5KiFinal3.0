@@ -12,6 +12,7 @@
   "dependencies": {
     "@expo/metro-runtime": "~5.0.4",
     "@expo/vector-icons": "^14.0.3",
+    "@google/generative-ai": "^0.24.1",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-native-community/checkbox": "^0.5.20",
     "@react-native-community/datetimepicker": "8.4.1",
@@ -44,6 +45,7 @@
     "react-native": "0.79.5",
     "react-native-biometrics": "^3.0.1",
     "react-native-calendars": "^1.1312.0",
+    "react-native-dotenv": "^3.4.11",
     "react-native-gesture-handler": "~2.24.0",
     "react-native-keychain": "^10.0.0",
     "react-native-modal-datetime-picker": "^18.0.0",

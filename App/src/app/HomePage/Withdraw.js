@@ -21,6 +21,10 @@ const Withdraw = () => {
   const [isLoading, setIsLoading] = useState(false); // Loading state
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const withdrawOptions = [
     { key: 'GCash', label: 'GCash' },
@@ -106,90 +110,8 @@ useEffect(() => {
     return;
   }
 
-  Alert.alert(
-    'Confirm Withdrawal',
-    `Balance: ₱${balance}\nWithdraw Option: ${withdrawOption}\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}\nAmount to be Withdrawn: ₱${parseFloat(withdrawAmount).toFixed(2)}`,
-    [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          setIsLoading(true);
-          try {
-            const transactionId = generateTransactionId();
-            const currentDate = new Date().toISOString();
-
-            // Prepare withdrawal data
-            const withdrawalData = {
-              transactionId,
-              id: memberId,
-              email,
-              firstName,
-              lastName,
-              withdrawOption,
-              accountName,
-              accountNumber,
-              amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
-              dateApplied: new Date().toLocaleString('en-US', {
-                month: 'long',
-                day: '2-digit',
-                year: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: false
-              })
-              .replace(',', '')
-              .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-              .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
-              status: 'Pending',
-            };
-
-            // Save to Firebase
-            const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
-            await set(newWithdrawRef, withdrawalData);
-
-            // Make API call with correct field names
-            await MemberWithdraw({
-              email,
-              firstName,
-              lastName,
-              amount: parseFloat(withdrawAmount),
-              date: currentDate,
-              recipientAccount: accountNumber, // Matches backend expectation
-              referenceNumber: transactionId,  // Using transactionId as reference
-              withdrawOption,                  // Additional field for your records
-              accountName                      // Additional field for your records
-            });
-
-            // Show success
-            Alert.alert(
-              'Success',
-              'Withdrawal recorded successfully',
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    resetFormFields();
-                    navigation.navigate('Home');
-                  }
-                }
-              ],
-              { cancelable: false }
-            );
-          } catch (error) {
-            console.error('Error during withdrawal submission:', error);
-            Alert.alert(
-              'Error',
-              'Failed to process withdrawal: ' + error.message,
-              [{ text: 'OK' }]
-            );
-          } finally {
-            setIsLoading(false);
-          }
-        },
-      },
-    ]
-  );
+  // Show confirmation modal
+  setConfirmModalVisible(true);
 };
 
   const formatCurrency = (amount) => {
@@ -198,6 +120,67 @@ useEffect(() => {
 
   const generateTransactionId = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
+  };
+  
+  const submitWithdrawal = async () => {
+    setIsLoading(true);
+    try {
+      const transactionId = generateTransactionId();
+      const currentDate = new Date().toISOString();
+
+      // Prepare withdrawal data
+      const withdrawalData = {
+        transactionId,
+        id: memberId,
+        email,
+        firstName,
+        lastName,
+        withdrawOption,
+        accountName,
+        accountNumber,
+        amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
+        dateApplied: new Date().toLocaleString('en-US', {
+          month: 'long',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        })
+        .replace(',', '')
+        .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+        .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+        status: 'Pending',
+      };
+
+      // Save to Firebase
+      const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
+      await set(newWithdrawRef, withdrawalData);
+
+      // Make API call with correct field names
+      await MemberWithdraw({
+        email,
+        firstName,
+        lastName,
+        amount: parseFloat(withdrawAmount),
+        date: currentDate,
+        recipientAccount: accountNumber, // Matches backend expectation
+        referenceNumber: transactionId,  // Using transactionId as reference
+        withdrawOption,                  // Additional field for your records
+        accountName                      // Additional field for your records
+      });
+
+      // Show success modal
+      setConfirmModalVisible(false);
+      setSuccessModalVisible(true);
+    } catch (error) {
+      console.error('Error during withdrawal submission:', error);
+      setErrorMessage('Failed to process withdrawal: ' + error.message);
+      setConfirmModalVisible(false);
+      setErrorModalVisible(true);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -225,6 +208,8 @@ useEffect(() => {
           initValue="Select Withdraw Option"
           onChange={handleWithdrawOptionChange}
           style={styles.picker}
+          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+          overlayStyle={{ justifyContent: 'flex-end' }}
         >
           <TouchableOpacity style={styles.pickerContainer}>
             <Text style={styles.pickerText}>{withdrawOption || 'Select Withdraw Option'}</Text>
@@ -268,12 +253,86 @@ useEffect(() => {
       </View>
       </ScrollView>
 
-      <Modal transparent={true} visible={isLoading}>
-        <View style={styles.modalContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.modalText}>Please wait...</Text>
+      {/* Confirmation Modal */}
+      <Modal visible={confirmModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="help-outline" size={40} color="#2C5282" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Confirm Withdrawal</Text>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>Balance: {formatCurrency(balance)}</Text>
+              <Text style={styles.modalText}>Withdraw Option: {withdrawOption}</Text>
+              <Text style={styles.modalText}>Account Name: {accountName}</Text>
+              <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+              <Text style={styles.modalText}>Amount to be Withdrawn: {formatCurrency(withdrawAmount)}</Text>
+            </View>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setConfirmModalVisible(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={submitWithdrawal}
+              >
+                <Text style={styles.confirmButtonText}>Confirm</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
+      
+      {/* Success Modal */}
+      <Modal visible={successModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Success</Text>
+            <Text style={styles.modalText}>
+              Withdrawal recorded successfully
+            </Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]} 
+              onPress={() => {
+                setSuccessModalVisible(false);
+                resetFormFields();
+                navigation.navigate('Home');
+              }}
+            >
+              <Text style={styles.confirmButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Error Modal */}
+      <Modal visible={errorModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Error</Text>
+            <Text style={styles.modalText}>{errorMessage}</Text>
+            <TouchableOpacity 
+              style={[styles.modalButton, styles.confirmButton]} 
+              onPress={() => setErrorModalVisible(false)}
+            >
+              <Text style={styles.confirmButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
       </KeyboardAvoidingView>
   );
 };
@@ -365,12 +424,96 @@ const styles = StyleSheet.create({
     color: 'white',
   },
   required: {
-  color: 'red',
-},
-disabledButton: {
-  backgroundColor: '#cccccc',
-  opacity: 0.6,
-},
+    color: 'red',
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+    opacity: 0.6,
+  },
+  centeredModal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#2C5282',
+  },
+  modalContent: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#333',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    minWidth: '45%',
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  confirmButton: {
+    backgroundColor: '#2C5282',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2C5282',
+  },
 });
 
 export default Withdraw;

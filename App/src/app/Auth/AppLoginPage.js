@@ -95,6 +95,17 @@ export default function AppLoginPage() {
         
         if (credentials) {
           const { email, password } = JSON.parse(credentials);
+          
+          // We can't modify auth.currentUser directly, so we'll use SecureStore
+          // to store the current user email for the session
+          try {
+            // Store the current user email in SecureStore for the session
+            await SecureStore.setItemAsync('currentUserEmail', email);
+            console.log('Stored current user email in SecureStore:', email);
+          } catch (error) {
+            console.error('Error storing current user email:', error);
+          }
+          
           navigation.navigate('TwoFactorEmail', { 
             email,
             password,
