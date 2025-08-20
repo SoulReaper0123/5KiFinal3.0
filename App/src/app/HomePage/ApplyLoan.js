@@ -12,6 +12,7 @@ import {
   BackHandler,
   KeyboardAvoidingView, Platform
 } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -44,6 +45,16 @@ const ApplyLoan = () => {
   const [collateralValue, setCollateralValue] = useState('');
   const [collateralDescription, setCollateralDescription] = useState('');
   const [showCollateralModal, setShowCollateralModal] = useState(false);
+  
+  // Modal states
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [successAction, setSuccessAction] = useState(null);
+  const [pendingApiData, setPendingApiData] = useState(null);
 
   const accountNumberInput = useRef(null);
 
@@ -115,7 +126,9 @@ const ApplyLoan = () => {
   const validateAccountNumber = (value) => {
     const maxLength = disbursement === 'GCash' ? 11 : disbursement === 'Bank' ? 16 : 0;
     if (maxLength > 0 && value.length > maxLength) {
-      Alert.alert(`Error`, `Account Number for ${disbursement} must be ${maxLength} digits long`);
+      setAlertMessage(`Account Number for ${disbursement} must be ${maxLength} digits long`);
+      setAlertType('error');
+      setAlertModalVisible(true);
       return value.slice(0, maxLength);
     }
     return value;
@@ -146,12 +159,40 @@ const ApplyLoan = () => {
   };
 
   useEffect(() => {
-    const user = auth.currentUser;
-    const userEmail = user ? user.email : route.params?.user?.email;
-    if (userEmail) {
-      setEmail(userEmail);
-      fetchUserData(userEmail);
-    }
+    const initializeUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const userEmail = user ? user.email : route.params?.user?.email;
+        
+        if (userEmail) {
+          setEmail(userEmail);
+          
+          // If user data is passed via navigation (from fingerprint auth), use it
+          if (route.params?.user) {
+            const userData = route.params.user;
+            setMemberId(userData.memberId || '');
+            setFirstName(userData.firstName || '');
+            setBalance(userData.balance || 0);
+            // Still fetch fresh data from database for consistency
+            await fetchUserData(userEmail);
+          } else {
+            // Fallback to database lookup
+            await fetchUserData(userEmail);
+          }
+        } else {
+          setAlertMessage('Unable to identify user. Please log in again.');
+          setAlertType('error');
+          setAlertModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Error initializing user data:', error);
+        setAlertMessage('Error loading user information.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+      }
+    };
+
+    initializeUserData();
   }, [route.params]);
 
   useEffect(() => {
@@ -205,13 +246,17 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     return true;
   } catch (error) {
     console.error('Failed to store loan application:', error);
-    Alert.alert('Error', 'Failed to submit loan application');
+    setAlertMessage('Failed to submit loan application');
+    setAlertType('error');
+    setAlertModalVisible(true);
     return false;
   }
 };
 
   const submitLoanApplication = async () => {
   setIsLoading(true);
+  setConfirmModalVisible(false);
+  
   try {
     const loanAmountNum = parseFloat(loanAmount);
     const applicationData = {
@@ -234,61 +279,37 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       })
     };
 
+    // Store in database first
     const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
     if (!storedSuccessfully) return;
 
-    // Prepare loan data for API with all required fields
+    // Prepare loan data for API call to run when user clicks OK
     const loanData = {
       email,
       firstName,
       lastName,
       amount: loanAmountNum,
       term,
-      date: new Date().toISOString(), // Add current date
-      loanType,
-      disbursementMethod: disbursement,
-      accountNumber,
-      requiresCollateral,
-      ...(requiresCollateral && {
-        collateralType,
-        collateralValue,
-        collateralDescription
-      })
+      date: new Date().toISOString(),
     };
 
-    // Make API call to trigger emails
-    const response = await MemberLoan(loanData);
-    console.log('Loan API response:', response);
+    // Store loan data to be used when user clicks OK
+    setPendingApiData(loanData);
 
-    Alert.alert(
-      'Success',
-      'Loan application submitted successfully. You will receive a confirmation email shortly.',
-      [
-        {
-          text: 'OK',
-          onPress: () => {
-            resetForm();
-            navigation.navigate('Home');
-          }
-        }
-      ],
-      { cancelable: false }
-    );
-  } catch (error) {
-    console.error('Error during loan submission:', {
-      error: error.message,
-      stack: error.stack,
-      loanData: {
-        email,
-        amount: loanAmount,
-        term
-      }
+    // Show success modal
+    setAlertMessage('Loan application submitted successfully. You will receive a confirmation email shortly.');
+    setAlertType('success');
+    setSuccessAction(() => () => {
+      resetForm();
+      navigation.navigate('Home');
     });
-    Alert.alert(
-      'Notice',
-      'Loan application was recorded but email notification failed. Please check your email later.',
-      [{ text: 'OK' }]
-    );
+    setAlertModalVisible(true);
+
+  } catch (error) {
+    console.error('Error during loan submission:', error);
+    setAlertMessage('An unexpected error occurred. Please try again later.');
+    setAlertType('error');
+    setAlertModalVisible(true);
   } finally {
     setIsLoading(false);
   }
@@ -309,58 +330,30 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         `Description: ${collateralDescription}`;
     }
 
-    Alert.alert(
-      'Confirm Loan Application',
-      message,
-      [
-        { 
-          text: 'Cancel', 
-          style: 'cancel',
-          onPress: () => {
-            if (requiresCollateral) {
-              setShowCollateralModal(true); // Go back to collateral modal
-            }
-          }
-        },
-        { 
-          text: 'Submit', 
-          onPress: () => {
-            submitLoanApplication(); 
-          }
-        }
-      ]
-    );
+    setConfirmMessage(message);
+    setConfirmAction(() => () => {
+      submitLoanApplication();
+    });
+    setConfirmModalVisible(true);
   };
 
   const handleSubmit = async () => {
     if (!isFormValid()) {
-      Alert.alert('Error', 'All required fields must be filled');
+      setAlertMessage('All required fields must be filled');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
     const loanAmountNum = parseFloat(loanAmount);
     
     if (loanAmountNum > balance) {
-      Alert.alert(
-        'Collateral Required',
-        'Your loan amount exceeds your current balance. You need to provide collateral to proceed.',
-        [
-          { 
-            text: 'Cancel', 
-            style: 'cancel',
-            onPress: () => {
-              // Just closes the alert
-            }
-          },
-          {
-            text: 'Continue with Collateral',
-            onPress: () => {
-              setShowCollateralModal(true);
-              setRequiresCollateral(true);
-            }
-          }
-        ]
-      );
+      setConfirmMessage('Your loan amount exceeds your current balance. You need to provide collateral to proceed.');
+      setConfirmAction(() => () => {
+        setRequiresCollateral(true);
+        setShowCollateralModal(true);
+      });
+      setConfirmModalVisible(true);
       return;
     }
 
@@ -581,6 +574,80 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           <Text style={styles.modalText}>Please wait...</Text>
         </View>
       </Modal>
+
+      {/* Custom Alert Modal */}
+      <CustomModal
+        visible={alertModalVisible}
+        onClose={() => {
+          setAlertModalVisible(false);
+          if (alertType === 'success' && pendingApiData) {
+            // Navigate immediately and run API in background  
+            if (successAction) {
+              successAction();
+              setSuccessAction(null);
+            }
+            
+            // Run API call in background after navigation
+            setTimeout(async () => {
+              try {
+                await MemberLoan(pendingApiData);
+                console.log('Loan API call completed successfully in background');
+              } catch (apiError) {
+                console.error('Background API call failed:', apiError);
+                // API failure doesn't affect user experience since data is already in database
+              }
+              // Clear pending data
+              setPendingApiData(null);
+            }, 100);
+          } else if (alertType === 'success' && successAction) {
+            successAction();
+            setSuccessAction(null);
+          }
+        }}
+        message={alertMessage}
+        type={alertType}
+      />
+
+      {/* Confirmation Modal */}
+      <Modal visible={confirmModalVisible} transparent animationType="fade">
+        <View style={styles.modalContainer}>
+          <View style={[styles.modalContent, { backgroundColor: 'white', borderRadius: 10, padding: 20, width: '80%' }]}>
+            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 15 }]}>
+              {confirmMessage.includes('Collateral Required') ? 'Collateral Required' : 'Confirm Loan Application'}
+            </Text>
+            <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+              {confirmMessage}
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setConfirmModalVisible(false);
+                  if (requiresCollateral) {
+                    setShowCollateralModal(true);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.continueButton]} 
+                onPress={() => {
+                  setConfirmModalVisible(false);
+                  if (confirmAction) {
+                    confirmAction();
+                    setConfirmAction(null);
+                  }
+                }}
+              >
+                <Text style={styles.modalButtonText}>
+                  {confirmMessage.includes('Collateral Required') ? 'Continue' : 'Submit'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -657,19 +724,22 @@ const styles = StyleSheet.create({
     color: 'grey',
   },
   submitButton: {
-    backgroundColor: '#2D5783',
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
+    marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   disabledButton: {
     backgroundColor: '#cccccc',
   },
   submitButtonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalContainer: {
     flex: 1,
@@ -728,6 +798,11 @@ const styles = StyleSheet.create({
   },
   continueButton: {
     backgroundColor: '#2D5783',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

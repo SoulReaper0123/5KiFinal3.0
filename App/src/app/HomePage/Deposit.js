@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Alert, ScrollView, Image, 
   ActivityIndicator, Modal, BackHandler 
 } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -36,14 +37,49 @@ const Deposit = () => {
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
   });
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
+  const [showImageOptions, setShowImageOptions] = useState(false);
+  const [showCropOptions, setShowCropOptions] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [pendingDepositData, setPendingDepositData] = useState(null);
 
   useEffect(() => {
-    const user = auth.currentUser;
-    const userEmail = user ? user.email : route.params?.user?.email;
-    if (userEmail) {
-      setEmail(userEmail);
-      fetchUserData(userEmail);
-    }
+    const initializeUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const userEmail = user ? user.email : route.params?.user?.email;
+        
+        if (userEmail) {
+          setEmail(userEmail);
+          
+          // If user data is passed via navigation (from fingerprint auth), use it
+          if (route.params?.user) {
+            const userData = route.params.user;
+            setMemberId(userData.memberId || '');
+            setFirstName(userData.firstName || '');
+            setBalance(userData.balance || 0);
+            // Still fetch fresh data from database for consistency
+            await fetchUserData(userEmail);
+          } else {
+            // Fallback to database lookup
+            await fetchUserData(userEmail);
+          }
+        } else {
+          setAlertMessage('Unable to identify user. Please log in again.');
+          setAlertType('error');
+          setAlertModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Error initializing user data:', error);
+        setAlertMessage('Error loading user information.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+      }
+    };
+
+    initializeUserData();
     fetchDepositSettings();
   }, [route.params]);
 
@@ -90,10 +126,14 @@ const Deposit = () => {
           setFirstName(foundUser.firstName || ''); 
           setLastName(foundUser.lastName || '');  
         } else {
-          Alert.alert('Error', 'User not found');
+          setAlertMessage('User not found');
+          setAlertType('error');
+          setAlertModalVisible(true);
         }
       } else {
-        Alert.alert('Error', 'No members found');
+        setAlertMessage('No members found');
+        setAlertType('error');
+        setAlertModalVisible(true);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -112,21 +152,82 @@ const Deposit = () => {
     setAccountName(selectedAccount.accountName || '');
   };
 
-  const handleSelectProofOfDeposit = async () => {
+  const handleSelectProofOfDeposit = () => {
+    setShowImageOptions(true);
+  };
+
+  const handleSelectImage = async (source) => {
+    const { status } = source === 'camera' 
+      ? await ImagePicker.requestCameraPermissionsAsync()
+      : await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+    if (status !== 'granted') {
+      setAlertMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    try {
+      const result = await (source === 'camera' 
+        ? ImagePicker.launchCameraAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          })
+        : ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            allowsEditing: false,
+            quality: 0.8,
+          }));
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setShowImageOptions(false);
+        if (source === 'camera') {
+          // For camera: automatically use the image as is
+          setProofOfDeposit(result.assets[0].uri);
+        } else {
+          // For gallery: show crop options
+          setSelectedImageUri(result.assets[0].uri);
+          setShowCropOptions(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error selecting image:', error);
+      setAlertMessage('Failed to select image');
+      setAlertType('error');
+      setAlertModalVisible(true);
+    }
+  };
+
+  const handleUseAsIs = () => {
+    if (selectedImageUri) {
+      setProofOfDeposit(selectedImageUri);
+      setShowCropOptions(false);
+      setSelectedImageUri(null);
+    }
+  };
+
+  const handleCropImage = async () => {
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [1, 1],
-        quality: 1,
+        quality: 0.8,
+        uri: selectedImageUri,
       });
 
-      if (!result.canceled) {
+      if (!result.canceled && result.assets && result.assets[0]) {
         setProofOfDeposit(result.assets[0].uri);
       }
+      setShowCropOptions(false);
+      setSelectedImageUri(null);
     } catch (error) {
-      console.error('Error selecting proof of deposit:', error);
-      Alert.alert('Error', 'Failed to select proof of deposit');
+      console.error('Error cropping image:', error);
+      setAlertMessage('Failed to crop image');
+      setAlertType('error');
+      setAlertModalVisible(true);
     }
   };
 
@@ -222,14 +323,16 @@ const Deposit = () => {
 
   const handleSubmit = async () => {
     if (!depositOption || !amountToBeDeposited || !proofOfDeposit) {
-      setErrorMessage('All fields are required');
-      setErrorModalVisible(true);
+      setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
     if (isNaN(amountToBeDeposited) || parseFloat(amountToBeDeposited) <= 0) {
-      setErrorMessage('Please enter a valid amount');
-      setErrorModalVisible(true);
+      setAlertMessage('Please enter a valid amount');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
@@ -251,7 +354,7 @@ const Deposit = () => {
       // Store in Firebase Realtime Database with the transaction ID
       await storeDepositDataInDatabase(proofOfDepositUrl, transactionId);
 
-      // Prepare data for API call
+      // Prepare data for API call to run when user clicks OK
       const depositData = {
         email,
         accountName,
@@ -259,32 +362,34 @@ const Deposit = () => {
         lastName,
         depositOption,
         accountNumber,
-        amountToBeDeposited: parseFloat(amountToBeDeposited),
+        amountToBeDeposited: parseFloat(amountToBeDeposited), // Keep original field name
         proofOfDepositUrl,
         transactionId,
+        date: new Date().toISOString(), // Added date field
       };
 
-      // Make API call
-      await MemberDeposit(depositData);
-      
+      // Store deposit data to be used when user clicks OK
+      setPendingDepositData(depositData);
+
       // Show success modal
-      setSuccessModalVisible(true);
+      setAlertMessage('Your deposit request has been submitted successfully. It will be processed shortly.');
+      setAlertType('success');
+      setAlertModalVisible(true);
+      
     } catch (error) {
       console.error('Error during deposit submission:', error);
       
       // Handle different types of errors
       if (error.code && error.code.startsWith('storage/')) {
         // Firebase Storage errors are already handled in uploadImageToFirebase
-        setErrorModalVisible(true);
-      } else if (error.response && error.response.data) {
-        // API errors
-        setErrorMessage(error.response.data.message || 
-          'There was an issue processing your deposit. Please try again.');
-        setErrorModalVisible(true);
+        setAlertMessage(errorMessage || 'Failed to upload image');
+        setAlertType('error');
+        setAlertModalVisible(true);
       } else {
         // Generic errors
-        setErrorMessage('An unexpected error occurred. Please try again later.');
-        setErrorModalVisible(true);
+        setAlertMessage('An unexpected error occurred. Please try again later.');
+        setAlertType('error');
+        setAlertModalVisible(true);
       }
     } finally {
       setLoading(false);
@@ -297,6 +402,7 @@ const Deposit = () => {
     setAccountName('');
     setAmountToBeDeposited('');
     setProofOfDeposit(null);
+    setPendingDepositData(null);
   };
 
   const formatCurrency = (amount) => {
@@ -347,7 +453,9 @@ const Deposit = () => {
           editable={false} 
         />
 
-        <Text style={styles.label}>Deposit Amount</Text>
+        <Text style={styles.label}>
+          Deposit Amount <Text style={styles.required}>*</Text>
+        </Text>
         <TextInput
           placeholder="Enter Amount"
           value={amountToBeDeposited}
@@ -356,22 +464,91 @@ const Deposit = () => {
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>Proof of Deposit</Text>
-        <View style={styles.imagePreviewContainer}>
+        <Text style={styles.label}>
+          Proof of Deposit <Text style={styles.required}>*</Text>
+        </Text>
+        <TouchableOpacity onPress={handleSelectProofOfDeposit} style={styles.imagePreviewContainer}>
           {proofOfDeposit ? (
             <Image source={{ uri: proofOfDeposit }} style={styles.imagePreview} />
           ) : (
-            <MaterialIcons name="photo" size={100} color="#ccc" />
+            <View style={styles.uploadPlaceholder}>
+              <MaterialIcons name="photo" size={100} color="#ccc" />
+              <Text style={styles.uploadPromptText}>Tap To Upload</Text>
+            </View>
           )}
-        </View>
-        <TouchableOpacity onPress={handleSelectProofOfDeposit} style={styles.uploadButton}>
-          <Text style={styles.uploadButtonText}>{proofOfDeposit ? 'Change Proof of Deposit' : 'Upload Proof of Deposit'}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Image Options Modal */}
+      <Modal
+        transparent={true}
+        visible={showImageOptions}
+        onRequestClose={() => setShowImageOptions(false)}
+        animationType="slide"
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.optionsModal}>
+            <Text style={styles.modalTitle}>Select Proof of Deposit</Text>
+            <View style={styles.optionButtonsContainer}>
+              <TouchableOpacity
+                style={styles.optionButton}
+                onPress={() => handleSelectImage('camera')}
+              >
+                <MaterialIcons name="photo-camera" size={24} color="#2D5783" />
+                <Text style={styles.optionText}>Camera</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.optionButton}
+                onPress={() => handleSelectImage('gallery')}
+              >
+                <MaterialIcons name="photo-library" size={24} color="#2D5783" />
+                <Text style={styles.optionText}>Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity
+              style={[styles.optionButton, styles.fullWidthOption]}
+              onPress={() => setShowImageOptions(false)}
+            >
+              <Text style={styles.optionText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Crop Options Modal */}
+      <Modal
+        transparent={true}
+        visible={showCropOptions}
+        onRequestClose={() => setShowCropOptions(false)}
+        animationType="slide"
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.optionsModal}>
+            <Text style={styles.modalTitle}>Image Options</Text>
+            {selectedImageUri && (
+              <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
+            )}
+            <View style={styles.cropButtonsContainer}>
+              <TouchableOpacity
+                style={[styles.cropButton, styles.useAsIsButton]}
+                onPress={handleUseAsIs}
+              >
+                <Text style={styles.cropButtonText}>Use as is</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.cropButton}
+                onPress={handleCropImage}
+              >
+                <Text style={styles.cropButtonText}>Crop</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Loading Modal */}
       <Modal transparent={true} visible={loading}>
@@ -407,45 +584,38 @@ const Deposit = () => {
         </View>
       </Modal>
 
-      {/* Success Modal */}
-      <Modal transparent={true} visible={successModalVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <MaterialIcons name="check-circle" size={60} color="#4FE7AF" />
-            <Text style={styles.modalTitle}>Success!</Text>
-            <Text style={styles.modalText}>
-              Your deposit request has been submitted successfully. It will be processed shortly.
-            </Text>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton, {width: '100%'}]} 
-              onPress={() => {
-                setSuccessModalVisible(false);
-                resetFormFields();
-                navigation.navigate('Home');
-              }}
-            >
-              <Text style={styles.modalButtonText}>Done</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Error Modal */}
-      <Modal transparent={true} visible={errorModalVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <MaterialIcons name="error" size={60} color="#FF6B6B" />
-            <Text style={styles.modalTitle}>Error</Text>
-            <Text style={styles.modalText}>{errorMessage}</Text>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton, {width: '100%', backgroundColor: '#FF6B6B'}]} 
-              onPress={() => setErrorModalVisible(false)}
-            >
-              <Text style={styles.modalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Custom Alert Modal */}
+      <CustomModal
+        visible={alertModalVisible}
+        onClose={() => {
+          setAlertModalVisible(false);
+          if (alertType === 'success' && pendingDepositData) {
+            // Navigate immediately and run API in background
+            resetFormFields();
+            navigation.navigate('Home');
+            
+            // Run API call in background after navigation
+            setTimeout(async () => {
+              try {
+                await MemberDeposit(pendingDepositData);
+                console.log('Deposit API call completed successfully in background');
+              } catch (apiError) {
+                console.error('Background API call failed:', apiError);
+                // API failure doesn't affect user experience since data is already in database
+              }
+              // Clear pending data
+              setPendingDepositData(null);
+            }, 100);
+          } else if (alertType === 'success') {
+            // Fallback for success without pending data
+            resetFormFields();
+            navigation.navigate('Home');
+          }
+        }}
+        message={alertMessage}
+        type={alertType}
+        buttonText="OK"
+      />
     </ScrollView>
   );
 };
@@ -480,6 +650,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginTop: 10,
     marginBottom: 5,
+  },
+  required: {
+    color: 'red',
   },
   balanceText: {
     fontSize: 30,
@@ -524,6 +697,17 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 150,
     marginBottom: 15,
+    backgroundColor: '#f5f5f5',
+  },
+  uploadPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  uploadPromptText: {
+    color: '#2D5783',
+    fontWeight: 'bold',
+    marginTop: 10,
+    fontSize: 16,
   },
   imagePreview: {
     width: '100%',
@@ -544,14 +728,18 @@ const styles = StyleSheet.create({
   },
   submitButton: {
     backgroundColor: '#4FE7AF',
-    padding: 15,
-    borderRadius: 8,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
+    marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   submitButtonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalOverlay: {
     flex: 1,
@@ -603,6 +791,74 @@ const styles = StyleSheet.create({
     color: 'white',
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  modalBackground: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  optionsModal: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    width: '100%',
+  },
+  optionButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 10,
+  },
+  optionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderWidth: 1,
+    borderColor: '#2D5783',
+    borderRadius: 8,
+    marginHorizontal: 5,
+  },
+  fullWidthOption: {
+    flex: 1,
+    marginHorizontal: 0,
+  },
+  optionText: {
+    fontSize: 16,
+    marginLeft: 10,
+    color: '#2D5783',
+  },
+  previewImage: {
+    width: '100%',
+    height: 200,
+    borderRadius: 8,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  cropButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    width: '100%',
+  },
+  cropButton: {
+    backgroundColor: '#2D5783',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    flex: 1,
+    marginHorizontal: 5,
+  },
+  useAsIsButton: {
+    backgroundColor: '#4FE7AF',
+  },
+  cropButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

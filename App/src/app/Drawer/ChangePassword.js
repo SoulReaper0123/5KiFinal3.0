@@ -9,6 +9,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { auth } from '../../firebaseConfig';
@@ -27,6 +28,9 @@ const ChangePassword = () => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
 
   const validatePassword = (password) => {
     const minLength = password.length >= 8;
@@ -67,8 +71,9 @@ const ChangePassword = () => {
     // Update password
     await auth.currentUser.updatePassword(newPassword);
     
-    Alert.alert('Success', 'Password changed successfully!');
-    navigation.goBack();
+    setAlertMessage('Password changed successfully!');
+    setAlertType('success');
+    setAlertModalVisible(true);
   } catch (error) {
     console.error('Password change error:', error);
     
@@ -87,7 +92,9 @@ const ChangePassword = () => {
         errorMessage = 'An error occurred. Please try again.';
     }
     
-    Alert.alert('Error', errorMessage);
+    setAlertMessage(errorMessage);
+    setAlertType('error');
+    setAlertModalVisible(true);
   } finally {
     setLoading(false);
   }
@@ -265,6 +272,19 @@ const ChangePassword = () => {
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Custom Alert Modal */}
+      <CustomModal
+        visible={alertModalVisible}
+        onClose={() => {
+          setAlertModalVisible(false);
+          if (alertType === 'success') {
+            navigation.goBack();
+          }
+        }}
+        message={alertMessage}
+        type={alertType}
+      />
     </View>
   );
 };
@@ -338,20 +358,22 @@ const styles = StyleSheet.create({
     color: 'green',
   },
   changeButton: {
-    backgroundColor: '#6C63FF',
-    borderRadius: 5,
-    paddingVertical: 15,
-    justifyContent: 'center',
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   disabledButton: {
     backgroundColor: '#cccccc',
   },
   changeButtonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
 });
 

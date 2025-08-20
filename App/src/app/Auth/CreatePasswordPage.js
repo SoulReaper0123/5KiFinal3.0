@@ -29,6 +29,7 @@ const CreatePasswordPage = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [pendingApiData, setPendingApiData] = useState(null);
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -190,12 +191,10 @@ const CreatePasswordPage = () => {
         password: password
       };
 
-      setSuccessModalVisible(true);
+      // Store API data to be used when user clicks OK
+      setPendingApiData(apiData);
       
-      // Make API call in background
-      registerUser(apiData)
-        .then(() => console.log('Registration API call completed'))
-        .catch(err => console.error('API error:', err));
+      setSuccessModalVisible(true);
       
     } catch (error) {
       console.error('Registration error:', error);
@@ -206,8 +205,22 @@ const CreatePasswordPage = () => {
     }
   };
 
-  const handleSuccessOk = () => {
+  const handleSuccessOk = async () => {
     setSuccessModalVisible(false);
+    
+    // Run API call when user clicks OK
+    if (pendingApiData) {
+      try {
+        await registerUser(pendingApiData);
+        console.log('Registration API call completed successfully after user clicked OK');
+      } catch (apiError) {
+        console.error('API call failed after user clicked OK:', apiError);
+        // API failure doesn't affect user experience since data is already in database
+      }
+      // Clear pending data
+      setPendingApiData(null);
+    }
+    
     navigation.navigate('Login');
   };
 
@@ -310,6 +323,10 @@ const CreatePasswordPage = () => {
                 />
               </TouchableOpacity>
             </View>
+            {/* Password mismatch error */}
+            {confirmPassword && password && password !== confirmPassword && (
+              <Text style={styles.errorText}>Passwords do not match</Text>
+            )}
           </View>
 
           <View style={styles.checkboxContainer}>
@@ -496,6 +513,11 @@ const styles = StyleSheet.create({
   required: {
     color: 'red',
   },
+  errorText: {
+    color: 'red',
+    fontSize: 14,
+    marginTop: 5,
+  },
   checkboxContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -568,6 +590,12 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#2C5282',
+  },
+  errorText: {
+    color: '#ff0000',
+    fontSize: 14,
+    marginTop: 5,
+    marginLeft: 5,
   },
 });
 

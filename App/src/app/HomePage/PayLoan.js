@@ -4,6 +4,7 @@ import {
   TouchableOpacity, Alert, ScrollView, Image, 
   ActivityIndicator, Modal, BackHandler, KeyboardAvoidingView, Platform
 } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -34,6 +35,10 @@ const PayLoan = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [pendingApiData, setPendingApiData] = useState(null);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
   const [paymentAccounts, setPaymentAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
@@ -45,12 +50,40 @@ const PayLoan = () => {
   ];
 
   useEffect(() => {
-    const user = auth.currentUser;
-    if (user) {
-      fetchUserData(user.email);
-    } else if (route.params?.user) {
-      fetchUserData(route.params.user.email);
-    }
+    const initializeUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const userEmail = user ? user.email : route.params?.user?.email;
+        
+        if (userEmail) {
+          setEmail(userEmail);
+          
+          // If user data is passed via navigation (from fingerprint auth), use it
+          if (route.params?.user) {
+            const userData = route.params.user;
+            setMemberId(userData.memberId || '');
+            setFirstName(userData.firstName || '');
+            setBalance(userData.balance || 0);
+            // Still fetch fresh data from database for consistency
+            await fetchUserData(userEmail);
+          } else {
+            // Fallback to database lookup
+            await fetchUserData(userEmail);
+          }
+        } else {
+          setAlertMessage('Unable to identify user. Please log in again.');
+          setAlertType('error');
+          setAlertModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Error initializing user data:', error);
+        setAlertMessage('Error loading user information.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+      }
+    };
+
+    initializeUserData();
     fetchPaymentSettings();
   }, [route.params]);
 
@@ -214,14 +247,16 @@ const PayLoan = () => {
 
   const handleSubmit = async () => {
     if (!paymentOption || !amountToBePaid || !proofOfPayment) {
-      setErrorMessage('All fields are required');
-      setErrorModalVisible(true);
+      setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
     if (isNaN(amountToBePaid) || parseFloat(amountToBePaid) <= 0) {
-      setErrorMessage('Please enter a valid amount');
-      setErrorModalVisible(true);
+      setAlertMessage('Please enter a valid amount');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
@@ -237,6 +272,7 @@ const PayLoan = () => {
       const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
       await storePaymentDataInDatabase(proofOfPaymentUrl);
 
+      // Prepare payment data for API call to run when user clicks OK
       const paymentData = {
         email,
         firstName,
@@ -244,16 +280,15 @@ const PayLoan = () => {
         amount: parseFloat(amountToBePaid),
         paymentMethod: paymentOption,
         date: new Date().toISOString(),
-        interestPaid: interest,
-        principalPaid: parseFloat(amountToBePaid) - interest,
-        isLoanPayment: true
       };
 
-      const response = await MemberPayment(paymentData);
-      console.log('Payment API response:', response);
+      // Store payment data to be used when user clicks OK
+      setPendingApiData(paymentData);
 
       // Show success modal
-      setSuccessModalVisible(true);
+      setAlertMessage('Your loan payment has been submitted successfully. It will be processed shortly.');
+      setAlertType('success');
+      setAlertModalVisible(true);
     } catch (error) {
       console.error('Error during payment submission:', {
         error: error.message,
@@ -265,8 +300,9 @@ const PayLoan = () => {
         }
       });
       
-      setErrorMessage('Payment was recorded but email notification failed. Please check your email later.');
-      setErrorModalVisible(true);
+      setAlertMessage('An unexpected error occurred. Please try again later.');
+      setAlertType('error');
+      setAlertModalVisible(true);
     } finally {
       setIsLoading(false);
     }
@@ -278,6 +314,7 @@ const PayLoan = () => {
     setAccountName('');
     setAmountToBePaid('');
     setProofOfPayment(null);
+    setPendingApiData(null);
   };
 
   const formatCurrency = (amount) => {
@@ -441,6 +478,35 @@ const PayLoan = () => {
           </View>
         </View>
       )}
+
+      {/* Custom Alert Modal */}
+      <CustomModal
+        visible={alertModalVisible}
+        type={alertType}
+        title={alertType === 'success' ? 'Success' : 'Error'}
+        message={alertMessage}
+        onClose={() => {
+          setAlertModalVisible(false);
+          if (alertType === 'success' && pendingApiData) {
+            // Navigate immediately and run API in background
+            resetFormFields();
+            navigation.navigate('Home');
+            
+            // Run API call in background after navigation
+            setTimeout(async () => {
+              try {
+                await MemberPayment(pendingApiData);
+                console.log('Payment API call completed successfully in background');
+              } catch (apiError) {
+                console.error('Background API call failed:', apiError);
+                // API failure doesn't affect user experience since data is already in database
+              }
+              // Clear pending data
+              setPendingApiData(null);
+            }, 100);
+          }
+        }}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -527,15 +593,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   submitButton: {
-    backgroundColor: '#2D5783',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
+    marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   submitButtonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalContainer: {
     flex: 1,

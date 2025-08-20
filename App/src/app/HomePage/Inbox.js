@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -18,6 +20,8 @@ export default function Inbox() {
   const route = useRoute();
   const [messages, setMessages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
   
   // State for email
   const [userEmail, setUserEmail] = useState(null);
@@ -28,6 +32,7 @@ export default function Inbox() {
       try {
         // Try to get email from different sources
         const routeEmail = route.params?.email;
+        const routeUserEmail = route.params?.user?.email;
         const parentRouteEmail = navigation.getParent()?.getState()?.routes?.[0]?.params?.email;
         const authEmail = auth.currentUser?.email;
         
@@ -40,10 +45,11 @@ export default function Inbox() {
         }
         
         // Use the first available email
-        const email = routeEmail || parentRouteEmail || authEmail || storedEmail;
+        const email = routeEmail || routeUserEmail || parentRouteEmail || authEmail || storedEmail;
         
         console.log('Inbox - Using email:', email, 'from sources:', { 
           routeEmail, 
+          routeUserEmail,
           parentRouteEmail, 
           authEmail, 
           storedEmail 
@@ -229,21 +235,100 @@ export default function Inbox() {
     }
   }, [userEmail]);
 
+  const handleMessagePress = (message) => {
+    setSelectedMessage(message);
+    setModalVisible(true);
+  };
+
+  const formatDisplayTime = (displayDate) => {
+    if (!displayDate || displayDate === 'Pending approval' || displayDate === 'Reminder') {
+      return displayDate;
+    }
+    try {
+      const date = new Date(displayDate);
+      return date.toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    } catch {
+      return displayDate;
+    }
+  };
+
   const renderItem = ({ item }) => (
-  <View style={[styles.card, { borderLeftWidth: 5, borderLeftColor: item.color }]}>
-    <MaterialIcons name={item.icon} size={32} color={item.color} style={styles.icon} />
-    <View style={styles.textContainer}>
-      <Text style={styles.title}>{item.title} - {item.status.toUpperCase()}</Text>
-      <Text style={styles.message}>{item.message}</Text>
-      {item.status === 'rejected' && (
-        <Text style={styles.rejectionReason}>Reason: {item.rejectionReason}</Text>
-      )}
-      {item.displayDate !== 'Pending approval' && (
-        <Text style={styles.time}>{item.displayDate}</Text>  // Removed the labels here
-      )}
-    </View>
-  </View>
-);
+    <TouchableOpacity 
+      style={[styles.compactCard, { borderLeftWidth: 4, borderLeftColor: item.color }]}
+      onPress={() => handleMessagePress(item)}
+    >
+      <View style={styles.iconContainer}>
+        <MaterialIcons name={item.icon} size={24} color={item.color} />
+      </View>
+      <View style={styles.messageInfo}>
+        <Text style={styles.messageTitle} numberOfLines={1}>
+          {item.title} - {item.status.toUpperCase()}
+        </Text>
+        <Text style={styles.messagePreview} numberOfLines={2}>
+          {item.message}
+        </Text>
+        <Text style={styles.messageTime}>
+          {formatDisplayTime(item.displayDate)}
+        </Text>
+      </View>
+      <View style={styles.statusIndicator}>
+        <MaterialIcons name="chevron-right" size={20} color="#666" />
+      </View>
+    </TouchableOpacity>
+  );
+
+  const renderMessageModal = () => {
+    if (!selectedMessage) return null;
+
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalTitleContainer}>
+                <MaterialIcons name={selectedMessage.icon} size={24} color={selectedMessage.color} />
+                <Text style={styles.modalTitle}>{selectedMessage.title}</Text>
+              </View>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <MaterialIcons name="close" size={24} color="#666" />
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView style={styles.modalContent}>
+              <View style={styles.statusBadge}>
+                <Text style={[styles.statusText, { color: selectedMessage.color }]}>
+                  {selectedMessage.status.toUpperCase()}
+                </Text>
+              </View>
+              
+              <Text style={styles.modalMessage}>{selectedMessage.message}</Text>
+              
+              {selectedMessage.status === 'rejected' && (
+                <View style={styles.rejectionContainer}>
+                  <Text style={styles.rejectionTitle}>Rejection Reason:</Text>
+                  <Text style={styles.rejectionReason}>{selectedMessage.rejectionReason}</Text>
+                </View>
+              )}
+              
+              <View style={styles.dateContainer}>
+                <Text style={styles.dateLabel}>Date:</Text>
+                <Text style={styles.dateValue}>{selectedMessage.displayDate}</Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   return (
     <View style={styles.container}>
@@ -262,9 +347,11 @@ export default function Inbox() {
           data={messages}
           renderItem={renderItem}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ paddingBottom: 20, paddingTop: 10 }}
+          contentContainerStyle={{ paddingBottom: 20, paddingTop: 10, paddingHorizontal: 15 }}
         />
       )}
+
+      {renderMessageModal()}
     </View>
   );
 }
@@ -272,7 +359,7 @@ export default function Inbox() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffffff',
+    backgroundColor: '#f5f5f5',
     paddingTop: 50,
   },
   backButton: {
@@ -288,46 +375,140 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
   },
-  card: {
+  compactCard: {
     flexDirection: 'row',
-    backgroundColor: '#d3e8fdff',
+    backgroundColor: 'white',
     borderRadius: 8,
-    padding: 15,
-    marginHorizontal: 20,
-    marginBottom: 10,
+    padding: 16,
+    marginBottom: 8,
     alignItems: 'center',
-    elevation: 2,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
-  icon: {
-    marginRight: 15,
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
   },
-  textContainer: {
-    flexShrink: 1,
+  messageInfo: {
+    flex: 1,
   },
-  title: {
+  messageTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  message: {
-    fontSize: 14,
+    fontWeight: '600',
     color: '#333',
     marginBottom: 4,
   },
-  rejectionReason: {
-    fontSize: 13,
-    color: '#E53935',
-    fontStyle: 'italic',
-    marginBottom: 4,
-  },
-  time: {
-    fontSize: 12,
+  messagePreview: {
+    fontSize: 14,
     color: '#666',
+    marginBottom: 4,
+    lineHeight: 18,
+  },
+  messageTime: {
+    fontSize: 12,
+    color: '#999',
+  },
+  statusIndicator: {
+    marginLeft: 8,
   },
   noMessagesText: {
     marginTop: 30,
     textAlign: 'center',
     fontSize: 16,
     color: '#666',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    width: '90%',
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  modalTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+    marginLeft: 8,
+  },
+  modalContent: {
+    padding: 20,
+  },
+  statusBadge: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    alignSelf: 'flex-start',
+    marginBottom: 16,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#333',
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  rejectionContainer: {
+    backgroundColor: '#ffeaea',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffcccc',
+  },
+  rejectionTitle: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#c62828',
+    marginBottom: 4,
+  },
+  rejectionReason: {
+    fontSize: 14,
+    color: '#c62828',
+    fontStyle: 'italic',
+  },
+  dateContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+  },
+  dateLabel: {
+    fontSize: 14,
+    color: '#666',
+    fontWeight: '500',
+  },
+  dateValue: {
+    fontSize: 14,
+    color: '#333',
   },
 });

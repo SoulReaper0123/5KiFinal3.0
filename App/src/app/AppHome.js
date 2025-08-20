@@ -292,7 +292,15 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
                     if (label === 'Withdraw') {
                       setWithdrawModalVisible(true);
                     } else {
-                      navigation.navigate(route, { email });
+                      // Pass complete user data
+                      navigation.navigate(route, { 
+                        user: { 
+                          email, 
+                          memberId, 
+                          firstName,
+                          balance 
+                        } 
+                      });
                     }
                   }}
                 >
@@ -312,7 +320,14 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               style={styles.modalButton}
               onPress={() => {
                 setWithdrawModalVisible(false);
-                navigation.navigate('Withdraw', { email });
+                navigation.navigate('Withdraw', { 
+                  user: { 
+                    email, 
+                    memberId, 
+                    firstName,
+                    balance 
+                  } 
+                });
               }}
             >
               <Text style={styles.modalButtonText}>Withdraw Money</Text>
@@ -321,7 +336,14 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               style={styles.modalButton}
               onPress={() => {
                 setWithdrawModalVisible(false);
-                navigation.navigate('WithdrawMembership', { email });
+                navigation.navigate('WithdrawMembership', { 
+                  user: { 
+                    email, 
+                    memberId, 
+                    firstName,
+                    balance 
+                  } 
+                });
               }}
             >
               <Text style={styles.modalButtonText}>Withdraw Membership</Text>

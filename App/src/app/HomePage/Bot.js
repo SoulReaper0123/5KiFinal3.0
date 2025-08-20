@@ -94,47 +94,132 @@ export default function Bot() {
     getEmailAndLoadData();
   }, [route.params, navigation]);
   
-  // Function to load user loans
-  const loadUserLoans = async (email) => {
+  // Function to load user data (loans, deposits, payments, withdrawals)
+  const loadUserData = async (email) => {
     try {
+      const userData = {
+        loans: [],
+        deposits: [],
+        payments: [],
+        withdrawals: [],
+        memberInfo: null,
+        totalBalance: 0
+      };
+
+      // Get member info
+      const membersRef = dbRef(database, 'Members');
+      const membersSnapshot = await get(membersRef);
+      if (membersSnapshot.exists()) {
+        const membersData = membersSnapshot.val();
+        Object.keys(membersData).forEach(memberId => {
+          const member = membersData[memberId];
+          if (member && member.email === email) {
+            userData.memberInfo = { id: memberId, ...member };
+          }
+        });
+      }
+
+      // Get user loans
       const loansRef = dbRef(database, 'Loans/LoanApplications');
-      const snapshot = await get(loansRef);
-      
-      if (snapshot.exists()) {
-        const loansData = snapshot.val();
-        const userLoans = [];
-        
-        // Loop through all loans to find those matching the user's email
+      const loansSnapshot = await get(loansRef);
+      if (loansSnapshot.exists()) {
+        const loansData = loansSnapshot.val();
         Object.keys(loansData).forEach(memberId => {
           const memberLoans = loansData[memberId];
           if (memberLoans) {
             Object.keys(memberLoans).forEach(loanId => {
               const loan = memberLoans[loanId];
               if (loan && loan.email === email) {
-                userLoans.push({
-                  id: loanId,
-                  ...loan
-                });
+                userData.loans.push({ id: loanId, ...loan });
               }
             });
           }
         });
+      }
+
+      // Get user deposits
+      const depositsRef = dbRef(database, 'Deposits/DepositApplications');
+      const depositsSnapshot = await get(depositsRef);
+      if (depositsSnapshot.exists()) {
+        const depositsData = depositsSnapshot.val();
+        Object.keys(depositsData).forEach(memberId => {
+          const memberDeposits = depositsData[memberId];
+          if (memberDeposits) {
+            Object.keys(memberDeposits).forEach(depositId => {
+              const deposit = memberDeposits[depositId];
+              if (deposit && deposit.email === email) {
+                userData.deposits.push({ id: depositId, ...deposit });
+                if (deposit.status === 'approved') {
+                  userData.totalBalance += parseFloat(deposit.depositAmount) || 0;
+                }
+              }
+            });
+          }
+        });
+      }
+
+      // Get user payments
+      const paymentsRef = dbRef(database, 'Payments/PaymentApplications');
+      const paymentsSnapshot = await get(paymentsRef);
+      if (paymentsSnapshot.exists()) {
+        const paymentsData = paymentsSnapshot.val();
+        Object.keys(paymentsData).forEach(memberId => {
+          const memberPayments = paymentsData[memberId];
+          if (memberPayments) {
+            Object.keys(memberPayments).forEach(paymentId => {
+              const payment = memberPayments[paymentId];
+              if (payment && payment.email === email) {
+                userData.payments.push({ id: paymentId, ...payment });
+              }
+            });
+          }
+        });
+      }
+
+      // Get user withdrawals
+      const withdrawalsRef = dbRef(database, 'Withdraws/WithdrawApplications');
+      const withdrawalsSnapshot = await get(withdrawalsRef);
+      if (withdrawalsSnapshot.exists()) {
+        const withdrawalsData = withdrawalsSnapshot.val();
+        Object.keys(withdrawalsData).forEach(memberId => {
+          const memberWithdrawals = withdrawalsData[memberId];
+          if (memberWithdrawals) {
+            Object.keys(memberWithdrawals).forEach(withdrawalId => {
+              const withdrawal = memberWithdrawals[withdrawalId];
+              if (withdrawal && withdrawal.email === email) {
+                userData.withdrawals.push({ id: withdrawalId, ...withdrawal });
+                if (withdrawal.status === 'approved') {
+                  userData.totalBalance -= parseFloat(withdrawal.withdrawAmount) || 0;
+                }
+              }
+            });
+          }
+        });
+      }
+
+      return userData;
+    } catch (error) {
+      console.log('Error loading user data:', error);
+      return null;
+    }
+  };
+
+  // Function to load user loans (keeping for backward compatibility)
+  const loadUserLoans = async (email) => {
+    try {
+      const userData = await loadUserData(email);
+      if (userData && userData.loans.length > 0) {
+        const loanInfo = userData.loans.map(loan => 
+          `Loan ID: ${loan.id}, Amount: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
+        ).join('\n');
         
-        // Add user loans to the context for the AI
-        if (userLoans.length > 0) {
-          const loanInfo = userLoans.map(loan => 
-            `Loan ID: ${loan.id}, Amount: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
-          ).join('\n');
-          
-          // Add a message about the loans
-          const botMessage = {
-            id: Date.now().toString() + '-bot-loans',
-            sender: 'bot',
-            text: `I see you have ${userLoans.length} loan(s) in our system. Here are the details:\n\n${loanInfo}`,
-          };
-          
-          setMessages(prev => [...prev, botMessage]);
-        }
+        const botMessage = {
+          id: Date.now().toString() + '-bot-loans',
+          sender: 'bot',
+          text: `I see you have ${userData.loans.length} loan(s) in our system. Here are the details:\n\n${loanInfo}`,
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
       }
     } catch (error) {
       console.log('Error loading user loans:', error);
@@ -249,12 +334,48 @@ export default function Bot() {
       try {
         console.log('Sending query to Gemini API...');
         
+        // Get user data for context
+        const userData = await loadUserData(userEmail);
+        let userDataContext = '';
+        
+        if (userData) {
+          userDataContext = `
+          
+User Account Information:
+- Member ID: ${userData.memberInfo?.id || 'N/A'}
+- Name: ${userData.memberInfo?.firstName || ''} ${userData.memberInfo?.lastName || ''}
+- Email: ${userData.memberInfo?.email || userEmail}
+- Current Balance: ₱${userData.totalBalance.toFixed(2)}
+- Total Loans: ${userData.loans.length}
+- Total Deposits: ${userData.deposits.length}
+- Total Payments: ${userData.payments.length}
+- Total Withdrawals: ${userData.withdrawals.length}
+
+Recent Loans:
+${userData.loans.slice(0, 3).map(loan => 
+  `- Loan ID: ${loan.id}, Amount: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
+).join('\n') || '- No loans found'}
+
+Recent Deposits:
+${userData.deposits.slice(0, 3).map(deposit => 
+  `- Deposit ID: ${deposit.id}, Amount: ₱${deposit.depositAmount}, Status: ${deposit.status}, Date: ${deposit.dateApplied}`
+).join('\n') || '- No deposits found'}
+
+Recent Payments:
+${userData.payments.slice(0, 3).map(payment => 
+  `- Payment ID: ${payment.id}, Amount: ₱${payment.paymentAmount}, Status: ${payment.status}, Date: ${payment.dateApplied}`
+).join('\n') || '- No payments found'}
+          `;
+        }
+        
         // Get context for the AI
-        const context = `You are a helpful banking assistant for a mobile banking app. 
+        const context = `You are a helpful banking assistant for a mobile banking app called 5KI Financial Services. 
         The user's email is ${userEmail || 'not provided'}. 
-        Provide concise, accurate information about banking services, loans, deposits, withdrawals, and account management.
-        If you don't know something specific about the user's account, suggest where they can find that information in the app.
-        Keep responses under 150 words and focus on being helpful.`;
+        You have access to their account information and can answer questions about their specific account details.
+        Provide concise, accurate information about their banking services, loans, deposits, withdrawals, and account management.
+        Use the provided account data to answer specific questions about their balance, transactions, loan status, etc.
+        Keep responses under 200 words and focus on being helpful and accurate.
+        Always use Philippine Peso (₱) for currency formatting.${userDataContext}`;
         
         // Generate AI response
         const prompt = `${context}\n\nUser question: ${userQuery}`;

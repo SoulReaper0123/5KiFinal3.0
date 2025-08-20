@@ -340,19 +340,24 @@ const loadChat = (chatId) => {
 
   const getProjectContext = () => {
     return `
-You are an AI assistant for a financial management system with the following structure:
+You are an AI assistant for 5KI Financial Services management system with comprehensive database access.
 
 DATABASE COLLECTIONS (Firebase Realtime Database):
-- users: User registrations and profiles
-- loans: Loan applications and approvals
-- deposits: Deposit applications and records
-- withdraws: Withdrawal requests and approvals
-- payments: Payment records and applications
-- transactions: All financial transactions
-- admins: Admin user management
+- Members: User registrations and profiles
+- Loans/LoanApplications: Loan applications and approvals
+- Deposits/DepositApplications: Deposit applications and records
+- Withdraws/WithdrawApplications: Withdrawal requests and approvals
+- Payments/PaymentApplications: Payment records and applications
+
+CAPABILITIES:
+- I can access real-time data from the Firebase database
+- I can provide statistics on members, loans, deposits, payments, and withdrawals
+- I can look up specific member information by email address
+- I can calculate totals, counts, and financial summaries
+- I can provide detailed breakdowns by status (pending, approved, rejected)
 
 MAIN SECTIONS:
-- Dashboard: Analytics and overview
+- Dashboard: Analytics and overview with real-time data
 - Registrations: User membership management
 - Deposits: Deposit applications and approvals
 - Loans: Loan applications and management
@@ -364,7 +369,14 @@ MAIN SECTIONS:
 
 CURRENT ACTIVE SECTION: ${activeSection}
 
-The system uses React.js frontend with Firebase backend. All data is stored in Firebase Realtime Database.
+QUERY EXAMPLES I CAN HANDLE:
+- "How many members do we have?"
+- "What's the total loan amount?"
+- "Show me statistics for john@example.com"
+- "How many pending deposits are there?"
+- "What's our available funds?"
+
+The system uses React.js frontend with Firebase Realtime Database. All amounts are in Philippine Peso (₱).
 `;
   };
 
@@ -553,41 +565,322 @@ const handleAIQuery = async (userMessage) => {
   }
 };
 
+// Helper function to get specific member data
+const getMemberData = async (email) => {
+  try {
+    const membersSnapshot = await database.ref('Members').once('value');
+    const membersData = membersSnapshot.val();
+    
+    if (!membersData) return null;
+    
+    // Find member by email
+    let memberInfo = null;
+    let memberId = null;
+    
+    Object.keys(membersData).forEach(id => {
+      const member = membersData[id];
+      if (member && member.email && member.email.toLowerCase() === email.toLowerCase()) {
+        memberInfo = { id, ...member };
+        memberId = id;
+      }
+    });
+    
+    if (!memberInfo) return null;
+    
+    // Get member's transactions
+    const memberData = {
+      info: memberInfo,
+      loans: [],
+      deposits: [],
+      payments: [],
+      withdrawals: [],
+      totalBalance: 0
+    };
+    
+    // Get loans
+    const loansSnapshot = await database.ref(`Loans/LoanApplications/${memberId}`).once('value');
+    const loansData = loansSnapshot.val();
+    if (loansData) {
+      memberData.loans = Object.keys(loansData).map(loanId => ({
+        id: loanId,
+        ...loansData[loanId]
+      }));
+    }
+    
+    // Get deposits
+    const depositsSnapshot = await database.ref(`Deposits/DepositApplications/${memberId}`).once('value');
+    const depositsData = depositsSnapshot.val();
+    if (depositsData) {
+      memberData.deposits = Object.keys(depositsData).map(depositId => ({
+        id: depositId,
+        ...depositsData[depositId]
+      }));
+      
+      // Calculate balance from approved deposits
+      memberData.deposits.forEach(deposit => {
+        if (deposit.status === 'approved') {
+          memberData.totalBalance += parseFloat(deposit.depositAmount) || 0;
+        }
+      });
+    }
+    
+    // Get payments
+    const paymentsSnapshot = await database.ref(`Payments/PaymentApplications/${memberId}`).once('value');
+    const paymentsData = paymentsSnapshot.val();
+    if (paymentsData) {
+      memberData.payments = Object.keys(paymentsData).map(paymentId => ({
+        id: paymentId,
+        ...paymentsData[paymentId]
+      }));
+    }
+    
+    // Get withdrawals
+    const withdrawalsSnapshot = await database.ref(`Withdraws/WithdrawApplications/${memberId}`).once('value');
+    const withdrawalsData = withdrawalsSnapshot.val();
+    if (withdrawalsData) {
+      memberData.withdrawals = Object.keys(withdrawalsData).map(withdrawalId => ({
+        id: withdrawalId,
+        ...withdrawalsData[withdrawalId]
+      }));
+      
+      // Subtract approved withdrawals from balance
+      memberData.withdrawals.forEach(withdrawal => {
+        if (withdrawal.status === 'approved') {
+          memberData.totalBalance -= parseFloat(withdrawal.withdrawAmount) || 0;
+        }
+      });
+    }
+    
+    return memberData;
+  } catch (error) {
+    console.error('Error getting member data:', error);
+    return null;
+  }
+};
+
 // Helper function to fetch relevant data
 const fetchRelevantData = async (userMessage) => {
-  if (!userMessage.toLowerCase().includes('data') && 
-      !userMessage.toLowerCase().includes('count') &&
-      !userMessage.toLowerCase().includes('how many')) {
+  const message = userMessage.toLowerCase();
+  
+  // Check if the message is asking for database information
+  const isDataQuery = message.includes('data') || message.includes('count') || 
+                     message.includes('how many') || message.includes('total') ||
+                     message.includes('member') || message.includes('loan') ||
+                     message.includes('deposit') || message.includes('payment') ||
+                     message.includes('withdraw') || message.includes('balance') ||
+                     message.includes('statistics') || message.includes('summary');
+
+  if (!isDataQuery) {
     return '';
   }
 
   try {
-    const collections = [];
-    if (userMessage.toLowerCase().includes('member')) collections.push('users');
-    if (userMessage.toLowerCase().includes('loan')) collections.push('loans');
-    if (userMessage.toLowerCase().includes('deposit')) collections.push('deposits');
+    // Check if asking for specific member data
+    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
+    const emailMatch = userMessage.match(emailRegex);
     
-    if (collections.length === 0) return '';
-    
-    let dataSummary = '\n\nCurrent System Data:';
-    
-    for (const collection of collections) {
-      const snapshot = await database.ref(collection).once('value');
-      const data = snapshot.val();
-      const count = data ? Object.keys(data).length : 0;
+    if (emailMatch) {
+      const email = emailMatch[0];
+      const memberData = await getMemberData(email);
       
-      dataSummary += `\n- ${collection.toUpperCase()}: ${count} records`;
-      
-      if (count > 0 && collection === 'loans') {
-        const loans = Object.values(data);
-        const statusCounts = loans.reduce((acc, loan) => {
-          acc[loan.status] = (acc[loan.status] || 0) + 1;
-          return acc;
-        }, {});
+      if (memberData) {
+        let memberSummary = `\n\nMember Data for ${email}:`;
+        memberSummary += `\n\n👤 MEMBER INFO:`;
+        memberSummary += `\n- Name: ${memberData.info.firstName || ''} ${memberData.info.lastName || ''}`;
+        memberSummary += `\n- Member ID: ${memberData.info.id}`;
+        memberSummary += `\n- Status: ${memberData.info.status || 'N/A'}`;
+        memberSummary += `\n- Current Balance: ₱${memberData.totalBalance.toLocaleString()}`;
         
-        dataSummary += ` (Pending: ${statusCounts.pending || 0}, Approved: ${statusCounts.approved || 0})`;
+        memberSummary += `\n\n💰 LOANS (${memberData.loans.length}):`;
+        if (memberData.loans.length > 0) {
+          memberData.loans.slice(0, 5).forEach(loan => {
+            memberSummary += `\n- ${loan.id}: ₱${loan.loanAmount} (${loan.status}) - ${loan.dateApplied}`;
+          });
+          if (memberData.loans.length > 5) {
+            memberSummary += `\n- ... and ${memberData.loans.length - 5} more loans`;
+          }
+        } else {
+          memberSummary += `\n- No loans found`;
+        }
+        
+        memberSummary += `\n\n💳 DEPOSITS (${memberData.deposits.length}):`;
+        if (memberData.deposits.length > 0) {
+          memberData.deposits.slice(0, 5).forEach(deposit => {
+            memberSummary += `\n- ${deposit.id}: ₱${deposit.depositAmount} (${deposit.status}) - ${deposit.dateApplied}`;
+          });
+          if (memberData.deposits.length > 5) {
+            memberSummary += `\n- ... and ${memberData.deposits.length - 5} more deposits`;
+          }
+        } else {
+          memberSummary += `\n- No deposits found`;
+        }
+        
+        memberSummary += `\n\n💸 PAYMENTS (${memberData.payments.length}):`;
+        if (memberData.payments.length > 0) {
+          memberData.payments.slice(0, 5).forEach(payment => {
+            memberSummary += `\n- ${payment.id}: ₱${payment.paymentAmount} (${payment.status}) - ${payment.dateApplied}`;
+          });
+          if (memberData.payments.length > 5) {
+            memberSummary += `\n- ... and ${memberData.payments.length - 5} more payments`;
+          }
+        } else {
+          memberSummary += `\n- No payments found`;
+        }
+        
+        return memberSummary;
+      } else {
+        return `\n\nMember with email ${email} not found in the system.`;
       }
     }
+    let dataSummary = '\n\nCurrent System Data Summary:';
+    
+    // Get Members data
+    const membersSnapshot = await database.ref('Members').once('value');
+    const membersData = membersSnapshot.val();
+    const totalMembers = membersData ? Object.keys(membersData).length : 0;
+    
+    // Get active/inactive members
+    let activeMembers = 0, inactiveMembers = 0;
+    if (membersData) {
+      Object.values(membersData).forEach(member => {
+        if (member.status === 'active') activeMembers++;
+        else inactiveMembers++;
+      });
+    }
+    
+    dataSummary += `\n\n📊 MEMBERS:`;
+    dataSummary += `\n- Total Members: ${totalMembers}`;
+    dataSummary += `\n- Active Members: ${activeMembers}`;
+    dataSummary += `\n- Inactive Members: ${inactiveMembers}`;
+
+    // Get Loans data
+    const loansSnapshot = await database.ref('Loans/LoanApplications').once('value');
+    const loansData = loansSnapshot.val();
+    let totalLoans = 0, pendingLoans = 0, approvedLoans = 0, rejectedLoans = 0;
+    let totalLoanAmount = 0;
+    
+    if (loansData) {
+      Object.values(loansData).forEach(memberLoans => {
+        if (memberLoans) {
+          Object.values(memberLoans).forEach(loan => {
+            totalLoans++;
+            if (loan.status === 'pending') pendingLoans++;
+            else if (loan.status === 'approved') approvedLoans++;
+            else if (loan.status === 'rejected') rejectedLoans++;
+            
+            if (loan.loanAmount) {
+              totalLoanAmount += parseFloat(loan.loanAmount) || 0;
+            }
+          });
+        }
+      });
+    }
+    
+    dataSummary += `\n\n💰 LOANS:`;
+    dataSummary += `\n- Total Loan Applications: ${totalLoans}`;
+    dataSummary += `\n- Pending: ${pendingLoans}`;
+    dataSummary += `\n- Approved: ${approvedLoans}`;
+    dataSummary += `\n- Rejected: ${rejectedLoans}`;
+    dataSummary += `\n- Total Loan Amount: ₱${totalLoanAmount.toLocaleString()}`;
+
+    // Get Deposits data
+    const depositsSnapshot = await database.ref('Deposits/DepositApplications').once('value');
+    const depositsData = depositsSnapshot.val();
+    let totalDeposits = 0, pendingDeposits = 0, approvedDeposits = 0, rejectedDeposits = 0;
+    let totalDepositAmount = 0;
+    
+    if (depositsData) {
+      Object.values(depositsData).forEach(memberDeposits => {
+        if (memberDeposits) {
+          Object.values(memberDeposits).forEach(deposit => {
+            totalDeposits++;
+            if (deposit.status === 'pending') pendingDeposits++;
+            else if (deposit.status === 'approved') approvedDeposits++;
+            else if (deposit.status === 'rejected') rejectedDeposits++;
+            
+            if (deposit.depositAmount) {
+              totalDepositAmount += parseFloat(deposit.depositAmount) || 0;
+            }
+          });
+        }
+      });
+    }
+    
+    dataSummary += `\n\n💳 DEPOSITS:`;
+    dataSummary += `\n- Total Deposit Applications: ${totalDeposits}`;
+    dataSummary += `\n- Pending: ${pendingDeposits}`;
+    dataSummary += `\n- Approved: ${approvedDeposits}`;
+    dataSummary += `\n- Rejected: ${rejectedDeposits}`;
+    dataSummary += `\n- Total Deposit Amount: ₱${totalDepositAmount.toLocaleString()}`;
+
+    // Get Payments data
+    const paymentsSnapshot = await database.ref('Payments/PaymentApplications').once('value');
+    const paymentsData = paymentsSnapshot.val();
+    let totalPayments = 0, pendingPayments = 0, approvedPayments = 0, rejectedPayments = 0;
+    let totalPaymentAmount = 0;
+    
+    if (paymentsData) {
+      Object.values(paymentsData).forEach(memberPayments => {
+        if (memberPayments) {
+          Object.values(memberPayments).forEach(payment => {
+            totalPayments++;
+            if (payment.status === 'pending') pendingPayments++;
+            else if (payment.status === 'approved') approvedPayments++;
+            else if (payment.status === 'rejected') rejectedPayments++;
+            
+            if (payment.paymentAmount) {
+              totalPaymentAmount += parseFloat(payment.paymentAmount) || 0;
+            }
+          });
+        }
+      });
+    }
+    
+    dataSummary += `\n\n💸 PAYMENTS:`;
+    dataSummary += `\n- Total Payment Applications: ${totalPayments}`;
+    dataSummary += `\n- Pending: ${pendingPayments}`;
+    dataSummary += `\n- Approved: ${approvedPayments}`;
+    dataSummary += `\n- Rejected: ${rejectedPayments}`;
+    dataSummary += `\n- Total Payment Amount: ₱${totalPaymentAmount.toLocaleString()}`;
+
+    // Get Withdrawals data
+    const withdrawalsSnapshot = await database.ref('Withdraws/WithdrawApplications').once('value');
+    const withdrawalsData = withdrawalsSnapshot.val();
+    let totalWithdrawals = 0, pendingWithdrawals = 0, approvedWithdrawals = 0, rejectedWithdrawals = 0;
+    let totalWithdrawalAmount = 0;
+    
+    if (withdrawalsData) {
+      Object.values(withdrawalsData).forEach(memberWithdrawals => {
+        if (memberWithdrawals) {
+          Object.values(memberWithdrawals).forEach(withdrawal => {
+            totalWithdrawals++;
+            if (withdrawal.status === 'pending') pendingWithdrawals++;
+            else if (withdrawal.status === 'approved') approvedWithdrawals++;
+            else if (withdrawal.status === 'rejected') rejectedWithdrawals++;
+            
+            if (withdrawal.withdrawAmount) {
+              totalWithdrawalAmount += parseFloat(withdrawal.withdrawAmount) || 0;
+            }
+          });
+        }
+      });
+    }
+    
+    dataSummary += `\n\n🏦 WITHDRAWALS:`;
+    dataSummary += `\n- Total Withdrawal Applications: ${totalWithdrawals}`;
+    dataSummary += `\n- Pending: ${pendingWithdrawals}`;
+    dataSummary += `\n- Approved: ${approvedWithdrawals}`;
+    dataSummary += `\n- Rejected: ${rejectedWithdrawals}`;
+    dataSummary += `\n- Total Withdrawal Amount: ₱${totalWithdrawalAmount.toLocaleString()}`;
+
+    // Calculate system totals
+    const totalFunds = totalDepositAmount - totalWithdrawalAmount;
+    const totalOutstanding = totalLoanAmount - totalPaymentAmount;
+    
+    dataSummary += `\n\n📈 SYSTEM TOTALS:`;
+    dataSummary += `\n- Available Funds: ₱${totalFunds.toLocaleString()}`;
+    dataSummary += `\n- Outstanding Loans: ₱${totalOutstanding.toLocaleString()}`;
+    dataSummary += `\n- Net Position: ₱${(totalFunds - totalOutstanding).toLocaleString()}`;
     
     return dataSummary;
   } catch (error) {

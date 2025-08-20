@@ -10,6 +10,7 @@ import {
   ScrollView,
   Modal 
 } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -32,6 +33,10 @@ const RegisterPage2 = () => {
     const [selectedImageUri, setSelectedImageUri] = useState(null);
     const [currentImageType, setCurrentImageType] = useState(null);
     const [currentSetFunction, setCurrentSetFunction] = useState(null);
+    // State for custom modal
+    const [modalVisible, setModalVisible] = useState(false);
+    const [modalMessage, setModalMessage] = useState('');
+    const [modalType, setModalType] = useState('error');
 
     useEffect(() => {
         if (route.params?.selfieWithId) {
@@ -70,7 +75,9 @@ const RegisterPage2 = () => {
             : await ImagePicker.requestMediaLibraryPermissionsAsync();
             
         if (status !== 'granted') {
-            Alert.alert('Permission denied', `We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+            setModalMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+            setModalType('error');
+            setModalVisible(true);
             return;
         }
 
@@ -103,7 +110,9 @@ const RegisterPage2 = () => {
             }
         } catch (error) {
             console.error('Error selecting image:', error);
-            Alert.alert('Error', 'Failed to select image');
+            setModalMessage('Failed to select image');
+            setModalType('error');
+            setModalVisible(true);
         }
     };
 
@@ -157,7 +166,9 @@ const RegisterPage2 = () => {
                                 }
                             } catch (error) {
                                 console.error('Error cropping image:', error);
-                                Alert.alert('Error', 'Failed to crop image');
+                                setModalMessage('Failed to crop image');
+                                setModalType('error');
+                                setModalVisible(true);
                                 setShowCropOptions(true);
                             }
                         },
@@ -166,13 +177,17 @@ const RegisterPage2 = () => {
             );
         } catch (error) {
             console.error('Error with crop:', error);
-            Alert.alert('Error', 'Failed to crop image');
+            setModalMessage('Failed to crop image');
+            setModalType('error');
+            setModalVisible(true);
         }
     };
 
     const handleNext = () => {
         if (!validIdFront || !validIdBack || !selfie || !selfieWithId) {
-            Alert.alert('Incomplete Information', 'Please upload all required images');
+            setModalMessage('Please upload all required images');
+            setModalType('error');
+            setModalVisible(true);
             return;
         }
 
@@ -411,6 +426,14 @@ const RegisterPage2 = () => {
                         </View>
                     </View>
                 </Modal>
+
+                {/* Custom Modal */}
+                <CustomModal
+                    visible={modalVisible}
+                    onClose={() => setModalVisible(false)}
+                    message={modalMessage}
+                    type={modalType}
+                />
             </View>
         </ScrollView>
     );
@@ -481,19 +504,21 @@ const styles = StyleSheet.create({
     },
     registerButton: {
         backgroundColor: '#4FE7AF',
-        borderRadius: 8,
+        borderRadius: 10,
         paddingVertical: 12,
         paddingHorizontal: 30,
         marginBottom: 40,
         alignItems: 'center',
-        width: '80%',
+        width: '50%',
+        alignSelf: 'center',
+        marginTop: 20,
     },
     disabledButton: {
         backgroundColor: '#cccccc',
     },
     registerButtonText: {
         color: 'black',
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: 'bold',
     },
     modalBackground: {

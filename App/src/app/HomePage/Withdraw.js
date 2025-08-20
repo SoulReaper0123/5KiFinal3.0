@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, ActivityIndicator, BackHandler } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -25,6 +26,10 @@ const Withdraw = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
+  const [pendingApiData, setPendingApiData] = useState(null);
 
   const withdrawOptions = [
     { key: 'GCash', label: 'GCash' },
@@ -45,10 +50,14 @@ const Withdraw = () => {
           setFirstName(foundUser.firstName || ''); // Fetch firstName
           setLastName(foundUser.lastName || '');   // Fetch lastName
         } else {
-          Alert.alert('Error', 'User not found');
+          setAlertMessage('User not found');
+          setAlertType('error');
+          setAlertModalVisible(true);
         }
       } else {
-        Alert.alert('Error', 'No members found');
+        setAlertMessage('No members found');
+        setAlertType('error');
+        setAlertModalVisible(true);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -58,14 +67,43 @@ const Withdraw = () => {
     setWithdrawOption('');
     setAccountNumber('');
     setWithdrawAmount('');
+    setPendingApiData(null);
   };
   useEffect(() => {
-    const user = auth.currentUser;
-    if (user) {
-      fetchUserData(user.email);
-    } else if (route.params?.user) {
-      fetchUserData(route.params.user.email);
-    }
+    const initializeUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const userEmail = user ? user.email : route.params?.user?.email;
+        
+        if (userEmail) {
+          setEmail(userEmail);
+          
+          // If user data is passed via navigation (from fingerprint auth), use it
+          if (route.params?.user) {
+            const userData = route.params.user;
+            setMemberId(userData.memberId || '');
+            setFirstName(userData.firstName || '');
+            setBalance(userData.balance || 0);
+            // Still fetch fresh data from database for consistency
+            await fetchUserData(userEmail);
+          } else {
+            // Fallback to database lookup
+            await fetchUserData(userEmail);
+          }
+        } else {
+          setAlertMessage('Unable to identify user. Please log in again.');
+          setAlertType('error');
+          setAlertModalVisible(true);
+        }
+      } catch (error) {
+        console.error('Error initializing user data:', error);
+        setAlertMessage('Error loading user information.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+      }
+    };
+
+    initializeUserData();
   }, [route.params]);
 
   useEffect(() => {
@@ -96,17 +134,23 @@ useEffect(() => {
 
  const handleSubmit = async () => {
   if (!withdrawOption || !accountName || !accountNumber || !withdrawAmount) {
-    Alert.alert('Error', 'All fields are required');
+    setAlertMessage('All fields are required');
+    setAlertType('error');
+    setAlertModalVisible(true);
     return;
   }
 
   if (isNaN(withdrawAmount) || parseFloat(withdrawAmount) <= 0) {
-    Alert.alert('Error', 'Please enter a valid amount');
+    setAlertMessage('Please enter a valid amount');
+    setAlertType('error');
+    setAlertModalVisible(true);
     return;
   }
 
   if (parseFloat(withdrawAmount) > balance) {
-    Alert.alert('Error', 'Insufficient balance');
+    setAlertMessage('Insufficient balance');
+    setAlertType('error');
+    setAlertModalVisible(true);
     return;
   }
 
@@ -124,6 +168,8 @@ useEffect(() => {
   
   const submitWithdrawal = async () => {
     setIsLoading(true);
+    setConfirmModalVisible(false);
+    
     try {
       const transactionId = generateTransactionId();
       const currentDate = new Date().toISOString();
@@ -153,31 +199,36 @@ useEffect(() => {
         status: 'Pending',
       };
 
-      // Save to Firebase
+      // Save to Firebase first
       const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
       await set(newWithdrawRef, withdrawalData);
 
-      // Make API call with correct field names
-      await MemberWithdraw({
+      // Prepare withdrawal data for API call to run when user clicks OK
+      const apiData = {
         email,
         firstName,
         lastName,
         amount: parseFloat(withdrawAmount),
         date: currentDate,
-        recipientAccount: accountNumber, // Matches backend expectation
-        referenceNumber: transactionId,  // Using transactionId as reference
-        withdrawOption,                  // Additional field for your records
-        accountName                      // Additional field for your records
-      });
+        recipientAccount: accountNumber,
+        referenceNumber: transactionId,
+        withdrawOption,
+        accountName
+      };
+
+      // Store withdrawal data to be used when user clicks OK
+      setPendingApiData(apiData);
 
       // Show success modal
-      setConfirmModalVisible(false);
-      setSuccessModalVisible(true);
+      setAlertMessage('Your withdrawal request has been submitted successfully. It will be processed shortly.');
+      setAlertType('success');
+      setAlertModalVisible(true);
+
     } catch (error) {
       console.error('Error during withdrawal submission:', error);
-      setErrorMessage('Failed to process withdrawal: ' + error.message);
-      setConfirmModalVisible(false);
-      setErrorModalVisible(true);
+      setAlertMessage('An unexpected error occurred. Please try again later.');
+      setAlertType('error');
+      setAlertModalVisible(true);
     } finally {
       setIsLoading(false);
     }
@@ -333,6 +384,34 @@ useEffect(() => {
           </View>
         </View>
       )}
+
+      {/* Custom Alert Modal */}
+      <CustomModal
+        visible={alertModalVisible}
+        onClose={() => {
+          setAlertModalVisible(false);
+          if (alertType === 'success' && pendingApiData) {
+            // Navigate immediately and run API in background
+            resetFormFields();
+            navigation.navigate('Home');
+            
+            // Run API call in background after navigation
+            setTimeout(async () => {
+              try {
+                await MemberWithdraw(pendingApiData);
+                console.log('Withdraw API call completed successfully in background');
+              } catch (apiError) {
+                console.error('Background API call failed:', apiError);
+                // API failure doesn't affect user experience since data is already in database
+              }
+              // Clear pending data
+              setPendingApiData(null);
+            }, 100);
+          }
+        }}
+        message={alertMessage}
+        type={alertType}
+      />
       </KeyboardAvoidingView>
   );
 };
@@ -401,16 +480,19 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   submitButton: {
-    backgroundColor: '#2D5783',
-    marginTop: 15,
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
+    marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   submitButtonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalContainer: {
     flex: 1,

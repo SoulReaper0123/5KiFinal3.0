@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
   BackHandler
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import CustomModal from '../../components/CustomModal';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { ref as dbRef, get, set } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
@@ -22,6 +23,7 @@ import { MemberWithdrawMembership } from '../../api';
 
 export default function WithdrawMembership() {
   const navigation = useNavigation();
+  const route = useRoute();
   const [form, setForm] = useState({
     email: '',
     firstName: '',
@@ -38,6 +40,10 @@ export default function WithdrawMembership() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [memberId, setMemberId] = useState('');
   const [isLoadingMember, setIsLoadingMember] = useState(false);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [emailError, setEmailError] = useState('');
   const [balance, setBalance] = useState(0);
   const [hasExistingLoan, setHasExistingLoan] = useState(false);
@@ -53,6 +59,50 @@ export default function WithdrawMembership() {
     const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
     return () => backHandler.remove();
   }, [navigation]);
+
+  useEffect(() => {
+    const initializeUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const userEmail = user ? user.email : route.params?.user?.email;
+        
+        if (userEmail) {
+          // If user data is passed via navigation (from fingerprint auth), use it
+          if (route.params?.user) {
+            const userData = route.params.user;
+            setMemberId(userData.memberId || '');
+            setBalance(userData.balance || 0);
+            
+            // Pre-fill form with user data
+            setForm(prev => ({
+              ...prev,
+              email: userEmail,
+              firstName: userData.firstName || '',
+            }));
+            
+            // Fetch complete member data
+            await fetchMemberData(userEmail);
+          } else {
+            // Set email and let user fetch their own data
+            setForm(prev => ({
+              ...prev,
+              email: userEmail
+            }));
+            
+            // Auto-fetch user data
+            await fetchMemberData(userEmail);
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing user data:', error);
+        setAlertMessage('Error loading user information.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+      }
+    };
+
+    initializeUserData();
+  }, [route.params]);
 
   const checkPendingWithdrawal = async (userId) => {
     try {
@@ -191,95 +241,91 @@ export default function WithdrawMembership() {
 
   const handleSubmit = async () => {
     if (!memberId) {
-      Alert.alert('Error', 'Please enter a valid member email first');
+      setAlertMessage('Please enter a valid member email first');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
     if (hasPendingWithdrawal) {
-      Alert.alert(
-        'Pending Withdrawal',
-        'You already have a pending withdrawal request. Please wait for it to be processed.',
-        [{ text: 'OK' }]
-      );
+      setAlertMessage('You already have a pending withdrawal request. Please wait for it to be processed.');
+      setAlertType('warning');
+      setAlertModalVisible(true);
       return;
     }
 
     if (!form.reason || (form.reason === 'Others' && !form.otherReason) || !agreed) {
-      Alert.alert('Incomplete Form', 'Please complete all required fields');
+      setAlertMessage('Please complete all required fields');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
     if (hasExistingLoan) {
-      Alert.alert(
-        'Existing Loan Detected',
-        'You cannot withdraw your membership while you have an active loan. Please settle your loan first.',
-        [{ text: 'OK' }]
-      );
+      setAlertMessage('You cannot withdraw your membership while you have an active loan. Please settle your loan first.');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
     const finalReason = form.reason === 'Others' ? form.otherReason : form.reason;
 
-    Alert.alert(
-      'Confirm Membership Withdrawal',
-      `You are about to submit a membership withdrawal request...`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            setIsSubmitting(true);
-            try {
-              const transactionId = generateTransactionId();
-              const currentDate = new Date().toISOString();
-              
-              const withdrawalData = {
-                transactionId,
-                memberId,
-                firstName: form.firstName,
-                lastName: form.lastName,
-                email: form.email,
-                address: form.address,
-                contact: form.contact,
-                dateJoined: form.joined,
-                reason: finalReason,
-                balance: balance,
-                date: currentDate,
-                hasExistingLoan
-              };
+    setConfirmModalVisible(true);
+  };
 
-              // Save to Firebase
-              const withdrawalRef = dbRef(database, `MembershipWithdrawal/PendingWithdrawals/${memberId}`);
-              await set(withdrawalRef, {
-                ...withdrawalData,
-                dateSubmitted: new Date().toLocaleString('en-US', {
-                  month: 'long',
-                  day: '2-digit',
-                  year: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                  hour12: false
-                }).replace(',', '')
-                  .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-                  .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
-                status: 'Pending'
-              });
+  const handleConfirmSubmit = async () => {
+    setConfirmModalVisible(false);
+    const finalReason = form.reason === 'Others' ? form.otherReason : form.reason;
+    setIsSubmitting(true);
+    try {
+      const transactionId = generateTransactionId();
+      const currentDate = new Date().toISOString();
+      
+      const withdrawalData = {
+        transactionId,
+        memberId,
+        firstName: form.firstName,
+        lastName: form.lastName,
+        email: form.email,
+        address: form.address,
+        contact: form.contact,
+        dateJoined: form.joined,
+        reason: finalReason,
+        balance: balance,
+        date: currentDate,
+        hasExistingLoan
+      };
 
-              // Send email notification
-              await MemberWithdrawMembership(withdrawalData);
-              
-              setModalVisible(true);
-              resetForm();
-            } catch (error) {
-              console.error('Error submitting withdrawal:', error);
-              Alert.alert('Error', 'Failed to submit withdrawal request');
-            } finally {
-              setIsSubmitting(false);
-            }
-          },
-        },
-      ]
-    );
+      // Save to Firebase
+      const withdrawalRef = dbRef(database, `MembershipWithdrawal/PendingWithdrawals/${memberId}`);
+      await set(withdrawalRef, {
+        ...withdrawalData,
+        dateSubmitted: new Date().toLocaleString('en-US', {
+          month: 'long',
+          day: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        }).replace(',', '')
+          .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+          .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+        status: 'Pending'
+      });
+
+      // Send email notification
+      await MemberWithdrawMembership(withdrawalData);
+      
+      setModalVisible(true);
+      resetForm();
+    } catch (error) {
+      console.error('Error submitting withdrawal:', error);
+      setAlertMessage('Failed to submit withdrawal request');
+      setAlertType('error');
+      setAlertModalVisible(true);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const generateTransactionId = () => {
@@ -499,6 +545,42 @@ export default function WithdrawMembership() {
               <Text style={styles.loadingModalText}>Submitting your request...</Text>
             </View>
           </Modal>
+
+          {/* Custom Alert Modal */}
+          <CustomModal
+            visible={alertModalVisible}
+            onClose={() => setAlertModalVisible(false)}
+            message={alertMessage}
+            type={alertType}
+          />
+
+          {/* Confirmation Modal */}
+          <Modal visible={confirmModalVisible} transparent animationType="fade">
+            <View style={styles.modalOverlay}>
+              <View style={[styles.modalView, { width: '80%' }]}>
+                <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 15 }]}>
+                  Confirm Membership Withdrawal
+                </Text>
+                <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+                  You are about to submit a membership withdrawal request. This action cannot be undone. Are you sure you want to proceed?
+                </Text>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+                  <TouchableOpacity 
+                    style={[styles.submitButton, { backgroundColor: '#cccccc', width: '45%' }]} 
+                    onPress={() => setConfirmModalVisible(false)}
+                  >
+                    <Text style={[styles.submitText, { color: 'black' }]}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[styles.submitButton, { width: '45%' }]} 
+                    onPress={handleConfirmSubmit}
+                  >
+                    <Text style={styles.submitText}>Confirm</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          </Modal>
         </SafeAreaView>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -591,11 +673,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   submitButton: {
-    backgroundColor: '#2D5783',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   submitButtonDisabled: {
     backgroundColor: '#cccccc',
@@ -604,9 +689,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#f44336',
   },
   submitText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalOverlay: {
     flex: 1,

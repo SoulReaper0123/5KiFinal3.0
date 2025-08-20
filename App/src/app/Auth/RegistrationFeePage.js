@@ -13,6 +13,7 @@ import {
   Platform,
   Modal
 } from 'react-native';
+import CustomModal from '../../components/CustomModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
@@ -38,6 +39,9 @@ const RegistrationFeePage = () => {
   // State for image selection and cropping
   const [showImageOptions, setShowImageOptions] = useState(false);
   const [showCropOptions, setShowCropOptions] = useState(false);
+  const [alertModalVisible, setAlertModalVisible] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState('error');
   const [selectedImageUri, setSelectedImageUri] = useState(null);
 
   const registrationData = route.params;
@@ -91,7 +95,9 @@ const RegistrationFeePage = () => {
       : await ImagePicker.requestMediaLibraryPermissionsAsync();
       
     if (status !== 'granted') {
-      Alert.alert('Permission denied', `We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+      setAlertMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
@@ -120,7 +126,9 @@ const RegistrationFeePage = () => {
       }
     } catch (error) {
       console.error('Error selecting image:', error);
-      Alert.alert('Error', 'Failed to select image');
+      setAlertMessage('Failed to select image');
+      setAlertType('error');
+      setAlertModalVisible(true);
     }
   };
 
@@ -165,7 +173,9 @@ const RegistrationFeePage = () => {
                 }
               } catch (error) {
                 console.error('Error cropping image:', error);
-                Alert.alert('Error', 'Failed to crop image');
+                setAlertMessage('Failed to crop image');
+                setAlertType('error');
+                setAlertModalVisible(true);
                 setShowCropOptions(true);
               }
             },
@@ -174,13 +184,17 @@ const RegistrationFeePage = () => {
       );
     } catch (error) {
       console.error('Error with crop:', error);
-      Alert.alert('Error', 'Failed to crop image');
+      setAlertMessage('Failed to crop image');
+      setAlertType('error');
+      setAlertModalVisible(true);
     }
   };
 
   const handleSubmit = () => {
     if (!paymentOption || !proofOfPayment) {
-      Alert.alert('Error', 'All fields are required');
+      setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
       return;
     }
 
@@ -268,7 +282,11 @@ const RegistrationFeePage = () => {
           </TouchableOpacity>
 
           <TouchableOpacity 
-            style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
+            style={[
+              styles.submitButton, 
+              isSubmitDisabled && styles.disabledButton,
+              { backgroundColor: isSubmitDisabled ? '#cccccc' : '#4FE7AF' }
+            ]} 
             onPress={handleSubmit}
             disabled={isSubmitDisabled}
           >
@@ -377,6 +395,15 @@ const RegistrationFeePage = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Alert Modal */}
+      <CustomModal
+        visible={alertModalVisible}
+        onClose={() => setAlertModalVisible(false)}
+        message={alertMessage}
+        type={alertType}
+        buttonText="OK"
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -448,16 +475,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   submitButton: {
-    backgroundColor: '#2D5783',
-    padding: 15,
-    borderRadius: 8,
+    backgroundColor: '#4FE7AF',
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
+    width: '50%',
+    alignSelf: 'center',
   },
   submitButtonText: {
-    color: 'white',
+    color: 'black',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 18,
   },
   modalOverlay: {
     position: 'absolute',
@@ -478,7 +508,6 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     backgroundColor: '#cccccc',
-    opacity: 0.6,
   },
   uploadPlaceholder: {
     alignItems: 'center',

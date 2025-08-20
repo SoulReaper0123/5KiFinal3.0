@@ -4,13 +4,14 @@ import {
   ScrollView, ActivityIndicator, BackHandler, Alert
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { ref as dbRef, get } from 'firebase/database';
 import { auth, database } from '../../firebaseConfig';
 import * as SecureStore from 'expo-secure-store';
 
 const ExistingLoan = () => {
   const navigation = useNavigation();
+  const route = useRoute();
   const [loanDetails, setLoanDetails] = useState(null);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +90,12 @@ const ExistingLoan = () => {
         const user = auth.currentUser;
         let userEmail = user?.email;
         
-        // If not available, try to get from SecureStore (for biometric login)
+        // Check if user data is passed via navigation (from fingerprint auth)
+        if (!userEmail && route.params?.user?.email) {
+          userEmail = route.params.user.email;
+        }
+        
+        // If still not available, try to get from SecureStore (for biometric login)
         if (!userEmail) {
           try {
             const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
@@ -114,7 +120,7 @@ const ExistingLoan = () => {
     };
     
     loadUserData();
-  }, []);
+  }, [route.params]);
 
   useEffect(() => {
     const backHandler = BackHandler.addEventListener(
