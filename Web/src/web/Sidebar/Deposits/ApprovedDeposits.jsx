@@ -484,25 +484,11 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
-              onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronLeft />
-            </button>
             <img
               src={currentImage.url}
               alt={currentImage.label}
               style={styles.largeImage}
             />
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
-              onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaChevronRight />
-            </button>
             <button 
               style={styles.imageViewerClose} 
               onClick={closeImageViewer}

@@ -15,20 +15,14 @@ import {
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { auth, database } from '../../firebaseConfig';
 import { ref as dbRef, get } from 'firebase/database';
+import { generateAIResponse, checkAIServiceStatus } from '../../services/firebaseAI';
 
-// Initialize Gemini AI with API key
-// Using a hardcoded API key for now
-const API_KEY = 'AIzaSyDPV6y1cgQMpOyJYKXIHeHXX0m6qIMrMZA';
-
-console.log('API Key available:', API_KEY ? 'Yes' : 'No');
-const genAI = new GoogleGenerativeAI(API_KEY);
-// Use gemini-1.5-flash to match AdminHome implementation
-const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Firebase AI is now initialized in the service
+console.log('Using Firebase AI with Gemini 2.0 Flash');
 
 export default function Bot() {
   const [messages, setMessages] = useState([
@@ -106,7 +100,7 @@ export default function Bot() {
         totalBalance: 0
       };
 
-      // Get member info
+      // Get member info and balance
       const membersRef = dbRef(database, 'Members');
       const membersSnapshot = await get(membersRef);
       if (membersSnapshot.exists()) {
@@ -115,11 +109,14 @@ export default function Bot() {
           const member = membersData[memberId];
           if (member && member.email === email) {
             userData.memberInfo = { id: memberId, ...member };
+            // Get the actual balance from the Members table
+            userData.totalBalance = parseFloat(member.balance) || 0;
+            console.log(`Found member ${memberId} with balance: ₱${userData.totalBalance}`);
           }
         });
       }
 
-      // Get user loans
+      // Get user loan applications
       const loansRef = dbRef(database, 'Loans/LoanApplications');
       const loansSnapshot = await get(loansRef);
       if (loansSnapshot.exists()) {
@@ -130,7 +127,26 @@ export default function Bot() {
             Object.keys(memberLoans).forEach(loanId => {
               const loan = memberLoans[loanId];
               if (loan && loan.email === email) {
-                userData.loans.push({ id: loanId, ...loan });
+                userData.loans.push({ id: loanId, memberId, ...loan });
+              }
+            });
+          }
+        });
+      }
+
+      // Get user current loans (approved loans)
+      const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+      const currentLoansSnapshot = await get(currentLoansRef);
+      if (currentLoansSnapshot.exists()) {
+        const currentLoansData = currentLoansSnapshot.val();
+        Object.keys(currentLoansData).forEach(memberId => {
+          const memberCurrentLoans = currentLoansData[memberId];
+          if (memberCurrentLoans && userData.memberInfo && userData.memberInfo.id === memberId) {
+            Object.keys(memberCurrentLoans).forEach(loanId => {
+              const currentLoan = memberCurrentLoans[loanId];
+              if (currentLoan) {
+                userData.currentLoans = userData.currentLoans || [];
+                userData.currentLoans.push({ id: loanId, memberId, ...currentLoan });
               }
             });
           }
@@ -149,9 +165,6 @@ export default function Bot() {
               const deposit = memberDeposits[depositId];
               if (deposit && deposit.email === email) {
                 userData.deposits.push({ id: depositId, ...deposit });
-                if (deposit.status === 'approved') {
-                  userData.totalBalance += parseFloat(deposit.depositAmount) || 0;
-                }
               }
             });
           }
@@ -188,9 +201,6 @@ export default function Bot() {
               const withdrawal = memberWithdrawals[withdrawalId];
               if (withdrawal && withdrawal.email === email) {
                 userData.withdrawals.push({ id: withdrawalId, ...withdrawal });
-                if (withdrawal.status === 'approved') {
-                  userData.totalBalance -= parseFloat(withdrawal.withdrawAmount) || 0;
-                }
               }
             });
           }
@@ -259,32 +269,27 @@ export default function Bot() {
   const [currentOptions, setCurrentOptions] = useState(initialOptions);
   const [currentContext, setCurrentContext] = useState('initial');
 
-  // Check if API key is valid
+  // Check if Firebase AI service is available
   useEffect(() => {
-    const checkApiKey = async () => {
-      console.log('Checking API key...');
+    const checkFirebaseAI = async () => {
+      console.log('Checking Firebase AI service...');
       try {
-        console.log('Testing connection to Gemini API...');
-        const result = await model.generateContent("Test connection");
-        const response = await result.response;
-        if (response) {
+        const status = await checkAIServiceStatus();
+        if (status.available) {
           setUseAI(true);
-          console.log('Gemini API connected successfully');
+          console.log('Firebase AI connected successfully:', status.model);
+        } else {
+          console.log('Firebase AI not available:', status.error);
+          setUseAI(false);
         }
       } catch (error) {
-        // Log a simplified error message without the full error details
-        console.log('Gemini API connection check failed - Will try to use AI anyway');
-        
-        // Still set useAI to true to allow the app to try using AI
-        // If it fails later, it will fall back to predefined responses
+        console.log('Firebase AI connection check failed - Will try to use AI anyway');
         setUseAI(true);
-        
-        // Only log that we're falling back to predefined responses if needed
-        console.log('Will attempt to use AI but may fall back to predefined responses');
+        console.log('Will attempt to use Firebase AI but may fall back to predefined responses');
       }
     };
     
-    checkApiKey();
+    checkFirebaseAI();
   }, []);
 
   const handleOptionSelect = (option) => {
@@ -336,64 +341,114 @@ export default function Bot() {
         
         // Get user data for context
         const userData = await loadUserData(userEmail);
+        console.log('Bot AI - User data loaded:', JSON.stringify(userData, null, 2));
         let userDataContext = '';
         
         if (userData) {
-          userDataContext = `
+          // Calculate approved deposits total
+          const approvedDeposits = userData.deposits.filter(d => d.status === 'approved');
+          const totalDeposited = approvedDeposits.reduce((sum, d) => sum + (parseFloat(d.depositAmount) || 0), 0);
           
-User Account Information:
-- Member ID: ${userData.memberInfo?.id || 'N/A'}
-- Name: ${userData.memberInfo?.firstName || ''} ${userData.memberInfo?.lastName || ''}
-- Email: ${userData.memberInfo?.email || userEmail}
-- Current Balance: ₱${userData.totalBalance.toFixed(2)}
-- Total Loans: ${userData.loans.length}
-- Total Deposits: ${userData.deposits.length}
-- Total Payments: ${userData.payments.length}
-- Total Withdrawals: ${userData.withdrawals.length}
+          // Calculate approved withdrawals total
+          const approvedWithdrawals = userData.withdrawals.filter(w => w.status === 'approved');
+          const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + (parseFloat(w.withdrawAmount) || 0), 0);
+          
+          // Calculate current loan balances
+          const currentLoanBalance = userData.currentLoans ? 
+            userData.currentLoans.reduce((sum, loan) => sum + (parseFloat(loan.remainingBalance) || parseFloat(loan.loanAmount) || 0), 0) : 0;
+          
+          userDataContext = `
 
-Recent Loans:
-${userData.loans.slice(0, 3).map(loan => 
-  `- Loan ID: ${loan.id}, Amount: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
-).join('\n') || '- No loans found'}
+PERSONAL ACCOUNT DATA (CONFIDENTIAL - Only for ${userData.memberInfo?.firstName || 'this user'}):
+===========================================
+Member Information:
+- Member ID: ${userData.memberInfo?.id || 'N/A'}
+- Full Name: ${userData.memberInfo?.firstName || ''} ${userData.memberInfo?.middleName || ''} ${userData.memberInfo?.lastName || ''}
+- Email: ${userData.memberInfo?.email || userEmail}
+- Phone: ${userData.memberInfo?.phoneNumber || 'Not provided'}
+- Address: ${userData.memberInfo?.address || 'Not provided'}
+
+Financial Summary:
+- Current Savings Balance: ₱${userData.totalBalance.toFixed(2)} (Real-time from database)
+- Total Deposited (Approved): ₱${totalDeposited.toFixed(2)}
+- Total Withdrawn (Approved): ₱${totalWithdrawn.toFixed(2)}
+- Current Loan Balance: ₱${currentLoanBalance.toFixed(2)}
+
+Account Activity:
+- Loan Applications: ${userData.loans.length} (All statuses)
+- Current Active Loans: ${userData.currentLoans?.length || 0}
+- Deposit Transactions: ${userData.deposits.length}
+- Withdrawal Transactions: ${userData.withdrawals.length}
+- Payment Transactions: ${userData.payments.length}
+
+Recent Loan Applications:
+${userData.loans.slice(-3).map(loan => 
+  `- Application ID: ${loan.transactionId || loan.id || 'N/A'}, Amount: ₱${loan.amount || 'N/A'}, Status: ${loan.status || 'N/A'}, Date: ${loan.dateApplied || 'N/A'}, Applicant: ${loan.firstName || 'N/A'} ${loan.lastName || 'N/A'}`
+).join('\n') || '- No loan applications'}
+
+Current Active Loans:
+${userData.currentLoans?.slice(-3).map(loan => 
+  `- Loan ID: ${loan.transactionId || loan.id || 'N/A'}, Original: ₱${loan.amount || loan.loanAmount || 'N/A'}, Remaining: ₱${loan.remainingBalance || loan.amount || 'N/A'}, Monthly Payment: ₱${loan.monthlyPayment || 'Not set'}`
+).join('\n') || '- No active loans'}
 
 Recent Deposits:
-${userData.deposits.slice(0, 3).map(deposit => 
-  `- Deposit ID: ${deposit.id}, Amount: ₱${deposit.depositAmount}, Status: ${deposit.status}, Date: ${deposit.dateApplied}`
+${userData.deposits.slice(-5).map(deposit => 
+  `- Amount: ₱${deposit.amountToBeDeposited || deposit.amount || 'N/A'}, Status: ${deposit.status || 'N/A'}, Date: ${deposit.dateApplied || 'N/A'}, Account: ${deposit.accountName || 'Not specified'} (${deposit.accountNumber || 'N/A'})`
 ).join('\n') || '- No deposits found'}
 
+Recent Withdrawals:
+${userData.withdrawals.slice(-5).map(withdrawal => 
+  `- Amount: ₱${withdrawal.amountWithdrawn || withdrawal.amount || 'N/A'}, Status: ${withdrawal.status || 'N/A'}, Date: ${withdrawal.dateApplied || 'N/A'}, Account: ${withdrawal.accountName || 'Not specified'} (${withdrawal.accountNumber || 'N/A'})`
+).join('\n') || '- No withdrawals found'}
+
 Recent Payments:
-${userData.payments.slice(0, 3).map(payment => 
-  `- Payment ID: ${payment.id}, Amount: ₱${payment.paymentAmount}, Status: ${payment.status}, Date: ${payment.dateApplied}`
+${userData.payments.slice(-5).map(payment => 
+  `- Amount: ₱${payment.amountToBePaid || payment.amount || 'N/A'}, Status: ${payment.status || 'N/A'}, Date: ${payment.dateApplied || 'N/A'}, Payment Option: ${payment.paymentOption || 'Not specified'}`
 ).join('\n') || '- No payments found'}
           `;
         }
         
         // Get context for the AI
-        const context = `You are a helpful banking assistant for a mobile banking app called 5KI Financial Services. 
-        The user's email is ${userEmail || 'not provided'}. 
-        You have access to their account information and can answer questions about their specific account details.
-        Provide concise, accurate information about their banking services, loans, deposits, withdrawals, and account management.
-        Use the provided account data to answer specific questions about their balance, transactions, loan status, etc.
-        Keep responses under 200 words and focus on being helpful and accurate.
-        Always use Philippine Peso (₱) for currency formatting.${userDataContext}`;
+        const context = `You are a secure banking assistant for 5KI Financial Services mobile app. 
+
+SECURITY RULES:
+- You can ONLY provide information about the account holder: ${userEmail || 'current user'}
+- NEVER provide information about other members or accounts
+- If asked about other accounts, respond: "I can only provide information about your own account for security reasons"
+- Always verify you're discussing the correct member ID: ${userData?.memberInfo?.id || 'N/A'}
+
+CAPABILITIES:
+- Answer questions about current account balance (from Members/${userData?.memberInfo?.id}/balance)
+- Provide savings information, deposits, and withdrawals
+- Provide loan information (applications and current loans)
+- Explain transaction history and payment records
+- Help with account inquiries and banking services
+- Calculate totals and provide financial summaries
+
+RESPONSE GUIDELINES:
+- Keep responses under 200 words
+- Use Philippine Peso (₱) formatting
+- Be accurate and helpful
+- Reference specific transaction IDs when relevant
+- Explain the difference between loan applications and current active loans
+
+${userDataContext}`;
         
-        // Generate AI response
+        // Generate AI response using Google AI
         const prompt = `${context}\n\nUser question: ${userQuery}`;
         
-        // Check if API key is available
-        if (!API_KEY || API_KEY.trim() === '') {
-          throw new Error('API_KEY_MISSING');
+        console.log('Sending query to Google AI...');
+        const result = await generateAIResponse(prompt, {
+          maxOutputTokens: 512,
+          temperature: 0.7
+        });
+        
+        if (!result.success) {
+          throw new Error(result.message || 'AI service unavailable');
         }
         
-        // Create a new instance for each request to avoid any potential issues
-        const genAI = new GoogleGenerativeAI(API_KEY);
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-        
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const aiResponse = response.text();
-        
-        console.log('Received response from Gemini API');
+        const aiResponse = result.text;
+        console.log('Received response from Google AI (Gemini 1.5 Flash)');
         
         const botMessage = {
           id: Date.now().toString() + '-bot',
@@ -416,14 +471,41 @@ ${userData.payments.slice(0, 3).map(payment =>
         }, 500);
       } catch (error) {
         // Log a simplified error message without the full error details
-        console.error('AI error occurred - Using fallback response');
+        console.log('Google AI quota limit reached - Using enhanced fallback response');
         
-        // Always use a friendly message regardless of the error
-        // Don't expose technical error details to the user
+        // Check if it's a quota error and provide helpful fallback
+        let fallbackText = '';
+        if (error.message && error.message.includes('quota')) {
+          fallbackText = `I've reached my daily AI limit, but I can still help you! 🤖
+
+📊 **Your Account Summary:**
+- Member ID: ${userData?.memberInfo?.id || 'N/A'}
+- Current Balance: ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+- Total Loans: ${userData?.loans?.length || 0}
+- Total Deposits: ${userData?.deposits?.length || 0}
+- Total Withdrawals: ${userData?.withdrawals?.length || 0}
+
+💡 **I can help with:**
+• Account balance inquiries
+• Recent transaction history  
+• Loan application status
+• Deposit and withdrawal information
+
+Please select from the options below or ask specific questions about your account!`;
+        } else {
+          fallbackText = `I'm temporarily having connection issues, but I can still help you! 🤖
+
+📊 **Your Account Summary:**
+- Member ID: ${userData?.memberInfo?.id || 'N/A'}
+- Current Balance: ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+
+Please try asking again or select from the available options below.`;
+        }
+        
         const botMessage = {
           id: Date.now().toString() + '-bot',
           sender: 'bot',
-          text: "I've reached my usage limit for the moment. Please try selecting one of the options below or try again later.",
+          text: fallbackText,
         };
         
         // Add a slight delay to make the response feel more natural
@@ -441,12 +523,47 @@ ${userData.payments.slice(0, 3).map(payment =>
         }, 500);
       }
     } else {
-      // Use predefined responses as fallback
-      setTimeout(() => {
+      // Use predefined responses with account data as fallback
+      setTimeout(async () => {
+        // Get user data for fallback responses
+        const userData = await loadUserData(userEmail);
+        
+        // Generate smart fallback response based on user query
+        let fallbackText = '';
+        const lowerQuery = userQuery.toLowerCase();
+        
+        if (lowerQuery.includes('balance') || lowerQuery.includes('money') || lowerQuery.includes('savings')) {
+          fallbackText = `💰 **Your Current Balance:** ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+
+This is your real-time balance from our database. For more detailed information, please select from the options below.`;
+        } else if (lowerQuery.includes('loan')) {
+          fallbackText = `🏦 **Your Loan Information:**
+- Total Loan Applications: ${userData?.loans?.length || 0}
+- Current Active Loans: ${userData?.currentLoans?.length || 0}
+
+For detailed loan information, please select "Loan Information" from the options below.`;
+        } else if (lowerQuery.includes('deposit')) {
+          fallbackText = `💳 **Your Deposit Information:**
+- Total Deposits: ${userData?.deposits?.length || 0}
+
+For detailed deposit information, please select "Deposit Questions" from the options below.`;
+        } else if (lowerQuery.includes('withdraw')) {
+          fallbackText = `💸 **Your Withdrawal Information:**
+- Total Withdrawals: ${userData?.withdrawals?.length || 0}
+
+For detailed withdrawal information, please select "Withdrawal Help" from the options below.`;
+        } else {
+          fallbackText = `I'm currently using basic responses. For better assistance, please select one of the options below:
+
+📊 **Quick Info:**
+- Your Balance: ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+- Member ID: ${userData?.memberInfo?.id || 'N/A'}`;
+        }
+        
         const botMessage = {
           id: Date.now().toString() + '-bot',
           sender: 'bot',
-          text: "I'm not sure I understand. Please select one of the options below for assistance.",
+          text: fallbackText,
         };
         setMessages(prev => [...prev, botMessage]);
         
@@ -462,10 +579,13 @@ ${userData.payments.slice(0, 3).map(payment =>
     }
   };
 
-  const generateBotResponse = (option) => {
+  const generateBotResponse = async (option) => {
     let reply = '';
     let nextOptions = [];
     let nextContext = currentContext;
+    
+    // Get user data for enhanced responses
+    const userData = await loadUserData(userEmail);
 
     switch (option.id) {
       // Main menu options
@@ -490,7 +610,18 @@ ${userData.payments.slice(0, 3).map(payment =>
         nextContext = 'initial';
         break;
       case '5':
-        reply = 'Your current balance can be viewed in your Account page. Would you like me to direct you there?';
+        reply = `💰 **Your Account Balance:**
+
+**Current Balance:** ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+**Member ID:** ${userData?.memberInfo?.id || 'N/A'}
+
+📊 **Account Summary:**
+- Total Loan Applications: ${userData?.loans?.length || 0}
+- Total Deposits: ${userData?.deposits?.length || 0}
+- Total Withdrawals: ${userData?.withdrawals?.length || 0}
+- Total Payments: ${userData?.payments?.length || 0}
+
+This balance is updated in real-time from our database. Is there anything else you'd like to know about your account?`;
         nextOptions = initialOptions;
         nextContext = 'initial';
         break;
@@ -516,15 +647,47 @@ ${userData.payments.slice(0, 3).map(payment =>
       
       // Loan options
       case 'l1':
-        reply = 'You can apply for a loan in the Apply Loan section. Minimum loan amount is $1,000 with 5% interest.';
+        reply = `🏦 **Apply for a Loan:**
+
+You can apply for a loan in the Apply Loan section. 
+
+**Your Current Status:**
+- Current Balance: ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+- Existing Loan Applications: ${userData?.loans?.length || 0}
+- Active Loans: ${userData?.currentLoans?.length || 0}
+
+**Requirements:**
+- Minimum loan amount: ₱1,000
+- Valid ID and employment proof
+- Good standing account`;
         nextOptions = loanOptions;
         break;
       case 'l2':
-        reply = 'Loan requirements include: 650+ credit score, 2 years of employment history, and valid ID.';
+        reply = `📋 **Loan Requirements:**
+
+**Your Account Status:**
+- Member ID: ${userData?.memberInfo?.id || 'N/A'}
+- Account Balance: ₱${userData?.totalBalance?.toFixed(2) || '0.00'}
+
+**General Requirements:**
+- Valid government-issued ID
+- Proof of income/employment
+- Good account standing
+- Minimum 6 months membership`;
         nextOptions = loanOptions;
         break;
       case 'l3':
-        reply = 'Loan repayment can be done through automatic deductions or manual payments in the app.';
+        reply = `💳 **Loan Repayment Information:**
+
+**Your Current Loans:**
+- Active Loans: ${userData?.currentLoans?.length || 0}
+- Loan Applications: ${userData?.loans?.length || 0}
+
+**Payment Methods:**
+- Through the app's Pay Loan section
+- Bank transfer
+- Over-the-counter payments
+- Automatic deductions`;
         nextOptions = loanOptions;
         break;
       case 'l4':

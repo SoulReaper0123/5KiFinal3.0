@@ -44,6 +44,7 @@ import {
 import { GrTransaction } from "react-icons/gr";
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { database } from '../../../Database/firebaseConfig';
+import { generateAdminAIResponse, checkAdminAIServiceStatus } from '../services/adminAI';
 
 const AdminHome = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -503,56 +504,55 @@ const handleAIQuery = async (userMessage) => {
   setAiLoading(true);
 
   try {
-    // Check if Gemini API key is available
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-    if (!apiKey || apiKey.trim() === '') {
-      throw new Error('API_KEY_MISSING');
-    }
-
-    // Initialize with the correct model for free version
-    const genAI = new GoogleGenerativeAI(apiKey);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-
-    // Get system context
-    const context = getProjectContext();
+    console.log('Processing admin AI query:', userMessage);
     
-    // Try to get fresh data if needed
-    let freshData = '';
-    try {
-      freshData = await fetchRelevantData(userMessage);
-    } catch (dataError) {
-      console.warn('Data fetch failed:', dataError);
-      freshData = '\n[Note: Could not fetch live data]';
-    }
-
-    // Generate response
-    const prompt = `${context}${freshData}\n\nUser Question: ${userMessage}`;
+    // Use the enhanced admin AI service
+    const result = await generateAdminAIResponse(userMessage);
     
-    // Updated generation call for free version
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const aiResponse = response.text();
+    if (!result.success) {
+      throw new Error(result.message || 'AI service unavailable');
+    }
 
     // Add AI response
     const newAIMessage = {
       type: 'ai',
-      content: aiResponse,
-      timestamp: new Date().toLocaleTimeString()
+      content: result.text,
+      timestamp: new Date().toLocaleTimeString(),
+      provider: result.provider
     };
 
     const finalMessages = [...updatedMessages, newAIMessage];
     setAiMessages(finalMessages);
     updateCurrentChat(finalMessages);
 
+    console.log('Admin AI response generated successfully');
+
   } catch (error) {
-    console.error('AI processing error:', error);
+    console.error('Admin AI processing error:', error);
     
-    // Use fallback response if AI fails
-    const fallbackResponse = getFallbackResponse(userMessage);
+    // Enhanced fallback response for admin
+    let fallbackResponse = '';
+    const lowerMessage = userMessage.toLowerCase();
+    
+    if (lowerMessage.includes('member') || lowerMessage.includes('user')) {
+      fallbackResponse = 'I can help you with member information. Try asking about specific member details, account summaries, or member statistics.';
+    } else if (lowerMessage.includes('loan')) {
+      fallbackResponse = 'I can provide loan information including applications, current loans, approval rates, and loan statistics.';
+    } else if (lowerMessage.includes('deposit') || lowerMessage.includes('saving')) {
+      fallbackResponse = 'I can help with deposit information, savings balances, and deposit transaction analysis.';
+    } else if (lowerMessage.includes('withdrawal')) {
+      fallbackResponse = 'I can provide withdrawal information, transaction history, and withdrawal patterns.';
+    } else if (lowerMessage.includes('payment')) {
+      fallbackResponse = 'I can help with payment information, transaction records, and payment analysis.';
+    } else if (lowerMessage.includes('report') || lowerMessage.includes('statistic')) {
+      fallbackResponse = 'I can generate various reports and statistics about members, loans, deposits, withdrawals, and overall system performance.';
+    } else {
+      fallbackResponse = 'I\'m your admin AI assistant with access to all database information. I can help with member management, financial reports, transaction analysis, and system insights.';
+    }
     
     const errorMessage = {
       type: 'ai',
-      content: `I'm having trouble connecting to the AI service. Here's what I can tell you:\n\n${fallbackResponse}`,
+      content: `I'm temporarily having trouble accessing the full database. Here's what I can help you with:\n\n${fallbackResponse}\n\nPlease try your question again, or contact support if the issue persists.`,
       timestamp: new Date().toLocaleTimeString()
     };
     

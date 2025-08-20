@@ -66,6 +66,11 @@ const Transactions = () => {
     for (const [type, members] of Object.entries(data)) {
       for (const [memberId, transactionsList] of Object.entries(members)) {
         for (const [transactionId, details] of Object.entries(transactionsList)) {
+          // Skip rejected applications
+          if (details.status === 'rejected') {
+            continue;
+          }
+
           const transactionData = {
             memberId,
             type,
@@ -75,6 +80,7 @@ const Transactions = () => {
             dateApproved: details.dateApproved,
             amount: 0,
             label: '',
+            status: details.status,
           };
 
           switch (type) {

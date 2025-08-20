@@ -17,8 +17,8 @@ import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
 import ModalSelector from 'react-native-modal-selector';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import { getDatabase, ref, get } from 'firebase/database';
+import CustomConfirmModal from '../../components/CustomConfirmModal';
 
 // RadioButton component
 const RadioButton = ({ selected, onPress }) => (
@@ -52,6 +52,20 @@ const RegisterPage = () => {
   const [orientationCode, setOrientationCode] = useState('');
   const [validOrientationCode, setValidOrientationCode] = useState('');
   const [isCheckingCode, setIsCheckingCode] = useState(false);
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+  
+  // Error states
+  const [firstNameError, setFirstNameError] = useState('');
+  const [lastNameError, setLastNameError] = useState('');
+  const [emailError, setEmailError] = useState('');
+  const [phoneNumberError, setPhoneNumberError] = useState('');
+  const [genderError, setGenderError] = useState('');
+  const [civilStatusError, setCivilStatusError] = useState('');
+  const [placeOfBirthError, setPlaceOfBirthError] = useState('');
+  const [addressError, setAddressError] = useState('');
+  const [governmentIdError, setGovernmentIdError] = useState('');
+  const [ageError, setAgeError] = useState('');
+  const [orientationError, setOrientationError] = useState('');
 
   const navigation = useNavigation();
 
@@ -78,7 +92,9 @@ const RegisterPage = () => {
     if (dateOfBirth) {
       const currentYear = new Date().getFullYear();
       const birthYear = dateOfBirth.getFullYear();
-      setAge(currentYear - birthYear);
+      const calculatedAge = currentYear - birthYear;
+      setAge(calculatedAge);
+      validateAge(calculatedAge);
     }
   }, [dateOfBirth]);
 
@@ -101,24 +117,177 @@ const RegisterPage = () => {
     fetchOrientationCode();
   }, []);
 
-  const isFormComplete = () => {
-    const basicInfoComplete = (
-      firstName &&
-      lastName &&
-      email &&
-      phoneNumber &&
-      gender &&
-      civilStatus &&
-      placeOfBirth &&
-      address &&
-      governmentId &&
-      age >= 21
-    );
-    
-    if (attendedOrientation) {
-      return basicInfoComplete && orientationCode && orientationCode === validOrientationCode;
+  // Validation functions
+  const validateFirstName = (value) => {
+    if (!value || !value.trim()) {
+      setFirstNameError('First name is required');
+      return false;
     }
-    return basicInfoComplete;
+    setFirstNameError('');
+    return true;
+  };
+
+  const validateLastName = (value) => {
+    if (!value || !value.trim()) {
+      setLastNameError('Last name is required');
+      return false;
+    }
+    setLastNameError('');
+    return true;
+  };
+
+  const validateEmail = (value) => {
+    if (!value || !value.trim()) {
+      setEmailError('Email is required');
+      return false;
+    }
+    if (!value.includes('@') || !value.endsWith('.com')) {
+      setEmailError('Please provide a valid email address (e.g., example@domain.com)');
+      return false;
+    }
+    setEmailError('');
+    return true;
+  };
+
+  const validatePhoneNumber = (value) => {
+    if (!value || !value.trim()) {
+      setPhoneNumberError('Phone number is required');
+      return false;
+    }
+    if (value.length < 11) {
+      setPhoneNumberError('Phone number should be at least 11 digits long');
+      return false;
+    }
+    setPhoneNumberError('');
+    return true;
+  };
+
+  const validateGender = (value) => {
+    if (!value) {
+      setGenderError('Gender is required');
+      return false;
+    }
+    setGenderError('');
+    return true;
+  };
+
+  const validateCivilStatus = (value) => {
+    if (!value) {
+      setCivilStatusError('Civil status is required');
+      return false;
+    }
+    setCivilStatusError('');
+    return true;
+  };
+
+  const validatePlaceOfBirth = (value) => {
+    if (!value || !value.trim()) {
+      setPlaceOfBirthError('Place of birth is required');
+      return false;
+    }
+    setPlaceOfBirthError('');
+    return true;
+  };
+
+  const validateAddress = (value) => {
+    if (!value || !value.trim()) {
+      setAddressError('Address is required');
+      return false;
+    }
+    setAddressError('');
+    return true;
+  };
+
+  const validateGovernmentId = (value) => {
+    if (!value) {
+      setGovernmentIdError('Government ID is required');
+      return false;
+    }
+    setGovernmentIdError('');
+    return true;
+  };
+
+  const validateAge = (ageValue) => {
+    if (!ageValue || ageValue < 21) {
+      setAgeError('You must be at least 21 years old to register');
+      return false;
+    }
+    setAgeError('');
+    return true;
+  };
+
+  const validateOrientation = () => {
+    if (!attendedOrientation) {
+      setOrientationError('You are required to attend the Orientation');
+      return false;
+    }
+    if (attendedOrientation && (!orientationCode || orientationCode !== validOrientationCode)) {
+      setOrientationError('Please enter a valid orientation code');
+      return false;
+    }
+    setOrientationError('');
+    return true;
+  };
+
+  // Real-time validation effect
+  useEffect(() => {
+    validateFirstName(firstName);
+  }, [firstName]);
+
+  useEffect(() => {
+    validateLastName(lastName);
+  }, [lastName]);
+
+  useEffect(() => {
+    validateEmail(email);
+  }, [email]);
+
+  useEffect(() => {
+    validatePhoneNumber(phoneNumber);
+  }, [phoneNumber]);
+
+  useEffect(() => {
+    validateGender(gender);
+  }, [gender]);
+
+  useEffect(() => {
+    validateCivilStatus(civilStatus);
+  }, [civilStatus]);
+
+  useEffect(() => {
+    validatePlaceOfBirth(placeOfBirth);
+  }, [placeOfBirth]);
+
+  useEffect(() => {
+    validateAddress(address);
+  }, [address]);
+
+  useEffect(() => {
+    validateGovernmentId(governmentId);
+  }, [governmentId]);
+
+  useEffect(() => {
+    validateAge(age);
+  }, [age]);
+
+  useEffect(() => {
+    validateOrientation();
+  }, [attendedOrientation, orientationCode]);
+
+  const isFormComplete = () => {
+    const hasNoErrors = !firstNameError && !lastNameError && !emailError && 
+                       !phoneNumberError && !genderError && !civilStatusError && 
+                       !placeOfBirthError && !addressError && !governmentIdError && 
+                       !ageError && !orientationError;
+    
+    const basicInfoComplete = firstName && lastName && email && phoneNumber && 
+                             gender && civilStatus && placeOfBirth && address && 
+                             governmentId && age >= 21;
+    
+    const orientationComplete = attendedOrientation ? 
+      (orientationCode && orientationCode === validOrientationCode) : true;
+    
+    return hasNoErrors && basicInfoComplete && orientationComplete;
   };
 
   const validateOrientationCode = async () => {
@@ -156,84 +325,57 @@ const RegisterPage = () => {
     }
   };
 
+  const handleProceedToNext = () => {
+    const dateOfBirthISO = dateOfBirth.toISOString();
+    navigation.navigate('Register2', {
+      firstName,
+      middleName,
+      lastName,
+      email,
+      phoneNumber,
+      gender,
+      civilStatus,
+      placeOfBirth,
+      address,
+      age,
+      dateOfBirth: dateOfBirthISO,
+      governmentId,
+      attendedOrientation,
+      orientationCode,
+    });
+  };
+
   const handleNext = async () => {
-    // Basic field validation
-    if (!firstName || !lastName || !email || !phoneNumber || !gender || 
-        !civilStatus || !placeOfBirth || !address || !governmentId) {
-      Alert.alert('Incomplete Form', 'Please fill in all required fields before proceeding.');
-      return;
-    }
+    // Validate all fields
+    const validations = [
+      validateFirstName(firstName),
+      validateLastName(lastName),
+      validateEmail(email),
+      validatePhoneNumber(phoneNumber),
+      validateGender(gender),
+      validateCivilStatus(civilStatus),
+      validatePlaceOfBirth(placeOfBirth),
+      validateAddress(address),
+      validateGovernmentId(governmentId),
+      validateAge(age),
+      validateOrientation()
+    ];
 
-    // Email validation
-    if (!email.includes('@') || !email.endsWith('.com')) {
-      Alert.alert('Invalid Email', 'Please provide a valid email address (e.g., example@domain.com).');
-      return;
-    }
-
-    // Phone number validation
-    if (phoneNumber.length < 11) {
-      Alert.alert('Invalid Phone Number', 'Phone numbers should be at least 11 digits long.');
-      return;
-    }
-
-    // Age validation
-    if (age < 21) {
-      Alert.alert('Age Restriction', 'You must be at least 21 years old to register.');
-      return;
-    }
-
-    // Orientation validation
-    if (!attendedOrientation) {
-      Alert.alert(
-        'Orientation Required',
-        'For you to be able to continue your registration, you are required to attend the Orientation.',
-        [{ text: 'OK' }]
-      );
-      return;
+    // Check if all validations passed
+    const isAllValid = validations.every(isValid => isValid === true);
+    
+    if (!isAllValid) {
+      return; // Don't proceed if there are validation errors
     }
 
     // Orientation code validation if attended
-    if (attendedOrientation) {
-      // Skip validation if code is already known to be valid
-      if (orientationCode === validOrientationCode) {
-        // Code is already valid, continue
-      } else {
-        // Need to validate the code
-        const isValidCode = await validateOrientationCode();
-        if (!isValidCode) return;
-      }
+    if (attendedOrientation && orientationCode !== validOrientationCode) {
+      const isValidCode = await validateOrientationCode();
+      if (!isValidCode) return;
     }
 
-    // Show confirmation alert before navigating
-    Alert.alert(
-      'Verify Your Information',
-      'Please double-check all the information you have provided. Make sure everything is accurate before proceeding.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Proceed', 
-          onPress: () => {
-            const dateOfBirthISO = dateOfBirth.toISOString();
-            navigation.navigate('Register2', {
-              firstName,
-              middleName,
-              lastName,
-              email,
-              phoneNumber,
-              gender,
-              civilStatus,
-              placeOfBirth,
-              address,
-              age,
-              dateOfBirth: dateOfBirthISO,
-              governmentId,
-              attendedOrientation,
-              orientationCode,
-            });
-          }
-        }
-      ]
-    );
+    // Show custom confirmation modal before navigating
+    setShowConfirmModal(true);
   };
 
   const handleDateChange = (event, selectedDate) => {
@@ -291,11 +433,13 @@ const RegisterPage = () => {
               placeholder="Enter First Name"
               value={firstName}
               onChangeText={setFirstName}
-              style={styles.input}
+              onBlur={() => validateFirstName(firstName)}
+              style={[styles.input, firstNameError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => middleNameInput.current?.focus()}
             />
+            {firstNameError ? <Text style={styles.errorText}>{firstNameError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -318,12 +462,14 @@ const RegisterPage = () => {
               placeholder="Enter Last Name"
               value={lastName}
               onChangeText={setLastName}
-              style={styles.input}
+              onBlur={() => validateLastName(lastName)}
+              style={[styles.input, lastNameError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={lastNameInput}
               onSubmitEditing={() => placeOfBirthInput.current?.focus()}
             />
+            {lastNameError ? <Text style={styles.errorText}>{lastNameError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -332,21 +478,22 @@ const RegisterPage = () => {
               data={genderOptions}
               initValue="Select Gender"
               cancelText="Cancel"
-              onChange={(option) => setGender(option.key)}
+              onChange={(option) => {
+                setGender(option.key);
+                validateGender(option.key);
+              }}
               style={styles.picker}
-              selectStyle={styles.pickerWithIcon}
-              optionTextStyle={{ fontSize: 16, color: '#222' }}
-              optionContainerStyle={{ backgroundColor: '#fff' }}
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
               overlayStyle={{ justifyContent: 'flex-end' }}
             >
-              <View style={styles.pickerContent}>
-                <Text style={[styles.pickerText, gender ? styles.selectedText : styles.placeholderText]}>
+              <TouchableOpacity style={[styles.pickerContainer, genderError ? styles.errorInput : null]}>
+                <Text style={styles.pickerText}>
                   {gender || 'Select Gender'}
                 </Text>
-                <Icon name="arrow-drop-down" size={24} color={gender ? '#000' : 'grey'} style={styles.pickerIcon} />
-              </View>
+                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+              </TouchableOpacity>
             </ModalSelector>
+            {genderError ? <Text style={styles.errorText}>{genderError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -355,7 +502,7 @@ const RegisterPage = () => {
               <Text style={[styles.dateText, dateOfBirth.toDateString() !== new Date().toDateString() ? { color: 'black' } : { color: 'grey' }]}>
                 {dateText}
               </Text>
-              <Icon name="calendar-today" size={24} color="grey" style={styles.calendarIcon} />
+              <MaterialIcons name="calendar-today" size={24} color="grey" style={styles.calendarIcon} />
             </TouchableOpacity>
             {showDatePicker && (
               <DateTimePicker
@@ -374,10 +521,11 @@ const RegisterPage = () => {
               placeholder="Age"
               value={age.toString()}
               onChangeText={text => setAge(text)}
-              style={styles.input}
+              style={[styles.input, ageError ? styles.errorInput : null]}
               keyboardType="numeric"
               editable={false}
             />
+            {ageError ? <Text style={styles.errorText}>{ageError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -386,12 +534,14 @@ const RegisterPage = () => {
               placeholder="Enter Place of Birth"
               value={placeOfBirth}
               onChangeText={setPlaceOfBirth}
-              style={styles.input}
+              onBlur={() => validatePlaceOfBirth(placeOfBirth)}
+              style={[styles.input, placeOfBirthError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={placeOfBirthInput}
               onSubmitEditing={() => addressInput.current?.focus()}
             />
+            {placeOfBirthError ? <Text style={styles.errorText}>{placeOfBirthError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -400,12 +550,14 @@ const RegisterPage = () => {
               placeholder="Enter Address"
               value={address}
               onChangeText={setAddress}
-              style={styles.input}
+              onBlur={() => validateAddress(address)}
+              style={[styles.input, addressError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={addressInput}
               onSubmitEditing={() => emailInput.current?.focus()}
             />
+            {addressError ? <Text style={styles.errorText}>{addressError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -414,21 +566,22 @@ const RegisterPage = () => {
               data={civilStatusOptions}
               initValue="Select Civil Status"
               cancelText="Cancel"
-              onChange={(option) => setCivilStatus(option.key)}
+              onChange={(option) => {
+                setCivilStatus(option.key);
+                validateCivilStatus(option.key);
+              }}
               style={styles.picker}
-              selectStyle={styles.pickerWithIcon}
-              optionTextStyle={{ fontSize: 16, color: '#222' }}
-              optionContainerStyle={{ backgroundColor: '#fff' }}
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
               overlayStyle={{ justifyContent: 'flex-end' }}
             >
-              <View style={styles.pickerContent}>
-                <Text style={[styles.pickerText, civilStatus ? styles.selectedText : styles.placeholderText]}>
+              <TouchableOpacity style={[styles.pickerContainer, civilStatusError ? styles.errorInput : null]}>
+                <Text style={styles.pickerText}>
                   {civilStatus || 'Select Civil Status'}
                 </Text>
-                <Icon name="arrow-drop-down" size={24} color={civilStatus ? '#000' : 'grey'} style={styles.pickerIcon} />
-              </View>
+                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+              </TouchableOpacity>
             </ModalSelector>
+            {civilStatusError ? <Text style={styles.errorText}>{civilStatusError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -437,13 +590,15 @@ const RegisterPage = () => {
               placeholder="example@domain.com"
               value={email}
               onChangeText={setEmail}
-              style={styles.input}
+              onBlur={() => validateEmail(email)}
+              style={[styles.input, emailError ? styles.errorInput : null]}
               keyboardType="email-address"
               returnKeyType="next"
               blurOnSubmit={false}
               ref={emailInput}
               onSubmitEditing={() => phoneNumberInput.current?.focus()}
             />
+            {emailError ? <Text style={styles.errorText}>{emailError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -451,14 +606,19 @@ const RegisterPage = () => {
             <TextInput
               placeholder="Enter Phone Number"
               value={phoneNumber}
-              onChangeText={handlePhoneNumberChange}
-              style={styles.input}
+              onChangeText={(text) => {
+                handlePhoneNumberChange(text);
+                validatePhoneNumber(text);
+              }}
+              onBlur={() => validatePhoneNumber(phoneNumber)}
+              style={[styles.input, phoneNumberError ? styles.errorInput : null]}
               keyboardType="phone-pad"
               returnKeyType="next"
               blurOnSubmit={false}
               ref={phoneNumberInput}
               onSubmitEditing={() => Keyboard.dismiss()}
             />
+            {phoneNumberError ? <Text style={styles.errorText}>{phoneNumberError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -467,24 +627,22 @@ const RegisterPage = () => {
               data={governmentIdOptions}
               initValue="Select Government ID"
               cancelText="Cancel"
-              onChange={(option) => setGovernmentId(option.label)}
+              onChange={(option) => {
+                setGovernmentId(option.label);
+                validateGovernmentId(option.label);
+              }}
               style={styles.picker}
-              selectStyle={styles.pickerWithIcon}
-              optionTextStyle={{ fontSize: 16, color: '#222' }}
-              optionContainerStyle={{ backgroundColor: '#fff' }}
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
               overlayStyle={{ justifyContent: 'flex-end' }}
             >
-              <View style={styles.pickerContent}>
-                <Text style={[
-                  styles.pickerText,
-                  governmentId ? styles.selectedText : styles.placeholderText
-                ]}>
+              <TouchableOpacity style={[styles.pickerContainer, governmentIdError ? styles.errorInput : null]}>
+                <Text style={styles.pickerText}>
                   {governmentId || 'Select Government ID'}
                 </Text>
-                <Icon name="arrow-drop-down" size={24} color={governmentId ? '#000' : 'grey'} style={styles.pickerIcon} />
-              </View>
+                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+              </TouchableOpacity>
             </ModalSelector>
+            {governmentIdError ? <Text style={styles.errorText}>{governmentIdError}</Text> : null}
           </View>
 
           <View style={styles.radioContainer}>
@@ -495,14 +653,20 @@ const RegisterPage = () => {
               <View style={styles.radioOption}>
                 <RadioButton 
                   selected={attendedOrientation} 
-                  onPress={() => setAttendedOrientation(true)} 
+                  onPress={() => {
+                    setAttendedOrientation(true);
+                    setOrientationError(''); // Clear any existing error
+                  }} 
                 />
                 <Text style={styles.radioOptionText}>Yes</Text>
               </View>
               <View style={styles.radioOption}>
                 <RadioButton 
                   selected={!attendedOrientation} 
-                  onPress={() => setAttendedOrientation(false)} 
+                  onPress={() => {
+                    setAttendedOrientation(false);
+                    setOrientationError(''); // Clear any existing error
+                  }} 
                 />
                 <Text style={styles.radioOptionText}>No</Text>
               </View>
@@ -541,8 +705,13 @@ const RegisterPage = () => {
                 value={orientationCode}
                 onChangeText={(text) => {
                   setOrientationCode(text);
+                  // Clear any existing orientation error when user starts typing
+                  if (orientationError) {
+                    setOrientationError('');
+                  }
                   // Auto-validate when the code matches the length of the valid code
                   if (text.length === validOrientationCode?.length) {
+                    validateOrientation();
                     // If code is valid, show proceed dialog automatically
                     if (text === validOrientationCode) {
                       // Small delay to allow the UI to update with the valid indicator
@@ -554,8 +723,10 @@ const RegisterPage = () => {
                     }
                   }
                 }}
+                onBlur={() => validateOrientation()}
                 style={[
                   styles.input,
+                  orientationError && orientationCode ? styles.errorInput : null,
                   orientationCode && validOrientationCode && orientationCode === validOrientationCode ? 
                     styles.validInput : 
                     (orientationCode && validOrientationCode && orientationCode !== validOrientationCode ? 
@@ -597,6 +768,22 @@ const RegisterPage = () => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Custom Confirmation Modal */}
+      <CustomConfirmModal
+        visible={showConfirmModal}
+        onClose={() => setShowConfirmModal(false)}
+        title="Verify Your Information"
+        message="Please double-check all the information you have provided. Make sure everything is accurate before proceeding."
+        type="info"
+        cancelText="Cancel"
+        confirmText="Proceed"
+        onCancel={() => setShowConfirmModal(false)}
+        onConfirm={() => {
+          setShowConfirmModal(false);
+          handleProceedToNext();
+        }}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -640,30 +827,20 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   picker: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    backgroundColor: '#fff',
+    marginBottom: 10,
   },
-  pickerContent: {
+  pickerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 10,
+    borderColor: '#ccc',
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 10,
   },
   pickerText: {
-    fontSize: 16,
-  },
-  pickerWithIcon: {
-    paddingVertical: 5,
-  },
-  pickerIcon: {
-    marginLeft: 10,
-  },
-  selectedText: {
-    color: '#000',
-  },
-  placeholderText: {
+    fontSize: 14,
     color: 'grey',
   },
   dateInput: {
@@ -834,6 +1011,16 @@ const styles = StyleSheet.create({
     color: '#8D6E63',
     lineHeight: 18,
     fontStyle: 'italic',
+  },
+  errorInput: {
+    borderColor: 'red',
+    borderWidth: 1.5,
+  },
+  errorText: {
+    color: 'red',
+    fontSize: 12,
+    marginTop: 5,
+    marginLeft: 2,
   },
 });
 

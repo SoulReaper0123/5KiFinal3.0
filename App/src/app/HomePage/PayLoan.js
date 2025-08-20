@@ -5,6 +5,7 @@ import {
   ActivityIndicator, Modal, BackHandler, KeyboardAvoidingView, Platform
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import ImagePickerModal from '../../components/ImagePickerModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -38,6 +39,7 @@ const PayLoan = () => {
   const [pendingApiData, setPendingApiData] = useState(null);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  const [showImagePicker, setShowImagePicker] = useState(false);
   const [alertType, setAlertType] = useState('error');
   const [paymentAccounts, setPaymentAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
@@ -170,23 +172,12 @@ const PayLoan = () => {
     setIsSubmitDisabled(!paymentOption || !amountToBePaid || !proofOfPayment);
   }, [paymentOption, amountToBePaid, proofOfPayment]);
 
-  const handleSelectProofOfPayment = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 1,
-      });
+  const handleSelectProofOfPayment = () => {
+    setShowImagePicker(true);
+  };
 
-      if (!result.canceled) {
-        setProofOfPayment(result.assets[0].uri);
-      }
-    } catch (error) {
-      console.error('Error selecting proof of payment:', error);
-      setErrorMessage('Failed to select proof of payment');
-      setErrorModalVisible(true);
-    }
+  const handleImageSelected = (imageUri) => {
+    setProofOfPayment(imageUri);
   };
 
   const uploadImageToFirebase = async (uri, folder) => {
@@ -506,6 +497,14 @@ const PayLoan = () => {
             }, 100);
           }
         }}
+      />
+
+      {/* Image Picker Modal */}
+      <ImagePickerModal
+        visible={showImagePicker}
+        onClose={() => setShowImagePicker(false)}
+        onImageSelected={handleImageSelected}
+        title="Select Proof of Payment"
       />
     </KeyboardAvoidingView>
   );

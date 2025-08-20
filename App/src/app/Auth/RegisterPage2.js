@@ -11,9 +11,9 @@ import {
   Modal 
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import ImagePickerModal from '../../components/ImagePickerModal';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { MaterialIcons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 
@@ -340,92 +340,50 @@ const RegisterPage2 = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Option Modals */}
-                {renderOptionsModal(
-                    showIdFrontOptions, 
-                    setShowIdFrontOptions, 
-                    () => handleSelectImage('camera', setValidIdFront, 'validIdFront'), 
-                    () => handleSelectImage('library', setValidIdFront, 'validIdFront'),
-                    'Select ID Front Source',
-                    true
-                )}
+                {/* Image Picker Modals */}
+                <ImagePickerModal
+                    visible={showIdFrontOptions}
+                    onClose={() => setShowIdFrontOptions(false)}
+                    onImageSelected={(imageUri) => {
+                        setValidIdFront(imageUri);
+                    }}
+                    title="Select ID Front Source"
+                    showCropOptions={true}
+                />
 
-                {renderOptionsModal(
-                    showIdBackOptions, 
-                    setShowIdBackOptions, 
-                    () => handleSelectImage('camera', setValidIdBack, 'validIdBack'), 
-                    () => handleSelectImage('library', setValidIdBack, 'validIdBack'),
-                    'Select ID Back Source',
-                    true
-                )}
+                <ImagePickerModal
+                    visible={showIdBackOptions}
+                    onClose={() => setShowIdBackOptions(false)}
+                    onImageSelected={(imageUri) => {
+                        setValidIdBack(imageUri);
+                    }}
+                    title="Select ID Back Source"
+                    showCropOptions={true}
+                />
 
-                {renderOptionsModal(
-                    showSelfieOptions, 
-                    setShowSelfieOptions, 
-                    () => handleSelectImage('camera', setSelfie, 'selfie'), 
-                    () => handleSelectImage('library', setSelfie, 'selfie'),
-                    'Take Selfie',
-                    false
-                )}
+                <ImagePickerModal
+                    visible={showSelfieOptions}
+                    onClose={() => setShowSelfieOptions(false)}
+                    onImageSelected={(imageUri) => {
+                        setSelfie(imageUri);
+                    }}
+                    title="Take Selfie"
+                    showCropOptions={false}
+                    cameraOnly={true}
+                />
 
-                {renderOptionsModal(
-                    showSelfieWithIdOptions, 
-                    setShowSelfieWithIdOptions, 
-                    () => handleSelectImage('camera', setSelfieWithId, 'selfieWithId'), 
-                    () => handleSelectImage('library', setSelfieWithId, 'selfieWithId'),
-                    'Take Selfie with ID',
-                    false
-                )}
+                <ImagePickerModal
+                    visible={showSelfieWithIdOptions}
+                    onClose={() => setShowSelfieWithIdOptions(false)}
+                    onImageSelected={(imageUri) => {
+                        setSelfieWithId(imageUri);
+                    }}
+                    title="Take Selfie with ID"
+                    showCropOptions={false}
+                    cameraOnly={true}
+                />
 
-                {/* Crop Options Modal */}
-                <Modal
-                    transparent={true}
-                    visible={showCropOptions}
-                    onRequestClose={() => setShowCropOptions(false)}
-                    animationType="slide"
-                >
-                    <View style={styles.modalBackground}>
-                        <View style={styles.optionsModal}>
-                            <Text style={styles.modalTitle}>Image Options</Text>
-                            
-                            {selectedImageUri && (
-                                <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
-                            )}
-                            
-                            <Text style={styles.cropInstructions}>
-                                Choose how you want to use this selected image. "Crop Image" will open a cropping interface where you can adjust the size by dragging the corners.
-                            </Text>
-                            
-                            <View style={styles.cropButtonsContainer}>
-                                <TouchableOpacity 
-                                    style={[styles.cropButton, styles.useAsIsButton]}
-                                    onPress={handleUseAsIs}
-                                >
-                                    <Text style={styles.cropButtonText}>Use As Is</Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity 
-                                    style={styles.cropButton}
-                                    onPress={handleCropImage}
-                                >
-                                    <Text style={styles.cropButtonText}>Crop Image</Text>
-                                </TouchableOpacity>
-                            </View>
-                            
-                            <TouchableOpacity 
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setShowCropOptions(false);
-                                    setSelectedImageUri(null);
-                                    setCurrentImageType(null);
-                                    setCurrentSetFunction(null);
-                                }}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
+
 
                 {/* Custom Modal */}
                 <CustomModal

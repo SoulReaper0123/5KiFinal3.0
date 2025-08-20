@@ -13,6 +13,7 @@ import {
   KeyboardAvoidingView, Platform
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import CustomConfirmModal from '../../components/CustomConfirmModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -37,6 +38,7 @@ const ApplyLoan = () => {
   const [balance, setBalance] = useState(0);
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
+  const [memberId, setMemberId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   
   // Collateral related states
@@ -144,17 +146,28 @@ const ApplyLoan = () => {
       const snapshot = await get(membersRef);
       if (snapshot.exists()) {
         const members = snapshot.val();
-        const foundUser = Object.entries(members).find(([_, member]) => member.email === userEmail);
+        const foundUser = Object.values(members).find(member => member.email === userEmail);
         if (foundUser) {
-          const [key, userData] = foundUser;
-          setUserId(key);
-          setBalance(userData.balance || 0);
-          setFirstName(userData.firstName || '');
-          setLastName(userData.lastName || '');
+          setBalance(foundUser.balance || 0);
+          setMemberId(foundUser.id || '');
+          setUserId(foundUser.id || '');
+          setFirstName(foundUser.firstName || '');
+          setLastName(foundUser.lastName || '');
+        } else {
+          setAlertMessage('User not found');
+          setAlertType('error');
+          setAlertModalVisible(true);
         }
+      } else {
+        setAlertMessage('No members found');
+        setAlertType('error');
+        setAlertModalVisible(true);
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+      setAlertMessage('Error loading user information.');
+      setAlertType('error');
+      setAlertModalVisible(true);
     }
   };
 
@@ -608,46 +621,29 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         type={alertType}
       />
 
-      {/* Confirmation Modal */}
-      <Modal visible={confirmModalVisible} transparent animationType="fade">
-        <View style={styles.modalContainer}>
-          <View style={[styles.modalContent, { backgroundColor: 'white', borderRadius: 10, padding: 20, width: '80%' }]}>
-            <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 15 }]}>
-              {confirmMessage.includes('Collateral Required') ? 'Collateral Required' : 'Confirm Loan Application'}
-            </Text>
-            <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
-              {confirmMessage}
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => {
-                  setConfirmModalVisible(false);
-                  if (requiresCollateral) {
-                    setShowCollateralModal(true);
-                  }
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.continueButton]} 
-                onPress={() => {
-                  setConfirmModalVisible(false);
-                  if (confirmAction) {
-                    confirmAction();
-                    setConfirmAction(null);
-                  }
-                }}
-              >
-                <Text style={styles.modalButtonText}>
-                  {confirmMessage.includes('Collateral Required') ? 'Continue' : 'Submit'}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Custom Confirmation Modal */}
+      <CustomConfirmModal
+        visible={confirmModalVisible}
+        onClose={() => setConfirmModalVisible(false)}
+        title={confirmMessage.includes('Collateral Required') ? 'Collateral Required' : 'Confirm Loan Application'}
+        message={confirmMessage}
+        type={confirmMessage.includes('Collateral Required') ? 'warning' : 'info'}
+        cancelText="Cancel"
+        confirmText={confirmMessage.includes('Collateral Required') ? 'Continue' : 'Submit'}
+        onCancel={() => {
+          setConfirmModalVisible(false);
+          if (requiresCollateral) {
+            setShowCollateralModal(true);
+          }
+        }}
+        onConfirm={() => {
+          setConfirmModalVisible(false);
+          if (confirmAction) {
+            confirmAction();
+            setConfirmAction(null);
+          }
+        }}
+      />
     </KeyboardAvoidingView>
   );
 };

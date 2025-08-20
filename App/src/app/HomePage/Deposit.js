@@ -5,6 +5,8 @@ import {
   ActivityIndicator, Modal, BackHandler 
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import CustomConfirmModal from '../../components/CustomConfirmModal';
+import ImagePickerModal from '../../components/ImagePickerModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -41,7 +43,7 @@ const Deposit = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('error');
   const [showImageOptions, setShowImageOptions] = useState(false);
-  const [showCropOptions, setShowCropOptions] = useState(false);
+
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [pendingDepositData, setPendingDepositData] = useState(null);
 
@@ -483,72 +485,18 @@ const Deposit = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Image Options Modal */}
-      <Modal
-        transparent={true}
+      {/* Image Picker Modal */}
+      <ImagePickerModal
         visible={showImageOptions}
-        onRequestClose={() => setShowImageOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.optionsModal}>
-            <Text style={styles.modalTitle}>Select Proof of Deposit</Text>
-            <View style={styles.optionButtonsContainer}>
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleSelectImage('camera')}
-              >
-                <MaterialIcons name="photo-camera" size={24} color="#2D5783" />
-                <Text style={styles.optionText}>Camera</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.optionButton}
-                onPress={() => handleSelectImage('gallery')}
-              >
-                <MaterialIcons name="photo-library" size={24} color="#2D5783" />
-                <Text style={styles.optionText}>Gallery</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity
-              style={[styles.optionButton, styles.fullWidthOption]}
-              onPress={() => setShowImageOptions(false)}
-            >
-              <Text style={styles.optionText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowImageOptions(false)}
+        onImageSelected={(imageUri) => {
+          setSelectedImageUri(imageUri);
+        }}
+        title="Select Proof of Deposit"
+        showCropOptions={true}
+      />
 
-      {/* Crop Options Modal */}
-      <Modal
-        transparent={true}
-        visible={showCropOptions}
-        onRequestClose={() => setShowCropOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.optionsModal}>
-            <Text style={styles.modalTitle}>Image Options</Text>
-            {selectedImageUri && (
-              <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
-            )}
-            <View style={styles.cropButtonsContainer}>
-              <TouchableOpacity
-                style={[styles.cropButton, styles.useAsIsButton]}
-                onPress={handleUseAsIs}
-              >
-                <Text style={styles.cropButtonText}>Use as is</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.cropButton}
-                onPress={handleCropImage}
-              >
-                <Text style={styles.cropButtonText}>Crop</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+
 
       {/* Loading Modal */}
       <Modal transparent={true} visible={loading}>
@@ -558,31 +506,21 @@ const Deposit = () => {
         </View>
       </Modal>
 
-      {/* Confirmation Modal */}
-      <Modal transparent={true} visible={confirmModalVisible}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Confirm Deposit</Text>
-            <Text style={styles.modalText}>
-              Are you sure you want to submit this deposit request for {formatCurrency(amountToBeDeposited)}?
-            </Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setConfirmModalVisible(false)}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]} 
-                onPress={submitDeposit}
-              >
-                <Text style={styles.modalButtonText}>Confirm</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      {/* Custom Confirmation Modal */}
+      <CustomConfirmModal
+        visible={confirmModalVisible}
+        onClose={() => setConfirmModalVisible(false)}
+        title="Confirm Deposit"
+        message={`Are you sure you want to submit this deposit request for ${formatCurrency(amountToBeDeposited)}?`}
+        type="info"
+        cancelText="Cancel"
+        confirmText="Confirm"
+        onCancel={() => setConfirmModalVisible(false)}
+        onConfirm={() => {
+          setConfirmModalVisible(false);
+          submitDeposit();
+        }}
+      />
 
       {/* Custom Alert Modal */}
       <CustomModal

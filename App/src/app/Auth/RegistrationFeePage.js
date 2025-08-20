@@ -14,11 +14,11 @@ import {
   Modal
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import ImagePickerModal from '../../components/ImagePickerModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import ModalSelector from 'react-native-modal-selector';
-import Icon from 'react-native-vector-icons/MaterialIcons';
 import { ref as dbRef, get } from 'firebase/database';
 import { database } from '../../firebaseConfig';
 
@@ -36,13 +36,11 @@ const RegistrationFeePage = () => {
     GCash: { accountName: '', accountNumber: '' }
   });
   
-  // State for image selection and cropping
+  // State for image selection
   const [showImageOptions, setShowImageOptions] = useState(false);
-  const [showCropOptions, setShowCropOptions] = useState(false);
   const [alertModalVisible, setAlertModalVisible] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('error');
-  const [selectedImageUri, setSelectedImageUri] = useState(null);
 
   const registrationData = route.params;
 
@@ -89,106 +87,7 @@ const RegistrationFeePage = () => {
     setShowImageOptions(true);
   };
 
-  const handleSelectImage = async (source) => {
-    const { status } = source === 'camera' 
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-    if (status !== 'granted') {
-      setAlertMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
-    }
 
-    try {
-      const result = await (source === 'camera' 
-        ? ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: false,
-            quality: 0.8,
-          })
-        : ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: false,
-            quality: 0.8,
-          }));
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        if (source === 'camera') {
-          // For camera: automatically use the image as is
-          setProofOfPayment(result.assets[0].uri);
-        } else {
-          // For gallery: show crop options
-          setSelectedImageUri(result.assets[0].uri);
-          setShowCropOptions(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error selecting image:', error);
-      setAlertMessage('Failed to select image');
-      setAlertType('error');
-      setAlertModalVisible(true);
-    }
-  };
-
-  const handleUseAsIs = () => {
-    if (selectedImageUri) {
-      setProofOfPayment(selectedImageUri);
-      setShowCropOptions(false);
-      setSelectedImageUri(null);
-    }
-  };
-
-  const handleCropImage = async () => {
-    if (!selectedImageUri) return;
-
-    try {
-      setShowCropOptions(false);
-      
-      Alert.alert(
-        'Crop Image',
-        'You can now crop the image with flexible dimensions. Drag the corners to adjust both height and width as needed.',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-            onPress: () => setShowCropOptions(true)
-          },
-          {
-            text: 'Continue',
-            onPress: async () => {
-              try {
-                const result = await ImagePicker.launchImageLibraryAsync({
-                  mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                  allowsEditing: true,
-                  quality: 0.8,
-                });
-
-                if (!result.canceled && result.assets && result.assets[0]) {
-                  setProofOfPayment(result.assets[0].uri);
-                  setSelectedImageUri(null);
-                } else {
-                  setShowCropOptions(true);
-                }
-              } catch (error) {
-                console.error('Error cropping image:', error);
-                setAlertMessage('Failed to crop image');
-                setAlertType('error');
-                setAlertModalVisible(true);
-                setShowCropOptions(true);
-              }
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Error with crop:', error);
-      setAlertMessage('Failed to crop image');
-      setAlertType('error');
-      setAlertModalVisible(true);
-    }
-  };
 
   const handleSubmit = () => {
     if (!paymentOption || !proofOfPayment) {
@@ -235,21 +134,15 @@ const RegistrationFeePage = () => {
             cancelText="Cancel"
             onChange={handlePaymentOptionChange}
             style={styles.picker}
-            selectStyle={styles.pickerWithIcon}
-            optionTextStyle={{ fontSize: 16, color: '#222' }}
-            optionContainerStyle={{ backgroundColor: '#fff' }}
             modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
             overlayStyle={{ justifyContent: 'flex-end' }}
           >
-            <View style={styles.pickerContent}>
-              <Text style={[
-                styles.pickerText,
-                paymentOption ? styles.selectedText : styles.placeholderText
-              ]}>
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>
                 {paymentOption || 'Select Payment Option'}
               </Text>
-              <Icon name="arrow-drop-down" size={24} color={paymentOption ? '#000' : 'grey'} style={styles.pickerIcon} />
-            </View>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+            </TouchableOpacity>
           </ModalSelector>
 
           <Text style={styles.label}>Account Name</Text>
@@ -303,98 +196,16 @@ const RegistrationFeePage = () => {
         </View>
       )}
 
-      {/* Image Options Modal */}
-      <Modal
-        transparent={true}
+      {/* Image Picker Modal */}
+      <ImagePickerModal
         visible={showImageOptions}
-        onRequestClose={() => setShowImageOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.optionsModal}>
-            <Text style={styles.modalTitle}>Select Proof of Payment</Text>
-            <View style={styles.optionButtonsContainer}>
-              <TouchableOpacity 
-                style={styles.optionButton}
-                onPress={() => {
-                  setShowImageOptions(false);
-                  setTimeout(() => {
-                    handleSelectImage('camera');
-                  }, 300);
-                }}
-              >
-                <Icon name="photo-camera" size={24} color="#2D5783" style={styles.optionIcon} />
-                <Text style={styles.optionText}>Take Photo</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.optionButton}
-                onPress={() => {
-                  setShowImageOptions(false);
-                  setTimeout(() => {
-                    handleSelectImage('gallery');
-                  }, 300);
-                }}
-              >
-                <Icon name="photo-library" size={24} color="#2D5783" style={styles.optionIcon} />
-                <Text style={styles.optionText}>Choose from Gallery</Text>
-              </TouchableOpacity>
-            </View>
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => setShowImageOptions(false)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Crop Options Modal */}
-      <Modal
-        transparent={true}
-        visible={showCropOptions}
-        onRequestClose={() => setShowCropOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.cropModal}>
-            <Text style={styles.modalTitle}>Image Selected</Text>
-            
-            {selectedImageUri && (
-              <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
-            )}
-            
-            <Text style={styles.cropInstructions}>
-              Choose how you want to use this selected image. "Crop Image" will open a cropping interface where you can adjust the size by dragging the corners.
-            </Text>
-            
-            <View style={styles.cropButtonsContainer}>
-              <TouchableOpacity 
-                style={styles.cropButton}
-                onPress={handleUseAsIs}
-              >
-                <Text style={styles.cropButtonText}>Use As Is</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={styles.cropButton}
-                onPress={handleCropImage}
-              >
-                <Text style={styles.cropButtonText}>Crop Image</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => {
-                setShowCropOptions(false);
-                setSelectedImageUri(null);
-              }}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+        onClose={() => setShowImageOptions(false)}
+        onImageSelected={(imageUri) => {
+          setProofOfPayment(imageUri);
+        }}
+        title="Select Proof of Payment"
+        showCropOptions={true}
+      />
 
       {/* Custom Alert Modal */}
       <CustomModal
@@ -456,8 +267,19 @@ const styles = StyleSheet.create({
   picker: {
     marginBottom: 10,
   },
-  pickerWithIcon: {
-    borderWidth: 0,
+  pickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    borderColor: '#ccc',
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  pickerText: {
+    fontSize: 14,
+    color: 'grey',
   },
   imagePreviewContainer: {
     alignItems: 'center',
@@ -519,127 +341,9 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
   },
-  // Modal selector styles
-  pickerContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-    borderColor: '#ccc',
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 10,
-    backgroundColor: '#fff',
-  },
-  selectedText: {
-    color: '#000',
-    fontSize: 16,
-  },
-  placeholderText: {
-    color: 'grey',
-    fontSize: 16,
-  },
-  pickerIcon: {
-    marginLeft: 10,
-  },
+
   // Modal styles (matching RegisterPage2 design)
-  modalBackground: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  optionsModal: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    width: '100%',
-  },
-  cropModal: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    width: '100%',
-    maxHeight: '80%',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: '#2D5783',
-  },
-  optionButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  optionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 15,
-    borderWidth: 1,
-    borderColor: '#2D5783',
-    borderRadius: 8,
-    marginHorizontal: 5,
-  },
-  optionIcon: {
-    marginRight: 5,
-  },
-  optionText: {
-    fontSize: 16,
-    marginLeft: 10,
-    color: '#2D5783',
-  },
-  cancelButton: {
-    padding: 15,
-    marginTop: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  cancelText: {
-    fontSize: 16,
-    color: 'red',
-  },
-  previewImage: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  cropInstructions: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 10,
-  },
-  cropButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    width: '100%',
-  },
-  cropButton: {
-    backgroundColor: '#2D5783',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-  },
-  cropButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
+
 });
 
 export default RegistrationFeePage;
