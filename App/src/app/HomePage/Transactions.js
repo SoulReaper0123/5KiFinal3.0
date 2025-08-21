@@ -55,7 +55,13 @@ const Transactions = () => {
       console.error('Error fetching transactions:', error);
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    fetchTransactions();
   };
 
   useEffect(() => {
@@ -147,11 +153,6 @@ const Transactions = () => {
       }
     }
     return parsed;
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchTransactions().then(() => setRefreshing(false));
   };
 
   const handleTransactionPress = (transaction) => {

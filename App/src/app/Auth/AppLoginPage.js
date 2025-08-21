@@ -22,6 +22,7 @@ import { auth, database } from '../../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import CustomModal from '../../components/CustomModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -31,16 +32,45 @@ export default function AppLoginPage() {
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showBiometricOption, setShowBiometricOption] = useState(false);
+  
+  // Modal state
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalTitle, setModalTitle] = useState('');
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalType, setModalType] = useState('info');
+  const [modalButtonText, setModalButtonText] = useState('OK');
+  const [modalAction, setModalAction] = useState(null);
+  const [showExitModal, setShowExitModal] = useState(false);
+  
   const navigation = useNavigation();
   const isFocused = useIsFocused();
   const passwordInputRef = useRef(null);
 
+  // Helper function to show modal
+  const showModal = (title, message, type = 'info', buttonText = 'OK', action = null) => {
+    setModalTitle(title);
+    setModalMessage(message);
+    setModalType(type);
+    setModalButtonText(buttonText);
+    setModalAction(() => action);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setModalAction(null);
+  };
+
+  const handleModalButtonPress = () => {
+    if (modalAction) {
+      modalAction();
+    }
+    closeModal();
+  };
+
   useEffect(() => {
     const backAction = () => {
-      Alert.alert('Exit Application?', 'Are you sure you want to exit?', [
-        { text: 'Cancel', onPress: () => null, style: 'cancel' },
-        { text: 'YES', onPress: () => BackHandler.exitApp() },
-      ]);
+      setShowExitModal(true);
       return true;
     };
 
@@ -111,10 +141,11 @@ export default function AppLoginPage() {
           const userStatusInfo = await checkUserStatus(email);
           
           if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
-            Alert.alert(
+            showModal(
               'Account Inactive',
               'Your account has been deactivated. Please contact the administrator for assistance.',
-              [{ text: 'OK' }]
+              'error',
+              'OK'
             );
             setLoading(false);
             return;
@@ -140,7 +171,12 @@ export default function AppLoginPage() {
         }
       }
     } catch (error) {
-      Alert.alert('Authentication Failed', 'Biometric authentication failed. Please try again or use email/password.');
+      showModal(
+        'Authentication Failed',
+        'Biometric authentication failed. Please try again or use email/password.',
+        'error',
+        'OK'
+      );
     } finally {
       setLoading(false);
     }
@@ -222,14 +258,21 @@ export default function AppLoginPage() {
 
   const handleLogin = async () => {
     if (!email || !password) {
-      Alert.alert('Missing Information', 'Please enter both your email and password to continue');
+      showModal(
+        'Missing Information',
+        'Please enter both your email and password to continue',
+        'warning',
+        'OK'
+      );
       return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      Alert.alert(
+      showModal(
         'Check Your Email',
-        'This doesn\'t look like a valid email address. Please check for typos (e.g., yourname@example.com)'
+        'This doesn\'t look like a valid email address. Please check for typos (e.g., yourname@example.com)',
+        'error',
+        'OK'
       );
       return;
     }
@@ -241,10 +284,11 @@ export default function AppLoginPage() {
       const userStatusInfo = await checkUserStatus(email);
       
       if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
-        Alert.alert(
+        showModal(
           'Account Inactive',
           'Your account has been deactivated. Please contact the administrator for assistance.',
-          [{ text: 'OK' }]
+          'error',
+          'OK'
         );
         setLoading(false);
         return;
@@ -257,10 +301,11 @@ export default function AppLoginPage() {
       if (finalStatusCheck.found && finalStatusCheck.status === 'inactive') {
         // Sign out the user immediately if they're inactive
         await auth.signOut();
-        Alert.alert(
+        showModal(
           'Account Inactive',
           'Your account has been deactivated. Please contact the administrator for assistance.',
-          [{ text: 'OK' }]
+          'error',
+          'OK'
         );
         setLoading(false);
         return;
@@ -274,68 +319,92 @@ export default function AppLoginPage() {
       setEmail('');
       setPassword('');
     } catch (error) {
+      console.log('=== FIREBASE LOGIN ERROR DEBUG ===');
+      console.log('Error code:', error.code);
+      console.log('Error message:', error.message);
+      console.log('Error name:', error.name);
+      console.log('Full error object:', JSON.stringify(error, null, 2));
+      console.log('Error keys:', Object.keys(error));
+      console.log('=====================================');
+      
       let title = '';
       let message = '';
-      let buttons = [{ text: 'OK' }];
+      let buttonText = 'OK';
+      let action = null;
 
-      switch (error.code) {
-        case 'auth/wrong-password':
-          title = 'Incorrect Password';
-          message = 'The password you entered is incorrect. Please try again.';
-          buttons = [
-            { text: 'Try Again' },
-            { 
-              text: 'Reset Password', 
-              onPress: () => navigation.navigate('ForgotPassword', { email }) 
+      // Check if error message contains credential-related keywords
+      const errorMessage = error.message?.toLowerCase() || '';
+      const isCredentialError = errorMessage.includes('credential') || 
+                               errorMessage.includes('password') || 
+                               errorMessage.includes('invalid') ||
+                               errorMessage.includes('wrong');
+
+      // Special handling for network errors that might actually be auth errors
+      if (error.code === 'auth/network-request-failed') {
+        // If user entered credentials, it's likely an auth issue disguised as network issue
+        if (email && password) {
+          console.log('Network error with credentials - treating as auth error');
+          title = 'Invalid Email or Password';
+          message = 'Please check your email and password and try again.';
+        } else {
+          title = 'Network Error';
+          message = 'Please check your internet connection and try again.';
+        }
+      } else {
+        switch (error.code) {
+          case 'auth/wrong-password':
+          case 'auth/invalid-credential':
+          case 'auth/invalid-login-credentials':
+          case 'auth/invalid-user-token':
+          case 'auth/user-token-expired':
+            title = 'Invalid Password';
+            message = 'The password you entered is incorrect. Please try again.';
+            buttonText = 'Reset Password';
+            action = () => navigation.navigate('ForgotPassword', { email });
+            break;
+
+          case 'auth/user-not-found':
+            title = 'Invalid Email';
+            message = 'No account found with this email address. Please check your email or sign up.';
+            buttonText = 'Sign Up';
+            action = () => navigation.navigate('Register', { prefillEmail: email });
+            break;
+
+          case 'auth/invalid-email':
+            title = 'Invalid Email';
+            message = 'Please enter a valid email address (e.g., yourname@example.com)';
+            break;
+
+          case 'auth/too-many-requests':
+            title = 'Too Many Attempts';
+            message = 'For your security, login is temporarily blocked. Please try again later or reset your password.';
+            buttonText = 'Reset Password';
+            action = () => navigation.navigate('ForgotPassword', { email });
+            break;
+
+          case 'auth/user-disabled':
+            title = 'Account Disabled';
+            message = 'This account has been deactivated. Please contact support for assistance.';
+            break;
+
+          case 'auth/weak-password':
+            title = 'Invalid Password';
+            message = 'The password you entered is incorrect. Please try again.';
+            break;
+
+          default:
+            // Check if it's a credential-related error based on message content
+            if (isCredentialError || (error.code && error.code.startsWith('auth/'))) {
+              title = 'Invalid Email or Password';
+              message = 'Please check your email and password and try again.';
+            } else {
+              title = 'Login Error';
+              message = 'Something went wrong. Please try again.';
             }
-          ];
-          break;
-
-        case 'auth/user-not-found':
-          title = 'Account Not Found';
-          message = `No account found with ${email}. Would you like to sign up instead?`;
-          buttons = [
-            { text: 'Try Different Email' },
-            { 
-              text: 'Sign Up', 
-              onPress: () => navigation.navigate('Register', { prefillEmail: email }) 
-            }
-          ];
-          break;
-
-        case 'auth/invalid-email':
-          title = 'Invalid Email';
-          message = 'Please enter a complete email address (e.g., yourname@example.com)';
-          break;
-
-        case 'auth/too-many-requests':
-          title = 'Too Many Attempts';
-          message = 'For your security, login is temporarily blocked. Please try again later or reset your password.';
-          buttons = [
-            { text: 'OK' },
-            { 
-              text: 'Reset Password', 
-              onPress: () => navigation.navigate('ForgotPassword', { email }) 
-            }
-          ];
-          break;
-
-        case 'auth/user-disabled':
-          title = 'Account Disabled';
-          message = 'This account has been deactivated. Please contact support for assistance.';
-          break;
-
-        case 'auth/network-request-failed':
-          title = 'Connection Error';
-          message = 'Unable to connect to our servers. Please check your internet connection and try again.';
-          break;
-
-        default:
-          title = 'Login Error';
-          message = 'We encountered an unexpected error. Please try again.';
+        }
       }
 
-      Alert.alert(title, message, buttons);
+      showModal(title, message, 'error', buttonText, action);
     } finally {
       setLoading(false);
     }
@@ -457,16 +526,40 @@ export default function AppLoginPage() {
               </TouchableOpacity>
             </View>
 
+            {/* Loading Overlay */}
             {loading && (
-              <TouchableWithoutFeedback>
-                <View style={styles.loadingOverlay}>
-                  <ActivityIndicator size="large" color="white" />
+              <View style={styles.loadingOverlay}>
+                <View style={styles.loadingBox}>
+                  <ActivityIndicator size="large" color="#4FE7AF" />
+                  <Text style={styles.loadingText}>Processing...</Text>
                 </View>
-              </TouchableWithoutFeedback>
+              </View>
             )}
           </View>
         </ScrollView>
       </TouchableWithoutFeedback>
+
+      {/* Custom Modal */}
+      <CustomModal
+        visible={modalVisible}
+        onClose={closeModal}
+        title={modalTitle}
+        message={modalMessage}
+        type={modalType}
+        buttonText={modalButtonText}
+        onButtonPress={handleModalButtonPress}
+      />
+
+      {/* Exit Confirmation Modal */}
+      <CustomModal
+        visible={showExitModal}
+        onClose={() => setShowExitModal(false)}
+        title="Exit Application?"
+        message="Are you sure you want to exit?"
+        type="warning"
+        buttonText="Exit"
+        onButtonPress={() => BackHandler.exitApp()}
+      />
     </KeyboardAvoidingView>
   );
 }
@@ -598,10 +691,27 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   loadingOverlay: {
-    ...StyleSheet.absoluteFillObject,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2D5783',
   },
   registerRow: {
     flexDirection: 'row',

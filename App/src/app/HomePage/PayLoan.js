@@ -45,6 +45,13 @@ const PayLoan = () => {
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
   });
+  
+  // Loan and penalty states
+  const [currentLoan, setCurrentLoan] = useState(null);
+  const [penaltyAmount, setPenaltyAmount] = useState(0);
+  const [penaltyPerDay, setPenaltyPerDay] = useState(100); // Default penalty
+  const [totalAmountDue, setTotalAmountDue] = useState(0);
+  const [overdueDays, setOverdueDays] = useState(0);
 
   const paymentOptions = [
     { key: 'Bank', label: 'Bank' },
@@ -87,6 +94,7 @@ const PayLoan = () => {
 
     initializeUserData();
     fetchPaymentSettings();
+    fetchSystemSettings();
   }, [route.params]);
 
   useEffect(() => {
@@ -105,6 +113,19 @@ const PayLoan = () => {
       fetchApprovedLoans();
     }
   }, [memberId]);
+
+  useEffect(() => {
+    if (email) {
+      fetchCurrentLoan(email);
+    }
+  }, [email]);
+
+  // Recalculate penalty when penalty per day changes
+  useEffect(() => {
+    if (currentLoan) {
+      calculatePenaltyAndTotal(currentLoan);
+    }
+  }, [penaltyPerDay]);
 
   const fetchPaymentSettings = async () => {
     try {
@@ -142,6 +163,91 @@ const PayLoan = () => {
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+    }
+  };
+
+  const fetchSystemSettings = async () => {
+    try {
+      const settingsRef = dbRef(database, 'Settings');
+      const snapshot = await get(settingsRef);
+      if (snapshot.exists()) {
+        const settings = snapshot.val();
+        const penalty = settings.PenaltyValue || 100; // Default to 100 pesos per day
+        setPenaltyPerDay(penalty);
+      }
+    } catch (error) {
+      console.error('Error fetching system settings:', error);
+      // Keep default penalty value
+    }
+  };
+
+  const fetchCurrentLoan = async (userEmail) => {
+    try {
+      const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+      const snapshot = await get(currentLoansRef);
+      
+      if (snapshot.exists()) {
+        const allCurrentLoans = snapshot.val();
+        for (const memberId in allCurrentLoans) {
+          const loans = allCurrentLoans[memberId];
+          for (const loanId in loans) {
+            const loan = loans[loanId];
+            if (loan?.email === userEmail) {
+              setCurrentLoan(loan);
+              calculatePenaltyAndTotal(loan);
+              return;
+            }
+          }
+        }
+      }
+      setCurrentLoan(null);
+    } catch (error) {
+      console.error('Error fetching current loan:', error);
+    }
+  };
+
+  const calculatePenaltyAndTotal = (loan) => {
+    if (!loan || !loan.dueDate) {
+      setPenaltyAmount(0);
+      setTotalAmountDue(loan?.totalMonthlyPayment || 0);
+      setOverdueDays(0);
+      return;
+    }
+
+    try {
+      // Parse due date
+      const dueDate = new Date(loan.dueDate);
+      const today = new Date();
+      
+      // Set time to start of day for accurate comparison
+      const todayStart = new Date(today);
+      todayStart.setHours(0, 0, 0, 0);
+      
+      const dueDateStart = new Date(dueDate);
+      dueDateStart.setHours(0, 0, 0, 0);
+      
+      if (todayStart > dueDateStart) {
+        // Calculate overdue days
+        const timeDiff = todayStart.getTime() - dueDateStart.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+        
+        setOverdueDays(daysDiff);
+        const penalty = daysDiff * penaltyPerDay;
+        setPenaltyAmount(penalty);
+        
+        const total = (loan.totalMonthlyPayment || 0) + penalty;
+        setTotalAmountDue(total);
+      } else {
+        // Not overdue
+        setOverdueDays(0);
+        setPenaltyAmount(0);
+        setTotalAmountDue(loan.totalMonthlyPayment || 0);
+      }
+    } catch (error) {
+      console.error('Error calculating penalty:', error);
+      setPenaltyAmount(0);
+      setTotalAmountDue(loan?.totalMonthlyPayment || 0);
+      setOverdueDays(0);
     }
   };
 
@@ -251,6 +357,24 @@ const PayLoan = () => {
       return;
     }
 
+    // Validate payment amount against total amount due
+    const paymentAmount = parseFloat(amountToBePaid);
+    if (totalAmountDue > 0 && paymentAmount < totalAmountDue) {
+      let message = `Payment amount must be at least ₱${totalAmountDue.toFixed(2)}`;
+      
+      if (penaltyAmount > 0) {
+        message += `\n\nBreakdown:
+• Monthly Payment: ₱${(currentLoan?.totalMonthlyPayment || 0).toFixed(2)}
+• Penalty (${overdueDays} days overdue): ₱${penaltyAmount.toFixed(2)}
+• Total Amount Due: ₱${totalAmountDue.toFixed(2)}`;
+      }
+      
+      setAlertMessage(message);
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
     // Show confirmation modal
     setConfirmModalVisible(true);
   };
@@ -326,6 +450,47 @@ const PayLoan = () => {
           <Text style={styles.label}>Balance</Text>
           <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
+          {/* Loan Information */}
+          {currentLoan && (
+            <View style={styles.loanInfoContainer}>
+              <Text style={styles.sectionTitle}>Current Loan Information</Text>
+              
+              <View style={styles.loanInfoRow}>
+                <Text style={styles.loanInfoLabel}>Monthly Payment:</Text>
+                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.totalMonthlyPayment || 0)}</Text>
+              </View>
+              
+              <View style={styles.loanInfoRow}>
+                <Text style={styles.loanInfoLabel}>Due Date:</Text>
+                <Text style={[
+                  styles.loanInfoValue,
+                  overdueDays > 0 ? styles.overdueText : styles.normalText
+                ]}>
+                  {currentLoan.dueDate || 'N/A'}
+                </Text>
+              </View>
+              
+              {overdueDays > 0 && (
+                <>
+                  <View style={styles.loanInfoRow}>
+                    <Text style={styles.loanInfoLabel}>Days Overdue:</Text>
+                    <Text style={[styles.loanInfoValue, styles.overdueText]}>{overdueDays} days</Text>
+                  </View>
+                  
+                  <View style={styles.loanInfoRow}>
+                    <Text style={styles.loanInfoLabel}>Penalty (₱{penaltyPerDay}/day):</Text>
+                    <Text style={[styles.loanInfoValue, styles.overdueText]}>{formatCurrency(penaltyAmount)}</Text>
+                  </View>
+                </>
+              )}
+              
+              <View style={[styles.loanInfoRow, styles.totalRow]}>
+                <Text style={styles.totalLabel}>Total Amount Due:</Text>
+                <Text style={styles.totalValue}>{formatCurrency(totalAmountDue)}</Text>
+              </View>
+            </View>
+          )}
+
           <Text style={styles.label}>Payment Option<Text style={styles.required}>*</Text></Text>
           <ModalSelector
             data={paymentOptions}
@@ -397,6 +562,15 @@ const PayLoan = () => {
             <Text style={styles.modalTitle}>Confirm Payment</Text>
             <View style={styles.modalContent}>
               <Text style={styles.modalText}>Balance: {formatCurrency(balance)}</Text>
+              {currentLoan && (
+                <>
+                  <Text style={styles.modalText}>Monthly Payment: {formatCurrency(currentLoan.totalMonthlyPayment || 0)}</Text>
+                  {penaltyAmount > 0 && (
+                    <Text style={styles.modalText}>Penalty ({overdueDays} days): {formatCurrency(penaltyAmount)}</Text>
+                  )}
+                  <Text style={styles.modalText}>Total Amount Due: {formatCurrency(totalAmountDue)}</Text>
+                </>
+              )}
               <Text style={styles.modalText}>Payment Option: {paymentOption}</Text>
               <Text style={styles.modalText}>Account Name: {accountName}</Text>
               <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
@@ -713,6 +887,61 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontWeight: 'bold',
     fontSize: 16,
+  },
+  // Loan information styles
+  loanInfoContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    padding: 15,
+    marginVertical: 15,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  loanInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  loanInfoLabel: {
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  loanInfoValue: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#333',
+  },
+  overdueText: {
+    color: '#FF0000',
+    fontWeight: 'bold',
+  },
+  normalText: {
+    color: '#333',
+  },
+  totalRow: {
+    backgroundColor: '#e9ecef',
+    padding: 8,
+    borderRadius: 5,
+    marginTop: 8,
+  },
+  totalLabel: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2D5783',
+  },
+  totalValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2D5783',
   },
 });
 

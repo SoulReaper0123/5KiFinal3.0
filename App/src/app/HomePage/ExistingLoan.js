@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, ActivityIndicator, BackHandler, Alert
+  ScrollView, ActivityIndicator, BackHandler, Alert, RefreshControl
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -15,6 +15,7 @@ const ExistingLoan = () => {
   const [loanDetails, setLoanDetails] = useState(null);
   const [transactionHistory, setTransactionHistory] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [loanStatus, setLoanStatus] = useState('Active');
   const [statusColor, setStatusColor] = useState('#3A7F0D');
 
@@ -26,28 +27,34 @@ const ExistingLoan = () => {
       // Handle Firebase Timestamp objects
       if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
         const date = new Date(dateInput.seconds * 1000);
-        return date.toLocaleString('en-US', {
-          month: 'short',
+        return date.toLocaleDateString('en-US', {
+          month: 'long',
           day: 'numeric',
-          year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit'
+          year: 'numeric'
         });
       }
 
       // Handle string dates
       if (typeof dateInput === 'string') {
-        // Return as-is if in "mm/dd/yyyy at 00:00" format
-        if (/^\d{2}\/\d{2}\/\d{4} at \d{2}:\d{2}$/.test(dateInput)) {
-          return dateInput;
-        }
-        
-        // Try to parse other string formats
+        // Try to parse the date
         const parsedDate = new Date(dateInput);
         if (!isNaN(parsedDate.getTime())) {
-          return parsedDate.toLocaleString();
+          return parsedDate.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          });
         }
         return dateInput; // Return original if can't parse
+      }
+
+      // Handle Date objects
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+        return dateInput.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
       }
 
       return 'N/A';
@@ -62,37 +69,70 @@ const ExistingLoan = () => {
     try {
       if (!dateInput) return new Date();
 
+      console.log('Parsing date input:', dateInput, typeof dateInput);
+
       // Firebase Timestamp
       if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
-        return new Date(dateInput.seconds * 1000);
+        const parsed = new Date(dateInput.seconds * 1000);
+        console.log('Parsed Firebase timestamp:', parsed);
+        return parsed;
       }
 
-      // Handle "mm/dd/yyyy at 00:00" format
-      if (typeof dateInput === 'string' && dateInput.includes(' at ')) {
-        const [datePart, timePart] = dateInput.split(' at ');
-        const [month, day, year] = datePart.split('/');
-        const [hours, minutes] = timePart.split(':');
-        return new Date(year, month - 1, day, hours, minutes);
-      }
+      // Handle string dates
+      if (typeof dateInput === 'string') {
+        // Handle "mm/dd/yyyy at 00:00" format
+        if (dateInput.includes(' at ')) {
+          const [datePart, timePart] = dateInput.split(' at ');
+          if (datePart.includes('/')) {
+            const [month, day, year] = datePart.split('/');
+            const [hours, minutes] = timePart.split(':');
+            const parsed = new Date(year, month - 1, day, hours, minutes);
+            console.log('Parsed mm/dd/yyyy at HH:MM format:', parsed);
+            return parsed;
+          } else {
+            // Handle "Month DD, YYYY at HH:MM" format
+            const parsed = new Date(dateInput.replace(' at ', ' '));
+            if (!isNaN(parsed.getTime())) {
+              console.log('Parsed Month DD, YYYY at HH:MM format:', parsed);
+              return parsed;
+            }
+          }
+        }
 
-      // Handle "Month DD, YYYY at HH:MM" format (like "December 15, 2024 at 10:30")
-      if (typeof dateInput === 'string' && dateInput.includes(' at ')) {
-        const parsed = new Date(dateInput.replace(' at ', ' '));
-        if (!isNaN(parsed.getTime())) {
+        // Handle "August 20, 2025" format
+        if (/^[A-Za-z]+ \d{1,2}, \d{4}$/.test(dateInput)) {
+          const parsed = new Date(dateInput + ' 00:00:00');
+          console.log('Parsed "Month DD, YYYY" format:', parsed);
+          if (!isNaN(parsed.getTime())) {
+            return parsed;
+          }
+        }
+
+        // Handle "YYYY-MM-DD" format
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+          const parsed = new Date(dateInput + 'T00:00:00');
+          console.log('Parsed YYYY-MM-DD format:', parsed);
           return parsed;
         }
-      }
 
-      // Handle ISO string or other standard formats
-      if (typeof dateInput === 'string') {
+        // Handle ISO string or other standard formats
         const parsed = new Date(dateInput);
         if (!isNaN(parsed.getTime())) {
+          console.log('Parsed standard format:', parsed);
           return parsed;
         }
+      }
+
+      // Handle Date objects
+      if (dateInput instanceof Date) {
+        console.log('Already a Date object:', dateInput);
+        return dateInput;
       }
 
       // Fallback to native Date parsing
-      return new Date(dateInput);
+      const fallback = new Date(dateInput);
+      console.log('Fallback parsing:', fallback);
+      return fallback;
     } catch (error) {
       console.warn('Date parsing error:', error);
       return new Date(); // Return current date as fallback
@@ -102,19 +142,33 @@ const ExistingLoan = () => {
   // Check if due date is overdue
   const isDueDateOverdue = (dueDate) => {
     try {
-      if (!dueDate) return false;
+      if (!dueDate) {
+        console.log('No due date provided');
+        return false;
+      }
+      
+      console.log('Original due date from database:', dueDate, typeof dueDate);
       
       const dueDateObj = parseDateTime(dueDate);
       const today = new Date();
       
       // Set time to start of day for accurate comparison
-      const todayStart = new Date(today);
-      todayStart.setHours(0, 0, 0, 0);
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const dueDateStart = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
       
-      const dueDateStart = new Date(dueDateObj);
-      dueDateStart.setHours(0, 0, 0, 0);
+      const isOverdue = todayStart > dueDateStart;
       
-      return todayStart > dueDateStart;
+      console.log('=== DUE DATE CHECK ===');
+      console.log('Raw due date:', dueDate);
+      console.log('Parsed due date:', dueDateObj.toDateString());
+      console.log('Due date (start of day):', dueDateStart.toDateString());
+      console.log('Today (start of day):', todayStart.toDateString());
+      console.log('Today timestamp:', todayStart.getTime());
+      console.log('Due date timestamp:', dueDateStart.getTime());
+      console.log('Is overdue?', isOverdue);
+      console.log('======================');
+      
+      return isOverdue;
     } catch (error) {
       console.warn('Due date check error:', error);
       return false;
@@ -122,41 +176,6 @@ const ExistingLoan = () => {
   };
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        // Try to get email from auth
-        const user = auth.currentUser;
-        let userEmail = user?.email;
-        
-        // Check if user data is passed via navigation (from fingerprint auth)
-        if (!userEmail && route.params?.user?.email) {
-          userEmail = route.params.user.email;
-        }
-        
-        // If still not available, try to get from SecureStore (for biometric login)
-        if (!userEmail) {
-          try {
-            const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-            if (storedEmail) {
-              userEmail = storedEmail;
-            }
-          } catch (error) {
-            console.error('Error getting email from SecureStore:', error);
-          }
-        }
-        
-        if (userEmail) {
-          fetchUserLoan(userEmail);
-        } else {
-          setLoading(false);
-          Alert.alert('Error', 'User email not found');
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-        setLoading(false);
-      }
-    };
-    
     loadUserData();
   }, [route.params]);
 
@@ -218,6 +237,11 @@ const ExistingLoan = () => {
           for (const loanId in loans) {
             const currentLoan = loans[loanId];
             if (currentLoan?.email === userEmail) {
+              console.log('Found loan for user:', userEmail);
+              console.log('Current loan data:', currentLoan);
+              console.log('Due date from database:', currentLoan.dueDate);
+              console.log('Next due date from database:', currentLoan.nextDueDate);
+              
               const loanData = {
                 ...currentLoan,
                 ...approvedData,
@@ -225,6 +249,8 @@ const ExistingLoan = () => {
                 dateApplied: currentLoan.dateApplied,
                 dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
               };
+              
+              console.log('Final loan data:', loanData);
               setLoanDetails(loanData);
               checkLoanStatus(loanData);
               fetchTransactionHistory(memberId);
@@ -240,6 +266,49 @@ const ExistingLoan = () => {
       setLoanDetails(null);
     } finally {
       setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadUserData();
+  };
+
+  const loadUserData = async () => {
+    try {
+      // Try to get email from auth
+      const user = auth.currentUser;
+      let userEmail = user?.email;
+      
+      // Check if user data is passed via navigation (from fingerprint auth)
+      if (!userEmail && route.params?.user?.email) {
+        userEmail = route.params.user.email;
+      }
+      
+      // If still not available, try to get from SecureStore (for biometric login)
+      if (!userEmail) {
+        try {
+          const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+          if (storedEmail) {
+            userEmail = storedEmail;
+          }
+        } catch (error) {
+          console.error('Error getting email from SecureStore:', error);
+        }
+      }
+      
+      if (userEmail) {
+        fetchUserLoan(userEmail);
+      } else {
+        setLoading(false);
+        setRefreshing(false);
+        Alert.alert('Error', 'User email not found');
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
@@ -361,7 +430,18 @@ const ExistingLoan = () => {
 
       <Text style={styles.headerTitle}>Loan Details</Text>
 
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={['#3A7F0D']}
+            tintColor="#3A7F0D"
+          />
+        }
+      >
         <View style={getCardStyle()}>
           <View style={styles.summaryHeader}>
             <Text style={styles.summaryTitle}>Current Loan</Text>
@@ -384,14 +464,34 @@ const ExistingLoan = () => {
             { 
               label: 'Due Date', 
               value: formatDisplayDate(loanDetails.dueDate || loanDetails.nextDueDate),
-              style: isDueDateOverdue(loanDetails.dueDate || loanDetails.nextDueDate) ? styles.overdueText : null 
+              isOverdue: (() => {
+                const dueDate = loanDetails.dueDate || loanDetails.nextDueDate;
+                console.log('Checking overdue for display - Due date:', dueDate);
+                const result = isDueDateOverdue(dueDate);
+                console.log('Overdue result for display:', result);
+                return result;
+              })()
             }
           ].map((item, index) => (
             <View key={index} style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{item.label}</Text>
-              <Text style={[styles.summaryValue, item.style]}>
-                {item.value}
-              </Text>
+              <View style={styles.summaryValueContainer}>
+                <Text style={item.isOverdue ? {
+                  fontSize: 14,
+                  fontWeight: '700',
+                  color: '#FF0000',
+                  backgroundColor: '#FFE6E6',
+                  paddingHorizontal: 4,
+                  paddingVertical: 2,
+                  borderRadius: 4,
+                } : styles.summaryValue}>
+                  {item.value}
+                  {console.log(`Rendering ${item.label}: isOverdue=${item.isOverdue}, value=${item.value}`)}
+                </Text>
+                {item.isOverdue && (
+                  <Text style={styles.overdueBadge}>OVERDUE</Text>
+                )}
+              </View>
             </View>
           ))}
         </View>
@@ -533,14 +633,36 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#2D5783'
   },
+  summaryValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'flex-end'
+  },
   overdueText: {
-    color: '#FF0000',
-    fontWeight: 'bold',
+    color: '#EF4444',
+    fontWeight: '600',
     fontSize: 14,
+  },
+  overdueTextComplete: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#FF0000',
     backgroundColor: '#FFE6E6',
     paddingHorizontal: 4,
     paddingVertical: 2,
     borderRadius: 4,
+  },
+  overdueBadge: {
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    backgroundColor: '#FEE2E2',
+    color: '#EF4444',
+    fontSize: 10,
+    fontWeight: '600',
+    borderRadius: 4,
+    textAlign: 'center',
   },
   sectionTitle: {
     fontSize: 20,

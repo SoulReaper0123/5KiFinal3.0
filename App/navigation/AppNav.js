@@ -6,6 +6,7 @@ import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicat
 import { getDatabase, ref, get, child } from 'firebase/database';
 import { MaterialIcons } from '@expo/vector-icons';
 import { auth } from '../../App/src/firebaseConfig';
+import * as SecureStore from 'expo-secure-store';
 
 import Splashscreen from '../src/app/Splashscreen';
 import AppLoginPage from '../src/app/Auth/AppLoginPage';
@@ -38,8 +39,7 @@ import BiometricSetupScreen from '../src/app/Auth/BiometricSetupScreen';
 const Stack = createNativeStackNavigator();
 const Drawer = createDrawerNavigator();
 
-const CustomDrawerContent = ({ user, loading, ...props }) => {
-  const [logoutLoading, setLogoutLoading] = useState(false);
+const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
   const handleLogout = () => {
@@ -48,20 +48,33 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
 
   const confirmLogout = async () => {
     setShowLogoutModal(false);
-    setLogoutLoading(true);
+    setGlobalLogoutLoading(true);
     try {
+      // Add a small delay to show the loading animation
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Clear any stored user data
+      await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
+      await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
+      
+      // Sign out from Firebase
       await auth.signOut();
-      props.navigation.navigate('Login');
+      
+      // Navigate to login
+      props.navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
     } catch (error) {
       console.error('Logout error:', error);
-      Alert.alert('Logout Error', 'There was an error during logout');
+      Alert.alert('Logout Error', 'There was an error during logout. Please try again.');
     } finally {
-      setLogoutLoading(false);
+      setGlobalLogoutLoading(false);
     }
   };
 
   return (
-    <View style={{ flex: 1 }} pointerEvents={logoutLoading ? 'none' : 'auto'}>
+    <View style={{ flex: 1 }}>
       <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
         <View style={styles.profileContainer}>
           <TouchableOpacity
@@ -99,11 +112,7 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
           </TouchableOpacity>
         </View>
       </DrawerContentScrollView>
-      {logoutLoading && (
-        <View style={styles.loadingOverlay}>
-          <ActivityIndicator size="large" color="white" />
-        </View>
-      )}
+
 
       {/* Logout Confirmation Modal */}
       <Modal
@@ -143,6 +152,7 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
 const DrawerNavigator = ({ route }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [globalLogoutLoading, setGlobalLogoutLoading] = useState(false);
   const { email, password, shouldPromptBiometric } = route.params;
 
   useEffect(() => {
@@ -176,12 +186,18 @@ const DrawerNavigator = ({ route }) => {
   }, [email]);
 
   return (
-    <Drawer.Navigator
-      drawerContent={(props) => <CustomDrawerContent user={user} loading={loading} {...props} />}
-      screenOptions={{
-        drawerStyle: { backgroundColor: 'black' },
-      }}
-    >
+    <View style={{ flex: 1 }}>
+      <Drawer.Navigator
+        drawerContent={(props) => <CustomDrawerContent 
+          user={user} 
+          loading={loading} 
+          setGlobalLogoutLoading={setGlobalLogoutLoading}
+          {...props} 
+        />}
+        screenOptions={{
+          drawerStyle: { backgroundColor: 'black' },
+        }}
+      >
       <Drawer.Screen 
         name="Home" 
         component={AppHome} 
@@ -200,6 +216,18 @@ const DrawerNavigator = ({ route }) => {
       <Drawer.Screen name="Contact Us" component={ContactUs} options={{ headerShown: false }} />
       <Drawer.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
     </Drawer.Navigator>
+    
+    {/* Global Logout Loading Overlay */}
+    {globalLogoutLoading && (
+      <View style={styles.globalLoadingOverlay}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#3A7F0D" />
+          <Text style={styles.loadingText}>Logging out...</Text>
+          <Text style={styles.loadingSubText}>Please wait</Text>
+        </View>
+      </View>
+    )}
+  </View>
   );
 };
 
@@ -296,7 +324,7 @@ const styles = StyleSheet.create({
   loadingIndicator: {
     marginTop: 20,
   },
-  loadingOverlay: {
+  globalLoadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -304,7 +332,32 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 10000,
+  },
+  loadingContainer: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 30,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  loadingText: {
+    marginTop: 15,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#2D5783',
+    textAlign: 'center',
+  },
+  loadingSubText: {
+    marginTop: 5,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
   drawerItemLabel: {
     fontSize: 15,
@@ -317,18 +370,28 @@ const styles = StyleSheet.create({
     zIndex: 10,
   },
   modalOverlay: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    zIndex: 999,
   },
   modalContainer: {
     backgroundColor: 'white',
     borderRadius: 15,
-    padding: 25,
+    padding: 30,
     alignItems: 'center',
-    width: '80%',
-    maxWidth: 300,
+    width: 320,
+    maxWidth: '90%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
   },
   modalIcon: {
     marginBottom: 15,
@@ -350,32 +413,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     width: '100%',
+    marginTop: 10,
   },
   modalButton: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 20,
-    borderRadius: 8,
+    borderRadius: 10,
     alignItems: 'center',
-    marginHorizontal: 5,
+    marginHorizontal: 6,
   },
   cancelButton: {
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#ddd',
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1.5,
+    borderColor: '#dee2e6',
   },
   confirmButton: {
     backgroundColor: '#8E0B16',
+    shadowColor: '#8E0B16',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cancelButtonText: {
-    color: '#333',
+    color: '#495057',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
   },
   confirmButtonText: {
     color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
 

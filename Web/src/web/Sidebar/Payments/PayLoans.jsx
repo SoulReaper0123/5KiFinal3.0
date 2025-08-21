@@ -46,6 +46,142 @@ const formatTime = (date) => {
   return `${hours}:${minutes}`;
 };
 
+const styles = {
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCard: {
+    width: '40%',
+    maxWidth: '800px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    cursor: 'pointer',
+    fontSize: '18px',
+    color: 'grey',
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: '4px',
+    outline: 'none'
+  },
+  modalHeader: {
+    borderBottom: '1px solid #eee',
+    paddingBottom: '12px',
+    marginBottom: '12px'
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  modalContent: {
+    paddingBottom: '12px',
+    overflowY: 'auto',
+    flex: 1
+  },
+  formColumns: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '30px',
+    flex: 1
+  },
+  formColumn: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  formGroup: {
+    marginBottom: '20px',
+    width: '100%'
+  },
+  formLabel: {
+    fontWeight: '600',
+    marginBottom: '5px',
+    display: 'block',
+    fontSize: '14px',
+    color: '#333'
+  },
+  requiredAsterisk: {
+    color: 'red',
+    marginLeft: '3px'
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
+    fontSize: '14px'
+  },
+  formSelect: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
+    backgroundColor: 'white',
+    fontSize: '14px'
+  },
+  fileInputLabel: {
+    display: 'block',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    backgroundColor: '#f8f9fa',
+    cursor: 'pointer',
+    textAlign: 'center',
+    fontSize: '14px',
+    color: '#495057'
+  },
+  fileInput: {
+    display: 'none'
+  },
+  bottomButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '16px',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #eee'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none'
+  }
+};
+
 const PayLoans = () => {
   const [activeSection, setActiveSection] = useState('pendingPayments');
   const [pending, setPending] = useState([]);
@@ -986,149 +1122,175 @@ const PayLoans = () => {
 
         {/* Add Payment Modal */}
         {addModalVisible && (
-          <div className="modal-overlay">
-            <div className="modal-container">
-              <button onClick={closeAddModal} className="close-button">
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCard}>
+              <button 
+                onClick={closeAddModal}
+                style={styles.closeButton}
+                aria-label="Close modal"
+              >
                 <AiOutlineClose />
               </button>
-              <h3 className="modal-title">Add Payment</h3>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  Member ID<span className="required"> *</span>
-                </label>
-                <input
-                  placeholder="Member ID"
-                  value={formData.memberId}
-                  onChange={(e) => handleInputChange('memberId', e.target.value)}
-                  className="form-input"
-                  type="text"
-                />
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Add Payment</h2>
               </div>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  First Name<span className="required"> *</span>
-                </label>
-                <input
-                  placeholder="First Name"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  Last Name<span className="required"> *</span>
-                </label>
-                <input
-                  placeholder="Last Name"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  className="form-input"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  Email<span className="required"> *</span>
-                </label>
-                <input
-                  placeholder="Email"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="form-input"
-                  type="email"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  Payment Option<span className="required"> *</span>
-                </label>
-                <select
-                  className="form-select"
-                  value={formData.paymentOption}
-                  onChange={(e) => handleInputChange('paymentOption', e.target.value)}
-                >
-                  <option value="">Select Payment Option</option>
-                  {paymentOptions.map(option => (
-                    <option key={option.key} value={option.key}>{option.label}</option>
-                  ))}
-                </select>
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">Account Name</label>
-                <input
-                  placeholder="Account Name"
-                  value={formData.accountName}
-                  onChange={(e) => handleInputChange('accountName', e.target.value)}
-                  className="form-input"
-                  readOnly
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">Account Number</label>
-                <input
-                  placeholder="Account Number"
-                  value={formData.accountNumber}
-                  onChange={(e) => handleInputChange('accountNumber', e.target.value)}
-                  className="form-input"
-                  readOnly
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  Amount<span className="required"> *</span>
-                </label>
-                <input
-                  placeholder="Amount"
-                  value={formData.amount}
-                  onChange={(e) => handleInputChange('amount', e.target.value)}
-                  className="form-input"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                />
-              </div>
-              
-              <div className="form-group">
-                <label className="form-label">
-                  Proof of Payment<span className="required"> *</span>
-                </label>
-                <label className="file-input-label">
-                  {proofOfPaymentFile ? proofOfPaymentFile.name : 'Click to upload Proof of Payment'}
-                  <input
-                    type="file"
-                    className="file-input"
-                    accept="image/*"
-                    onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
-                  />
-                </label>
-              </div>
-              
-              <div className="modal-button-container">
-                <button
-                  className="modal-submit-button"
-                  onClick={handleSubmitConfirmation}
-                  disabled={uploading}
-                >
-                  {uploading ? (
-                    <div className="spinner"></div>
-                  ) : (
-                    'Add Payment'
-                  )}
-                </button>
-                <button 
-                  className="modal-cancel-button" 
-                  onClick={closeAddModal}
-                >
-                  Cancel
-                </button>
+              <div style={styles.modalContent}>
+                <div style={styles.formColumns}>
+                  <div style={styles.formColumn}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Member ID<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Member ID"
+                        value={formData.memberId}
+                        onChange={(e) => handleInputChange('memberId', e.target.value)}
+                        type="text"
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Last Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Last Name"
+                        value={formData.lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value)}
+                        autoCapitalize="words"
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Payment Option<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={formData.paymentOption}
+                        onChange={(e) => handleInputChange('paymentOption', e.target.value)}
+                      >
+                        <option value="">Select Payment Option</option>
+                        {paymentOptions.map((option) => (
+                          <option key={option.key} value={option.key}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Account Number
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Account Number"
+                        value={formData.accountNumber}
+                        onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                        readOnly
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Proof of Payment<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {proofOfPaymentFile ? proofOfPaymentFile.name : "Choose file"}
+                        <input
+                          style={styles.fileInput}
+                          type="file"
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={styles.formColumn}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        First Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="First Name"
+                        value={formData.firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value)}
+                        autoCapitalize="words"
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Email<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Email"
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        type="email"
+                        autoCapitalize="none"
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Account Name
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Account Name"
+                        value={formData.accountName}
+                        onChange={(e) => handleInputChange('accountName', e.target.value)}
+                        readOnly
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Amount<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Amount"
+                        value={formData.amount}
+                        onChange={(e) => handleInputChange('amount', e.target.value)}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div style={styles.bottomButtons}>
+                  <button 
+                    style={{
+                      ...styles.actionButton,
+                      backgroundColor: '#2D5783',
+                      color: '#FFF'
+                    }}
+                    onClick={handleSubmitConfirmation}
+                    disabled={uploading}
+                  >
+                    {uploading ? 'Adding...' : 'Add Payment'}
+                  </button>
+                  <button
+                    style={{
+                      ...styles.actionButton,
+                      backgroundColor: '#6c757d',
+                      color: '#FFF'
+                    }}
+                    onClick={closeAddModal}
+                  >
+                    Cancel
+                  </button>
+                </div>
               </div>
             </div>
           </div>

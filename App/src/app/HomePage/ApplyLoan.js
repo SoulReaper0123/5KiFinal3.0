@@ -19,7 +19,6 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import { ref as dbRef, set, get } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
-import { MemberLoan } from '../../api';
 
 const ApplyLoan = () => {
   const navigation = useNavigation();
@@ -59,6 +58,12 @@ const ApplyLoan = () => {
   const [pendingApiData, setPendingApiData] = useState(null);
   const [hasExistingLoan, setHasExistingLoan] = useState(false);
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
+  const [loanableAmountPercentage, setLoanableAmountPercentage] = useState(80); // Default 80%
+  const [maxLoanableAmount, setMaxLoanableAmount] = useState(0);
+  const [loanTypeOptions, setLoanTypeOptions] = useState([
+    { key: 'Regular Loan', label: 'Regular Loan' },
+    { key: 'Quick Cash', label: 'Quick Cash' },
+  ]);
 
   const accountNumberInput = useRef(null);
 
@@ -69,10 +74,7 @@ const ApplyLoan = () => {
     { key: '12', label: '12 Months', interestRate: 0.03 },
   ];
 
-  const loanTypeOptions = [
-    { key: 'Regular Loan', label: 'Regular Loan' },
-    { key: 'Quick Cash', label: 'Quick Cash' },
-  ];
+
 
   const disbursementOptions = [
     { key: 'GCash', label: 'GCash' },
@@ -142,6 +144,35 @@ const ApplyLoan = () => {
     setAccountNumber(validateAccountNumber(value));
   };
 
+  const fetchSystemSettings = async () => {
+    try {
+      const settingsRef = dbRef(database, 'Settings');
+      const snapshot = await get(settingsRef);
+      if (snapshot.exists()) {
+        const settings = snapshot.val();
+        const loanPercentage = settings.LoanPercentage || 80; // Default to 80%
+        setLoanableAmountPercentage(loanPercentage);
+        
+        // Fetch loan types from settings
+        const loanTypes = settings.LoanTypes || ['Regular Loan', 'Quick Cash'];
+        const formattedLoanTypes = loanTypes.map(type => ({
+          key: type,
+          label: type
+        }));
+        setLoanTypeOptions(formattedLoanTypes);
+      }
+    } catch (error) {
+      console.error('Error fetching system settings:', error);
+      // Keep defaults if error
+    }
+  };
+
+  const calculateMaxLoanableAmount = (userBalance, percentage) => {
+    const maxAmount = (userBalance * percentage) / 100;
+    setMaxLoanableAmount(maxAmount);
+    return maxAmount;
+  };
+
   const fetchUserData = async (userEmail) => {
     const membersRef = dbRef(database, 'Members');
     try {
@@ -150,11 +181,15 @@ const ApplyLoan = () => {
         const members = snapshot.val();
         const foundUser = Object.values(members).find(member => member.email === userEmail);
         if (foundUser) {
-          setBalance(foundUser.balance || 0);
+          const userBalance = foundUser.balance || 0;
+          setBalance(userBalance);
           setMemberId(foundUser.id || '');
           setUserId(foundUser.id || '');
           setFirstName(foundUser.firstName || '');
           setLastName(foundUser.lastName || '');
+          
+          // Calculate max loanable amount
+          calculateMaxLoanableAmount(userBalance, loanableAmountPercentage);
           
           // Check for existing loans after setting user data
           await checkExistingLoans(userEmail);
@@ -223,8 +258,11 @@ const ApplyLoan = () => {
   };
 
   useEffect(() => {
-    const initializeUserData = async () => {
+    const initializeData = async () => {
       try {
+        // First fetch system settings
+        await fetchSystemSettings();
+        
         const user = auth.currentUser;
         const userEmail = user ? user.email : route.params?.user?.email;
         
@@ -249,15 +287,22 @@ const ApplyLoan = () => {
           setAlertModalVisible(true);
         }
       } catch (error) {
-        console.error('Error initializing user data:', error);
-        setAlertMessage('Error loading user information.');
+        console.error('Error initializing data:', error);
+        setAlertMessage('Error loading information.');
         setAlertType('error');
         setAlertModalVisible(true);
       }
     };
 
-    initializeUserData();
+    initializeData();
   }, [route.params]);
+
+  // Recalculate max loanable amount when balance or percentage changes
+  useEffect(() => {
+    if (balance > 0 && loanableAmountPercentage > 0) {
+      calculateMaxLoanableAmount(balance, loanableAmountPercentage);
+    }
+  }, [balance, loanableAmountPercentage]);
 
   useEffect(() => {
     const handleBackPress = () => {
@@ -314,6 +359,31 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   }
 };
 
+  // Function to run API operations in background after user navigates to home
+  const runApiOperationsInBackground = async (loanData) => {
+    try {
+      console.log('Running API operations in background...');
+      
+      // Make API call for loan application
+      const response = await fetch('http://192.168.1.9:3000/apply-loan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(loanData),
+      });
+
+      if (response.ok) {
+        console.log('API call completed successfully in background');
+      } else {
+        console.log('API call failed, but user already navigated away');
+      }
+    } catch (error) {
+      console.log('API error in background (non-critical):', error);
+      // Don't show error to user since they've already moved on
+    }
+  };
+
   const submitLoanApplication = async () => {
   setIsLoading(true);
   setConfirmModalVisible(false);
@@ -340,9 +410,16 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       })
     };
 
-    // Store in database first
+    // Store in database first and wait for completion
+    console.log('Starting database operation...');
     const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
-    if (!storedSuccessfully) return;
+    
+    if (!storedSuccessfully) {
+      setIsLoading(false);
+      return;
+    }
+
+    console.log('Database operation completed successfully');
 
     // Prepare loan data for API call to run when user clicks OK
     const loanData = {
@@ -357,12 +434,17 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     // Store loan data to be used when user clicks OK
     setPendingApiData(loanData);
 
-    // Show success modal
+    // Only show success modal after database operations are complete
+    setIsLoading(false);
     setAlertMessage('Loan application submitted successfully. You will receive a confirmation email shortly.');
     setAlertType('success');
     setSuccessAction(() => () => {
       resetForm();
       navigation.navigate('Home');
+      // Run API operations in background after navigation
+      if (loanData) {
+        runApiOperationsInBackground(loanData);
+      }
     });
     setAlertModalVisible(true);
 
@@ -371,7 +453,6 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     setAlertMessage('An unexpected error occurred. Please try again later.');
     setAlertType('error');
     setAlertModalVisible(true);
-  } finally {
     setIsLoading(false);
   }
 };
@@ -424,8 +505,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 
     const loanAmountNum = parseFloat(loanAmount);
     
-    if (loanAmountNum > balance) {
-      setConfirmMessage('Your loan amount exceeds your current balance. You need to provide collateral to proceed.');
+    // Check if loan amount exceeds loanable amount (based on percentage)
+    if (loanAmountNum > maxLoanableAmount) {
+      setConfirmMessage(`Your loan amount exceeds the maximum loanable amount of ₱${maxLoanableAmount.toFixed(2)} (${loanableAmountPercentage}% of your balance). You need to provide collateral to proceed.`);
       setConfirmAction(() => () => {
         setRequiresCollateral(true);
         setShowCollateralModal(true);
@@ -474,6 +556,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       <View style={styles.content}>
         <Text style={styles.label}>Balance</Text>
         <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
+        
+        <Text style={styles.label}>Maximum Loanable Amount ({loanableAmountPercentage}%)</Text>
+        <Text style={styles.balanceText}>{formatCurrency(maxLoanableAmount)}</Text>
 
         <Text style={styles.label}><RequiredField>Loan Type</RequiredField></Text>
         <ModalSelector
@@ -657,29 +742,13 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         visible={alertModalVisible}
         onClose={() => {
           setAlertModalVisible(false);
-          if (alertType === 'success' && pendingApiData) {
-            // Navigate immediately and run API in background  
-            if (successAction) {
-              successAction();
-              setSuccessAction(null);
-            }
-            
-            // Run API call in background after navigation
-            setTimeout(async () => {
-              try {
-                await MemberLoan(pendingApiData);
-                console.log('Loan API call completed successfully in background');
-              } catch (apiError) {
-                console.error('Background API call failed:', apiError);
-                // API failure doesn't affect user experience since data is already in database
-              }
-              // Clear pending data
-              setPendingApiData(null);
-            }, 100);
-          } else if (alertType === 'success' && successAction) {
+          // Execute success action (navigation + background API) if it exists
+          if (alertType === 'success' && successAction) {
             successAction();
             setSuccessAction(null);
           }
+          // Clear any pending data
+          setPendingApiData(null);
         }}
         message={alertMessage}
         type={alertType}

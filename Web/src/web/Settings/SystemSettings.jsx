@@ -2,10 +2,112 @@ import React, { useEffect, useState } from 'react';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle } from 'react-icons/fa';
+import { FiAlertCircle } from 'react-icons/fi';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
+
+  // Add CSS styles for modals matching registration design
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      .centered-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(0, 0, 0, 0.5);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 1000;
+      }
+
+      .confirm-modal-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        width: 90%;
+        max-width: 400px;
+      }
+
+      .small-modal-card {
+        background-color: white;
+        border-radius: 10px;
+        padding: 30px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        width: 90%;
+        max-width: 350px;
+      }
+
+      .confirm-icon {
+        font-size: 48px;
+        color: #2D5783;
+        margin-bottom: 20px;
+      }
+
+      .modal-text {
+        font-size: 16px;
+        color: #333;
+        margin-bottom: 25px;
+        line-height: 1.5;
+      }
+
+      .bottom-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+      }
+
+      .confirm-btn {
+        background-color: #2D5783;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        padding: 12px 24px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        min-width: 80px;
+        transition: all 0.2s;
+      }
+
+      .confirm-btn:hover {
+        background-color: #1a3d66;
+        transform: translateY(-1px);
+      }
+
+      .cancel-btn {
+        background-color: #f1f5f9;
+        color: #555;
+        border: none;
+        border-radius: 5px;
+        padding: 12px 24px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        min-width: 80px;
+        transition: all 0.2s;
+      }
+
+      .cancel-btn:hover {
+        background-color: #e2e8f0;
+        transform: translateY(-1px);
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
+    };
+  }, []);
   const [settings, setSettings] = useState({
     LoanPercentage: '',
     Funds: '',
@@ -40,6 +142,12 @@ const SystemSettings = () => {
 
   const [newTerm, setNewTerm] = useState('');
   const [newRate, setNewRate] = useState('');
+  
+  // Loan types management
+  const [newLoanType, setNewLoanType] = useState('');
+  const [addLoanTypeModalVisible, setAddLoanTypeModalVisible] = useState(false);
+  const [deleteLoanTypeModalVisible, setDeleteLoanTypeModalVisible] = useState(false);
+  const [loanTypeToDelete, setLoanTypeToDelete] = useState('');
   const [editMode, setEditMode] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -70,7 +178,9 @@ const SystemSettings = () => {
           AdvancedPayments: data.AdvancedPayments || false,
           DividendDate: data.DividendDate || '',
           PenaltyValue: data.PenaltyValue?.toString() || '',
-          PenaltyType: data.PenaltyType || 'percentage',
+          PenaltyType: data.PenaltyType || 'fixed',
+          LoanTypes: data.LoanTypes || ['Regular Loan', 'Quick Cash'],
+          LoanPercentage: data.LoanPercentage?.toString() || '80',
           OrientationCode: data.OrientationCode || generateOrientationCode(),
           Accounts: data.Accounts || {
             Bank: { accountName: '', accountNumber: '' },
@@ -201,6 +311,52 @@ const SystemSettings = () => {
     showMessage('Success', 'Interest rate deleted successfully!');
   };
 
+  // Loan Types management functions
+  const requestAddLoanType = () => {
+    if (!newLoanType.trim()) {
+      showMessage('Error', 'Please enter a loan type name.', true);
+      return;
+    }
+
+    if (settings.LoanTypes.includes(newLoanType.trim())) {
+      showMessage('Error', 'This loan type already exists.', true);
+      return;
+    }
+
+    setAddLoanTypeModalVisible(true);
+  };
+
+  const confirmAddLoanType = () => {
+    const newLoanTypes = [...settings.LoanTypes, newLoanType.trim()];
+    setSettings({
+      ...settings,
+      LoanTypes: newLoanTypes
+    });
+    setNewLoanType('');
+    setAddLoanTypeModalVisible(false);
+    showMessage('Success', 'Loan type added successfully!');
+  };
+
+  const requestDeleteLoanType = (loanType) => {
+    if (settings.LoanTypes.length <= 1) {
+      showMessage('Error', 'You must have at least one loan type.', true);
+      return;
+    }
+    
+    setLoanTypeToDelete(loanType);
+    setDeleteLoanTypeModalVisible(true);
+  };
+
+  const confirmDeleteLoanType = () => {
+    const newLoanTypes = settings.LoanTypes.filter(type => type !== loanTypeToDelete);
+    setSettings({
+      ...settings,
+      LoanTypes: newLoanTypes
+    });
+    setDeleteLoanTypeModalVisible(false);
+    showMessage('Success', 'Loan type deleted successfully!');
+  };
+
   const handleSave = () => setConfirmationModalVisible(true);
 
   const confirmSave = () => {
@@ -219,7 +375,8 @@ const SystemSettings = () => {
       AdvancedPayments: settings.AdvancedPayments,
       DividendDate: settings.DividendDate,
       PenaltyValue: parseFloat(settings.PenaltyValue),
-      PenaltyType: settings.PenaltyType,
+      PenaltyType: 'fixed',
+      LoanTypes: settings.LoanTypes,
       OrientationCode: settings.OrientationCode,
       Accounts: settings.Accounts,
       TermsAndConditions: settings.TermsAndConditions,
@@ -523,12 +680,51 @@ const SystemSettings = () => {
             </div>
             
             <InputRow
-              label="Penalty Value"
+              label="Penalty Value (per day)"
               value={settings.PenaltyValue}
               onChange={(text) => handleInputChange('PenaltyValue', text)}
               editable={editMode}
-              suffix={settings.PenaltyType === 'percentage' ? '%' : '₱'}
+              suffix="₱"
             />
+
+            <InputRow
+              label="Loanable Amount Percentage"
+              value={settings.LoanPercentage}
+              onChange={(text) => handleInputChange('LoanPercentage', text)}
+              editable={editMode}
+              suffix="%"
+            />
+
+            <div style={styles.loanTypesSection}>
+              <h3 style={styles.subSectionTitle}>Types of Loans</h3>
+              {settings.LoanTypes.map((loanType, index) => (
+                <div key={index} style={styles.loanTypeRow}>
+                  <span style={styles.loanTypeText}>{loanType}</span>
+                  {editMode && (
+                    <button 
+                      style={styles.deleteLoanTypeBtn}
+                      onClick={() => requestDeleteLoanType(loanType)}
+                    >
+                      <FaTrashAlt style={styles.buttonIcon} />
+                    </button>
+                  )}
+                </div>
+              ))}
+              {editMode && (
+                <div style={styles.inputRow}>
+                  <input
+                    style={styles.input}
+                    placeholder="New Loan Type (e.g. Emergency Loan)"
+                    value={newLoanType}
+                    onChange={(e) => setNewLoanType(e.target.value)}
+                    type="text"
+                  />
+                  <button style={styles.addLoanTypeBtn} onClick={requestAddLoanType}>
+                    <FaPlus style={styles.buttonIcon} /> Add
+                  </button>
+                </div>
+              )}
+            </div>
 
             <div style={styles.interestRatesSection}>
               <h3 style={styles.subSectionTitle}>Interest Rates</h3>
@@ -798,22 +994,22 @@ const SystemSettings = () => {
 
         {/* Save Confirmation Modal */}
         {confirmationModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>Confirm Changes</h3>
-              <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
-              <div style={styles.modalButtons}>
-                <button 
-                  style={styles.modalBtnCancel}
-                  onClick={() => setConfirmationModalVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  style={styles.modalBtnConfirm}
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Are you sure you want to save these settings changes?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
                   onClick={confirmSave}
                 >
-                  Save Changes
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setConfirmationModalVisible(false)}
+                >
+                  No
                 </button>
               </div>
             </div>
@@ -822,24 +1018,22 @@ const SystemSettings = () => {
 
         {/* Add Interest Term Modal */}
         {addModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>Add Interest Rate</h3>
-              <p style={styles.modalText}>
-                Add {newTerm} months at {newRate}% interest?
-              </p>
-              <div style={styles.modalButtons}>
-                <button 
-                  style={styles.modalBtnCancel}
-                  onClick={() => setAddModalVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  style={styles.modalBtnConfirm}
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Add {newTerm} months at {newRate}% interest?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
                   onClick={confirmAddTerm}
                 >
-                  Add Rate
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setAddModalVisible(false)}
+                >
+                  No
                 </button>
               </div>
             </div>
@@ -848,24 +1042,22 @@ const SystemSettings = () => {
 
         {/* Delete Interest Term Modal */}
         {deleteModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>Delete Interest Rate</h3>
-              <p style={styles.modalText}>
-                Are you sure you want to delete the {termToDelete} month interest rate?
-              </p>
-              <div style={styles.modalButtons}>
-                <button 
-                  style={styles.modalBtnCancel}
-                  onClick={() => setDeleteModalVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  style={styles.modalBtnConfirm}
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Are you sure you want to delete the {termToDelete} month interest rate?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
                   onClick={confirmDeleteTerm}
                 >
-                  Delete Rate
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setDeleteModalVisible(false)}
+                >
+                  No
                 </button>
               </div>
             </div>
@@ -874,12 +1066,21 @@ const SystemSettings = () => {
 
         {/* Add Savings Modal */}
         {savingsModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>Add to Savings</h3>
-              <p style={styles.modalText}>Enter amount to add to savings:</p>
+          <div className="centered-modal">
+            <div className="small-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Enter amount to add to savings:</p>
               <input
-                style={styles.modalInput}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  marginBottom: '20px',
+                  boxSizing: 'border-box',
+                  textAlign: 'center'
+                }}
                 value={actionAmount}
                 onChange={(e) => setActionAmount(e.target.value)}
                 type="number"
@@ -887,18 +1088,18 @@ const SystemSettings = () => {
                 min="0"
                 step="0.01"
               />
-              <div style={styles.modalButtons}>
-                <button 
-                  style={styles.modalBtnCancel}
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
+                  onClick={confirmAddSavings}
+                >
+                  Add
+                </button>
+                <button
+                  className="cancel-btn"
                   onClick={() => setSavingsModalVisible(false)}
                 >
                   Cancel
-                </button>
-                <button 
-                  style={styles.modalBtnConfirm}
-                  onClick={confirmAddSavings}
-                >
-                  Add Savings
                 </button>
               </div>
             </div>
@@ -907,18 +1108,28 @@ const SystemSettings = () => {
 
         {/* Funds Action Modal */}
         {fundsActionModal && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>
+          <div className="centered-modal">
+            <div className="small-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">
                 {fundsActionModal === 'add' ? 'Add to Funds' : 'Withdraw to Savings'}
-              </h3>
-              <p style={styles.modalText}>
+              </p>
+              <p className="modal-text">
                 {fundsActionModal === 'add' ? 
                   `Available Savings: ₱${settings.Savings}` : 
                   `Available Funds: ₱${settings.Funds}`}
               </p>
               <input
-                style={styles.modalInput}
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  border: '1px solid #ddd',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  marginBottom: '20px',
+                  boxSizing: 'border-box',
+                  textAlign: 'center'
+                }}
                 value={actionAmount}
                 onChange={(e) => setActionAmount(e.target.value)}
                 type="number"
@@ -926,18 +1137,66 @@ const SystemSettings = () => {
                 min="0"
                 step="0.01"
               />
-              <div style={styles.modalButtons}>
-                <button 
-                  style={styles.modalBtnCancel}
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
+                  onClick={confirmFundsAction}
+                >
+                  {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
+                </button>
+                <button
+                  className="cancel-btn"
                   onClick={() => setFundsActionModal(null)}
                 >
                   Cancel
                 </button>
-                <button 
-                  style={styles.modalBtnConfirm}
-                  onClick={confirmFundsAction}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Loan Type Modal */}
+        {addLoanTypeModalVisible && (
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Add "{newLoanType}" as a new loan type?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
+                  onClick={confirmAddLoanType}
                 >
-                  {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setAddLoanTypeModalVisible(false)}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Delete Loan Type Modal */}
+        {deleteLoanTypeModalVisible && (
+          <div className="centered-modal">
+            <div className="confirm-modal-card">
+              <FiAlertCircle className="confirm-icon" />
+              <p className="modal-text">Are you sure you want to delete "{loanTypeToDelete}" loan type?</p>
+              <div className="bottom-buttons">
+                <button
+                  className="confirm-btn"
+                  onClick={confirmDeleteLoanType}
+                >
+                  Yes
+                </button>
+                <button
+                  className="cancel-btn"
+                  onClick={() => setDeleteLoanTypeModalVisible(false)}
+                >
+                  No
                 </button>
               </div>
             </div>
@@ -946,21 +1205,20 @@ const SystemSettings = () => {
 
         {/* Message Modal */}
         {messageModal.visible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>{messageModal.title}</h3>
-              <p style={styles.modalText}>{messageModal.message}</p>
-              <div style={styles.modalButtons}>
-                <button 
-                  style={{
-                    ...styles.modalBtn,
-                    ...(messageModal.isError ? styles.modalBtnError : styles.modalBtnSuccess)
-                  }}
-                  onClick={() => setMessageModal({ ...messageModal, visible: false })}
-                >
-                  OK
-                </button>
-              </div>
+          <div className="centered-modal">
+            <div className="small-modal-card">
+              {messageModal.isError ? (
+                <FiAlertCircle className="confirm-icon" />
+              ) : (
+                <FaCheckCircle className="confirm-icon" />
+              )}
+              <p className="modal-text">{messageModal.message}</p>
+              <button 
+                className={messageModal.isError ? "cancel-btn" : "confirm-btn"} 
+                onClick={() => setMessageModal({ ...messageModal, visible: false })}
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
@@ -1217,6 +1475,44 @@ const styles = {
     backgroundColor: 'white',
     transition: '.4s',
     borderRadius: '50%',
+  },
+  loanTypesSection: {
+    marginTop: '30px',
+    paddingTop: '20px',
+    borderTop: '1px solid #eee',
+  },
+  loanTypeRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 0',
+    borderBottom: '1px solid #f0f0f0',
+  },
+  loanTypeText: {
+    fontSize: '16px',
+    color: '#333',
+  },
+  deleteLoanTypeBtn: {
+    background: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    padding: '5px 10px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
+  },
+  addLoanTypeBtn: {
+    background: '#28a745',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    padding: '8px 12px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '5px',
   },
   interestRatesSection: {
     marginTop: '30px',
