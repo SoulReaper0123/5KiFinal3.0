@@ -591,134 +591,30 @@ const Registrations = ({
     loadModels();
   }, []);
 
-  // CORS-safe image loading function for TensorFlow
+  // Simplified image loading that bypasses CORS issues completely
   const loadImageForTensorFlow = async (imageUrl) => {
     return new Promise((resolve, reject) => {
-      console.log('Loading image for TensorFlow processing:', imageUrl);
+      console.log('Loading image for basic validation:', imageUrl);
       
-      // Strategy 1: Try to load with CORS enabled first
-      const tryWithCORS = () => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
+      // Create a simple image element for basic validation
+      const img = new Image();
+      
+      img.onload = () => {
+        console.log('Image loaded successfully');
+        console.log('Image dimensions:', img.naturalWidth || img.width, 'x', img.naturalHeight || img.height);
         
-        img.onload = () => {
-          console.log('Image loaded with CORS successfully');
-          
-          // Test if we can create a canvas without tainting
-          const testCanvas = document.createElement('canvas');
-          const testCtx = testCanvas.getContext('2d');
-          testCanvas.width = 1;
-          testCanvas.height = 1;
-          
-          try {
-            testCtx.drawImage(img, 0, 0, 1, 1);
-            // If we can get image data, the canvas is not tainted
-            testCtx.getImageData(0, 0, 1, 1);
-            
-            // Success! Create the actual canvas
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.naturalWidth || img.width;
-            canvas.height = img.naturalHeight || img.height;
-            ctx.drawImage(img, 0, 0);
-            
-            console.log('Canvas created successfully without tainting');
-            resolve(canvas);
-          } catch (taintError) {
-            console.warn('Canvas is tainted, trying alternative approach:', taintError);
-            tryWithoutCanvas();
-          }
-        };
-        
-        img.onerror = (error) => {
-          console.warn('CORS image loading failed:', error);
-          tryWithoutCORS();
-        };
-        
-        img.src = imageUrl;
+        // Return image element for basic validation
+        // We'll do validation based on image properties rather than TensorFlow
+        resolve(img);
       };
       
-      // Strategy 2: Try without CORS but return the image element directly
-      const tryWithoutCORS = () => {
-        const img = new Image();
-        
-        img.onload = () => {
-          console.log('Image loaded without CORS, returning image element');
-          // Return the image element directly for TensorFlow
-          // TensorFlow.js can work with image elements even if canvas is tainted
-          resolve(img);
-        };
-        
-        img.onerror = (error) => {
-          console.warn('Image loading without CORS failed:', error);
-          tryWithProxy();
-        };
-        
-        img.src = imageUrl;
+      img.onerror = (error) => {
+        console.warn('Image loading failed:', error);
+        reject(new Error('Failed to load image'));
       };
       
-      // Strategy 3: Try with CORS proxy
-      const tryWithProxy = () => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        
-        const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(imageUrl)}`;
-        console.log('Trying with CORS proxy:', proxyUrl);
-        
-        img.onload = () => {
-          console.log('Image loaded via proxy successfully');
-          
-          try {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            canvas.width = img.naturalWidth || img.width;
-            canvas.height = img.naturalHeight || img.height;
-            ctx.drawImage(img, 0, 0);
-            resolve(canvas);
-          } catch (error) {
-            console.warn('Proxy canvas creation failed, returning image element:', error);
-            resolve(img);
-          }
-        };
-        
-        img.onerror = (error) => {
-          console.warn('Proxy image loading failed:', error);
-          tryWithoutCanvas();
-        };
-        
-        img.src = proxyUrl;
-      };
-      
-      // Strategy 4: Create a clean canvas for TensorFlow processing
-      const tryWithoutCanvas = () => {
-        console.log('Creating clean canvas for TensorFlow processing');
-        
-        // Create a simple test pattern that TensorFlow can process
-        const canvas = document.createElement('canvas');
-        canvas.width = 224; // Standard input size for many models
-        canvas.height = 224;
-        const ctx = canvas.getContext('2d');
-        
-        // Create a gradient pattern that won't cause issues
-        const gradient = ctx.createLinearGradient(0, 0, 224, 224);
-        gradient.addColorStop(0, '#f0f0f0');
-        gradient.addColorStop(1, '#d0d0d0');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 224, 224);
-        
-        // Add some text to indicate this is a fallback
-        ctx.fillStyle = '#666';
-        ctx.font = '16px Arial';
-        ctx.textAlign = 'center';
-        ctx.fillText('Image Available', 112, 100);
-        ctx.fillText('Manual Review Required', 112, 120);
-        
-        console.log('Fallback canvas created for TensorFlow processing');
-        resolve(canvas);
-      };
-      
-      // Start with CORS approach
-      tryWithCORS();
+      // Load image without CORS to avoid tainted canvas issues
+      img.src = imageUrl;
     });
   };
 
@@ -834,34 +730,62 @@ const Registrations = ({
     setIsValidating(true);
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Manual ID verification...' }
+      [label]: { status: 'verifying', message: 'Analyzing ID document with AI...' }
     }));
 
     try {
       // Load image to verify it's accessible
       const loadedImg = await loadImageWithCORS(imageUrl);
-      console.log('Image loaded for manual ID verification');
+      console.log('Image loaded for ID verification');
       
-      // Try to use TensorFlow models if available, even when face-api.js failed
+      // Enhanced TensorFlow analysis if models are available
       if (tfModels.mobilenet || tfModels.blazeface) {
-        console.log('Using TensorFlow models for manual verification fallback');
+        console.log('Using TensorFlow models for enhanced ID verification');
         
         let documentScore = 0;
         let faceCount = 0;
+        let predictions = [];
+        let isLikelyID = false;
         
-        // Try MobileNet classification
+        // Try MobileNet classification with enhanced keywords
         if (tfModels.mobilenet) {
           try {
-            const predictions = await tfModels.mobilenet.classify(loadedImg);
-            const documentKeywords = ['book', 'paper', 'document', 'card', 'license', 'passport', 'text', 'page'];
-            documentScore = predictions.reduce((score, prediction) => {
-              const isDocumentRelated = documentKeywords.some(keyword => 
-                prediction.className.toLowerCase().includes(keyword)
+            predictions = await tfModels.mobilenet.classify(loadedImg);
+            console.log('MobileNet predictions for ID:', predictions);
+            
+            // Enhanced document detection keywords
+            const documentKeywords = [
+              'document', 'paper', 'card', 'license', 'passport', 'id', 'certificate',
+              'plastic', 'laminated', 'official', 'government', 'identification',
+              'driver', 'national', 'security', 'photo', 'book', 'page', 'text'
+            ];
+            
+            // Calculate document score with better logic
+            documentScore = predictions.reduce((score, pred) => {
+              const hasDocumentKeyword = documentKeywords.some(keyword => 
+                pred.className.toLowerCase().includes(keyword)
               );
-              return isDocumentRelated ? score + prediction.probability : score;
+              return hasDocumentKeyword ? Math.max(score, pred.probability) : score;
             }, 0);
+            
+            // Check for non-document items that should be rejected
+            const nonDocumentKeywords = [
+              'person', 'selfie', 'portrait', 'human', 'man', 'woman',
+              'anime', 'cartoon', 'drawing', 'illustration', 'art', 'painting',
+              'screen', 'monitor', 'computer', 'phone', 'device', 'face'
+            ];
+            
+            const hasNonDocumentItems = predictions.some(pred => 
+              nonDocumentKeywords.some(keyword => 
+                pred.className.toLowerCase().includes(keyword) && pred.probability > 0.3
+              )
+            );
+            
+            isLikelyID = documentScore > 0.15 && !hasNonDocumentItems;
+            
+            console.log(`Enhanced ID analysis - Document score: ${documentScore}, Likely ID: ${isLikelyID}`);
           } catch (error) {
-            console.warn('MobileNet classification failed in manual mode:', error);
+            console.warn('MobileNet classification failed:', error);
           }
         }
         
@@ -870,22 +794,64 @@ const Registrations = ({
           try {
             const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
             faceCount = faces.length;
+            console.log(`BlazeFace detected ${faceCount} faces in ID`);
           } catch (error) {
-            console.warn('BlazeFace detection failed in manual mode:', error);
+            console.warn('BlazeFace detection failed:', error);
           }
         }
         
-        const hasBasicValidation = faceCount > 0 || documentScore > 0.1;
+        // Enhanced validation logic
+        let status = 'manual';
+        let message = 'Manual ID verification required';
+        let details = '';
+        
+        if (isLikelyID && faceCount === 1) {
+          // Perfect case: looks like ID document with exactly one face
+          status = 'valid';
+          message = 'Valid ID document detected';
+          details = `✅ AI Analysis Results:
+• Document confidence: ${(documentScore * 100).toFixed(1)}%
+• Faces detected: ${faceCount} (expected for ID)
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Appears to be a valid ID document`;
+        } else if (isLikelyID && faceCount === 0) {
+          // ID document but no face detected
+          status = 'partial';
+          message = 'ID document detected - Face unclear';
+          details = `⚠️ AI Analysis Results:
+• Document confidence: ${(documentScore * 100).toFixed(1)}%
+• Faces detected: ${faceCount} (face may be unclear or small)
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Appears to be ID document but face detection unclear`;
+        } else if (faceCount > 1) {
+          // Multiple faces detected - likely not a proper ID
+          status = 'invalid';
+          message = 'Multiple faces detected - Not a valid ID';
+          details = `❌ AI Analysis Results:
+• Faces detected: ${faceCount} (IDs should have exactly 1 face)
+• Document confidence: ${(documentScore * 100).toFixed(1)}%
+• Status: Multiple faces suggest this is not a proper ID document`;
+        } else if (documentScore > 0.1) {
+          // Some document-like features but not conclusive
+          status = 'partial';
+          message = 'Possible ID document - Manual review needed';
+          details = `⚠️ AI Analysis Results:
+• Document confidence: ${(documentScore * 100).toFixed(1)}%
+• Faces detected: ${faceCount}
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Some document features detected, manual verification recommended`;
+        } else {
+          // Low confidence - manual review required
+          details = `🔍 AI Analysis Results:
+• Document confidence: ${(documentScore * 100).toFixed(1)}% (low)
+• Faces detected: ${faceCount}
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: AI analysis inconclusive, manual verification required`;
+        }
         
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: hasBasicValidation ? 'partial' : 'manual', 
-            message: hasBasicValidation ? 'Partial TensorFlow verification completed' : 'Manual ID verification required',
-            details: hasBasicValidation 
-              ? `TensorFlow Analysis:\nFaces detected: ${faceCount}\nDocument confidence: ${(documentScore * 100).toFixed(1)}%\nPlease verify additional details manually.`
-              : 'Face-api.js models unavailable and TensorFlow analysis inconclusive. Please verify manually that this is a valid ID document.'
-          }
+          [label]: { status, message, details }
         }));
       } else {
         // No models available at all
@@ -894,143 +860,7 @@ const Registrations = ({
           [label]: { 
             status: 'manual', 
             message: 'Manual ID verification required',
-            details: 'All AI models unavailable. Please verify manually that this is a valid ID document.'
-          }
-        }));
-      }
-    } catch (error) {
-      console.error('Manual ID verification failed:', error);
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { 
-          status: 'error', 
-          message: 'Image loading failed', 
-          details: error.message 
-        }
-      }));
-    } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const verifyID = async (imageUrl, label) => {
-    if (!modelsLoaded) {
-      console.warn('Models not loaded, using manual ID verification');
-      return manualVerifyID(imageUrl, label);
-    }
-
-    setIsValidating(true);
-    setValidationStatus(prev => ({
-      ...prev,
-      [label]: { status: 'verifying', message: 'Verifying ID...' }
-    }));
-
-    try {
-      console.log(`Starting ID verification for: ${label}`);
-      console.log(`Image URL: ${imageUrl}`);
-
-      // Load image with simplified approach for TensorFlow
-      const loadedImg = await loadImageForTensorFlow(imageUrl);
-      console.log('Image loaded successfully');
-      console.log('Image dimensions:', loadedImg.width, 'x', loadedImg.height);
-
-      // Skip face-api.js detection to avoid model loading issues
-      console.log('Skipping face-api.js detection, using TensorFlow BlazeFace only');
-
-      // TensorFlow.js image classification for document verification
-      let imageClassification = null;
-      let documentScore = 0;
-      
-      try {
-        console.log('Starting TensorFlow image classification...');
-        if (tfModels.mobilenet) {
-          const predictions = await tfModels.mobilenet.classify(loadedImg);
-          imageClassification = predictions;
-          console.log('Image classification results:', predictions);
-          
-          // Check if the image contains document-like features
-          const documentKeywords = ['book', 'paper', 'document', 'card', 'license', 'passport', 'text', 'page'];
-          documentScore = predictions.reduce((score, prediction) => {
-            const isDocumentRelated = documentKeywords.some(keyword => 
-              prediction.className.toLowerCase().includes(keyword)
-            );
-            return isDocumentRelated ? score + prediction.probability : score;
-          }, 0);
-          
-          console.log('Document classification score:', documentScore);
-        }
-      } catch (classificationError) {
-        console.error('Image classification failed:', classificationError);
-        imageClassification = null;
-      }
-
-      // Enhanced face detection using BlazeFace
-      let blazeFaceDetections = [];
-      try {
-        if (tfModels.blazeface) {
-          console.log('Starting BlazeFace detection...');
-          blazeFaceDetections = await tfModels.blazeface.estimateFaces(loadedImg, false);
-          console.log(`BlazeFace detected ${blazeFaceDetections.length} faces`);
-        }
-      } catch (blazeFaceError) {
-        console.error('BlazeFace detection failed:', blazeFaceError);
-      }
-
-      // Use only BlazeFace detection results
-      const totalFaces = blazeFaceDetections.length;
-      
-      // Image quality and document verification checks
-      const hasValidFaces = totalFaces > 0;
-      const hasDocumentFeatures = documentScore > 0.1; // Threshold for document-like content
-      const imageQualityGood = loadedImg.width >= 200 && loadedImg.height >= 200;
-
-      console.log('TensorFlow ID validation results:', { 
-        totalFaces,
-        blazeFaceDetections: blazeFaceDetections.length,
-        hasValidFaces,
-        hasDocumentFeatures,
-        documentScore,
-        imageQualityGood,
-        imageClassification: imageClassification?.slice(0, 3) // Top 3 predictions
-      });
-
-      // Enhanced validation logic using TensorFlow results
-      const validationScore = (
-        (hasValidFaces ? 0.4 : 0) +
-        (hasDocumentFeatures ? 0.3 : 0) +
-        (imageQualityGood ? 0.2 : 0) +
-        (documentScore > 0.3 ? 0.1 : 0) // Bonus for high document confidence
-      );
-
-      if (validationScore >= 0.6) {
-        const topPrediction = imageClassification?.[0];
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { 
-            status: 'valid', 
-            message: 'ID appears valid using TensorFlow analysis',
-            details: `Validation Score: ${(validationScore * 100).toFixed(1)}%\n` +
-                    `Faces Detected: ${totalFaces}\n` +
-                    `Document Score: ${(documentScore * 100).toFixed(1)}%\n` +
-                    `Image Quality: ${imageQualityGood ? 'Good' : 'Poor'}\n` +
-                    `Top Classification: ${topPrediction ? `${topPrediction.className} (${(topPrediction.probability * 100).toFixed(1)}%)` : 'N/A'}`
-          }
-        }));
-      } else {
-        let issues = [];
-        if (!hasValidFaces) issues.push('No faces detected');
-        if (!hasDocumentFeatures) issues.push('Low document confidence');
-        if (!imageQualityGood) issues.push('Poor image quality');
-        if (documentScore <= 0.1) issues.push('Not recognized as document');
-
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { 
-            status: 'invalid', 
-            message: `TensorFlow validation failed: ${issues.join(', ')}`,
-            details: `Validation Score: ${(validationScore * 100).toFixed(1)}%\n` +
-                    `Issues: ${issues.join(', ')}\n` +
-                    `Faces: ${totalFaces}, Document Score: ${(documentScore * 100).toFixed(1)}%`
+            details: 'AI models unavailable. Please verify manually that this is a valid ID document.'
           }
         }));
       }
@@ -1040,8 +870,8 @@ const Registrations = ({
         ...prev,
         [label]: { 
           status: 'error', 
-          message: 'Verification failed', 
-          details: error.message 
+          message: 'Image analysis failed', 
+          details: `Error: ${error.message}. Please try again or verify manually.`
         }
       }));
     } finally {
@@ -1049,64 +879,404 @@ const Registrations = ({
     }
   };
 
+  const verifyID = async (imageUrl, label) => {
+    // Always use manual verification due to CORS issues with TensorFlow
+    console.log('Using manual ID verification due to CORS restrictions');
+    return manualVerifyID(imageUrl, label);
+  };
+
   const manualVerifyFace = async (imageUrl, label) => {
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Manual verification triggered...' }
+      [label]: { status: 'verifying', message: 'Analyzing selfie with AI...' }
     }));
 
     try {
       // Load image to verify it's accessible
-      const loadedImg = await loadImageForTensorFlow(imageUrl);
-      console.log('Image loaded for manual verification');
+      const loadedImg = await loadImageWithCORS(imageUrl);
+      console.log('Image loaded for face verification');
       
-      // Try TensorFlow models if available as a fallback
-      if (tfModels.blazeface) {
-        try {
-          const predictions = await tfModels.blazeface.estimateFaces(loadedImg, false);
-          if (predictions.length > 0) {
-            setValidationStatus(prev => ({
-              ...prev,
-              [label]: { 
-                status: 'partial', 
-                message: 'TensorFlow detected faces',
-                details: `BlazeFace detected ${predictions.length} face(s). Please verify manually for quality.`
-              }
-            }));
-            return;
+      // Enhanced TensorFlow analysis if models are available
+      if (tfModels.blazeface || tfModels.mobilenet) {
+        console.log('Using TensorFlow models for enhanced face verification');
+        
+        let faceCount = 0;
+        let faceQuality = 0;
+        let predictions = [];
+        let isLikelySelfie = false;
+        
+        // Try BlazeFace for face detection
+        if (tfModels.blazeface) {
+          try {
+            const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
+            faceCount = faces.length;
+            
+            // Calculate face quality based on detection confidence
+            if (faces.length > 0) {
+              faceQuality = faces.reduce((avg, face) => avg + (face.probability || 0.5), 0) / faces.length;
+            }
+            
+            console.log(`BlazeFace detected ${faceCount} faces with average quality: ${faceQuality}`);
+          } catch (error) {
+            console.warn('BlazeFace detection failed:', error);
           }
-        } catch (tfError) {
-          console.warn('TensorFlow fallback failed:', tfError);
         }
+        
+        // Try MobileNet for image classification
+        if (tfModels.mobilenet) {
+          try {
+            predictions = await tfModels.mobilenet.classify(loadedImg);
+            console.log('MobileNet predictions for selfie:', predictions);
+            
+            // Look for person/face-related classifications
+            const personKeywords = [
+              'person', 'face', 'human', 'man', 'woman', 'boy', 'girl',
+              'portrait', 'selfie', 'head', 'people'
+            ];
+            
+            // Look for non-person items that should be rejected
+            const nonPersonKeywords = [
+              'document', 'paper', 'card', 'license', 'passport', 'id',
+              'anime', 'cartoon', 'drawing', 'illustration', 'art', 'painting',
+              'screen', 'monitor', 'computer', 'phone', 'device'
+            ];
+            
+            const personScore = predictions.reduce((score, pred) => {
+              const hasPersonKeyword = personKeywords.some(keyword => 
+                pred.className.toLowerCase().includes(keyword)
+              );
+              return hasPersonKeyword ? Math.max(score, pred.probability) : score;
+            }, 0);
+            
+            const hasNonPersonItems = predictions.some(pred => 
+              nonPersonKeywords.some(keyword => 
+                pred.className.toLowerCase().includes(keyword) && pred.probability > 0.3
+              )
+            );
+            
+            isLikelySelfie = personScore > 0.2 && !hasNonPersonItems;
+            
+            console.log(`Selfie analysis - Person score: ${personScore}, Likely selfie: ${isLikelySelfie}`);
+          } catch (error) {
+            console.warn('MobileNet classification failed:', error);
+          }
+        }
+        
+        // Enhanced validation logic
+        let status = 'manual';
+        let message = 'Manual verification required';
+        let details = '';
+        
+        if (faceCount === 1 && isLikelySelfie && faceQuality > 0.6) {
+          // Perfect case: exactly one face with good quality
+          status = 'valid';
+          message = 'Valid selfie detected';
+          details = `✅ AI Analysis Results:
+• Faces detected: ${faceCount} (perfect for selfie)
+• Face quality: ${(faceQuality * 100).toFixed(1)}%
+• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Clear selfie with good face detection`;
+        } else if (faceCount === 1 && (isLikelySelfie || faceQuality > 0.4)) {
+          // Good case: one face but lower quality or confidence
+          status = 'partial';
+          message = 'Face detected - Quality check needed';
+          details = `⚠️ AI Analysis Results:
+• Faces detected: ${faceCount}
+• Face quality: ${(faceQuality * 100).toFixed(1)}%
+• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Face detected but please verify image quality`;
+        } else if (faceCount > 1) {
+          // Multiple faces - not ideal for selfie
+          status = 'invalid';
+          message = 'Multiple faces detected';
+          details = `❌ AI Analysis Results:
+• Faces detected: ${faceCount} (selfies should have exactly 1 face)
+• Average face quality: ${(faceQuality * 100).toFixed(1)}%
+• Status: Multiple faces detected - not suitable for ID verification`;
+        } else if (faceCount === 0 && isLikelySelfie) {
+          // Looks like person but no face detected
+          status = 'partial';
+          message = 'Person detected - Face unclear';
+          details = `⚠️ AI Analysis Results:
+• Faces detected: ${faceCount} (face may be unclear, turned away, or too small)
+• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Person detected but face is not clear`;
+        } else {
+          // No clear face or person detected
+          details = `🔍 AI Analysis Results:
+• Faces detected: ${faceCount}
+• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: No clear face detected - manual verification required`;
+        }
+        
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status, message, details }
+        }));
+      } else {
+        // No models available
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { 
+            status: 'manual', 
+            message: 'Manual verification required',
+            details: 'AI models unavailable. Please verify manually that this is a clear selfie.'
+          }
+        }));
       }
-      
-      // Full manual verification required
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { 
-          status: 'manual', 
-          message: 'Manual verification required',
-          details: 'Automatic face detection unavailable. Please verify manually that this is a clear selfie.'
-        }
-      }));
     } catch (error) {
-      console.error('Manual face verification failed:', error);
+      console.error('Face verification failed:', error);
+      
+      // Check if it's a CORS-related error
+      const isCORSError = error.message && (
+        error.message.includes('CORS') || 
+        error.message.includes('Tainted canvases') ||
+        error.message.includes('cross-origin')
+      );
+      
+      if (isCORSError) {
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { 
+            status: 'manual', 
+            message: 'Image accessible - Manual review required', 
+            details: 'Automatic face detection unavailable due to browser security restrictions. Please verify manually.'
+          }
+        }));
+      } else {
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { 
+            status: 'error', 
+            message: 'Image analysis failed', 
+            details: `Error: ${error.message}. Please try again or verify manually.`
+          }
+        }));
+      }
+    }
+  };
+
+  const verifyPaymentProof = async (imageUrl, label) => {
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Analyzing payment proof with AI...' }
+    }));
+
+    try {
+      // Load image to verify it's accessible
+      const loadedImg = await loadImageWithCORS(imageUrl);
+      console.log('Image loaded for payment proof verification');
+      
+      // Enhanced TensorFlow analysis if models are available
+      if (tfModels.mobilenet) {
+        console.log('Using TensorFlow models for payment proof verification');
+        
+        let predictions = [];
+        let paymentScore = 0;
+        let textScore = 0;
+        let screenScore = 0;
+        let isLikelyPaymentProof = false;
+        
+        try {
+          predictions = await tfModels.mobilenet.classify(loadedImg);
+          console.log('MobileNet predictions for payment proof:', predictions);
+          
+          // Keywords that indicate payment/transaction receipts
+          const paymentKeywords = [
+            'receipt', 'document', 'paper', 'text', 'page', 'book',
+            'screen', 'monitor', 'display', 'phone', 'mobile', 'app',
+            'interface', 'application', 'digital', 'electronic'
+          ];
+          
+          // Keywords that indicate text/numbers (important for receipts)
+          const textKeywords = [
+            'text', 'writing', 'print', 'number', 'digit', 'character',
+            'letter', 'word', 'line', 'paragraph', 'document'
+          ];
+          
+          // Keywords that indicate digital screens (GCash, banking apps)
+          const screenKeywords = [
+            'screen', 'monitor', 'display', 'phone', 'mobile', 'smartphone',
+            'tablet', 'computer', 'laptop', 'interface', 'app', 'application'
+          ];
+          
+          // Keywords that should be rejected (not payment proofs)
+          const nonPaymentKeywords = [
+            'person', 'face', 'human', 'man', 'woman', 'selfie', 'portrait',
+            'anime', 'cartoon', 'drawing', 'illustration', 'art', 'painting',
+            'animal', 'nature', 'landscape', 'food', 'vehicle'
+          ];
+          
+          // Calculate scores
+          paymentScore = predictions.reduce((score, pred) => {
+            const hasPaymentKeyword = paymentKeywords.some(keyword => 
+              pred.className.toLowerCase().includes(keyword)
+            );
+            return hasPaymentKeyword ? Math.max(score, pred.probability) : score;
+          }, 0);
+          
+          textScore = predictions.reduce((score, pred) => {
+            const hasTextKeyword = textKeywords.some(keyword => 
+              pred.className.toLowerCase().includes(keyword)
+            );
+            return hasTextKeyword ? Math.max(score, pred.probability) : score;
+          }, 0);
+          
+          screenScore = predictions.reduce((score, pred) => {
+            const hasScreenKeyword = screenKeywords.some(keyword => 
+              pred.className.toLowerCase().includes(keyword)
+            );
+            return hasScreenKeyword ? Math.max(score, pred.probability) : score;
+          }, 0);
+          
+          const hasNonPaymentItems = predictions.some(pred => 
+            nonPaymentKeywords.some(keyword => 
+              pred.className.toLowerCase().includes(keyword) && pred.probability > 0.3
+            )
+          );
+          
+          // Enhanced logic for payment proof detection
+          const hasGoodPaymentScore = paymentScore > 0.2;
+          const hasGoodTextScore = textScore > 0.3;
+          const hasGoodScreenScore = screenScore > 0.25;
+          const combinedScore = (paymentScore * 0.4) + (textScore * 0.4) + (screenScore * 0.2);
+          
+          isLikelyPaymentProof = (hasGoodPaymentScore || hasGoodTextScore || hasGoodScreenScore) && 
+                                !hasNonPaymentItems && 
+                                combinedScore > 0.25;
+          
+          console.log(`Payment proof analysis - Payment: ${paymentScore}, Text: ${textScore}, Screen: ${screenScore}, Combined: ${combinedScore}, Likely proof: ${isLikelyPaymentProof}`);
+          
+        } catch (error) {
+          console.warn('MobileNet classification failed for payment proof:', error);
+        }
+        
+        // Enhanced validation logic for payment proofs
+        let status = 'manual';
+        let message = 'Manual payment verification required';
+        let details = '';
+        
+        if (isLikelyPaymentProof && (paymentScore > 0.3 || textScore > 0.4)) {
+          // High confidence payment proof
+          status = 'valid';
+          message = 'Valid payment proof detected';
+          details = `✅ AI Analysis Results:
+• Payment confidence: ${(paymentScore * 100).toFixed(1)}%
+• Text/Receipt confidence: ${(textScore * 100).toFixed(1)}%
+• Digital screen confidence: ${(screenScore * 100).toFixed(1)}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Appears to be a valid payment receipt/proof
+
+💡 Verification Tips:
+• Check for reference/transaction number
+• Verify amount matches registration fee
+• Confirm date is recent
+• Look for GCash/Bank/Payment platform branding`;
+        } else if (isLikelyPaymentProof || paymentScore > 0.15 || textScore > 0.25) {
+          // Moderate confidence - needs manual review
+          status = 'partial';
+          message = 'Possible payment proof - Manual review needed';
+          details = `⚠️ AI Analysis Results:
+• Payment confidence: ${(paymentScore * 100).toFixed(1)}%
+• Text/Receipt confidence: ${(textScore * 100).toFixed(1)}%
+• Digital screen confidence: ${(screenScore * 100).toFixed(1)}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Some payment-related features detected
+
+🔍 Manual Verification Required:
+• Check for reference/transaction number
+• Verify payment amount and date
+• Confirm it's from legitimate payment platform
+• Look for complete transaction details`;
+        } else {
+          // Low confidence or likely not a payment proof
+          const topPrediction = predictions[0];
+          const isPersonOrFace = topPrediction && 
+            ['person', 'face', 'human', 'man', 'woman', 'selfie', 'portrait'].some(keyword => 
+              topPrediction.className.toLowerCase().includes(keyword)
+            );
+          
+          if (isPersonOrFace) {
+            status = 'invalid';
+            message = 'Not a payment proof - Person/Face detected';
+            details = `❌ AI Analysis Results:
+• Detected: ${topPrediction.className} (${(topPrediction.probability * 100).toFixed(1)}%)
+• Payment confidence: ${(paymentScore * 100).toFixed(1)}% (low)
+• Status: This appears to be a photo of a person, not a payment receipt
+
+❗ Please upload:
+• Screenshot of GCash/Bank transaction
+• Receipt with reference number
+• Payment confirmation from legitimate platform`;
+          } else {
+            details = `🔍 AI Analysis Results:
+• Payment confidence: ${(paymentScore * 100).toFixed(1)}% (low)
+• Text confidence: ${(textScore * 100).toFixed(1)}%
+• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
+• Status: Unable to identify as payment proof
+
+📋 Manual Verification Required:
+• Check if image shows transaction details
+• Look for reference/transaction number
+• Verify payment platform (GCash, Bank, etc.)
+• Confirm amount and date are correct`;
+          }
+        }
+        
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status, message, details }
+        }));
+      } else {
+        // No AI models available - basic manual verification
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { 
+            status: 'manual', 
+            message: 'Manual payment verification required',
+            details: `📋 Manual Verification Checklist:
+• Reference/Transaction Number present
+• Payment amount matches registration fee
+• Date is recent and valid
+• From legitimate payment platform (GCash, Bank, etc.)
+• Shows complete transaction details
+• Clear and readable image
+
+💡 Common Payment Platforms:
+• GCash, PayMaya, Coins.ph
+• BPI, BDO, Metrobank, etc.
+• Online banking screenshots
+• ATM/Bank receipts`
+          }
+        }));
+      }
+    } catch (error) {
+      console.error('Payment proof verification failed:', error);
       setValidationStatus(prev => ({
         ...prev,
         [label]: { 
           status: 'error', 
-          message: 'Image loading failed', 
-          details: error.message 
+          message: 'Image analysis failed', 
+          details: `Error: ${error.message}. Please try again or verify manually.
+
+📋 For manual verification, check:
+• Reference/Transaction number
+• Payment amount and date
+• Legitimate payment platform
+• Complete transaction details`
         }
       }));
     }
   };
 
   const verifyFace = async (imageUrl, label) => {
-    if (!modelsLoaded && !tfModels.blazeface) {
-      console.warn('No models loaded, using manual verification');
-      return manualVerifyFace(imageUrl, label);
-    }
+    // Always use manual verification due to CORS issues with TensorFlow
+    console.log('Using manual face verification due to CORS restrictions');
+    return manualVerifyFace(imageUrl, label);
 
     setValidationStatus(prev => ({
       ...prev,
@@ -1318,22 +1488,30 @@ const Registrations = ({
   const handleManualVerification = () => {
     const { url, label } = currentImage;
     
-    if (!modelsLoaded) {
-      console.warn('Face-api.js models not loaded yet');
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Models not loaded yet' }
-      }));
-      return;
-    }
-
     console.log('Manual verification triggered for:', label);
-    console.log('Models loaded:', modelsLoaded);
     console.log('Image URL:', url);
 
-    if (label.includes('ID')) {
+    if (label.includes('Payment') || label.includes('Proof')) {
+      verifyPaymentProof(url, label);
+    } else if (label.includes('ID')) {
+      if (!modelsLoaded) {
+        console.warn('AI models not loaded yet');
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status: 'error', message: 'AI models not loaded yet' }
+        }));
+        return;
+      }
       verifyID(url, label);
     } else if (label.includes('Selfie')) {
+      if (!modelsLoaded) {
+        console.warn('AI models not loaded yet');
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status: 'error', message: 'AI models not loaded yet' }
+        }));
+        return;
+      }
       verifyFace(url, label);
     }
   };
@@ -1895,15 +2073,7 @@ const processDatabaseApprove = async (reg) => {
     const isPaid = selectedRegistration.paymentStatus === 'paid';
     return (
       <div style={styles.compactField}>
-        <span style={styles.fieldLabel}>Payment Status:</span>
-        <span 
-          style={{ 
-            ...styles.paymentStatus,
-            ...(isPaid ? styles.paidStatus : styles.unpaidStatus)
-          }}
-        >
-          {isPaid ? 'PAID' : 'UNPAID'}
-        </span>
+
       </div>
     );
   };
@@ -2372,7 +2542,7 @@ const processDatabaseApprove = async (reg) => {
               <button
                 style={styles.verifyButton}
                 onClick={handleManualVerification}
-                disabled={!modelsLoaded || isValidating}
+                disabled={(currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof')) ? isValidating : (!modelsLoaded || isValidating)}
                 onFocus={(e) => e.target.style.outline = 'none'}
               >
                 {isValidating ? (
@@ -2382,7 +2552,8 @@ const processDatabaseApprove = async (reg) => {
                   </>
                 ) : (
                   <>
-                    {currentImage.label?.includes('ID') ? 'Verify ID' : 'Verify Face'}
+                    {currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof') ? 'Verify Payment' : 
+                     currentImage.label?.includes('ID') ? 'Verify ID' : 'Verify Face'}
                   </>
                 )}
               </button>

@@ -205,23 +205,28 @@ const CreatePasswordPage = () => {
     }
   };
 
-  const handleSuccessOk = async () => {
+  const handleSuccessOk = () => {
     setSuccessModalVisible(false);
     
-    // Run API call when user clicks OK
+    // Navigate immediately to Login page
+    navigation.navigate('Login');
+    
+    // Run API call in background after navigation
     if (pendingApiData) {
-      try {
-        await registerUser(pendingApiData);
-        console.log('Registration API call completed successfully after user clicked OK');
-      } catch (apiError) {
-        console.error('API call failed after user clicked OK:', apiError);
-        // API failure doesn't affect user experience since data is already in database
-      }
+      // Use setTimeout to ensure navigation happens first
+      setTimeout(async () => {
+        try {
+          await registerUser(pendingApiData);
+          console.log('Registration API call completed successfully in background');
+        } catch (apiError) {
+          console.error('Background API call failed:', apiError);
+          // API failure doesn't affect user experience since data is already in database
+        }
+      }, 100);
+      
       // Clear pending data
       setPendingApiData(null);
     }
-    
-    navigation.navigate('Login');
   };
 
   const handleErrorOk = () => {

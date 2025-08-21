@@ -283,9 +283,6 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       month: 'long',
       day: '2-digit',
       year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false // Ensures 24-hour format
     }).replace(',', '').replace(/(\d{1,2}):(\d{2})/, (match, h, m) => {
       // Ensure 2-digit hour and minute
       const hours = h.padStart(2, '0');

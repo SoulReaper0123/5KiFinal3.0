@@ -18,7 +18,7 @@ import {
 import { useNavigation, useIsFocused } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
-import { auth } from '../../firebaseConfig';
+import { auth, database } from '../../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -69,8 +69,19 @@ export default function AppLoginPage() {
       
       if (credentials) {
         const { email } = JSON.parse(credentials);
-        setShowBiometricOption(true);
-        setEmail(email);
+        
+        // Check if the user is still active before showing biometric option
+        const userStatusInfo = await checkUserStatus(email);
+        
+        if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
+          // User is inactive, don't show biometric option and clear stored credentials
+          await SecureStore.deleteItemAsync('biometricCredentials');
+          setShowBiometricOption(false);
+          setEmail('');
+        } else {
+          setShowBiometricOption(true);
+          setEmail(email);
+        }
       } else {
         setShowBiometricOption(false);
       }
@@ -95,6 +106,19 @@ export default function AppLoginPage() {
         
         if (credentials) {
           const { email, password } = JSON.parse(credentials);
+          
+          // Check user status before proceeding
+          const userStatusInfo = await checkUserStatus(email);
+          
+          if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
+            Alert.alert(
+              'Account Inactive',
+              'Your account has been deactivated. Please contact the administrator for assistance.',
+              [{ text: 'OK' }]
+            );
+            setLoading(false);
+            return;
+          }
           
           // We can't modify auth.currentUser directly, so we'll use SecureStore
           // to store the current user email for the session
@@ -122,6 +146,80 @@ export default function AppLoginPage() {
     }
   };
 
+  const checkUserStatus = async (email) => {
+    try {
+      // Check in Members collection first
+      const membersSnapshot = await database.ref('Members').once('value');
+      const membersData = membersSnapshot.val() || {};
+      
+      // Find user by email in Members collection
+      const memberEntry = Object.entries(membersData).find(([id, member]) => 
+        member.email && member.email.toLowerCase() === email.toLowerCase()
+      );
+      
+      if (memberEntry) {
+        const [memberId, memberData] = memberEntry;
+        return {
+          found: true,
+          status: memberData.status || 'active', // Default to active if status not set
+          role: memberData.role || 'member',
+          id: memberId
+        };
+      }
+      
+      // If not found in Members, check in Users collections
+      const usersSnapshot = await database.ref('Users').once('value');
+      const usersData = usersSnapshot.val() || {};
+      
+      // Check in Admin collection
+      if (usersData.Admin) {
+        const adminEntry = Object.entries(usersData.Admin).find(([id, admin]) => 
+          admin.email && admin.email.toLowerCase() === email.toLowerCase()
+        );
+        if (adminEntry) {
+          const [adminId, adminData] = adminEntry;
+          return {
+            found: true,
+            status: adminData.status || 'active',
+            role: 'admin',
+            id: adminId
+          };
+        }
+      }
+      
+      // Check in CoAdmin collection
+      if (usersData.CoAdmin) {
+        const coAdminEntry = Object.entries(usersData.CoAdmin).find(([id, coAdmin]) => 
+          coAdmin.email && coAdmin.email.toLowerCase() === email.toLowerCase()
+        );
+        if (coAdminEntry) {
+          const [coAdminId, coAdminData] = coAdminEntry;
+          return {
+            found: true,
+            status: coAdminData.status || 'active',
+            role: 'coadmin',
+            id: coAdminId
+          };
+        }
+      }
+      
+      return {
+        found: false,
+        status: null,
+        role: null,
+        id: null
+      };
+    } catch (error) {
+      console.error('Error checking user status:', error);
+      return {
+        found: false,
+        status: null,
+        role: null,
+        id: null
+      };
+    }
+  };
+
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Missing Information', 'Please enter both your email and password to continue');
@@ -139,7 +237,35 @@ export default function AppLoginPage() {
     setLoading(true);
 
     try {
+      // First check user status before attempting Firebase authentication
+      const userStatusInfo = await checkUserStatus(email);
+      
+      if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
+        Alert.alert(
+          'Account Inactive',
+          'Your account has been deactivated. Please contact the administrator for assistance.',
+          [{ text: 'OK' }]
+        );
+        setLoading(false);
+        return;
+      }
+
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      
+      // Double-check status after successful authentication (in case it changed)
+      const finalStatusCheck = await checkUserStatus(email);
+      if (finalStatusCheck.found && finalStatusCheck.status === 'inactive') {
+        // Sign out the user immediately if they're inactive
+        await auth.signOut();
+        Alert.alert(
+          'Account Inactive',
+          'Your account has been deactivated. Please contact the administrator for assistance.',
+          [{ text: 'OK' }]
+        );
+        setLoading(false);
+        return;
+      }
+      
       navigation.navigate('TwoFactorEmail', { 
         email,
         password,

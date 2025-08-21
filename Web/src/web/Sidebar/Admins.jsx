@@ -375,6 +375,67 @@ const styles = {
   },
   nextButton: { 
     right: '50px'
+  },
+  formColumns: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '30px',
+    flex: 1
+  },
+  formColumn: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  formGroup: {
+    marginBottom: '20px',
+    width: '100%'
+  },
+  formLabel: {
+    fontWeight: '600',
+    marginBottom: '5px',
+    display: 'block',
+    fontSize: '14px',
+    color: '#333'
+  },
+  requiredAsterisk: {
+    color: 'red',
+    marginLeft: '3px'
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
+    fontSize: '14px'
+  },
+  formSelect: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
+    backgroundColor: 'white',
+    fontSize: '14px'
+  },
+  errorText: {
+    color: 'red',
+    fontSize: '12px',
+    marginTop: '5px'
+  },
+  fileInputLabel: {
+    display: 'block',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    backgroundColor: '#f8f9fa',
+    cursor: 'pointer',
+    textAlign: 'center',
+    fontSize: '14px',
+    color: '#495057'
+  },
+  fileInput: {
+    display: 'none'
   }
 };
 
@@ -411,8 +472,7 @@ const Admins = () => {
   const [address, setAddress] = useState('');
   const [age, setAge] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [dateText, setDateText] = useState('Select Date of Birth');
+
   const [governmentId, setGovernmentId] = useState('');
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
   const [validIdBackFile, setValidIdBackFile] = useState(null);
@@ -591,14 +651,13 @@ const Admins = () => {
         height: 100vh;
       }
       .modal-container {
-        width: 500px;
-        height: 650px;
+        width: 800px;
+        height: 550px;
         background-color: #fff;
         border-radius: 10px;
         padding: 20px;
         position: relative;
-        overflow-x: hidden;
-        overflow-y: auto;
+        overflow: hidden;
       }
       @media (max-width: 800px) {
         .modal-container {
@@ -618,6 +677,16 @@ const Admins = () => {
       .modal-content {
         padding-bottom: 20px;
         height: calc(100% - 100px);
+        display: flex;
+        flex-direction: column;
+      }
+      .form-columns {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 30px;
+        flex: 1;
+      }
+      .form-column {
         display: flex;
         flex-direction: column;
       }
@@ -707,19 +776,15 @@ const Admins = () => {
         align-items: center;
       }
       .date-input {
-        flex: 1;
+        width: 100%;
         padding: 10px;
         border: 1px solid #ccc;
         border-radius: 5px;
-        margin-right: 10px;
-      }
-      .date-picker-button {
-        padding: 10px;
-        background-color: #2D5783;
-        color: white;
-        border: none;
-        border-radius: 5px;
         cursor: pointer;
+        box-sizing: border-box;
+      }
+      .date-input:hover {
+        border-color: #2D5783;
       }
       .file-input-label {
         display: block;
@@ -900,10 +965,19 @@ const Admins = () => {
 
   const handleDateChange = (date) => {
     setDateOfBirth(date);
-    setDateText(date.toDateString());
-    const currentYear = new Date().getFullYear();
-    const birthYear = date.getFullYear();
-    setAge(currentYear - birthYear);
+    
+    // Calculate accurate age considering full date
+    const today = new Date();
+    const birthDate = new Date(date);
+    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    
+    // Check if birthday hasn't occurred this year yet
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
+    }
+    
+    setAge(calculatedAge);
   };
 
   const handleFileChange = (e, setFileFunction) => {
@@ -1242,7 +1316,7 @@ const Admins = () => {
       setAddress('');
       setAge('');
       setDateOfBirth(new Date());
-      setDateText('Select Date of Birth');
+
       setGovernmentId('');
       setValidIdFrontFile(null);
       setValidIdBackFile(null);
@@ -1395,7 +1469,7 @@ const Admins = () => {
         {/* Add Admin Modal */}
         {modalVisible && (
           <div style={styles.centeredModal}>
-            <div className="modal-container">
+            <div style={styles.modalCard}>
               <button 
                 onClick={() => {
                   setModalVisible(false);
@@ -1410,7 +1484,7 @@ const Admins = () => {
                   setAddress('');
                   setAge('');
                   setDateOfBirth(new Date());
-                  setDateText('Select Date of Birth');
+            
                   setGovernmentId('');
                   setValidIdFrontFile(null);
                   setValidIdBackFile(null);
@@ -1422,260 +1496,263 @@ const Admins = () => {
               >
                 <AiOutlineClose />
               </button>
-              <h3 className="modal-title">New Admin</h3>
-              <div className="modal-content">
-                <div className="form-group">
-                  <label className="form-label">
-                    First Name<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="First Name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    autoCapitalize="words"
-                  />
-                  {firstNameError && <span className="error-text">{firstNameError}</span>}
-                </div>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>New Admin</h2>
+              </div>
+              <div style={styles.modalContent}>
+                <div style={styles.formColumns}>
+                  <div style={styles.formColumn}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        First Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="First Name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                      {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
+                    </div>
 
-                <div className="form-group">
-                  <label className="form-label">Middle Name</label>
-                  <input
-                    className="form-input"
-                    placeholder="Middle Name"
-                    value={middleName}
-                    onChange={(e) => setMiddleName(e.target.value)}
-                    autoCapitalize="words"
-                  />
-                </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Last Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Last Name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                      {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
+                    </div>
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Last Name<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Last Name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    autoCapitalize="words"
-                  />
-                  {lastNameError && <span className="error-text">{lastNameError}</span>}
-                </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Email<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                        autoCapitalize="none"
+                      />
+                      {emailError && <span style={styles.errorText}>{emailError}</span>}
+                    </div>
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Gender<span className="required-asterisk">*</span>
-                  </label>
-                  <select
-                    className="form-select"
-                    value={gender}
-                    onChange={(e) => setGender(e.target.value)}
-                  >
-                    <option value="">Select Gender</option>
-                    {genderOptions.map(option => (
-                      <option key={option.key} value={option.key}>{option.label}</option>
-                    ))}
-                  </select>
-                  {genderError && <span className="error-text">{genderError}</span>}
-                </div>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Place of Birth<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Place of Birth"
+                        value={placeOfBirth}
+                        onChange={(e) => setPlaceOfBirth(e.target.value)}
+                      />
+                      {placeOfBirthError && <span style={styles.errorText}>{placeOfBirthError}</span>}
+                    </div>
 
-                <div className="form-group">
-                  <label className="form-label">
-                    Date of Birth<span className="required-asterisk">*</span>
-                  </label>
-                  <div className="date-input-container">
-                    <input
-                      type="text"
-                      className="date-input"
-                      value={dateText}
-                      readOnly
-                    />
-                    <button
-                      className="date-picker-button"
-                      onClick={() => setShowDatePicker(!showDatePicker)}
-                    >
-                      Select
-                    </button>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Gender<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value)}
+                      >
+                        <option value="">Select Gender</option>
+                        {genderOptions.map(option => (
+                          <option key={option.key} value={option.key}>{option.label}</option>
+                        ))}
+                      </select>
+                      {genderError && <span style={styles.errorText}>{genderError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Government ID<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={governmentId}
+                        onChange={(e) => setGovernmentId(e.target.value)}
+                      >
+                        <option value="">Select Government ID</option>
+                        {governmentIdOptions.map(option => (
+                          <option key={option.key} value={option.label}>{option.label}</option>
+                        ))}
+                      </select>
+                      {governmentIdError && <span style={styles.errorText}>{governmentIdError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Valid ID Front<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {validIdFrontFile ? validIdFrontFile.name : 'Click to upload ID Front'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                        />
+                      </label>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Selfie<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {selfieFile ? selfieFile.name : 'Click to upload Selfie'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setSelfieFile)}
+                        />
+                      </label>
+                    </div>
                   </div>
-                  {showDatePicker && (
-                    <input
-                      type="date"
-                      value={dateOfBirth.toISOString().split('T')[0]}
-                      onChange={(e) => handleDateChange(new Date(e.target.value))}
-                      style={{ marginTop: '10px' }}
-                    />
-                  )}
+
+                  <div style={styles.formColumn}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Middle Name</label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Middle Name"
+                        value={middleName}
+                        onChange={(e) => setMiddleName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Contact Number<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Contact Number (11 digits)"
+                        value={contactNumber}
+                        onChange={(e) => {
+                          const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                          setContactNumber(numericText);
+                        }}
+                        type="tel"
+                      />
+                      {contactNumberError && <span style={styles.errorText}>{contactNumberError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Date of Birth<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        style={styles.formInput}
+                        value={dateOfBirth.toISOString().split('T')[0]}
+                        onChange={(e) => handleDateChange(new Date(e.target.value))}
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Age</label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Age"
+                        value={age}
+                        readOnly
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Civil Status<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={civilStatus}
+                        onChange={(e) => setCivilStatus(e.target.value)}
+                      >
+                        <option value="">Select Civil Status</option>
+                        {civilStatusOptions.map(option => (
+                          <option key={option.key} value={option.key}>{option.label}</option>
+                        ))}
+                      </select>
+                      {civilStatusError && <span style={styles.errorText}>{civilStatusError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Current Address<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Address"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                      />
+                      {addressError && <span style={styles.errorText}>{addressError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Valid ID Back<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {validIdBackFile ? validIdBackFile.name : 'Click to upload ID Back'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setValidIdBackFile)}
+                        />
+                      </label>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Selfie with ID<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {selfieWithIdFile ? selfieWithIdFile.name : 'Click to upload Selfie with ID'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Age</label>
-                  <input
-                    className="form-input"
-                    placeholder="Age"
-                    value={age}
-                    readOnly
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Place of Birth<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Place of Birth"
-                    value={placeOfBirth}
-                    onChange={(e) => setPlaceOfBirth(e.target.value)}
-                  />
-                  {placeOfBirthError && <span className="error-text">{placeOfBirthError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Current Address<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                  />
-                  {addressError && <span className="error-text">{addressError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Civil Status<span className="required-asterisk">*</span>
-                  </label>
-                  <select
-                    className="form-select"
-                    value={civilStatus}
-                    onChange={(e) => setCivilStatus(e.target.value)}
-                  >
-                    <option value="">Select Civil Status</option>
-                    {civilStatusOptions.map(option => (
-                      <option key={option.key} value={option.key}>{option.label}</option>
-                    ))}
-                  </select>
-                  {civilStatusError && <span className="error-text">{civilStatusError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Email<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    autoCapitalize="none"
-                  />
-                  {emailError && <span className="error-text">{emailError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Contact Number<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Contact Number (11 digits)"
-                    value={contactNumber}
-                    onChange={(e) => {
-                      const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
-                      setContactNumber(numericText);
+                <div style={styles.bottomButtons}>
+                  <button 
+                    style={{
+                      ...styles.actionButton,
+                      backgroundColor: '#2D5783',
+                      color: '#FFF'
                     }}
-                    type="tel"
-                  />
-                  {contactNumberError && <span className="error-text">{contactNumberError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Government ID<span className="required-asterisk">*</span>
-                  </label>
-                  <select
-                    className="form-select"
-                    value={governmentId}
-                    onChange={(e) => setGovernmentId(e.target.value)}
+                    onClick={onPressAdd}
                   >
-                    <option value="">Select Government ID</option>
-                    {governmentIdOptions.map(option => (
-                      <option key={option.key} value={option.label}>{option.label}</option>
-                    ))}
-                  </select>
-                  {governmentIdError && <span className="error-text">{governmentIdError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Valid ID Front<span className="required-asterisk">*</span>
-                  </label>
-                  <label className="file-input-label">
-                    {validIdFrontFile ? validIdFrontFile.name : 'Click to upload ID Front'}
-                    <input
-                      type="file"
-                      className="file-input"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
-                    />
-                  </label>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Valid ID Back<span className="required-asterisk">*</span>
-                  </label>
-                  <label className="file-input-label">
-                    {validIdBackFile ? validIdBackFile.name : 'Click to upload ID Back'}
-                    <input
-                      type="file"
-                      className="file-input"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, setValidIdBackFile)}
-                    />
-                  </label>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Selfie<span className="required-asterisk">*</span>
-                  </label>
-                  <label className="file-input-label">
-                    {selfieFile ? selfieFile.name : 'Click to upload Selfie'}
-                    <input
-                      type="file"
-                      className="file-input"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, setSelfieFile)}
-                    />
-                  </label>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Selfie with ID<span className="required-asterisk">*</span>
-                  </label>
-                  <label className="file-input-label">
-                    {selfieWithIdFile ? selfieWithIdFile.name : 'Click to upload Selfie with ID'}
-                    <input
-                      type="file"
-                      className="file-input"
-                      accept="image/*"
-                      onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
-                    />
-                  </label>
-                </div>
-
-                <div className="modal-button-container">
-                  <button className="modal-submit-button" onClick={onPressAdd}>
                     Add Admin
                   </button>
                   <button
-                    className="modal-cancel-button"
+                    style={{
+                      ...styles.actionButton,
+                      backgroundColor: '#6c757d',
+                      color: '#FFF'
+                    }}
                     onClick={() => {
                       setModalVisible(false);
                       setFirstName('');
@@ -1689,7 +1766,7 @@ const Admins = () => {
                       setAddress('');
                       setAge('');
                       setDateOfBirth(new Date());
-                      setDateText('Select Date of Birth');
+                
                       setGovernmentId('');
                       setValidIdFrontFile(null);
                       setValidIdBackFile(null);

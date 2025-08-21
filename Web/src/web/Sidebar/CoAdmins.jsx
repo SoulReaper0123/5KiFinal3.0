@@ -5,12 +5,14 @@ import {
   FaChevronLeft, 
   FaChevronRight,
   FaCheckCircle,
-  FaTimes
+  FaTimes,
+  FaExclamationCircle
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
-import { database, auth } from '../../../../Database/firebaseConfig';
+import { database, auth, storage } from '../../../../Database/firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendAdminCredentialsEmail, sendAdminDeleteData } from '../../../../Server/api';
 
 const generateRandomPassword = () => {
@@ -173,8 +175,183 @@ const styles = {
       outline: 'none',
       boxShadow: 'none'
     }
+  },
+  modalCard: {
+    width: '40%',
+    maxWidth: '800px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalContent: {
+    paddingBottom: '12px',
+    overflowY: 'auto',
+    flex: 1
+  },
+  modalHeader: {
+    borderBottom: '1px solid #eee',
+    paddingBottom: '12px',
+    marginBottom: '12px'
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  columns: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '30px'
+  },
+  leftColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  rightColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  compactField: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '6px',
+    gap: '8px'
+  },
+  fieldLabel: {
+    fontWeight: 'bold',
+    color: '#555',
+    fontSize: '13px',
+    minWidth: '100px'
+  },
+  fieldValue: {
+    textAlign: 'right',
+    flex: 1,
+    wordBreak: 'break-word',
+    color: '#333',
+    fontSize: '13px'
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    margin: '12px 0 8px 0',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #eee',
+    textAlign: 'left',
+    width: '100%'
+  },
+  bottomButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '16px',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #eee'
+  },
+  deleteButton: {
+    backgroundColor: '#f44336',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+    opacity: '0.7'
+  },
+  formColumns: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '30px',
+    flex: 1
+  },
+  formColumn: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  formGroup: {
+    marginBottom: '20px',
+    width: '100%'
+  },
+  formLabel: {
+    fontWeight: '600',
+    marginBottom: '5px',
+    display: 'block',
+    fontSize: '14px',
+    color: '#333'
+  },
+  requiredAsterisk: {
+    color: 'red',
+    marginLeft: '3px'
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
+    fontSize: '14px'
+  },
+  formSelect: {
+    width: '100%',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    boxSizing: 'border-box',
+    backgroundColor: 'white',
+    fontSize: '14px'
+  },
+  errorText: {
+    color: 'red',
+    fontSize: '12px',
+    marginTop: '5px'
+  },
+  fileInputLabel: {
+    display: 'block',
+    padding: '10px',
+    border: '1px solid #ccc',
+    borderRadius: '5px',
+    backgroundColor: '#f8f9fa',
+    cursor: 'pointer',
+    textAlign: 'center',
+    fontSize: '14px',
+    color: '#495057'
+  },
+  fileInput: {
+    display: 'none'
   }
 };
+
+const genderOptions = [
+  { key: 'Male', label: 'Male' },
+  { key: 'Female', label: 'Female' }
+];
+
+const civilStatusOptions = [
+  { key: 'Single', label: 'Single' },
+  { key: 'Married', label: 'Married' },
+  { key: 'Widowed', label: 'Widowed' },
+  { key: 'Separated', label: 'Separated' }
+];
+
+const governmentIdOptions = [
+  { key: 'national', label: 'National ID (PhilSys)' },
+  { key: 'sss', label: 'SSS ID' },
+  { key: 'philhealth', label: 'PhilHealth ID' },
+  { key: 'drivers_license', label: 'Drivers License' }
+];
 
 const CoAdmins = () => {
   const [admins, setAdmins] = useState([]);
@@ -184,10 +361,26 @@ const CoAdmins = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [contactNumber, setContactNumber] = useState('');
+  const [gender, setGender] = useState('');
+  const [civilStatus, setCivilStatus] = useState('');
+  const [placeOfBirth, setPlaceOfBirth] = useState('');
+  const [address, setAddress] = useState('');
+  const [age, setAge] = useState('');
+  const [dateOfBirth, setDateOfBirth] = useState(new Date());
+  const [governmentId, setGovernmentId] = useState('');
+  const [validIdFrontFile, setValidIdFrontFile] = useState(null);
+  const [validIdBackFile, setValidIdBackFile] = useState(null);
+  const [selfieFile, setSelfieFile] = useState(null);
+  const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
   const [emailError, setEmailError] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [contactNumberError, setContactNumberError] = useState('');
+  const [genderError, setGenderError] = useState('');
+  const [civilStatusError, setCivilStatusError] = useState('');
+  const [placeOfBirthError, setPlaceOfBirthError] = useState('');
+  const [addressError, setAddressError] = useState('');
+  const [governmentIdError, setGovernmentIdError] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmAddVisible, setConfirmAddVisible] = useState(false);
@@ -530,12 +723,53 @@ const CoAdmins = () => {
     }
   };
 
+  const handleDateChange = (date) => {
+    setDateOfBirth(date);
+    
+    // Calculate accurate age considering full date
+    const today = new Date();
+    const birthDate = new Date(date);
+    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+    
+    // Check if birthday hasn't occurred this year yet
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      calculatedAge--;
+    }
+    
+    setAge(calculatedAge);
+  };
+
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
+  };
+
+  const uploadImageToStorage = async (file, path) => {
+    try {
+      const fileRef = storageRef(storage, path);
+      await uploadBytes(fileRef, file);
+      const downloadURL = await getDownloadURL(fileRef);
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      throw error;
+    }
+  };
+
   const validateFields = () => {
     let isValid = true;
     setFirstNameError('');
     setLastNameError('');
     setEmailError('');
     setContactNumberError('');
+    setGenderError('');
+    setCivilStatusError('');
+    setPlaceOfBirthError('');
+    setAddressError('');
+    setGovernmentIdError('');
 
     if (!firstName.trim()) {
       setFirstNameError('First name is required');
@@ -563,6 +797,37 @@ const CoAdmins = () => {
       isValid = false;
     }
 
+    if (!gender) {
+      setGenderError('Gender is required');
+      isValid = false;
+    }
+
+    if (!civilStatus) {
+      setCivilStatusError('Civil status is required');
+      isValid = false;
+    }
+
+    if (!placeOfBirth.trim()) {
+      setPlaceOfBirthError('Place of birth is required');
+      isValid = false;
+    }
+
+    if (!address.trim()) {
+      setAddressError('Address is required');
+      isValid = false;
+    }
+
+    if (!governmentId) {
+      setGovernmentIdError('Government ID is required');
+      isValid = false;
+    }
+
+    if (!validIdFrontFile || !validIdBackFile || !selfieFile || !selfieWithIdFile) {
+      setErrorMessage('All image uploads are required');
+      setErrorModalVisible(true);
+      isValid = false;
+    }
+
     return isValid;
   };
 
@@ -580,7 +845,18 @@ const CoAdmins = () => {
       middleName,
       lastName,
       email,
-      contactNumber
+      contactNumber,
+      gender,
+      civilStatus,
+      placeOfBirth,
+      address,
+      age,
+      dateOfBirth,
+      governmentId,
+      validIdFrontFile,
+      validIdBackFile,
+      selfieFile,
+      selfieWithIdFile
     });
     setConfirmAddVisible(true);
   };
@@ -606,6 +882,12 @@ const CoAdmins = () => {
       await auth.currentUser.updatePassword(password);
       await auth.currentUser.sendEmailVerification();
 
+      // Upload images to storage
+      const validIdFrontUrl = await uploadImageToStorage(validIdFrontFile, `CoAdmins/${newId}/validIdFront`);
+      const validIdBackUrl = await uploadImageToStorage(validIdBackFile, `CoAdmins/${newId}/validIdBack`);
+      const selfieUrl = await uploadImageToStorage(selfieFile, `CoAdmins/${newId}/selfie`);
+      const selfieWithIdUrl = await uploadImageToStorage(selfieWithIdFile, `CoAdmins/${newId}/selfieWithId`);
+
       await database.ref(`Users/CoAdmin/${newId}`).set({
         id: newId,
         firstName,
@@ -613,6 +895,17 @@ const CoAdmins = () => {
         lastName,
         email,
         contactNumber,
+        gender,
+        civilStatus,
+        placeOfBirth,
+        address,
+        age,
+        dateOfBirth: dateOfBirth.toISOString().split('T')[0],
+        governmentId,
+        validIdFront: validIdFrontUrl,
+        validIdBack: validIdBackUrl,
+        selfie: selfieUrl,
+        selfieWithId: selfieWithIdUrl,
         dateAdded,
         timeAdded,
         role: 'coadmin',
@@ -627,6 +920,17 @@ const CoAdmins = () => {
         lastName,
         email,
         contactNumber,
+        gender,
+        civilStatus,
+        placeOfBirth,
+        address,
+        age,
+        dateOfBirth: dateOfBirth.toISOString().split('T')[0],
+        governmentId,
+        validIdFront: validIdFrontUrl,
+        validIdBack: validIdBackUrl,
+        selfie: selfieUrl,
+        selfieWithId: selfieWithIdUrl,
         dateAdded,
         timeAdded,
         role: 'coadmin',
@@ -889,7 +1193,7 @@ const CoAdmins = () => {
         {/* Add Admin Modal */}
         {modalVisible && (
           <div style={styles.centeredModal}>
-            <div className="modal-container">
+            <div style={styles.modalCard}>
               <button 
                 onClick={() => {
                   setModalVisible(false);
@@ -898,91 +1202,280 @@ const CoAdmins = () => {
                   setLastName('');
                   setEmail('');
                   setContactNumber('');
+                  setGender('');
+                  setCivilStatus('');
+                  setPlaceOfBirth('');
+                  setAddress('');
+                  setAge('');
+                  setDateOfBirth(new Date());
+                  setGovernmentId('');
+                  setValidIdFrontFile(null);
+                  setValidIdBackFile(null);
+                  setSelfieFile(null);
+                  setSelfieWithIdFile(null);
                 }} 
                 style={styles.closeButton}
                 aria-label="Close modal"
               >
                 <AiOutlineClose />
               </button>
-              <h3 className="modal-title">New Co-Admin</h3>
-              <div className="modal-content">
-                <div className="form-group">
-                  <label className="form-label">
-                    First Name<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="First Name"
-                    value={firstName}
-                    onChange={(e) => setFirstName(e.target.value)}
-                    autoCapitalize="words"
-                  />
-                  {firstNameError && <span className="error-text">{firstNameError}</span>}
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>New Co-Admin</h2>
+              </div>
+              <div style={styles.modalContent}>
+                <div style={styles.formColumns}>
+                  <div style={styles.formColumn}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        First Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="First Name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                      {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Last Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Last Name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                      {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Email<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                        autoCapitalize="none"
+                      />
+                      {emailError && <span style={styles.errorText}>{emailError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Place of Birth<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Place of Birth"
+                        value={placeOfBirth}
+                        onChange={(e) => setPlaceOfBirth(e.target.value)}
+                      />
+                      {placeOfBirthError && <span style={styles.errorText}>{placeOfBirthError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Gender<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={gender}
+                        onChange={(e) => setGender(e.target.value)}
+                      >
+                        <option value="">Select Gender</option>
+                        {genderOptions.map(option => (
+                          <option key={option.key} value={option.key}>{option.label}</option>
+                        ))}
+                      </select>
+                      {genderError && <span style={styles.errorText}>{genderError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Government ID<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={governmentId}
+                        onChange={(e) => setGovernmentId(e.target.value)}
+                      >
+                        <option value="">Select Government ID</option>
+                        {governmentIdOptions.map(option => (
+                          <option key={option.key} value={option.label}>{option.label}</option>
+                        ))}
+                      </select>
+                      {governmentIdError && <span style={styles.errorText}>{governmentIdError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Valid ID Front<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {validIdFrontFile ? validIdFrontFile.name : 'Click to upload ID Front'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                        />
+                      </label>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Selfie<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {selfieFile ? selfieFile.name : 'Click to upload Selfie'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setSelfieFile)}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div style={styles.formColumn}>
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Middle Name</label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Middle Name"
+                        value={middleName}
+                        onChange={(e) => setMiddleName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Contact Number<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Contact Number (11 digits)"
+                        value={contactNumber}
+                        onChange={(e) => {
+                          const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                          setContactNumber(numericText);
+                        }}
+                        type="tel"
+                      />
+                      {contactNumberError && <span style={styles.errorText}>{contactNumberError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Date of Birth<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        type="date"
+                        style={styles.formInput}
+                        value={dateOfBirth.toISOString().split('T')[0]}
+                        onChange={(e) => handleDateChange(new Date(e.target.value))}
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>Age</label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Age"
+                        value={age}
+                        readOnly
+                      />
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Civil Status<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <select
+                        style={styles.formSelect}
+                        value={civilStatus}
+                        onChange={(e) => setCivilStatus(e.target.value)}
+                      >
+                        <option value="">Select Civil Status</option>
+                        {civilStatusOptions.map(option => (
+                          <option key={option.key} value={option.key}>{option.label}</option>
+                        ))}
+                      </select>
+                      {civilStatusError && <span style={styles.errorText}>{civilStatusError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Current Address<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Address"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                      />
+                      {addressError && <span style={styles.errorText}>{addressError}</span>}
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Valid ID Back<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {validIdBackFile ? validIdBackFile.name : 'Click to upload ID Back'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setValidIdBackFile)}
+                        />
+                      </label>
+                    </div>
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Selfie with ID<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {selfieWithIdFile ? selfieWithIdFile.name : 'Click to upload Selfie with ID'}
+                        <input
+                          type="file"
+                          style={styles.fileInput}
+                          accept="image/*"
+                          onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
+                        />
+                      </label>
+                    </div>
+                  </div>
                 </div>
 
-                <div className="form-group">
-                  <label className="form-label">Middle Name</label>
-                  <input
-                    className="form-input"
-                    placeholder="Middle Name"
-                    value={middleName}
-                    onChange={(e) => setMiddleName(e.target.value)}
-                    autoCapitalize="words"
-                  />
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Last Name<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Last Name"
-                    value={lastName}
-                    onChange={(e) => setLastName(e.target.value)}
-                    autoCapitalize="words"
-                  />
-                  {lastNameError && <span className="error-text">{lastNameError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Email<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    type="email"
-                    autoCapitalize="none"
-                  />
-                  {emailError && <span className="error-text">{emailError}</span>}
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">
-                    Contact Number<span className="required-asterisk">*</span>
-                  </label>
-                  <input
-                    className="form-input"
-                    placeholder="Contact Number (11 digits)"
-                    value={contactNumber}
-                    onChange={(e) => {
-                      const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
-                      setContactNumber(numericText);
+                <div style={styles.bottomButtons}>
+                  <button 
+                    style={{
+                      ...styles.actionButton,
+                      backgroundColor: '#2D5783',
+                      color: '#FFF'
                     }}
-                    type="tel"
-                  />
-                  {contactNumberError && <span className="error-text">{contactNumberError}</span>}
-                </div>
-
-                <div className="modal-button-container">
-                  <button className="modal-submit-button" onClick={onPressAdd}>
+                    onClick={onPressAdd}
+                  >
                     Add Co-Admin
                   </button>
                   <button
-                    className="modal-cancel-button"
+                    style={{
+                      ...styles.actionButton,
+                      backgroundColor: '#6c757d',
+                      color: '#FFF'
+                    }}
                     onClick={() => {
                       setModalVisible(false);
                       setFirstName('');
@@ -990,6 +1483,17 @@ const CoAdmins = () => {
                       setLastName('');
                       setEmail('');
                       setContactNumber('');
+                      setGender('');
+                      setCivilStatus('');
+                      setPlaceOfBirth('');
+                      setAddress('');
+                      setAge('');
+                      setDateOfBirth(new Date());
+                      setGovernmentId('');
+                      setValidIdFrontFile(null);
+                      setValidIdBackFile(null);
+                      setSelfieFile(null);
+                      setSelfieWithIdFile(null);
                     }}
                   >
                     Cancel
@@ -1003,7 +1507,7 @@ const CoAdmins = () => {
         {/* Admin Details Modal */}
         {adminModalVisible && (
           <div style={styles.centeredModal}>
-            <div className="modal-container">
+            <div style={styles.modalCard}>
               <button 
                 onClick={() => setAdminModalVisible(false)} 
                 style={styles.closeButton}
@@ -1011,52 +1515,141 @@ const CoAdmins = () => {
               >
                 <AiOutlineClose />
               </button>
-              <div className="modal-content">
-                <h3 className="modal-title">Admin Details</h3>
-                <div className="form-group">
-                  <label className="form-label">ID:</label>
-                  <p>{selectedAdmin?.id || 'N/A'}</p>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Co-Admin Details</h2>
+              </div>
+              <div style={styles.modalContent}>
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+                    <div style={styles.sectionTitle}>Personal Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>ID:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.id || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>First Name:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.firstName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Middle Name:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.middleName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Last Name:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.lastName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Gender:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.gender || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Civil Status:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.civilStatus || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date of Birth:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.dateOfBirth || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Age:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.age || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Place of Birth:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.placeOfBirth || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Address:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.address || 'N/A'}</span>
+                    </div>
+                  </div>
+                  
+                  <div style={styles.rightColumn}>
+                    <div style={styles.sectionTitle}>Contact Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Email:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.email || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Contact Number:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.contactNumber || 'N/A'}</span>
+                    </div>
+                    
+                    <div style={styles.sectionTitle}>Account Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Added:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.dateAdded || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Time Added:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.timeAdded || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Government ID:</span>
+                      <span style={styles.fieldValue}>{selectedAdmin?.governmentId || 'N/A'}</span>
+                    </div>
+                    
+                    <div style={styles.sectionTitle}>Uploaded Documents</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '12px' }}>
+                      {selectedAdmin?.validIdFront && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>Valid ID Front</span>
+                          <img 
+                            src={selectedAdmin.validIdFront} 
+                            alt="Valid ID Front" 
+                            style={{ width: '100px', height: '100px', borderRadius: '4px', border: '1px solid #ddd', objectFit: 'cover', cursor: 'pointer' }}
+                          />
+                        </div>
+                      )}
+                      {selectedAdmin?.validIdBack && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>Valid ID Back</span>
+                          <img 
+                            src={selectedAdmin.validIdBack} 
+                            alt="Valid ID Back" 
+                            style={{ width: '100px', height: '100px', borderRadius: '4px', border: '1px solid #ddd', objectFit: 'cover', cursor: 'pointer' }}
+                          />
+                        </div>
+                      )}
+                      {selectedAdmin?.selfie && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>Selfie</span>
+                          <img 
+                            src={selectedAdmin.selfie} 
+                            alt="Selfie" 
+                            style={{ width: '100px', height: '100px', borderRadius: '4px', border: '1px solid #ddd', objectFit: 'cover', cursor: 'pointer' }}
+                          />
+                        </div>
+                      )}
+                      {selectedAdmin?.selfieWithId && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                          <span style={{ fontSize: '13px', fontWeight: 'bold', color: '#333', marginBottom: '4px' }}>Selfie with ID</span>
+                          <img 
+                            src={selectedAdmin.selfieWithId} 
+                            alt="Selfie with ID" 
+                            style={{ width: '100px', height: '100px', borderRadius: '4px', border: '1px solid #ddd', objectFit: 'cover', cursor: 'pointer' }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <div className="form-group">
-                  <label className="form-label">First Name:</label>
-                  <p>{selectedAdmin?.firstName || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Middle Name:</label>
-                  <p>{selectedAdmin?.middleName || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Last Name:</label>
-                  <p>{selectedAdmin?.lastName || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Email Address:</label>
-                  <p>{selectedAdmin?.email || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Contact Number:</label>
-                  <p>{selectedAdmin?.contactNumber || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Date Added:</label>
-                  <p>{selectedAdmin?.dateAdded || 'N/A'}</p>
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Time Added:</label>
-                  <p>{selectedAdmin?.timeAdded || 'N/A'}</p>
-                </div>
-                <div className="action-buttons-container">
-                  <button
-                    className="delete-button"
-                    onClick={() => {
-                      setPendingDelete(selectedAdmin);
-                      setConfirmDeleteVisible(true);
-                      setAdminModalVisible(false);
-                    }}
-                  >
-                    Delete Admin
-                  </button>
-                </div>
+              </div>
+              <div style={styles.bottomButtons}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.deleteButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={() => {
+                    setPendingDelete(selectedAdmin);
+                    setConfirmDeleteVisible(true);
+                  }}
+                  disabled={isProcessing}
+                >
+                  Delete Co-Admin
+                </button>
               </div>
             </div>
           </div>
@@ -1066,7 +1659,7 @@ const CoAdmins = () => {
         {confirmAddVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
               <p style={styles.modalText}>Are you sure you want to add this admin?</p>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
@@ -1097,7 +1690,7 @@ const CoAdmins = () => {
         {confirmDeleteVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
               <p style={styles.modalText}>Are you sure you want to delete this admin?</p>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 

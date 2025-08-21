@@ -90,9 +90,17 @@ const RegisterPage = () => {
 
   useEffect(() => {
     if (dateOfBirth) {
-      const currentYear = new Date().getFullYear();
-      const birthYear = dateOfBirth.getFullYear();
-      const calculatedAge = currentYear - birthYear;
+      // Calculate accurate age considering full date
+      const today = new Date();
+      const birthDate = new Date(dateOfBirth);
+      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
+      
+      // Check if birthday hasn't occurred this year yet
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        calculatedAge--;
+      }
+      
       setAge(calculatedAge);
       validateAge(calculatedAge);
     }

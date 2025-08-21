@@ -304,9 +304,6 @@ export default function WithdrawMembership() {
           month: 'long',
           day: '2-digit',
           year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
         }).replace(',', '')
           .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
           .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),

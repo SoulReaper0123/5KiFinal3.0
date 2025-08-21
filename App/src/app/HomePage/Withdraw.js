@@ -189,9 +189,6 @@ useEffect(() => {
           month: 'long',
           day: '2-digit',
           year: 'numeric',
-          hour: '2-digit',
-          minute: '2-digit',
-          hour12: false
         })
         .replace(',', '')
         .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)

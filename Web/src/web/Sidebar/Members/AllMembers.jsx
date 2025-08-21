@@ -511,13 +511,14 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Email</th>
+              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '13%' }}>First Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '13%' }}>Last Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '18%' }}>Email</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Savings</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Role</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
@@ -545,6 +546,15 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                   ...(member.status === 'active' ? styles.statusActive : styles.statusInactive)
                 }}>
                   {member.status || 'N/A'}
+                </td>
+                <td style={{
+                  ...styles.tableCell,
+                  fontWeight: 'bold',
+                  color: member.role === 'admin' ? '#d32f2f' : 
+                         member.role === 'coadmin' ? '#f57c00' : '#2e7d32',
+                  textTransform: 'capitalize'
+                }}>
+                  {member.role || 'Member'}
                 </td>
                 <td style={styles.tableCell}>
                   <span 
@@ -601,7 +611,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.phoneNumber || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedMember?.contactNumber || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Gender:</span>
@@ -659,8 +669,20 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                     </span>
                   </div>
                   <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Role:</span>
+                    <span style={{
+                      ...styles.fieldValue,
+                      fontWeight: 'bold',
+                      color: selectedMember?.role === 'admin' ? '#d32f2f' : 
+                             selectedMember?.role === 'coadmin' ? '#f57c00' : '#2e7d32',
+                      textTransform: 'capitalize'
+                    }}>
+                      {selectedMember?.role || 'Member'}
+                    </span>
+                  </div>
+                  <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Date Added:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.dateApproved || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedMember?.dateApproved || selectedMember?.dateAdded || 'N/A'}</span>
                   </div>
                 </div>
                 <div style={styles.rightColumn}>
