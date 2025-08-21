@@ -121,16 +121,39 @@ export default function Inbox() {
             const status = (details.status || 'pending').toLowerCase();
             let displayDate, timestamp;
 
-            // Get the appropriate date based on status
+            // Get the appropriate date based on status and create reliable timestamp
+            const getReliableTimestamp = (dateObj, details) => {
+              // First, check if there's already a timestamp field from web approval
+              if (details.timestamp && typeof details.timestamp === 'number') {
+                return details.timestamp;
+              }
+              
+              if (!dateObj) return Date.now();
+              
+              // Handle Firebase timestamp objects
+              if (typeof dateObj === 'object' && dateObj.seconds) {
+                return dateObj.seconds * 1000;
+              }
+              
+              // Handle string dates
+              if (typeof dateObj === 'string') {
+                const parsed = new Date(dateObj);
+                return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+              }
+              
+              return new Date(dateObj).getTime() || Date.now();
+            };
+
             if (status === 'approved') {
               displayDate = getRawDateFromFirebase(details.dateApproved);
-              timestamp = details.dateApproved?.seconds ? details.dateApproved.seconds * 1000 : Date.now();
+              timestamp = getReliableTimestamp(details.dateApproved, details);
             } else if (status === 'rejected') {
               displayDate = getRawDateFromFirebase(details.dateRejected);
-              timestamp = details.dateRejected?.seconds ? details.dateRejected.seconds * 1000 : Date.now();
+              timestamp = getReliableTimestamp(details.dateRejected, details);
             } else {
+              // For pending items, use dateApplied if available, otherwise current time
               displayDate = 'Pending approval';
-              timestamp = Date.now();
+              timestamp = getReliableTimestamp(details.dateApplied, details);
             }
 
             let amount = 0;
@@ -156,7 +179,7 @@ export default function Inbox() {
                     id: `${type}-${transactionId}-reminder`,
                     title: 'Loan Payment Reminder',
                     message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
-                    timestamp: Date.now(),
+                    timestamp: getReliableTimestamp(details.dueDate, details), // Use due date timestamp for proper sorting
                     displayDate: 'Reminder',
                     email: details.email,
                     icon: 'alarm',
@@ -216,6 +239,7 @@ export default function Inbox() {
         );
 
         filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
+        
         setMessages(filteredMessages);
       } else {
         setMessages([]);

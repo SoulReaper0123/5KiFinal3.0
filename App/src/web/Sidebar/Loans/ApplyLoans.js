@@ -68,6 +68,12 @@ const ApplyLoans = () => {
       const releaseAmountFloat = parseFloat(selectedLoan.releaseAmount); // Ensure this is a float
       const currentDate = new Date();
       const formattedDateApproved = formatDate(currentDate.toISOString());
+      const formattedTimeApproved = currentDate.toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const timestamp = currentDate.getTime(); // Unix timestamp in milliseconds
   
       // Calculate dueDateMonth (30 days from date approved)
       const dueDateMonth = new Date(currentDate);
@@ -88,6 +94,8 @@ const ApplyLoans = () => {
           currentBalance: selectedLoan.currentBalance,
           dateApplied: formatDate(selectedLoan.dateApplied),
           dateApproved: formattedDateApproved,
+          timeApproved: formattedTimeApproved,
+          timestamp: timestamp,
           disbursement: selectedLoan.disbursement,
           email: selectedLoan.email,
           id: selectedLoan.id,
@@ -135,11 +143,14 @@ const ApplyLoans = () => {
         }
   
         // Send a copy of the approved loan to Transactions
-        await set(ref(db, `Transactions/ApplyLoans/${selectedLoan.id}/${selectedLoan.transactionId}`), {
+        await set(ref(db, `Transactions/Loans/${selectedLoan.id}/${selectedLoan.transactionId}`), {
           accountName: selectedLoan.accountName,
           accountNumber: selectedLoan.accountNumber,
           currentBalance: selectedLoan.currentBalance,
           dateApplied: formatDate(selectedLoan.dateApplied), // Format date
+          dateApproved: formattedDateApproved, // Format date
+          timeApproved: formattedTimeApproved,
+          timestamp: timestamp,
           disbursement: selectedLoan.disbursement,
           email: selectedLoan.email,
           id: selectedLoan.id,
@@ -151,9 +162,9 @@ const ApplyLoans = () => {
           processingFee: parseFloat(selectedLoan.processingFee).toFixed(2),
           releaseAmount: parseFloat(selectedLoan.releaseAmount).toFixed(2),
           term: selectedLoan.term,
-          dateApproved: formattedDateApproved, // Format date
           dueDateMonth: formattedDueDateMonth, // Add dueDateMonth
           dueDateTerm: formattedDueDateTerm, // Add dueDateTerm
+          status: 'approved'
         });
   
         // Remove loan from ApplyLoans
@@ -193,17 +204,25 @@ const ApplyLoans = () => {
       const loanAmountFloat = parseFloat(selectedLoan.loanAmount).toFixed(2);
       const currentDate = new Date();
       const formattedDateRejected = formatDate(currentDate.toISOString());
+      const formattedTimeRejected = currentDate.toLocaleString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      });
+      const timestamp = currentDate.getTime(); // Unix timestamp in milliseconds
   
       try {
         // Reference to the existing member's RejectedLoans
         const rejectedLoanRef = ref(db, `RejectedLoans/${selectedLoan.memberId}/${selectedLoan.transactionId}`);
   
-       // Move all loan data to ApprovedLoans
+       // Move all loan data to RejectedLoans
        await set(ref(db, `RejectedLoans/${selectedLoan.id}/${selectedLoan.transactionId}`), {
         accountName: selectedLoan.accountName,
         accountNumber: selectedLoan.accountNumber,
         dateApplied: formatDate(selectedLoan.dateApplied),
         dateRejected: formattedDateRejected,
+        timeRejected: formattedTimeRejected,
+        timestamp: timestamp,
         disbursement: selectedLoan.disbursement,
         email: selectedLoan.email,
         term: Number(parseFloat(selectedLoan.term).toFixed(2)),
@@ -216,6 +235,25 @@ const ApplyLoans = () => {
         releaseAmount: Number(parseFloat(selectedLoan.releaseAmount).toFixed(2)),
         interest: Number(parseFloat(selectedLoan.interest).toFixed(2)),
         interestPercentage: Number(parseFloat(selectedLoan.interestPercentage).toFixed(2)),
+      });
+
+      // Also add to Transactions table for rejected loans
+      await set(ref(db, `Transactions/Loans/${selectedLoan.id}/${selectedLoan.transactionId}`), {
+        accountName: selectedLoan.accountName,
+        accountNumber: selectedLoan.accountNumber,
+        dateApplied: formatDate(selectedLoan.dateApplied),
+        dateRejected: formattedDateRejected,
+        timeRejected: formattedTimeRejected,
+        timestamp: timestamp,
+        disbursement: selectedLoan.disbursement,
+        email: selectedLoan.email,
+        id: selectedLoan.id,
+        firstName: selectedLoan.firstName,
+        lastName: selectedLoan.lastName,
+        transactionId: selectedLoan.transactionId,
+        loanAmount: Number(parseFloat(selectedLoan.loanAmount).toFixed(2)),
+        term: selectedLoan.term,
+        status: 'rejected'
       });
         // Remove loan from ApplyLoans
         await set(ref(db, `Loans/LoanApplications/${selectedLoan.id}`), null);

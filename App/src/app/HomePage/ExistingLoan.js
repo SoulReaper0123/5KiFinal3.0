@@ -75,11 +75,49 @@ const ExistingLoan = () => {
         return new Date(year, month - 1, day, hours, minutes);
       }
 
+      // Handle "Month DD, YYYY at HH:MM" format (like "December 15, 2024 at 10:30")
+      if (typeof dateInput === 'string' && dateInput.includes(' at ')) {
+        const parsed = new Date(dateInput.replace(' at ', ' '));
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+
+      // Handle ISO string or other standard formats
+      if (typeof dateInput === 'string') {
+        const parsed = new Date(dateInput);
+        if (!isNaN(parsed.getTime())) {
+          return parsed;
+        }
+      }
+
       // Fallback to native Date parsing
       return new Date(dateInput);
     } catch (error) {
       console.warn('Date parsing error:', error);
       return new Date(); // Return current date as fallback
+    }
+  };
+
+  // Check if due date is overdue
+  const isDueDateOverdue = (dueDate) => {
+    try {
+      if (!dueDate) return false;
+      
+      const dueDateObj = parseDateTime(dueDate);
+      const today = new Date();
+      
+      // Set time to start of day for accurate comparison
+      const todayStart = new Date(today);
+      todayStart.setHours(0, 0, 0, 0);
+      
+      const dueDateStart = new Date(dueDateObj);
+      dueDateStart.setHours(0, 0, 0, 0);
+      
+      return todayStart > dueDateStart;
+    } catch (error) {
+      console.warn('Due date check error:', error);
+      return false;
     }
   };
 
@@ -346,7 +384,7 @@ const ExistingLoan = () => {
             { 
               label: 'Due Date', 
               value: formatDisplayDate(loanDetails.dueDate || loanDetails.nextDueDate),
-              style: loanStatus === 'Overdue' ? styles.overdueText : null 
+              style: isDueDateOverdue(loanDetails.dueDate || loanDetails.nextDueDate) ? styles.overdueText : null 
             }
           ].map((item, index) => (
             <View key={index} style={styles.summaryRow}>
@@ -496,8 +534,13 @@ const styles = StyleSheet.create({
     color: '#2D5783'
   },
   overdueText: {
-    color: '#D32F2F',
-    fontWeight: 'bold'
+    color: '#FF0000',
+    fontWeight: 'bold',
+    fontSize: 14,
+    backgroundColor: '#FFE6E6',
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   sectionTitle: {
     fontSize: 20,

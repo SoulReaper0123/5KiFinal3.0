@@ -505,6 +505,7 @@ const PayLoan = () => {
         onClose={() => setShowImagePicker(false)}
         onImageSelected={handleImageSelected}
         title="Select Proof of Payment"
+        showCropOptions={true}
       />
     </KeyboardAvoidingView>
   );

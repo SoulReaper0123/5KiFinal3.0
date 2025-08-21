@@ -539,12 +539,15 @@ export default function WithdrawMembership() {
             </View>
           </Modal>
 
-          <Modal transparent={true} visible={isSubmitting}>
-            <View style={styles.loadingModalContainer}>
-              <ActivityIndicator size="large" color="#2D5783" />
-              <Text style={styles.loadingModalText}>Submitting your request...</Text>
+          {/* Loading Overlay */}
+          {isSubmitting && (
+            <View style={styles.loadingOverlay}>
+              <View style={styles.loadingBox}>
+                <ActivityIndicator size="large" color="#4FE7AF" />
+                <Text style={styles.loadingText}>Processing...</Text>
+              </View>
             </View>
-          </Modal>
+          )}
 
           {/* Custom Alert Modal */}
           <CustomModal
@@ -782,15 +785,27 @@ const styles = StyleSheet.create({
     color: '#5D4037',
     flex: 1,
   },
-  loadingModalContainer: {
-    flex: 1,
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
   },
-  loadingModalText: {
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
     marginTop: 10,
     fontSize: 16,
-    color: 'white',
+    fontWeight: '500',
+    color: '#2D5783',
   },
 });

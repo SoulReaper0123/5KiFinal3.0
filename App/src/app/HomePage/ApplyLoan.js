@@ -57,6 +57,8 @@ const ApplyLoan = () => {
   const [confirmAction, setConfirmAction] = useState(null);
   const [successAction, setSuccessAction] = useState(null);
   const [pendingApiData, setPendingApiData] = useState(null);
+  const [hasExistingLoan, setHasExistingLoan] = useState(false);
+  const [hasPendingApplication, setHasPendingApplication] = useState(false);
 
   const accountNumberInput = useRef(null);
 
@@ -153,6 +155,9 @@ const ApplyLoan = () => {
           setUserId(foundUser.id || '');
           setFirstName(foundUser.firstName || '');
           setLastName(foundUser.lastName || '');
+          
+          // Check for existing loans after setting user data
+          await checkExistingLoans(userEmail);
         } else {
           setAlertMessage('User not found');
           setAlertType('error');
@@ -168,6 +173,52 @@ const ApplyLoan = () => {
       setAlertMessage('Error loading user information.');
       setAlertType('error');
       setAlertModalVisible(true);
+    }
+  };
+
+  const checkExistingLoans = async (userEmail) => {
+    try {
+      // Check CurrentLoans table for existing active loans
+      const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+      const currentSnapshot = await get(currentLoansRef);
+
+      if (currentSnapshot.exists()) {
+        const allCurrentLoans = currentSnapshot.val();
+        for (const memberId in allCurrentLoans) {
+          const loans = allCurrentLoans[memberId];
+          for (const loanId in loans) {
+            const currentLoan = loans[loanId];
+            if (currentLoan?.email === userEmail) {
+              setHasExistingLoan(true);
+              return;
+            }
+          }
+        }
+      }
+      setHasExistingLoan(false);
+
+      // Check LoanApplications table for pending applications
+      const applicationsRef = dbRef(database, 'Loans/LoanApplications');
+      const applicationsSnapshot = await get(applicationsRef);
+
+      if (applicationsSnapshot.exists()) {
+        const allApplications = applicationsSnapshot.val();
+        for (const memberId in allApplications) {
+          const applications = allApplications[memberId];
+          for (const applicationId in applications) {
+            const application = applications[applicationId];
+            if (application?.email === userEmail && application?.status === 'pending') {
+              setHasPendingApplication(true);
+              return;
+            }
+          }
+        }
+      }
+      setHasPendingApplication(false);
+    } catch (error) {
+      console.error('Error checking existing loans and applications:', error);
+      setHasExistingLoan(false);
+      setHasPendingApplication(false);
     }
   };
 
@@ -353,6 +404,22 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   const handleSubmit = async () => {
     if (!isFormValid()) {
       setAlertMessage('All required fields must be filled');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    // Check for existing loans first
+    if (hasExistingLoan) {
+      setAlertMessage('You already have an active loan. Please complete your current loan before applying for a new one.');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    // Check for pending applications
+    if (hasPendingApplication) {
+      setAlertMessage('You already have a pending loan application. Please wait for approval or rejection before submitting a new application.');
       setAlertType('error');
       setAlertModalVisible(true);
       return;
@@ -621,6 +688,16 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         type={alertType}
       />
 
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
+
       {/* Custom Confirmation Modal */}
       <CustomConfirmModal
         visible={confirmModalVisible}
@@ -799,6 +876,29 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2D5783',
   },
 });
 

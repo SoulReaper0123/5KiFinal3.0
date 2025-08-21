@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
-import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { getDatabase, ref, get, child } from 'firebase/database';
 import { MaterialIcons } from '@expo/vector-icons';
 import { auth } from '../../App/src/firebaseConfig';
@@ -40,31 +40,24 @@ const Drawer = createDrawerNavigator();
 
 const CustomDrawerContent = ({ user, loading, ...props }) => {
   const [logoutLoading, setLogoutLoading] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Confirm Logout',
-      'Are you sure you want to logout?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'OK',
-          onPress: async () => {
-            setLogoutLoading(true);
-            try {
-              await auth.signOut();
-              props.navigation.navigate('Login');
-            } catch (error) {
-              console.error('Logout error:', error);
-              Alert.alert('Logout Error', 'There was an error during logout');
-            } finally {
-              setLogoutLoading(false);
-            }
-          },
-        },
-      ],
-      { cancelable: false }
-    );
+  const handleLogout = () => {
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    setShowLogoutModal(false);
+    setLogoutLoading(true);
+    try {
+      await auth.signOut();
+      props.navigation.navigate('Login');
+    } catch (error) {
+      console.error('Logout error:', error);
+      Alert.alert('Logout Error', 'There was an error during logout');
+    } finally {
+      setLogoutLoading(false);
+    }
   };
 
   return (
@@ -111,6 +104,38 @@ const CustomDrawerContent = ({ user, loading, ...props }) => {
           <ActivityIndicator size="large" color="white" />
         </View>
       )}
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={showLogoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <MaterialIcons name="logout" size={40} color="#2D5783" style={styles.modalIcon} />
+            <Text style={styles.modalTitle}>Confirm Logout</Text>
+            <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
+            
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => setShowLogoutModal(false)}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={confirmLogout}
+              >
+                <Text style={styles.confirmButtonText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -290,6 +315,67 @@ const styles = StyleSheet.create({
     top: 50,
     right: 20,
     zIndex: 10,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContainer: {
+    backgroundColor: 'white',
+    borderRadius: 15,
+    padding: 25,
+    alignItems: 'center',
+    width: '80%',
+    maxWidth: 300,
+  },
+  modalIcon: {
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: 10,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 25,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 5,
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  confirmButton: {
+    backgroundColor: '#8E0B16',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

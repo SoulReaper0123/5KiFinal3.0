@@ -111,6 +111,12 @@ const PaymentApplications = () => {
       try {
         const currentDate = new Date();
         const dateApproved = formatDate(currentDate);
+        const timeApproved = currentDate.toLocaleString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const timestamp = currentDate.getTime(); // Unix timestamp in milliseconds
         const memberSnapshot = await database.ref(`Members/${selectedPayment.id}`).once('value');
         const memberData = memberSnapshot.val();
   
@@ -214,11 +220,12 @@ const PaymentApplications = () => {
             interest: interestAmount,
             paymentOption: selectedPayment.paymentOption,
             proofOfPaymentUrl: selectedPayment.proofOfPaymentUrl,
-            dateApplied: formatDate(currentDate),
-            dateApproved: formatDate(currentDate),
+            dateApproved: dateApproved,
+            timeApproved: timeApproved,
+            timestamp: timestamp,
           });
-  
-          await set(ref(database, `Transactions/PayLoans/${selectedPayment.id}/${selectedPayment.transactionId}`), {
+
+          await set(ref(database, `Transactions/Payments/${selectedPayment.id}/${selectedPayment.transactionId}`), {
             accountName: selectedPayment.accountName,
             accountNumber: selectedPayment.accountNumber,
             dateApplied: selectedPayment.dateApplied,
@@ -229,8 +236,10 @@ const PaymentApplications = () => {
             interest: interestAmount,
             paymentOption: selectedPayment.paymentOption,
             proofOfPaymentUrl: selectedPayment.proofOfPaymentUrl,
-            dateApplied: formatDate(currentDate),
-            dateApproved: formatDate(currentDate),
+            dateApproved: dateApproved,
+            timeApproved: timeApproved,
+            timestamp: timestamp,
+            status: 'approved'
           });
   
 
@@ -287,6 +296,12 @@ const PaymentApplications = () => {
       try {
         const currentDate = new Date();
         const dateRejected = formatDate(currentDate);
+        const timeRejected = currentDate.toLocaleString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        });
+        const timestamp = currentDate.getTime(); // Unix timestamp in milliseconds
         const memberSnapshot = await database.ref(`Members/${selectedPayment.id}`).once('value');
         const memberData = memberSnapshot.val();
   
@@ -310,7 +325,26 @@ const PaymentApplications = () => {
           transactionId: selectedPayment.transactionId,
           dateApplied: selectedPayment.dateApplied,
           dateRejected: dateRejected,
+          timeRejected: timeRejected,
+          timestamp: timestamp,
           email: selectedPayment.email,
+        });
+
+        // Also add to Transactions table for rejected payments
+        await set(ref(database, `Transactions/Payments/${selectedPayment.id}/${selectedPayment.transactionId}`), {
+          accountName: selectedPayment.accountName,
+          accountNumber: selectedPayment.accountNumber,
+          dateApplied: selectedPayment.dateApplied,
+          email: selectedPayment.email,
+          id: selectedPayment.id,
+          transactionId: selectedPayment.transactionId,
+          amount: parseFloat(selectedPayment.amountToBePaid),
+          paymentOption: selectedPayment.paymentOption,
+          proofOfPaymentUrl: selectedPayment.proofOfPaymentUrl,
+          dateRejected: dateRejected,
+          timeRejected: timeRejected,
+          timestamp: timestamp,
+          status: 'rejected'
         });
 
         setSuccessMessage(`Withdrawal rejected for ${firstName} ${lastName} (Member ID: ${selectedPayment.id}) \nDate Rejected: ${dateRejected}`);

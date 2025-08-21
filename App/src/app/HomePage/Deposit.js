@@ -43,8 +43,6 @@ const Deposit = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('error');
   const [showImageOptions, setShowImageOptions] = useState(false);
-
-  const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [pendingDepositData, setPendingDepositData] = useState(null);
 
   useEffect(() => {
@@ -158,80 +156,7 @@ const Deposit = () => {
     setShowImageOptions(true);
   };
 
-  const handleSelectImage = async (source) => {
-    const { status } = source === 'camera' 
-      ? await ImagePicker.requestCameraPermissionsAsync()
-      : await ImagePicker.requestMediaLibraryPermissionsAsync();
-      
-    if (status !== 'granted') {
-      setAlertMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
-    }
 
-    try {
-      const result = await (source === 'camera' 
-        ? ImagePicker.launchCameraAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: false,
-            quality: 0.8,
-          })
-        : ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
-            allowsEditing: false,
-            quality: 0.8,
-          }));
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        setShowImageOptions(false);
-        if (source === 'camera') {
-          // For camera: automatically use the image as is
-          setProofOfDeposit(result.assets[0].uri);
-        } else {
-          // For gallery: show crop options
-          setSelectedImageUri(result.assets[0].uri);
-          setShowCropOptions(true);
-        }
-      }
-    } catch (error) {
-      console.error('Error selecting image:', error);
-      setAlertMessage('Failed to select image');
-      setAlertType('error');
-      setAlertModalVisible(true);
-    }
-  };
-
-  const handleUseAsIs = () => {
-    if (selectedImageUri) {
-      setProofOfDeposit(selectedImageUri);
-      setShowCropOptions(false);
-      setSelectedImageUri(null);
-    }
-  };
-
-  const handleCropImage = async () => {
-    try {
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.8,
-        uri: selectedImageUri,
-      });
-
-      if (!result.canceled && result.assets && result.assets[0]) {
-        setProofOfDeposit(result.assets[0].uri);
-      }
-      setShowCropOptions(false);
-      setSelectedImageUri(null);
-    } catch (error) {
-      console.error('Error cropping image:', error);
-      setAlertMessage('Failed to crop image');
-      setAlertType('error');
-      setAlertModalVisible(true);
-    }
-  };
 
   const uploadImageToFirebase = async (uri, folder) => {
     try {
@@ -490,7 +415,7 @@ const Deposit = () => {
         visible={showImageOptions}
         onClose={() => setShowImageOptions(false)}
         onImageSelected={(imageUri) => {
-          setSelectedImageUri(imageUri);
+          setProofOfDeposit(imageUri);
         }}
         title="Select Proof of Deposit"
         showCropOptions={true}
@@ -498,13 +423,15 @@ const Deposit = () => {
 
 
 
-      {/* Loading Modal */}
-      <Modal transparent={true} visible={loading}>
-        <View style={styles.modalOverlay}>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.loadingText}>Please wait...</Text>
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
         </View>
-      </Modal>
+      )}
 
       {/* Custom Confirmation Modal */}
       <CustomConfirmModal
@@ -679,15 +606,28 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 18,
   },
-  modalOverlay: {
-    flex: 1,
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 10,
-    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2D5783',
   },
   modalContent: {
     backgroundColor: 'white',

@@ -44,7 +44,8 @@ const Transactions = () => {
 
         const filteredTransactions = parsedTransactions.filter(transaction => transaction.email === email);
 
-        filteredTransactions.sort((a, b) => new Date(b.dateApproved || b.dateApplied) - new Date(a.dateApproved || a.dateApplied));
+        // Sort by timestamp in descending order (newest first)
+        filteredTransactions.sort((a, b) => b.timestamp - a.timestamp);
 
         setTransactions(filteredTransactions);
       } else {
@@ -71,6 +72,31 @@ const Transactions = () => {
             continue;
           }
 
+          // Create timestamp for sorting - prioritize existing timestamp field
+          const getTimestamp = (details) => {
+            // First, check if there's already a timestamp field from web approval
+            if (details.timestamp && typeof details.timestamp === 'number') {
+              return details.timestamp;
+            }
+            
+            // Fallback to date parsing
+            const dateToUse = details.dateApproved || details.dateApplied;
+            if (!dateToUse) return Date.now();
+            
+            // Handle Firebase timestamp objects
+            if (typeof dateToUse === 'object' && dateToUse.seconds) {
+              return dateToUse.seconds * 1000;
+            }
+            
+            // Handle string dates
+            if (typeof dateToUse === 'string') {
+              const parsed = new Date(dateToUse);
+              return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+            }
+            
+            return new Date(dateToUse).getTime() || Date.now();
+          };
+
           const transactionData = {
             memberId,
             type,
@@ -78,6 +104,7 @@ const Transactions = () => {
             email: details.email,
             dateApplied: details.dateApplied,
             dateApproved: details.dateApproved,
+            timestamp: getTimestamp(details),
             amount: 0,
             label: '',
             status: details.status,

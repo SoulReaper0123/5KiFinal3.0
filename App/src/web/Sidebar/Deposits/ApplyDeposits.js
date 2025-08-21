@@ -93,16 +93,25 @@ const ApplyDeposits = () => {
         const memberData = memberSnapshot.val();
   
         const approvalDate = new Date();
-        const options = {
+        const dateOptions = {
           month: 'long',
           day: 'numeric',
           year: 'numeric',
         };
-        const formattedApprovalDate = approvalDate.toLocaleString('en-US', options);
-  
+        const timeOptions = {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        };
+        const formattedApprovalDate = approvalDate.toLocaleString('en-US', dateOptions);
+        const formattedApprovalTime = approvalDate.toLocaleString('en-US', timeOptions);
+        const timestamp = approvalDate.getTime(); // Unix timestamp in milliseconds
+
         await approvedDepositRef.set({
           ...depositData,
           dateApproved: formattedApprovalDate,
+          timeApproved: formattedApprovalTime,
+          timestamp: timestamp,
           memberId: currentMemberId,
           transactionId: currentTransactionId,
           amount: depositData.amountToBeDeposited,
@@ -110,11 +119,13 @@ const ApplyDeposits = () => {
           lastName: memberData.lastName,
           email: memberData.email,
         });
-  
+
         await transactionsRef.set({
           transactionId: currentTransactionId,
           ...depositData,
           dateApproved: formattedApprovalDate,
+          timeApproved: formattedApprovalTime,
+          timestamp: timestamp,
         });
   
         await depositRef.remove();
@@ -174,21 +185,40 @@ const ApplyDeposits = () => {
         const memberData = memberSnapshot.val();
   
         const rejectionDate = new Date();
-        const options = {
+        const dateOptions = {
           month: 'long',
           day: 'numeric',
           year: 'numeric',
         };
-        const formattedRejectionDate = rejectionDate.toLocaleString('en-US', options);
-  
+        const timeOptions = {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: false
+        };
+        const formattedRejectionDate = rejectionDate.toLocaleString('en-US', dateOptions);
+        const formattedRejectionTime = rejectionDate.toLocaleString('en-US', timeOptions);
+        const timestamp = rejectionDate.getTime(); // Unix timestamp in milliseconds
+
         await database.ref(`Deposits/RejectedDeposits/${currentMemberId}/${currentTransactionId}`).set({
           ...depositData,
           dateRejected: formattedRejectionDate,
+          timeRejected: formattedRejectionTime,
+          timestamp: timestamp,
           memberId: currentMemberId,
           transactionId: currentTransactionId,
           firstName: memberData.firstName,
           lastName: memberData.lastName,
           email: memberData.email,
+        });
+
+        // Also update the Transactions table for rejected deposits
+        await database.ref(`Transactions/Deposits/${currentMemberId}/${currentTransactionId}`).set({
+          transactionId: currentTransactionId,
+          ...depositData,
+          dateRejected: formattedRejectionDate,
+          timeRejected: formattedRejectionTime,
+          timestamp: timestamp,
+          status: 'rejected'
         });
   
         await depositRef.remove();

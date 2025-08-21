@@ -55,13 +55,20 @@ const WithdrawApplications = () => {
   
     try {
       const currentDate = new Date();
-      const options = {
+      const dateOptions = {
         month: 'long', 
         day: 'numeric',
         year: 'numeric',
       };
+      const timeOptions = {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      };
 
-      const dateApproved = currentDate.toLocaleString('en-US', options);
+      const dateApproved = currentDate.toLocaleString('en-US', dateOptions);
+      const timeApproved = currentDate.toLocaleString('en-US', timeOptions);
+      const timestamp = currentDate.getTime(); // Unix timestamp in milliseconds
 
       
             // Show success message modal
@@ -72,11 +79,22 @@ const WithdrawApplications = () => {
   
       // Step 1: Move the transaction to the ApprovedWithdraws table
       const approvedWithdrawRef = ref(database, `ApprovedWithdraws/${memberId}/${transactionId}`);
-      await set(approvedWithdrawRef, { ...item, dateApproved });
+      await set(approvedWithdrawRef, { 
+        ...item, 
+        dateApproved,
+        timeApproved,
+        timestamp
+      });
   
       // Step 2: Log the transaction
       const transactionRef = ref(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
-      await set(transactionRef, { ...item, dateApproved });
+      await set(transactionRef, { 
+        ...item, 
+        dateApproved,
+        timeApproved,
+        timestamp,
+        status: 'approved'
+      });
   
       // Step 3: Get the member's current balance
       const memberBalanceRef = ref(database, `Members/${memberId}/balance`);
@@ -127,11 +145,18 @@ const WithdrawApplications = () => {
     const { memberId, transactionId, amountWithdrawn, email, firstName, lastName } = item;
   
     // Create a new date object and format it
-    const dateRejected = new Date().toLocaleString('en-US', {
+    const currentDate = new Date();
+    const dateRejected = currentDate.toLocaleString('en-US', {
       month: 'long',
       day: 'numeric',
       year: 'numeric',
     });
+    const timeRejected = currentDate.toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const timestamp = currentDate.getTime(); // Unix timestamp in milliseconds
 
     
                   // Show success message modal
@@ -142,12 +167,24 @@ const WithdrawApplications = () => {
       // Create a new object to store the rejection details
       const updatedItem = { 
         ...item, 
-        dateRejected // Add dateRejected to the item
+        dateRejected,
+        timeRejected,
+        timestamp
       };
   
       // Move the data to the RejectedWithdraws table and include dateRejected
       const rejectedWithdrawRef = ref(database, `RejectedWithdraws/${memberId}/${transactionId}`);
       await set(rejectedWithdrawRef, updatedItem);
+
+      // Also add to Transactions table for rejected withdrawals
+      const transactionRef = ref(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
+      await set(transactionRef, { 
+        ...item, 
+        dateRejected,
+        timeRejected,
+        timestamp,
+        status: 'rejected'
+      });
   
       // Remove the withdrawal from the Withdrawals table
       const withdrawalRef = ref(database, `Withdrawals/${memberId}/${transactionId}`);
