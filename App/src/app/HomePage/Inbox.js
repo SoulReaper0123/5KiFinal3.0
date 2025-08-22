@@ -143,6 +143,11 @@ export default function Inbox() {
                 return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
               }
               
+              // Handle Date objects
+              if (dateObj instanceof Date) {
+                return dateObj.getTime();
+              }
+              
               return new Date(dateObj).getTime() || Date.now();
             };
 

@@ -162,7 +162,7 @@ const ApplyLoan = () => {
         setLoanTypeOptions(formattedLoanTypes);
       }
     } catch (error) {
-      console.error('Error fetching system settings:', error);
+      console.error('Error fetching system settings:', error?.message || error || 'Unknown error');
       // Keep defaults if error
     }
   };
@@ -204,7 +204,7 @@ const ApplyLoan = () => {
         setAlertModalVisible(true);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error);
+      console.error('Error fetching user data:', error?.message || error || 'Unknown error');
       setAlertMessage('Error loading user information.');
       setAlertType('error');
       setAlertModalVisible(true);
@@ -351,7 +351,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     await set(applicationRef, applicationDataWithMeta);
     return true;
   } catch (error) {
-    console.error('Failed to store loan application:', error);
+    console.error('Failed to store loan application:', error?.message || error || 'Unknown error');
     setAlertMessage('Failed to submit loan application');
     setAlertType('error');
     setAlertModalVisible(true);
@@ -379,7 +379,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         console.log('API call failed, but user already navigated away');
       }
     } catch (error) {
-      console.log('API error in background (non-critical):', error);
+      console.log('API error in background (non-critical):', error?.message || error || 'Unknown API error');
       // Don't show error to user since they've already moved on
     }
   };
@@ -449,7 +449,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     setAlertModalVisible(true);
 
   } catch (error) {
-    console.error('Error during loan submission:', error);
+    console.error('Error during loan submission:', error?.message || error || 'Unknown error');
     setAlertMessage('An unexpected error occurred. Please try again later.');
     setAlertType('error');
     setAlertModalVisible(true);

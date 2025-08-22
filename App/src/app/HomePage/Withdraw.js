@@ -398,7 +398,7 @@ useEffect(() => {
                 await MemberWithdraw(pendingApiData);
                 console.log('Withdraw API call completed successfully in background');
               } catch (apiError) {
-                console.error('Background API call failed:', apiError);
+                console.error('Background API call failed:', apiError?.message || apiError || 'Unknown API error');
                 // API failure doesn't affect user experience since data is already in database
               }
               // Clear pending data

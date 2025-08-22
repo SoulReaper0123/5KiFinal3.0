@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
-import { Pie, Bar } from 'react-chartjs-2';
+import { Pie, Bar, Line } from 'react-chartjs-2';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 import { SendLoanReminder } from '../../../../../Server/api';
 import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner } from 'react-icons/fa';
@@ -242,6 +242,7 @@ const Dashboard = () => {
         fundsSnapshot,
         fiveKISnapshot,
         savingsHistorySnapshot,
+        fundsHistorySnapshot,
         membersSnapshot,
         currentLoansSnapshot,
         approvedLoansSnapshot,
@@ -250,6 +251,7 @@ const Dashboard = () => {
         database.ref('Settings/Funds').once('value'),
         database.ref('Settings/Savings').once('value'),
         database.ref('Settings/SavingsHistory').once('value'),
+        database.ref('Settings/FundsHistory').once('value'),
         database.ref('Members').once('value'),
         database.ref('Loans/CurrentLoans').once('value'),
         database.ref('Loans/ApprovedLoans').once('value'),
@@ -259,6 +261,10 @@ const Dashboard = () => {
       const availableFunds = fundsSnapshot.val() || 0;
       const fiveKISavings = fiveKISnapshot.val() || 0;
       const savingsHistory = Object.entries(savingsHistorySnapshot.val() || {}).map(([date, amount]) => ({
+        date,
+        amount: parseFloat(amount) || 0
+      }));
+      const fundsHistory = Object.entries(fundsHistorySnapshot.val() || {}).map(([date, amount]) => ({
         date,
         amount: parseFloat(amount) || 0
       }));
@@ -273,7 +279,7 @@ const Dashboard = () => {
       let activeBorrowers = 0;
       const loanItems = [];
       const borrowerSet = new Set();
-      const monthlyEarnings = Array(12).fill(0);
+      const monthlyFunds = Array(12).fill(0);
 
       Object.entries(currentLoansData).forEach(([memberId, loans]) => {
         Object.entries(loans).forEach(([transactionId, loan]) => {
@@ -312,29 +318,35 @@ const Dashboard = () => {
 
       activeBorrowers = borrowerSet.size;
 
-      Object.values(paymentsData).forEach(payment => {
-        if (payment.dateApproved) {
-          const date = parseCustomDate(payment.dateApproved);
-          if (date && date.getFullYear() === parseInt(selectedYear)) {
-            const month = date.getMonth();
-            monthlyEarnings[month] += parseFloat(payment.interestPaid || 0);
-          }
+      // Process funds history data for the selected year
+      fundsHistory.forEach(item => {
+        const date = new Date(item.date);
+        if (date.getFullYear() === parseInt(selectedYear)) {
+          const month = date.getMonth();
+          // Get the latest funds amount for each month (or sum if multiple entries)
+          monthlyFunds[month] = Math.max(monthlyFunds[month], item.amount);
         }
       });
 
-      const formattedEarnings = [
-        { month: 'Jan', earnings: monthlyEarnings[0] },
-        { month: 'Feb', earnings: monthlyEarnings[1] },
-        { month: 'Mar', earnings: monthlyEarnings[2] },
-        { month: 'Apr', earnings: monthlyEarnings[3] },
-        { month: 'May', earnings: monthlyEarnings[4] },
-        { month: 'Jun', earnings: monthlyEarnings[5] },
-        { month: 'Jul', earnings: monthlyEarnings[6] },
-        { month: 'Aug', earnings: monthlyEarnings[7] },
-        { month: 'Sep', earnings: monthlyEarnings[8] },
-        { month: 'Oct', earnings: monthlyEarnings[9] },
-        { month: 'Nov', earnings: monthlyEarnings[10] },
-        { month: 'Dec', earnings: monthlyEarnings[11] },
+      // If no funds history data, use current available funds for current month
+      if (monthlyFunds.every(amount => amount === 0) && parseInt(selectedYear) === new Date().getFullYear()) {
+        const currentMonth = new Date().getMonth();
+        monthlyFunds[currentMonth] = availableFunds;
+      }
+
+      const formattedFunds = [
+        { month: 'Jan', funds: monthlyFunds[0] },
+        { month: 'Feb', funds: monthlyFunds[1] },
+        { month: 'Mar', funds: monthlyFunds[2] },
+        { month: 'Apr', funds: monthlyFunds[3] },
+        { month: 'May', funds: monthlyFunds[4] },
+        { month: 'Jun', funds: monthlyFunds[5] },
+        { month: 'Jul', funds: monthlyFunds[6] },
+        { month: 'Aug', funds: monthlyFunds[7] },
+        { month: 'Sep', funds: monthlyFunds[8] },
+        { month: 'Oct', funds: monthlyFunds[9] },
+        { month: 'Nov', funds: monthlyFunds[10] },
+        { month: 'Dec', funds: monthlyFunds[11] },
       ];
 
       setFundsData({
@@ -344,11 +356,12 @@ const Dashboard = () => {
         fiveKISavings,
         activeBorrowers,
         totalMembers,
-        savingsHistory
+        savingsHistory,
+        fundsHistory
       });
       
       setLoanData(loanItems);
-      setEarningsData(formattedEarnings);
+      setEarningsData(formattedFunds);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -396,15 +409,22 @@ const Dashboard = () => {
     ],
   };
 
-  const earningsBarData = {
+  const fundsLineData = {
     labels: earningsData.map(item => item.month),
     datasets: [
       {
-        label: 'Interest Earnings',
-        data: earningsData.map(item => item.earnings),
-        backgroundColor: '#2D5783',
+        label: 'Available Funds',
+        data: earningsData.map(item => item.funds),
+        backgroundColor: 'rgba(45, 87, 131, 0.1)',
         borderColor: '#2D5783',
-        borderWidth: 1,
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 6,
+        pointHoverRadius: 8,
+        pointBackgroundColor: '#2D5783',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
       },
       {
         label: 'Savings',
@@ -415,13 +435,16 @@ const Dashboard = () => {
           });
           return monthSavings.reduce((sum, item) => sum + item.amount, 0);
         }),
-        backgroundColor: '#10B981',
+        backgroundColor: 'rgba(16, 185, 129, 0.1)',
         borderColor: '#10B981',
-        borderWidth: 1,
-        type: 'line',
+        borderWidth: 3,
+        fill: true,
+        tension: 0.4,
         pointRadius: 6,
         pointHoverRadius: 8,
-        yAxisID: 'y',
+        pointBackgroundColor: '#10B981',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 2,
       }
     ],
   };
@@ -482,15 +505,15 @@ const Dashboard = () => {
     }
   };
 
-  const earningsChartOptions = {
+  const fundsChartOptions = {
     ...chartOptions,
     scales: {
       y: {
         ...chartOptions.scales.y,
         ticks: {
           ...chartOptions.scales.y.ticks,
-          stepSize: 50,
-          suggestedMax: 200
+          stepSize: 1000,
+          suggestedMax: Math.ceil(fundsData.availableFunds / 1000) * 1000 || 10000
         }
       }
     }
@@ -891,7 +914,7 @@ const Dashboard = () => {
             }}
             onClick={() => setSelectedChart('earnings')}
           >
-            Earnings
+            Funds & Savings
           </button>
         </div>
 
@@ -913,7 +936,7 @@ const Dashboard = () => {
           {selectedChart === 'earnings' && (
             <>
               <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Monthly Earnings ({selectedYear})</h3>
+                <h3 style={styles.chartTitle}>Funds & Savings Growth ({selectedYear})</h3>
                 <select 
                   value={selectedYear}
                   onChange={(e) => setSelectedYear(e.target.value)}
@@ -925,9 +948,9 @@ const Dashboard = () => {
                 </select>
               </div>
               <div style={styles.chartWrapper}>
-                <Bar 
-                  data={earningsBarData} 
-                  options={earningsChartOptions}
+                <Line 
+                  data={fundsLineData} 
+                  options={fundsChartOptions}
                 />
               </div>
             </>

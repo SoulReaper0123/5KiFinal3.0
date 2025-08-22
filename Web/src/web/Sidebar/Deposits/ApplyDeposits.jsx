@@ -645,6 +645,7 @@ const ApplyDeposits = ({
           ...deposit, 
           dateApproved: approvalDate,
           timeApproved: approvalTime,
+          timestamp: now.getTime(),
           status
         };
 
@@ -660,6 +661,11 @@ const ApplyDeposits = ({
         const fundSnap = await fundsRef.once('value');
         const updatedFund = (parseFloat(fundSnap.val()) || 0) + parseFloat(deposit.amountToBeDeposited);
         await fundsRef.set(updatedFund);
+        
+        // Log to FundsHistory for dashboard chart
+        const timestamp = now.toISOString();
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        await fundsHistoryRef.set(updatedFund);
 
         // Remove from pending AFTER all other operations succeed
         await pendingRef.remove();
@@ -687,6 +693,7 @@ const ApplyDeposits = ({
         ...deposit, 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
+        timestamp: now.getTime(),
         status,
         rejectionReason: rejectionReason || 'Rejected by admin'
       };

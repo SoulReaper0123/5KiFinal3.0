@@ -175,6 +175,64 @@ const ExistingLoan = () => {
     }
   };
 
+  // Alternative simpler overdue check for debugging
+  const isSimplyOverdue = (dueDate) => {
+    try {
+      if (!dueDate) return false;
+      
+      console.log('=== SIMPLE OVERDUE CHECK START ===');
+      console.log('Input due date:', dueDate, typeof dueDate);
+      
+      // Handle different date formats
+      let dueDateObj;
+      
+      if (typeof dueDate === 'string') {
+        // Try direct parsing first
+        dueDateObj = new Date(dueDate);
+        
+        // If that fails, try manual parsing for "August 20, 2025" format
+        if (isNaN(dueDateObj.getTime())) {
+          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+          
+          const parts = dueDate.split(' ');
+          if (parts.length === 3) {
+            const monthName = parts[0];
+            const day = parseInt(parts[1].replace(',', ''));
+            const year = parseInt(parts[2]);
+            const monthIndex = monthNames.indexOf(monthName);
+            
+            if (monthIndex !== -1) {
+              dueDateObj = new Date(year, monthIndex, day);
+            }
+          }
+        }
+      } else {
+        dueDateObj = new Date(dueDate);
+      }
+      
+      const today = new Date();
+      
+      // Set both dates to start of day for accurate comparison
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const dueDateStart = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
+      
+      const isOverdue = todayStart > dueDateStart;
+      
+      console.log('Due date string:', dueDate);
+      console.log('Parsed due date:', dueDateObj);
+      console.log('Due date (start of day):', dueDateStart);
+      console.log('Today (start of day):', todayStart);
+      console.log('Is overdue (simple):', isOverdue);
+      console.log('=== SIMPLE OVERDUE CHECK END ===');
+      
+      return isOverdue;
+    } catch (error) {
+      console.warn('Simple overdue check error:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     loadUserData();
   }, [route.params]);
@@ -450,29 +508,35 @@ const ExistingLoan = () => {
             </Text>
           </View>
           
-          {[
-            { label: 'Loan ID', value: loanDetails.transactionId || 'N/A' },
-            { label: 'Loan Type', value: loanDetails.loanType || 'N/A' },
-            { label: 'Approved Amount', value: `₱${(loanDetails.loanAmount || 0).toFixed(2)}` },
-            { label: 'Outstanding Balance', value: `₱${(loanDetails.outstandingBalance || 0).toFixed(2)}` },
-            { label: 'Date Applied', value: formatDisplayDate(loanDetails.dateApplied) },
-            { label: 'Date Approved', value: formatDisplayDate(loanDetails.dateApproved) },
-            { label: 'Interest Rate', value: `${(loanDetails.interestRate || 0).toFixed(2)}%` },
-            { label: 'Total Interest', value: `₱${(loanDetails.interest || 0).toFixed(2)}` },
-            { label: 'Terms', value: loanDetails.term ? `${loanDetails.term} months` : 'N/A' },
-            { label: 'Monthly Payment', value: `₱${(loanDetails.monthlyPayment || 0).toFixed(2)}` },
-            { 
-              label: 'Due Date', 
-              value: formatDisplayDate(loanDetails.dueDate || loanDetails.nextDueDate),
-              isOverdue: (() => {
-                const dueDate = loanDetails.dueDate || loanDetails.nextDueDate;
-                console.log('Checking overdue for display - Due date:', dueDate);
-                const result = isDueDateOverdue(dueDate);
-                console.log('Overdue result for display:', result);
-                return result;
-              })()
-            }
-          ].map((item, index) => (
+          {(() => {
+            // Check if due date is overdue outside of the array
+            const currentDueDate = loanDetails.dueDate || loanDetails.nextDueDate;
+            const isCurrentDueDateOverdue = isSimplyOverdue(currentDueDate);
+            
+            console.log('=== FINAL OVERDUE CHECK FOR UI ===');
+            console.log('Current due date:', currentDueDate);
+            console.log('Is overdue for UI:', isCurrentDueDateOverdue);
+            console.log('Today:', new Date().toDateString());
+            console.log('================================');
+
+            return [
+              { label: 'Loan ID', value: loanDetails.transactionId || 'N/A' },
+              { label: 'Loan Type', value: loanDetails.loanType || 'N/A' },
+              { label: 'Approved Amount', value: `₱${(loanDetails.loanAmount || 0).toFixed(2)}` },
+              { label: 'Outstanding Balance', value: `₱${(loanDetails.outstandingBalance || 0).toFixed(2)}` },
+              { label: 'Date Applied', value: formatDisplayDate(loanDetails.dateApplied) },
+              { label: 'Date Approved', value: formatDisplayDate(loanDetails.dateApproved) },
+              { label: 'Interest Rate', value: `${(loanDetails.interestRate || 0).toFixed(2)}%` },
+              { label: 'Total Interest', value: `₱${(loanDetails.interest || 0).toFixed(2)}` },
+              { label: 'Terms', value: loanDetails.term ? `${loanDetails.term} months` : 'N/A' },
+              { label: 'Monthly Payment', value: `₱${(loanDetails.monthlyPayment || 0).toFixed(2)}` },
+              { 
+                label: 'Due Date', 
+                value: formatDisplayDate(currentDueDate),
+                isOverdue: isCurrentDueDateOverdue
+              }
+            ];
+          })().map((item, index) => (
             <View key={index} style={styles.summaryRow}>
               <Text style={styles.summaryLabel}>{item.label}</Text>
               <View style={styles.summaryValueContainer}>

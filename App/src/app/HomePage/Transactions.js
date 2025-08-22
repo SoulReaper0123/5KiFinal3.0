@@ -85,8 +85,8 @@ const Transactions = () => {
               return details.timestamp;
             }
             
-            // Fallback to date parsing
-            const dateToUse = details.dateApproved || details.dateApplied;
+            // Fallback to date parsing - prioritize approved date, then applied date
+            const dateToUse = details.dateApproved || details.dateRejected || details.dateApplied;
             if (!dateToUse) return Date.now();
             
             // Handle Firebase timestamp objects
@@ -98,6 +98,11 @@ const Transactions = () => {
             if (typeof dateToUse === 'string') {
               const parsed = new Date(dateToUse);
               return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+            }
+            
+            // Handle Date objects
+            if (dateToUse instanceof Date) {
+              return dateToUse.getTime();
             }
             
             return new Date(dateToUse).getTime() || Date.now();

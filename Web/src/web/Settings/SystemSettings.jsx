@@ -4,6 +4,7 @@ import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
+import { FaEdit, FaSave } from 'react-icons/fa';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
@@ -149,6 +150,7 @@ const SystemSettings = () => {
   const [deleteLoanTypeModalVisible, setDeleteLoanTypeModalVisible] = useState(false);
   const [loanTypeToDelete, setLoanTypeToDelete] = useState('');
   const [editMode, setEditMode] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orientationCopied, setOrientationCopied] = useState(false);
@@ -359,41 +361,43 @@ const SystemSettings = () => {
 
   const handleSave = () => setConfirmationModalVisible(true);
 
-  const confirmSave = () => {
-    const settingsRef = ref(db, 'Settings/');
-    const parsedInterest = {};
-    for (let key in settings.InterestRate) {
-      const val = parseFloat(settings.InterestRate[key]);
-      if (!isNaN(val)) parsedInterest[key] = val;
+  const confirmSave = async () => {
+    setActionInProgress(true);
+    try {
+      const settingsRef = ref(db, 'Settings/');
+      const parsedInterest = {};
+      for (let key in settings.InterestRate) {
+        const val = parseFloat(settings.InterestRate[key]);
+        if (!isNaN(val)) parsedInterest[key] = val;
+      }
+
+      const updatedData = {
+        LoanPercentage: parseFloat(settings.LoanPercentage),
+        Funds: parseFloat(settings.Funds),
+        Savings: parseFloat(settings.Savings),
+        InterestRate: parsedInterest,
+        AdvancedPayments: settings.AdvancedPayments,
+        DividendDate: settings.DividendDate,
+        PenaltyValue: parseFloat(settings.PenaltyValue),
+        PenaltyType: 'fixed',
+        LoanTypes: settings.LoanTypes,
+        OrientationCode: settings.OrientationCode,
+        Accounts: settings.Accounts,
+        TermsAndConditions: settings.TermsAndConditions,
+        PrivacyPolicy: settings.PrivacyPolicy,
+        AboutUs: settings.AboutUs,
+        ContactUs: settings.ContactUs
+      };
+
+      await update(settingsRef, updatedData);
+      setConfirmationModalVisible(false);
+      setEditMode(false);
+      showMessage('Success', 'Settings updated successfully!');
+    } catch (error) {
+      showMessage('Error', 'Failed to update settings: ' + error.message, true);
+    } finally {
+      setActionInProgress(false);
     }
-
-    const updatedData = {
-      LoanPercentage: parseFloat(settings.LoanPercentage),
-      Funds: parseFloat(settings.Funds),
-      Savings: parseFloat(settings.Savings),
-      InterestRate: parsedInterest,
-      AdvancedPayments: settings.AdvancedPayments,
-      DividendDate: settings.DividendDate,
-      PenaltyValue: parseFloat(settings.PenaltyValue),
-      PenaltyType: 'fixed',
-      LoanTypes: settings.LoanTypes,
-      OrientationCode: settings.OrientationCode,
-      Accounts: settings.Accounts,
-      TermsAndConditions: settings.TermsAndConditions,
-      PrivacyPolicy: settings.PrivacyPolicy,
-      AboutUs: settings.AboutUs,
-      ContactUs: settings.ContactUs
-    };
-
-    update(settingsRef, updatedData)
-      .then(() => {
-        setConfirmationModalVisible(false);
-        setEditMode(false);
-        showMessage('Success', 'Settings updated successfully!');
-      })
-      .catch((error) => {
-        showMessage('Error', 'Failed to update settings: ' + error.message, true);
-      });
   };
 
   const handleDateChange = (date) => {
@@ -674,7 +678,10 @@ const SystemSettings = () => {
                   ...styles.slider,
                   ...(settings.AdvancedPayments ? styles.sliderChecked : {})
                 }}>
-                  <span style={styles.sliderBefore}></span>
+                  <span style={{
+                    ...styles.sliderBefore,
+                    ...(settings.AdvancedPayments ? styles.sliderBeforeChecked : {})
+                  }}></span>
                 </span>
               </label>
             </div>
@@ -989,25 +996,36 @@ const SystemSettings = () => {
           }}
           onClick={editMode ? handleSave : () => setEditMode(true)}
         >
+          {editMode ? <FaSave style={{ marginRight: '8px' }} /> : <FaEdit style={{ marginRight: '8px' }} />}
           {editMode ? 'Save Settings' : 'Edit Settings'}
         </button>
 
         {/* Save Confirmation Modal */}
         {confirmationModalVisible && (
-          <div className="centered-modal">
-            <div className="confirm-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Are you sure you want to save these settings changes?</p>
-              <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+              <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    backgroundColor: '#2D5783',
+                    color: '#fff'
+                  }} 
                   onClick={confirmSave}
+                  disabled={actionInProgress}
                 >
-                  Yes
+                  {actionInProgress ? 'Saving...' : 'Yes'}
                 </button>
-                <button
-                  className="cancel-btn"
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    backgroundColor: '#f44336',
+                    color: '#fff'
+                  }} 
                   onClick={() => setConfirmationModalVisible(false)}
+                  disabled={actionInProgress}
                 >
                   No
                 </button>
@@ -1475,6 +1493,10 @@ const styles = {
     backgroundColor: 'white',
     transition: '.4s',
     borderRadius: '50%',
+    transform: 'translateX(0px)',
+  },
+  sliderBeforeChecked: {
+    transform: 'translateX(26px)',
   },
   loanTypesSection: {
     marginTop: '30px',
@@ -1641,25 +1663,22 @@ const styles = {
     whiteSpace: 'pre-line',
   },
   saveBtn: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    padding: '10px 20px',
     backgroundColor: '#2D5783',
     color: 'white',
-    padding: '12px 24px',
     border: 'none',
     borderRadius: '6px',
     cursor: 'pointer',
-    fontSize: '15px',
-    fontWeight: '600',
-    width: '100%',
-    marginTop: '20px',
+    fontSize: '14px',
+    fontWeight: '500',
     transition: 'all 0.2s',
-    maxWidth: '1000px',
-    marginLeft: 'auto',
-    marginRight: 'auto',
-    display: 'block',
+    margin: '20px 0',
   },
   saveBtnSaveMode: {
-    backgroundColor: '#1a3d66',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    backgroundColor: '#4CAF50',
   },
   modalOverlay: {
     position: 'fixed',
@@ -1758,6 +1777,60 @@ const styles = {
     fontWeight: '600',
     marginBottom: '15px',
     color: '#2D5783',
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCardSmall: {
+    width: '250px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    textAlign: 'center'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '16px',
+    textAlign: 'center',
+    color: '#333',
+    lineHeight: '1.4'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
   },
 };
 

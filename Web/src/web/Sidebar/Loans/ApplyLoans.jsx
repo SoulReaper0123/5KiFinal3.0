@@ -700,6 +700,7 @@ const ApplyLoans = ({
         processingFee: processingFee,
         dateApproved: approvalDate,
         timeApproved: approvalTime,
+        timestamp: now.getTime(),
         dueDate: formattedDueDate,
         status: 'approved',
         paymentsMade: 0 
@@ -710,7 +711,16 @@ const ApplyLoans = ({
       await transactionRef.set(approvedData);
       await currentLoanRef.set(approvedData);
       await memberLoanRef.set(approvedData);
-      await fundsRef.set(currentFunds - amount);
+      
+      // Update funds and log to history
+      const newFundsAmount = currentFunds - amount;
+      await fundsRef.set(newFundsAmount);
+      
+      // Log to FundsHistory for dashboard chart
+      const timestamp = now.toISOString();
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+      await fundsHistoryRef.set(newFundsAmount);
+      
       await memberRef.set(memberBalance - amount);
 
       // Remove from pending loans AFTER all other operations succeed
@@ -738,6 +748,7 @@ const ApplyLoans = ({
         ...loan, 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
+        timestamp: now.getTime(),
         status,
         rejectionReason: rejectionReason || 'Rejected by admin'
       };

@@ -654,7 +654,13 @@ const PaymentApplications = ({
         throw new Error('Member details do not match our records');
       }
 
-      // 2. Find current loans
+      // 2. Load Settings (Funds, Savings, Penalty)
+      const fundsRef = database.ref('Settings/Funds');
+      const savingsRef = database.ref('Settings/Savings');
+      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+      const penaltyValueRef = database.ref('Settings/PenaltyValue');
+
+      // 3. Find current loan (if any)
       const memberLoansRef = database.ref(`Loans/CurrentLoans/${id}`);
       const memberLoansSnap = await memberLoansRef.once('value');
       
@@ -663,6 +669,7 @@ const PaymentApplications = ({
       let isLoanPayment = false;
       let interestAmount = 0;
       let loanAmount = 0;
+      let dueDateStr = '';
       
       if (memberLoansSnap.exists()) {
         memberLoansSnap.forEach((loanSnap) => {
@@ -672,23 +679,22 @@ const PaymentApplications = ({
             isLoanPayment = true;
             interestAmount = parseFloat(currentLoanData.interest) || 0;
             loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+            dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
           }
         });
       }
 
-      // Database references
+      // Database references for Payment and Logs
       const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
       const approvedRef = database.ref(`Payments/ApprovedPayments/${id}/${transactionId}`);
       const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-      
-      // Fetch data
-      const [paymentSnap, fundsSnap, savingsSnap] = await Promise.all([
+
+      // 4. Fetch current values
+      const [paymentSnap, fundsSnap, savingsSnap, penaltySnap] = await Promise.all([
         paymentRef.once('value'),
         fundsRef.once('value'),
-        savingsRef.once('value')
+        savingsRef.once('value'),
+        penaltyValueRef.once('value')
       ]);
 
       if (!paymentSnap.exists()) throw new Error('Payment data not found');
@@ -698,81 +704,123 @@ const PaymentApplications = ({
       const currentFunds = parseFloat(fundsSnap.val()) || 0;
       const currentSavings = parseFloat(savingsSnap.val()) || 0;
       const memberBalance = parseFloat(memberData.balance || 0);
+      const penaltyPerDay = parseFloat(penaltySnap.val()) || 0;
 
-      // Payment calculations
-      let principalAmount = paymentAmount;
+      // 5. Compute overdue penalty (days * penaltyPerDay)
+      const parseToStartOfDay = (d) => {
+        const dt = new Date(d);
+        return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      };
+
+      let overdueDays = 0;
+      if (isLoanPayment && dueDateStr) {
+        const todayStart = parseToStartOfDay(new Date());
+        const dueDateParsed = parseToStartOfDay(new Date(dueDateStr));
+        if (!isNaN(dueDateParsed.getTime()) && todayStart > dueDateParsed) {
+          const ms = todayStart.getTime() - dueDateParsed.getTime();
+          overdueDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
+        }
+      }
+
+      const penaltyDue = Math.max(0, overdueDays * penaltyPerDay);
+      const penaltyPaid = Math.min(paymentAmount, penaltyDue);
+
+      // Amount left for interest/principal after penalty
+      const remainingAfterPenalty = paymentAmount - penaltyPaid;
+
+      // 6. Split remaining into interest then principal
+      let interestPaid = 0;
+      let principalPaid = 0;
       let excessPayment = 0;
       let newMemberBalance = memberBalance;
 
       if (isLoanPayment && currentLoanData) {
-        // Calculate principal (payment minus interest)
-        principalAmount = Math.max(0, paymentAmount - interestAmount);
-        
-        // Calculate remaining loan after this payment
-        let remainingLoan = loanAmount - principalAmount;
-        
-        // Handle overpayment (payment exceeds remaining loan + interest)
+        interestPaid = Math.min(remainingAfterPenalty, interestAmount);
+        const afterInterest = remainingAfterPenalty - interestPaid;
+        principalPaid = Math.min(afterInterest, loanAmount);
+
+        // Remaining beyond loan principal becomes excess
+        const remainingAfterPrincipal = afterInterest - principalPaid;
+        excessPayment = Math.max(0, remainingAfterPrincipal);
+
+        // Update or clear the loan
+        const remainingLoan = loanAmount - principalPaid;
         if (remainingLoan <= 0) {
-          excessPayment = Math.abs(remainingLoan);
-          principalAmount = loanAmount;
-          
-          // Remove the loan since it's fully paid
+          // Fully paid: remove from CurrentLoans and any ApprovedLoans entries
           await memberLoansRef.child(currentLoanKey).remove();
+          // Remove potential ApprovedLoans records in both possible paths
+          try { await database.ref(`Loans/ApprovedLoans/${id}`).remove(); } catch (_) {}
+          try { await database.ref(`ApprovedLoans/${id}`).remove(); } catch (_) {}
         } else {
-          // For partial payments, update the loan terms
           const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
-          const remainingTerm = Math.max(1, currentLoanData.term - paymentsMade);
+          const remainingTerm = Math.max(1, (currentLoanData.term || 1) - paymentsMade);
           const newMonthlyPayment = remainingLoan / remainingTerm;
-          
+
           await memberLoansRef.child(currentLoanKey).update({
             loanAmount: remainingLoan,
             monthlyPayment: newMonthlyPayment,
             totalMonthlyPayment: newMonthlyPayment + interestAmount,
             dueDate: formatDate(new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000)), // 30 days later
-            paymentsMade: paymentsMade
+            paymentsMade
           });
         }
 
-        // Update member balance (principal + excess)
-        newMemberBalance = memberBalance + principalAmount + excessPayment;
+        // Principal and any excess increase member's balance
+        newMemberBalance = memberBalance + principalPaid + excessPayment;
       }
 
-      // Update all databases
+      // 7. Update Savings: add penalty first, and interest paid (if any)
       const now = new Date();
-      const dateKey = now.toISOString().split('T')[0]; // Format as YYYY-MM-DD
-      
-      // Only update savings if there's interest
-      if (interestAmount > 0) {
-        const newSavingsTotal = currentSavings + interestAmount;
+      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const savingsIncrement = penaltyPaid + (interestPaid > 0 ? interestPaid : 0);
+
+      if (savingsIncrement > 0) {
+        await savingsRef.set(currentSavings + savingsIncrement);
         
-        // Update savings total
-        await savingsRef.set(newSavingsTotal);
+        // Get current day's savings history to add to it (not overwrite)
+        const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const newDaySavings = currentDaySavings + savingsIncrement;
         
-        // Update savings history
         const savingsHistoryUpdate = {};
-        savingsHistoryUpdate[dateKey] = interestAmount;
-        
+        savingsHistoryUpdate[dateKey] = newDaySavings;
         await savingsHistoryRef.update(savingsHistoryUpdate);
       }
 
-      // Update funds and member balance
-      await fundsRef.set(currentFunds + principalAmount);
+      // 8. Update Funds with principal only
+      if (principalPaid > 0) {
+        const newFundsAmount = currentFunds + principalPaid;
+        await fundsRef.set(newFundsAmount);
+        
+        // Log to FundsHistory for dashboard chart
+        const timestamp = now.toISOString();
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        await fundsHistoryRef.set(newFundsAmount);
+      }
+
+      // 9. Update member balance
       await memberRef.update({ balance: newMemberBalance });
 
-      // Create payment record
+      // 10. Write approved/transaction records
       const approvedData = {
         ...paymentData,
         dateApproved: formatDate(now),
         timeApproved: formatTime(now),
+        timestamp: now.getTime(),
         status: 'approved',
-        interestPaid: interestAmount,
-        principalPaid: principalAmount,
-        excessPayment: excessPayment,
-        isLoanPayment: isLoanPayment,
+        // breakdown
+        penaltyPerDay,
+        overdueDays,
+        penaltyDue,
+        penaltyPaid,
+        interestScheduled: interestAmount,
+        interestPaid,
+        principalPaid,
+        excessPayment,
+        isLoanPayment,
         appliedToLoan: currentLoanKey
       };
 
-      // Finalize operations
       await approvedRef.set(approvedData);
       await transactionRef.set(approvedData);
       await paymentRef.remove();
@@ -803,6 +851,7 @@ const PaymentApplications = ({
         ...paymentSnap.val(), 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
+        timestamp: now.getTime(),
         status: 'rejected',
         rejectionReason: rejectionReason || 'Rejected by admin'
       };

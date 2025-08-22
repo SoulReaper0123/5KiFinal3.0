@@ -1627,7 +1627,7 @@ const Registrations = ({
         }
         
         const memberId = await processDatabaseApprove(registration);
-       // await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+       await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
         
         setSuccessMessage('Registration approved successfully!');
         setSuccessMessageModalVisible(true);
@@ -1649,7 +1649,7 @@ const Registrations = ({
 
       } else {
         await processDatabaseReject(registration, rejectionReason);
-        //await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
         
         setSuccessMessage('Registration rejected successfully!');
         setSuccessMessageModalVisible(true);
@@ -1747,7 +1747,17 @@ const Registrations = ({
       const fundsRef = database.ref('Settings/Funds');
       const snapshot = await fundsRef.once('value');
       const currentFunds = snapshot.val() || 0;
-      await fundsRef.set(currentFunds + parseFloat(amount));
+      const newFundsAmount = currentFunds + parseFloat(amount);
+      
+      // Update the current funds
+      await fundsRef.set(newFundsAmount);
+      
+      // Log to FundsHistory for dashboard chart
+      const now = new Date();
+      const timestamp = now.toISOString();
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+      await fundsHistoryRef.set(newFundsAmount);
+      
     } catch (error) {
       console.error('Error updating funds:', error);
       throw error;

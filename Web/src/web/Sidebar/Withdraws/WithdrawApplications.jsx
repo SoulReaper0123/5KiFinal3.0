@@ -687,6 +687,12 @@ const WithdrawApplications = ({
       const newFunds = currentFunds - withdrawAmount;
       
       await fundsRef.set(newFunds);
+      
+      // Log to FundsHistory for dashboard chart
+      const timestamp = now.toISOString();
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+      await fundsHistoryRef.set(newFunds);
+      
       await memberRef.update({ balance: newBalance });
 
       // Create withdrawal record
@@ -694,6 +700,7 @@ const WithdrawApplications = ({
         ...withdrawData,
         dateApproved: formatDate(now),
         timeApproved: formatTime(now),
+        timestamp: now.getTime(),
         status: 'approved'
       };
 
@@ -728,6 +735,7 @@ const WithdrawApplications = ({
         ...withdrawSnap.val(), 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
+        timestamp: now.getTime(),
         status: 'rejected',
         rejectionReason: rejectionReason || 'Rejected by admin'
       };

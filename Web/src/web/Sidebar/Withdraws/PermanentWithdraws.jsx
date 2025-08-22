@@ -574,6 +574,7 @@ const processDatabaseApprove = async (withdrawal) => {
       ...withdrawal, 
       dateApproved: approvalDate,
       timeApproved: approvalTime,
+      timestamp: now.getTime(),
       status
     };
 
@@ -587,6 +588,11 @@ const processDatabaseApprove = async (withdrawal) => {
       }),
       // pendingRef.remove() // Remove from pending after approval
     ]);
+    
+    // Log to FundsHistory for dashboard chart
+    const timestamp = now.toISOString();
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+    await fundsHistoryRef.set(newFunds);
 
         // Send approval email
     await ApproveMembershipWithdrawal({
@@ -617,6 +623,7 @@ const processDatabaseApprove = async (withdrawal) => {
         ...withdrawal, 
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
+        timestamp: now.getTime(),
         status,
         rejectionReason: rejectionReason || 'Rejected by admin'
       };
