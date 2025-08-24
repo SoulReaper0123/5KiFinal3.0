@@ -495,6 +495,7 @@ const PaymentApplications = ({
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -595,36 +596,48 @@ const PaymentApplications = ({
         await processDatabaseApprove(payment);
         setSuccessMessage('Payment approved successfully!');
         
-        setSelectedPayment(prev => ({
-          ...prev,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date()),
-          status: 'approved'
-        }));
-
-        callApiApprove({
+        const approveData = {
           ...payment,
           dateApproved: formatDate(new Date()),
           timeApproved: formatTime(new Date())
-        }).catch(console.error);
+        };
+        
+        setSelectedPayment(prev => ({
+          ...prev,
+          dateApproved: approveData.dateApproved,
+          timeApproved: approveData.timeApproved,
+          status: 'approved'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
       } else {
         await processDatabaseReject(payment, rejectionReason);
         setSuccessMessage('Payment rejected successfully!');
         
-        setSelectedPayment(prev => ({
-          ...prev,
-          dateRejected: formatDate(new Date()),
-          timeRejected: formatTime(new Date()),
-          rejectionReason,
-          status: 'rejected'
-        }));
-
-        callApiReject({
+        const rejectData = {
           ...payment,
           dateRejected: formatDate(new Date()),
           timeRejected: formatTime(new Date()),
           rejectionReason
-        }).catch(console.error);
+        };
+        
+        setSelectedPayment(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          timeRejected: rejectData.timeRejected,
+          rejectionReason,
+          status: 'rejected'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
       }
       
       setSuccessMessageModalVisible(true);
@@ -670,18 +683,43 @@ const PaymentApplications = ({
       let interestAmount = 0;
       let loanAmount = 0;
       let dueDateStr = '';
+      let approvedLoanData = null;
       
       if (memberLoansSnap.exists()) {
+        console.log('Found member loans, processing...');
         memberLoansSnap.forEach((loanSnap) => {
           if (!currentLoanData) {
             currentLoanData = loanSnap.val();
             currentLoanKey = loanSnap.key;
             isLoanPayment = true;
-            interestAmount = parseFloat(currentLoanData.interest) || 0;
             loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
             dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+            
+            console.log('Current loan found:', {
+              key: currentLoanKey,
+              loanAmount,
+              currentDueDate: dueDateStr
+            });
           }
         });
+        
+        // 4. Fetch the original interest and term from ApprovedLoans (not from CurrentLoans)
+        if (currentLoanKey) {
+          const approvedLoanRef = database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`);
+          const approvedLoanSnap = await approvedLoanRef.once('value');
+          
+          if (approvedLoanSnap.exists()) {
+            approvedLoanData = approvedLoanSnap.val();
+            interestAmount = parseFloat(approvedLoanData.interest) || 0;
+            console.log('Original interest from ApprovedLoans:', interestAmount);
+            console.log('Original term from ApprovedLoans:', approvedLoanData.term);
+          } else {
+            console.log('Warning: ApprovedLoan data not found, using 0 interest');
+            interestAmount = 0;
+          }
+        }
+      } else {
+        console.log('No current loans found for member:', id);
       }
 
       // Database references for Payment and Logs
@@ -734,6 +772,13 @@ const PaymentApplications = ({
       let excessPayment = 0;
       let newMemberBalance = memberBalance;
 
+      console.log('Payment processing debug:');
+      console.log('isLoanPayment:', isLoanPayment);
+      console.log('currentLoanData exists:', !!currentLoanData);
+      console.log('currentLoanKey:', currentLoanKey);
+      console.log('loanAmount:', loanAmount);
+      console.log('paymentAmount:', paymentAmount);
+      
       if (isLoanPayment && currentLoanData) {
         interestPaid = Math.min(remainingAfterPenalty, interestAmount);
         const afterInterest = remainingAfterPenalty - interestPaid;
@@ -745,61 +790,130 @@ const PaymentApplications = ({
 
         // Update or clear the loan
         const remainingLoan = loanAmount - principalPaid;
+        console.log('remainingLoan after payment:', remainingLoan);
+        
         if (remainingLoan <= 0) {
           // Fully paid: remove from CurrentLoans and any ApprovedLoans entries
+          console.log('Loan fully paid - removing from CurrentLoans');
           await memberLoansRef.child(currentLoanKey).remove();
           // Remove potential ApprovedLoans records in both possible paths
           try { await database.ref(`Loans/ApprovedLoans/${id}`).remove(); } catch (_) {}
           try { await database.ref(`ApprovedLoans/${id}`).remove(); } catch (_) {}
         } else {
+          // STEP 1: UPDATE CURRENTLOANS FIRST (in specific order)
+          console.log('=== STEP 1: Updating CurrentLoans ===');
+          
           const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
-          const remainingTerm = Math.max(1, (currentLoanData.term || 1) - paymentsMade);
-          const newMonthlyPayment = remainingLoan / remainingTerm;
-
-          await memberLoansRef.child(currentLoanKey).update({
-            loanAmount: remainingLoan,
-            monthlyPayment: newMonthlyPayment,
-            totalMonthlyPayment: newMonthlyPayment + interestAmount,
-            dueDate: formatDate(new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000)), // 30 days later
-            paymentsMade
+          const currentMonthlyPayment = parseFloat(currentLoanData.monthlyPayment) || 0;
+          const currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
+          
+          // Calculate excess payment beyond the scheduled total monthly payment
+          const scheduledPayment = currentTotalMonthlyPayment + penaltyDue;
+          const excessBeyondScheduled = Math.max(0, paymentAmount - scheduledPayment);
+          
+          // FIXED: Calculate new monthly payment by reducing excess from current monthly payment
+          const originalTerm = parseFloat(approvedLoanData?.term) || 1;
+          const remainingTerm = Math.max(1, originalTerm - paymentsMade);
+          
+          // If this is the last payment term, calculate based on remaining loan
+          let newMonthlyPayment;
+          if (remainingTerm === 1) {
+            // Last payment: monthly payment = remaining loan amount
+            newMonthlyPayment = remainingLoan;
+          } else {
+            // Normal payment: reduce current monthly payment by excess
+            newMonthlyPayment = Math.max(0, currentMonthlyPayment - excessBeyondScheduled);
+          }
+          
+          // New total monthly payment = new monthly payment + interest
+          const newTotalMonthlyPayment = newMonthlyPayment + interestAmount;
+          
+          console.log('Payment calculation details:', {
+            originalTerm,
+            paymentsMade,
+            remainingTerm,
+            remainingLoan,
+            currentMonthlyPayment,
+            excessBeyondScheduled,
+            newMonthlyPayment,
+            interestAmount,
+            newTotalMonthlyPayment,
+            isLastPayment: remainingTerm === 1
           });
+
+          // Add 30 days to the current due date, not today's date
+          let newDueDateObj;
+          if (dueDateStr) {
+            // Parse the current due date and add 30 days to it
+            newDueDateObj = new Date(dueDateStr);
+            newDueDateObj.setDate(newDueDateObj.getDate() + 30);
+          } else {
+            // Fallback: if no current due date, use today + 30 days
+            newDueDateObj = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+          }
+          
+          const newDueDate = formatDate(newDueDateObj);
+          
+          console.log('Current dueDate:', dueDateStr);
+          console.log('New dueDate (adding 30 days):', newDueDate);
+          console.log('Loan path:', `Loans/CurrentLoans/${id}/${currentLoanKey}`);
+          
+          // Update CurrentLoans in the specific order: loanAmount, dueDate, monthlyPayment, totalMonthlyPayment
+          const loanUpdates = {};
+          loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100;
+          loanUpdates['dueDate'] = newDueDate;
+          loanUpdates['monthlyPayment'] = Math.ceil(newMonthlyPayment * 100) / 100;
+          loanUpdates['totalMonthlyPayment'] = Math.ceil(newTotalMonthlyPayment * 100) / 100;
+          loanUpdates['paymentsMade'] = paymentsMade;
+          
+          await memberLoansRef.child(currentLoanKey).update(loanUpdates);
+          console.log('CurrentLoans updated successfully with new dueDate:', newDueDate);
         }
 
         // Principal and any excess increase member's balance
         newMemberBalance = memberBalance + principalPaid + excessPayment;
       }
 
-      // 7. Update Savings: add penalty first, and interest paid (if any)
+      // STEP 2: UPDATE MEMBERS AND FUNDS AFTER CURRENTLOANS
+      console.log('=== STEP 2: Updating Members and Funds ===');
+      
+      // Update member balance first
+      await memberRef.update({ balance: Math.ceil(newMemberBalance * 100) / 100 });
+      console.log('Member balance updated');
+
+      // Update Savings: add penalty first, and interest paid (if any)
       const now = new Date();
       const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
       const savingsIncrement = penaltyPaid + (interestPaid > 0 ? interestPaid : 0);
 
       if (savingsIncrement > 0) {
-        await savingsRef.set(currentSavings + savingsIncrement);
+        const newSavingsAmount = Math.ceil((currentSavings + savingsIncrement) * 100) / 100;
+        await savingsRef.set(newSavingsAmount);
+        console.log('Savings updated');
         
         // Get current day's savings history to add to it (not overwrite)
         const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
         const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-        const newDaySavings = currentDaySavings + savingsIncrement;
+        const newDaySavings = Math.ceil((currentDaySavings + savingsIncrement) * 100) / 100;
         
         const savingsHistoryUpdate = {};
         savingsHistoryUpdate[dateKey] = newDaySavings;
         await savingsHistoryRef.update(savingsHistoryUpdate);
+        console.log('Savings history updated');
       }
 
-      // 8. Update Funds with principal only
+      // Update Funds with principal only
       if (principalPaid > 0) {
-        const newFundsAmount = currentFunds + principalPaid;
+        const newFundsAmount = Math.ceil((currentFunds + principalPaid) * 100) / 100;
         await fundsRef.set(newFundsAmount);
+        console.log('Funds updated');
         
         // Log to FundsHistory for dashboard chart
-        const timestamp = now.toISOString();
+        const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
         const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
         await fundsHistoryRef.set(newFundsAmount);
+        console.log('Funds history updated');
       }
-
-      // 9. Update member balance
-      await memberRef.update({ balance: newMemberBalance });
 
       // 10. Write approved/transaction records
       const approvedData = {
@@ -970,11 +1084,26 @@ const PaymentApplications = ({
     }
   };
 
-  const handleSuccessOk = () => {
+  const handleSuccessOk = async () => {
     setSuccessMessageModalVisible(false);
     closeModal();
     setSelectedPayment(null);
     setCurrentAction(null);
+    
+    // Execute pending API call
+    if (pendingApiCall) {
+      try {
+        if (pendingApiCall.type === 'approve') {
+          await callApiApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await callApiReject(pendingApiCall.data);
+        }
+      } catch (error) {
+        console.error('Error calling API:', error);
+      }
+      setPendingApiCall(null);
+    }
+    
     refreshData();
   };
 

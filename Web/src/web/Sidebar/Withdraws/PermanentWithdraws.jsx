@@ -383,6 +383,7 @@ const PermanentWithdraws = ({ refreshData }) => {
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
   useEffect(() => {
     const fetchWithdrawals = async () => {
@@ -512,23 +513,50 @@ const PermanentWithdraws = ({ refreshData }) => {
         await processDatabaseApprove(withdrawal);
         setSuccessMessage('Membership withdrawal approved successfully!');
         
-        setSelectedWithdrawal(prev => ({
-          ...prev,
+        const approveData = {
+          ...withdrawal,
           dateApproved: formatDate(new Date()),
           timeApproved: formatTime(new Date()),
           status: 'approved'
+        };
+        
+        setSelectedWithdrawal(prev => ({
+          ...prev,
+          dateApproved: approveData.dateApproved,
+          timeApproved: approveData.timeApproved,
+          status: 'approved'
         }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
       } else {
         await processDatabaseReject(withdrawal, rejectionReason);
         setSuccessMessage('Membership withdrawal rejected successfully!');
         
-        setSelectedWithdrawal(prev => ({
-          ...prev,
+        const rejectData = {
+          ...withdrawal,
           dateRejected: formatDate(new Date()),
           timeRejected: formatTime(new Date()),
           rejectionReason,
           status: 'rejected'
+        };
+        
+        setSelectedWithdrawal(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          timeRejected: rejectData.timeRejected,
+          rejectionReason,
+          status: 'rejected'
         }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
       }
       
       setSuccessMessageModalVisible(true);
@@ -590,17 +618,9 @@ const processDatabaseApprove = async (withdrawal) => {
     ]);
     
     // Log to FundsHistory for dashboard chart
-    const timestamp = now.toISOString();
+    const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
     const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
     await fundsHistoryRef.set(newFunds);
-
-        // Send approval email
-    await ApproveMembershipWithdrawal({
-      ...withdrawal,
-      dateApproved: approvalDate,
-      timeApproved: approvalTime,
-      status
-    });
 
   } catch (err) {
     console.error('Approval DB error:', err);
@@ -633,15 +653,6 @@ const processDatabaseApprove = async (withdrawal) => {
         //pendingRef.remove()
       ]);
 
-          // Send rejection email
-    await RejectMembershipWithdrawal({
-      ...withdrawal,
-      dateRejected: rejectionDate,
-      timeRejected: rejectionTime,
-      status,
-      rejectionReason
-    });
-
     } catch (err) {
       console.error('Rejection DB error:', err);
       throw new Error(err.message || 'Failed to reject membership withdrawal');
@@ -652,6 +663,21 @@ const processDatabaseApprove = async (withdrawal) => {
     setSuccessMessageModalVisible(false);
     setSelectedWithdrawal(null);
     setCurrentAction(null);
+    
+    // Execute pending API call
+    if (pendingApiCall) {
+      try {
+        if (pendingApiCall.type === 'approve') {
+          await ApproveMembershipWithdrawal(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await RejectMembershipWithdrawal(pendingApiCall.data);
+        }
+      } catch (error) {
+        console.error('Error calling API:', error);
+      }
+      setPendingApiCall(null);
+    }
+    
     refreshData();
   };
 

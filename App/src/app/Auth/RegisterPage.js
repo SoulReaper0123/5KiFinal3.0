@@ -442,7 +442,7 @@ const RegisterPage = () => {
               value={firstName}
               onChangeText={setFirstName}
               onBlur={() => validateFirstName(firstName)}
-              style={[styles.input, firstNameError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => middleNameInput.current?.focus()}
@@ -471,7 +471,7 @@ const RegisterPage = () => {
               value={lastName}
               onChangeText={setLastName}
               onBlur={() => validateLastName(lastName)}
-              style={[styles.input, lastNameError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={lastNameInput}
@@ -494,7 +494,7 @@ const RegisterPage = () => {
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
               overlayStyle={{ justifyContent: 'flex-end' }}
             >
-              <TouchableOpacity style={[styles.pickerContainer, genderError ? styles.errorInput : null]}>
+              <TouchableOpacity style={styles.pickerContainer}>
                 <Text style={styles.pickerText}>
                   {gender || 'Select Gender'}
                 </Text>
@@ -529,7 +529,7 @@ const RegisterPage = () => {
               placeholder="Age"
               value={age.toString()}
               onChangeText={text => setAge(text)}
-              style={[styles.input, ageError ? styles.errorInput : null]}
+              style={styles.input}
               keyboardType="numeric"
               editable={false}
             />
@@ -543,7 +543,7 @@ const RegisterPage = () => {
               value={placeOfBirth}
               onChangeText={setPlaceOfBirth}
               onBlur={() => validatePlaceOfBirth(placeOfBirth)}
-              style={[styles.input, placeOfBirthError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={placeOfBirthInput}
@@ -559,7 +559,7 @@ const RegisterPage = () => {
               value={address}
               onChangeText={setAddress}
               onBlur={() => validateAddress(address)}
-              style={[styles.input, addressError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={addressInput}
@@ -582,7 +582,7 @@ const RegisterPage = () => {
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
               overlayStyle={{ justifyContent: 'flex-end' }}
             >
-              <TouchableOpacity style={[styles.pickerContainer, civilStatusError ? styles.errorInput : null]}>
+              <TouchableOpacity style={styles.pickerContainer}>
                 <Text style={styles.pickerText}>
                   {civilStatus || 'Select Civil Status'}
                 </Text>
@@ -599,7 +599,7 @@ const RegisterPage = () => {
               value={email}
               onChangeText={setEmail}
               onBlur={() => validateEmail(email)}
-              style={[styles.input, emailError ? styles.errorInput : null]}
+              style={styles.input}
               keyboardType="email-address"
               returnKeyType="next"
               blurOnSubmit={false}
@@ -619,7 +619,7 @@ const RegisterPage = () => {
                 validatePhoneNumber(text);
               }}
               onBlur={() => validatePhoneNumber(phoneNumber)}
-              style={[styles.input, phoneNumberError ? styles.errorInput : null]}
+              style={styles.input}
               keyboardType="phone-pad"
               returnKeyType="next"
               blurOnSubmit={false}
@@ -643,7 +643,7 @@ const RegisterPage = () => {
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
               overlayStyle={{ justifyContent: 'flex-end' }}
             >
-              <TouchableOpacity style={[styles.pickerContainer, governmentIdError ? styles.errorInput : null]}>
+              <TouchableOpacity style={styles.pickerContainer}>
                 <Text style={styles.pickerText}>
                   {governmentId || 'Select Government ID'}
                 </Text>
@@ -734,7 +734,6 @@ const RegisterPage = () => {
                 onBlur={() => validateOrientation()}
                 style={[
                   styles.input,
-                  orientationError && orientationCode ? styles.errorInput : null,
                   orientationCode && validOrientationCode && orientationCode === validOrientationCode ? 
                     styles.validInput : 
                     (orientationCode && validOrientationCode && orientationCode !== validOrientationCode ? 

@@ -1252,7 +1252,6 @@ const Register = () => {
             {[
               { key: 'registrations', label: 'Pending', color: '#2D5783' },
               { key: 'rejectedRegistrations', label: 'Rejected', color: '#FF0000' },
-              { key: 'approvedRegistrations', label: 'Approved', color: '#4CAF50' },
               { key: 'members', label: 'Members', color: '#2D5783' },
               { key: 'permanentWithdrawals', label: 'Membership Withdrawals', color: '#FF0000' },
             ].map((tab) => {

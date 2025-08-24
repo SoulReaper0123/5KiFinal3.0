@@ -495,6 +495,7 @@ const WithdrawApplications = ({
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -595,36 +596,48 @@ const WithdrawApplications = ({
         await processDatabaseApprove(withdraw);
         setSuccessMessage('Withdrawal approved successfully!');
         
-        setSelectedWithdraw(prev => ({
-          ...prev,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date()),
-          status: 'approved'
-        }));
-
-        callApiApprove({
+        const approveData = {
           ...withdraw,
           dateApproved: formatDate(new Date()),
           timeApproved: formatTime(new Date())
-        }).catch(console.error);
+        };
+        
+        setSelectedWithdraw(prev => ({
+          ...prev,
+          dateApproved: approveData.dateApproved,
+          timeApproved: approveData.timeApproved,
+          status: 'approved'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
       } else {
         await processDatabaseReject(withdraw, rejectionReason);
         setSuccessMessage('Withdrawal rejected successfully!');
         
-        setSelectedWithdraw(prev => ({
-          ...prev,
-          dateRejected: formatDate(new Date()),
-          timeRejected: formatTime(new Date()),
-          rejectionReason,
-          status: 'rejected'
-        }));
-
-        callApiReject({
+        const rejectData = {
           ...withdraw,
           dateRejected: formatDate(new Date()),
           timeRejected: formatTime(new Date()),
           rejectionReason
-        }).catch(console.error);
+        };
+        
+        setSelectedWithdraw(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          timeRejected: rejectData.timeRejected,
+          rejectionReason,
+          status: 'rejected'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
       }
       
       setSuccessMessageModalVisible(true);
@@ -689,7 +702,7 @@ const WithdrawApplications = ({
       await fundsRef.set(newFunds);
       
       // Log to FundsHistory for dashboard chart
-      const timestamp = now.toISOString();
+      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
       const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
       await fundsHistoryRef.set(newFunds);
       
@@ -824,11 +837,26 @@ const WithdrawApplications = ({
     }
   };
 
-  const handleSuccessOk = () => {
+  const handleSuccessOk = async () => {
     setSuccessMessageModalVisible(false);
     closeModal();
     setSelectedWithdraw(null);
     setCurrentAction(null);
+    
+    // Execute pending API call
+    if (pendingApiCall) {
+      try {
+        if (pendingApiCall.type === 'approve') {
+          await callApiApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await callApiReject(pendingApiCall.data);
+        }
+      } catch (error) {
+        console.error('Error calling API:', error);
+      }
+      setPendingApiCall(null);
+    }
+    
     refreshData();
   };
 

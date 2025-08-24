@@ -223,14 +223,57 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     return () => backHandler.remove();
   }, [navigation]);
 
-  const onRefresh = () => {
+  const onRefresh = async () => {
     setRefreshing(true);
-    const user = auth.currentUser;
-    const paramEmail = route.params?.user?.email;
-    if (user?.email) {
-      fetchUserData(user.email);
-    } else if (paramEmail) {
-      fetchUserData(paramEmail);
+    try {
+      const user = auth.currentUser;
+      const paramEmail = route.params?.user?.email;
+      const routeEmail = route.params?.email;
+      let storedEmail = null;
+      
+      // Try to get email from SecureStore (for biometric login)
+      try {
+        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+      } catch (error) {
+        console.error('Error getting email from SecureStore during refresh:', error);
+      }
+      
+      console.log('AppHome - Refreshing user data with:', { 
+        authEmail: user?.email, 
+        paramEmail, 
+        routeEmail,
+        storedEmail,
+        email
+      });
+      
+      // Use the same priority order as initial load
+      if (email) {
+        console.log('Refreshing with email prop:', email);
+        fetchUserData(email);
+      }
+      else if (storedEmail) {
+        console.log('Refreshing with email from SecureStore:', storedEmail);
+        fetchUserData(storedEmail);
+      }
+      else if (user?.email) {
+        console.log('Refreshing with Firebase auth email:', user.email);
+        fetchUserData(user.email);
+      }
+      else if (paramEmail) {
+        console.log('Refreshing with param email from user object:', paramEmail);
+        fetchUserData(paramEmail);
+      }
+      else if (routeEmail) {
+        console.log('Refreshing with direct route email:', routeEmail);
+        fetchUserData(routeEmail);
+      }
+      else {
+        console.log('No email found during refresh, stopping refresh');
+        setRefreshing(false);
+      }
+    } catch (error) {
+      console.error('Error in onRefresh:', error);
+      setRefreshing(false);
     }
   };
 

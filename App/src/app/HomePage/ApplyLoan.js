@@ -60,6 +60,7 @@ const ApplyLoan = () => {
   const [hasPendingApplication, setHasPendingApplication] = useState(false);
   const [loanableAmountPercentage, setLoanableAmountPercentage] = useState(80); // Default 80%
   const [maxLoanableAmount, setMaxLoanableAmount] = useState(0);
+  const [processingFee, setProcessingFee] = useState(0);
   const [loanTypeOptions, setLoanTypeOptions] = useState([
     { key: 'Regular Loan', label: 'Regular Loan' },
     { key: 'Quick Cash', label: 'Quick Cash' },
@@ -152,6 +153,10 @@ const ApplyLoan = () => {
         const settings = snapshot.val();
         const loanPercentage = settings.LoanPercentage || 80; // Default to 80%
         setLoanableAmountPercentage(loanPercentage);
+        
+        // Fetch processing fee from settings
+        const processingFeeValue = settings.ProcessingFee || 0; // Default to 0
+        setProcessingFee(processingFeeValue);
         
         // Fetch loan types from settings
         const loanTypes = settings.LoanTypes || ['Regular Loan', 'Quick Cash'];
@@ -457,8 +462,14 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   }
 };
  const showConfirmationAlert = () => {
+    const loanAmountNum = parseFloat(loanAmount) || 0;
+    const processingFeeNum = parseFloat(processingFee) || 0;
+    const releaseAmount = loanAmountNum - processingFeeNum;
+
     let message = `Loan Type: ${loanType}\n` +
-      `Loan Amount: ₱${loanAmount}\n` +
+      `Loan Amount: ₱${loanAmountNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+      `Processing Fee: ₱${processingFeeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+      `Release Amount: ₱${releaseAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
       `Disbursement: ${disbursement}\n` +
       `Account Name: ${accountName}\n` +

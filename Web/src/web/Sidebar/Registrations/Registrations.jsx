@@ -223,7 +223,8 @@ const styles = {
     borderLeftColor: '#2D5783',
     borderRadius: '50%',
     width: '36px',
-    height: '36px'
+    height: '36px',
+    animation: 'spin 1s linear infinite'
   },
   viewText: {
     color: '#2D5783',
@@ -472,6 +473,25 @@ const styles = {
   }
 };
 
+// Add keyframes for spinner animation
+const spinKeyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the keyframes into the document head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = spinKeyframes;
+  if (!document.head.querySelector('style[data-spin-keyframes]')) {
+    styleSheet.setAttribute('data-spin-keyframes', 'true');
+    document.head.appendChild(styleSheet);
+  }
+}
+
 const rejectionReasons = [
   "Invalid ID documents",
   "Incomplete information",
@@ -513,6 +533,7 @@ const Registrations = ({
     mobilenet: null,
     blazeface: null
   });
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
   useEffect(() => {
     const loadModels = async () => {
@@ -1632,20 +1653,26 @@ const Registrations = ({
         setSuccessMessage('Registration approved successfully!');
         setSuccessMessageModalVisible(true);
         
-        setSelectedRegistration(prev => ({
-          ...prev,
-          memberId,
-          dateApproved: formatDate(new Date()), 
-          approvedTime: formatTime(new Date()),
-          status: 'approved'
-        }));
-
-        callApiApprove({
+        const approveData = {
           ...registration,
           memberId,
           dateApproved: formatDate(new Date()),
           approvedTime: formatTime(new Date())
-        }).catch(console.error);
+        };
+
+        setSelectedRegistration(prev => ({
+          ...prev,
+          memberId,
+          dateApproved: approveData.dateApproved, 
+          approvedTime: approveData.approvedTime,
+          status: 'approved'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
 
       } else {
         await processDatabaseReject(registration, rejectionReason);
@@ -1654,20 +1681,26 @@ const Registrations = ({
         setSuccessMessage('Registration rejected successfully!');
         setSuccessMessageModalVisible(true);
         
-        setSelectedRegistration(prev => ({
-          ...prev,
-          dateRejected: formatDate(new Date()),
-          rejectedTime: formatTime(new Date()),
-          rejectionReason,
-          status: 'rejected'
-        }));
-
-        callApiReject({
+        const rejectData = {
           ...registration,
           dateRejected: formatDate(new Date()),
           rejectedTime: formatTime(new Date()),
           rejectionReason
-        }).catch(console.error);
+        };
+
+        setSelectedRegistration(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          rejectedTime: rejectData.rejectedTime,
+          rejectionReason,
+          status: 'rejected'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
       }
     } catch (error) {
       console.error('Error processing action:', error);
@@ -1754,7 +1787,7 @@ const Registrations = ({
       
       // Log to FundsHistory for dashboard chart
       const now = new Date();
-      const timestamp = now.toISOString();
+      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
       const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
       await fundsHistoryRef.set(newFundsAmount);
       
@@ -1974,11 +2007,26 @@ const processDatabaseApprove = async (reg) => {
     }
   };
 
-  const handleSuccessOk = () => {
+  const handleSuccessOk = async () => {
     setSuccessMessageModalVisible(false);
     closeModal();
     setSelectedRegistration(null);
     setCurrentAction(null);
+    
+    // Execute pending API call
+    if (pendingApiCall) {
+      try {
+        if (pendingApiCall.type === 'approve') {
+          await callApiApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await callApiReject(pendingApiCall.data);
+        }
+      } catch (error) {
+        console.error('Error calling API:', error);
+      }
+      setPendingApiCall(null);
+    }
+    
     refreshData();
   };
 

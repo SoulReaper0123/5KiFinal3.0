@@ -118,6 +118,7 @@ const SystemSettings = () => {
     DividendDate: '',
     PenaltyValue: '',
     PenaltyType: 'percentage',
+    ProcessingFee: '',
     OrientationCode: '',
     Accounts: {
       Bank: { accountName: '', accountNumber: '' },
@@ -181,6 +182,7 @@ const SystemSettings = () => {
           DividendDate: data.DividendDate || '',
           PenaltyValue: data.PenaltyValue?.toString() || '',
           PenaltyType: data.PenaltyType || 'fixed',
+          ProcessingFee: data.ProcessingFee?.toString() || '',
           LoanTypes: data.LoanTypes || ['Regular Loan', 'Quick Cash'],
           LoanPercentage: data.LoanPercentage?.toString() || '80',
           OrientationCode: data.OrientationCode || generateOrientationCode(),
@@ -371,15 +373,22 @@ const SystemSettings = () => {
         if (!isNaN(val)) parsedInterest[key] = val;
       }
 
+      // Helper function to safely parse float values
+      const safeParseFloat = (value, defaultValue = 0) => {
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? defaultValue : parsed;
+      };
+
       const updatedData = {
-        LoanPercentage: parseFloat(settings.LoanPercentage),
-        Funds: parseFloat(settings.Funds),
-        Savings: parseFloat(settings.Savings),
+        LoanPercentage: safeParseFloat(settings.LoanPercentage, 80),
+        Funds: safeParseFloat(settings.Funds, 0),
+        Savings: safeParseFloat(settings.Savings, 0),
         InterestRate: parsedInterest,
         AdvancedPayments: settings.AdvancedPayments,
         DividendDate: settings.DividendDate,
-        PenaltyValue: parseFloat(settings.PenaltyValue),
+        PenaltyValue: safeParseFloat(settings.PenaltyValue, 0),
         PenaltyType: 'fixed',
+        ProcessingFee: safeParseFloat(settings.ProcessingFee, 0),
         LoanTypes: settings.LoanTypes,
         OrientationCode: settings.OrientationCode,
         Accounts: settings.Accounts,
@@ -690,6 +699,14 @@ const SystemSettings = () => {
               label="Penalty Value (per day)"
               value={settings.PenaltyValue}
               onChange={(text) => handleInputChange('PenaltyValue', text)}
+              editable={editMode}
+              suffix="₱"
+            />
+
+            <InputRow
+              label="Processing Fee"
+              value={settings.ProcessingFee}
+              onChange={(text) => handleInputChange('ProcessingFee', text)}
               editable={editMode}
               suffix="₱"
             />
@@ -1805,13 +1822,6 @@ const styles = {
   confirmIcon: {
     marginBottom: '12px',
     fontSize: '32px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
   },
   actionButton: {
     padding: '8px 16px',

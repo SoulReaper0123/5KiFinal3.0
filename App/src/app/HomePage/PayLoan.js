@@ -95,7 +95,6 @@ const PayLoan = () => {
 
     initializeUserData();
     fetchPaymentSettings();
-    fetchSystemSettings();
   }, [route.params]);
 
   useEffect(() => {
@@ -121,21 +120,20 @@ const PayLoan = () => {
     }
   }, [email]);
 
-  // Recalculate penalty when penalty per day changes
+  // Recalculate penalty when interest changes
   useEffect(() => {
-    console.log('PayLoan - Penalty per day changed:', penaltyPerDay);
+    console.log('PayLoan - Interest changed:', interest);
     if (currentLoan) {
-      console.log('PayLoan - Recalculating penalty due to penalty per day change');
+      console.log('PayLoan - Recalculating penalty due to interest change');
       calculatePenaltyAndTotal(currentLoan);
     }
-  }, [penaltyPerDay]);
+  }, [interest]);
 
   // Refresh function
   const onRefresh = async () => {
     setRefreshing(true);
     try {
       // Refresh all data
-      await fetchSystemSettings();
       await fetchPaymentSettings();
       if (email) {
         await fetchUserData(email);
@@ -526,12 +524,15 @@ const PayLoan = () => {
         console.log('PayLoan - Penalty per day:', penaltyPerDay);
         
         setOverdueDays(daysDiff);
-        // Use fallback penalty if not loaded from settings yet
-        const effectivePenaltyPerDay = penaltyPerDay > 0 ? penaltyPerDay : 100;
-        const penalty = daysDiff * effectivePenaltyPerDay;
+        
+        // NEW PENALTY CALCULATION: Interest × (Days Overdue ÷ 30)
+        const loanInterest = parseFloat(loan.interest) || parseFloat(interest) || 0;
+        const penalty = loanInterest * (daysDiff / 30);
         setPenaltyAmount(penalty);
         
-        console.log('PayLoan - Effective penalty per day:', effectivePenaltyPerDay);
+        console.log('PayLoan - Loan interest:', loanInterest);
+        console.log('PayLoan - Days overdue:', daysDiff);
+        console.log('PayLoan - Penalty calculation: ', loanInterest, '× (', daysDiff, '÷ 30) =', penalty);
         
         const monthlyPayment = loan.totalMonthlyPayment || 0;
         const total = monthlyPayment + penalty;
@@ -670,7 +671,7 @@ const PayLoan = () => {
       if (penaltyAmount > 0) {
         message += `\n\nBreakdown:
 • Monthly Payment: ₱${(currentLoan?.totalMonthlyPayment || 0).toFixed(2)}
-• Penalty (${overdueDays} days overdue): ₱${penaltyAmount.toFixed(2)}
+• Late Fee (${overdueDays} days overdue): ₱${penaltyAmount.toFixed(2)}
 • Total Amount Due: ₱${totalAmountDue.toFixed(2)}`;
       }
       
@@ -786,7 +787,17 @@ const PayLoan = () => {
               </View>
               
               <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Monthly Payment:</Text>
+                <Text style={styles.loanInfoLabel}>Principal:</Text>
+                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.monthlyPayment || 0)}</Text>
+              </View>
+              
+              <View style={styles.loanInfoRow}>
+                <Text style={styles.loanInfoLabel}>Interest:</Text>
+                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.interest || interest || 0)}</Text>
+              </View>
+              
+              <View style={styles.loanInfoRow}>
+                <Text style={styles.loanInfoLabel}>Total Monthly Payment:</Text>
                 <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.totalMonthlyPayment || 0)}</Text>
               </View>
               
@@ -823,7 +834,7 @@ const PayLoan = () => {
                   penaltyAmount > 0 ? styles.overdueText : styles.normalText
                 ]}>
                   {penaltyAmount > 0 ? 
-                    `${formatCurrency(penaltyAmount)} (${overdueDays} days × ₱${penaltyPerDay > 0 ? penaltyPerDay : 100})` : 
+                    `${formatCurrency(penaltyAmount)} (₱${(currentLoan?.interest || interest || 0).toFixed(2)} × ${overdueDays}/30 days)` : 
                     formatCurrency(0)
                   }
                 </Text>
@@ -929,7 +940,7 @@ const PayLoan = () => {
                     penaltyAmount > 0 ? { color: '#FF0000', fontWeight: 'bold' } : null
                   ]}>
                     Penalty: {penaltyAmount > 0 ? 
-                      `${formatCurrency(penaltyAmount)} (${overdueDays} days × ₱${penaltyPerDay > 0 ? penaltyPerDay : 100})` : 
+                      `${formatCurrency(penaltyAmount)} (₱${(currentLoan?.interest || interest || 0).toFixed(2)} × ${overdueDays}/30 days)` : 
                       formatCurrency(0)
                     }
                   </Text>
