@@ -734,6 +734,17 @@ const ApplyLoans = ({
       const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
       await fundsHistoryRef.set(newFundsAmount);
       
+      // Add processing fee to Settings/Savings
+      const savingsRef = database.ref('Settings/Savings');
+      const savingsSnap = await savingsRef.once('value');
+      const currentSavings = parseFloat(savingsSnap.val()) || 0;
+      const newSavingsAmount = currentSavings + processingFee;
+      await savingsRef.set(newSavingsAmount);
+      
+      // Log processing fee to SavingsHistory for tracking
+      const savingsHistoryRef = database.ref(`Settings/SavingsHistory/${timestamp}`);
+      await savingsHistoryRef.set(newSavingsAmount);
+      
       await memberRef.set(memberBalance - amount);
 
       // Remove from pending loans AFTER all other operations succeed

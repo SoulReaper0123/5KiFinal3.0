@@ -319,7 +319,8 @@ const Dashboard = () => {
         membersSnapshot,
         currentLoansSnapshot,
         approvedLoansSnapshot,
-        paymentsSnapshot
+        paymentsSnapshot,
+        settingsSnapshot
       ] = await Promise.all([
         database.ref('Settings/Funds').once('value'),
         database.ref('Settings/Savings').once('value'),
@@ -328,7 +329,8 @@ const Dashboard = () => {
         database.ref('Members').once('value'),
         database.ref('Loans/CurrentLoans').once('value'),
         database.ref('Loans/ApprovedLoans').once('value'),
-        database.ref('Payments/ApprovedPayments').once('value')
+        database.ref('Payments/ApprovedPayments').once('value'),
+        database.ref('Settings').once('value')
       ]);
 
       const availableFunds = fundsSnapshot.val() || 0;
@@ -346,6 +348,12 @@ const Dashboard = () => {
       const currentLoansData = currentLoansSnapshot.val() || {};
       const approvedLoansData = approvedLoansSnapshot.val() || {};
       const paymentsData = paymentsSnapshot.val() || {};
+      const settingsData = settingsSnapshot.val() || {};
+      
+      // Extract percentage settings
+      const investmentSharePercentage = parseFloat(settingsData.InvestmentSharePercentage || 0) / 100;
+      const patronageSharePercentage = parseFloat(settingsData.PatronageSharePercentage || 0) / 100;
+      const activeMonthsPercentage = parseFloat(settingsData.ActiveMonthsPercentage || 0) / 100;
       
       let totalLoans = 0;
       let totalReceivables = 0;
@@ -430,7 +438,10 @@ const Dashboard = () => {
         activeBorrowers,
         totalMembers,
         savingsHistory,
-        fundsHistory
+        fundsHistory,
+        investmentSharePercentage,
+        patronageSharePercentage,
+        activeMonthsPercentage
       });
       
       setLoanData(loanItems);
@@ -1397,11 +1408,14 @@ const Dashboard = () => {
                       <th style={styles.dividendsHeaderCell}>Oct</th>
                       <th style={styles.dividendsHeaderCell}>Nov</th>
                       <th style={styles.dividendsHeaderCell}>Dec</th>
-                      <th style={styles.dividendsHeaderCell}>Total</th>
-                      <th style={styles.dividendsHeaderCell}>Count</th>
+                      <th style={styles.dividendsHeaderCell}>Total Loans</th>
+                      <th style={styles.dividendsHeaderCell}>Loan Count</th>
                       <th style={styles.dividendsHeaderCell}>Amount</th>
                       <th style={styles.dividendsHeaderCell}>Investment Share</th>
                       <th style={styles.dividendsHeaderCell}>Patronage Share</th>
+                      <th style={styles.dividendsHeaderCell}>Active Month</th>
+                      <th style={styles.dividendsHeaderCell}>Active Month %</th>
+                      <th style={styles.dividendsHeaderCell}>Total %</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1494,6 +1508,49 @@ const Dashboard = () => {
                             {fundsData.availableFunds > 0 
                               ? ((member.investment / fundsData.availableFunds) * 100).toFixed(2) + '%' 
                               : '0.00%'}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#DC2626'}}>
+                            {totalAllMembersLoanAmount > 0 
+                              ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount) * 100).toFixed(2) + '%' 
+                              : '0.00%'}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#059669'}}>
+                            12
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#7C3AED'}}>
+                            {dividendsData.length > 0 
+                              ? (12 / (dividendsData.length * 12) * 100).toFixed(2) + '%' 
+                              : '0.00%'}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#DC2626'}}>
+                            {(() => {
+                              // Get percentages as decimal values (divide by 100)
+                              const investmentShareDecimal = fundsData.availableFunds > 0 
+                                ? ((member.investment / fundsData.availableFunds)) 
+                                : 0;
+                              const patronageShareDecimal = totalAllMembersLoanAmount > 0 
+                                ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount)) 
+                                : 0;
+                              const activeMonthShareDecimal = dividendsData.length > 0 
+                                ? (12 / (dividendsData.length * 12)) 
+                                : 0;
+                              
+                              // Settings percentages are already converted to decimal in fetchDashboardData
+                              const totalPercentage = 
+                                (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
+                                (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
+                                (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
+                              
+                              return (totalPercentage * 100).toFixed(2) + '%';
+                            })()}
                           </strong>
                         </td>
                       </tr>

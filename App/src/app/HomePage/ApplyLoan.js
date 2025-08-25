@@ -13,7 +13,6 @@ import {
   KeyboardAvoidingView, Platform
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
-import CustomConfirmModal from '../../components/CustomConfirmModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
@@ -775,29 +774,69 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         </View>
       )}
 
-      {/* Custom Confirmation Modal */}
-      <CustomConfirmModal
-        visible={confirmModalVisible}
-        onClose={() => setConfirmModalVisible(false)}
-        title={confirmMessage.includes('Collateral Required') ? 'Collateral Required' : 'Confirm Loan Application'}
-        message={confirmMessage}
-        type={confirmMessage.includes('Collateral Required') ? 'warning' : 'info'}
-        cancelText="Cancel"
-        confirmText={confirmMessage.includes('Collateral Required') ? 'Continue' : 'Submit'}
-        onCancel={() => {
-          setConfirmModalVisible(false);
-          if (requiresCollateral) {
-            setShowCollateralModal(true);
-          }
-        }}
-        onConfirm={() => {
-          setConfirmModalVisible(false);
-          if (confirmAction) {
-            confirmAction();
-            setConfirmAction(null);
-          }
-        }}
-      />
+      {/* Detailed Confirmation Modal */}
+      <Modal visible={confirmModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons 
+              name={confirmMessage.includes('Collateral Required') ? 'warning' : 'help-outline'} 
+              size={40} 
+              color={confirmMessage.includes('Collateral Required') ? '#ff9800' : '#2C5282'} 
+              style={styles.modalIcon} 
+            />
+            <Text style={styles.modalTitle}>
+              {confirmMessage.includes('Collateral Required') ? 'Collateral Required' : 'Confirm Loan Application'}
+            </Text>
+            <View style={styles.modalContent}>
+              <Text style={styles.modalText}>Balance: ₱{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={styles.modalText}>Loan Type: {loanType}</Text>
+              <Text style={styles.modalText}>Loan Amount: ₱{parseFloat(loanAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={styles.modalText}>Processing Fee: ₱{parseFloat(processingFee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={styles.modalText}>Release Amount: ₱{(parseFloat(loanAmount || 0) - parseFloat(processingFee || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+              <Text style={styles.modalText}>Term: {term} {term === '1' ? 'Month' : 'Months'}</Text>
+              <Text style={styles.modalText}>Interest Rate: {(interestRate * 100).toFixed(1)}%</Text>
+              <Text style={styles.modalText}>Disbursement: {disbursement}</Text>
+              <Text style={styles.modalText}>Account Name: {accountName}</Text>
+              <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+              {requiresCollateral && (
+                <>
+                  <Text style={[styles.modalText, { fontWeight: 'bold', marginTop: 10 }]}>Collateral Details:</Text>
+                  <Text style={styles.modalText}>Type: {collateralType}</Text>
+                  <Text style={styles.modalText}>Value: ₱{parseFloat(collateralValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                  <Text style={styles.modalText}>Description: {collateralDescription}</Text>
+                </>
+              )}
+            </View>
+            <View style={styles.modalButtonContainer}>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.cancelButton]} 
+                onPress={() => {
+                  setConfirmModalVisible(false);
+                  if (requiresCollateral) {
+                    setShowCollateralModal(true);
+                  }
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.modalButton, styles.confirmButton]} 
+                onPress={() => {
+                  setConfirmModalVisible(false);
+                  if (confirmAction) {
+                    confirmAction();
+                    setConfirmAction(null);
+                  }
+                }}
+              >
+                <Text style={styles.confirmButtonText}>
+                  {confirmMessage.includes('Collateral Required') ? 'Continue' : 'Submit'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -976,6 +1015,63 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#2D5783',
+  },
+  // Modal styles matching PayLoan.js structure
+  centeredModal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#2C5282',
+  },
+  modalContent: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  modalText: {
+    fontSize: 16,
+    marginBottom: 8,
+    color: '#333',
+  },
+  modalButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    minWidth: '45%',
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  confirmButton: {
+    backgroundColor: '#2C5282',
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 
