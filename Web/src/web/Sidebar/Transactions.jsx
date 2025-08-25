@@ -385,6 +385,7 @@ const Transactions = () => {
     const loansRef = database.ref('Transactions/Loans');
     const withdrawalsRef = database.ref('Transactions/Withdrawals');
     const paymentsRef = database.ref('Transactions/Payments');
+    const registrationsRef = database.ref('Transactions/Registrations');
     const membersRef = database.ref('Members');
 
     const processTransactions = (data, type) => {
@@ -439,6 +440,11 @@ const Transactions = () => {
       setLoading(false);
     });
 
+    const registrationsListener = registrationsRef.on('value', (snapshot) => {
+      processTransactions(snapshot, 'Registrations');
+      setLoading(false);
+    });
+
     const membersListener = membersRef.on('value', (snapshot) => {
       if (snapshot.exists()) {
         setMembers(snapshot.val());
@@ -451,6 +457,7 @@ const Transactions = () => {
       loansRef.off('value', loansListener);
       withdrawalsRef.off('value', withdrawalsListener);
       paymentsRef.off('value', paymentsListener);
+      registrationsRef.off('value', registrationsListener);
       membersRef.off('value', membersListener);
     };
   }, []);

@@ -33,10 +33,18 @@ const Dashboard = () => {
   });
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
+  const [dividendsData, setDividendsData] = useState([]);
   const [selectedChart, setSelectedChart] = useState('loans');
   const [searchTerm, setSearchTerm] = useState('');
   const [showResendConfirmation, setShowResendConfirmation] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
+  const [transactionBreakdownModal, setTransactionBreakdownModal] = useState(false);
+  const [selectedMonthTransactions, setSelectedMonthTransactions] = useState({
+    member: null,
+    month: null,
+    year: null,
+    transactions: []
+  });
   const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -228,10 +236,75 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [selectedYear]);
 
+  // Refresh dividends data when year changes
+  useEffect(() => {
+    if (selectedChart === 'dividends') {
+      fetchDashboardData();
+    }
+  }, [selectedYear, selectedChart]);
+
   const parseCustomDate = (dateString) => {
     if (!dateString) return null;
     const parsedDate = new Date(dateString);
     return !isNaN(parsedDate.getTime()) ? parsedDate : new Date();
+  };
+
+  const parseTransactionDate = (dateInput) => {
+    if (!dateInput) return null;
+    
+    try {
+      // Handle Firebase Timestamp objects
+      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+        return new Date(dateInput.seconds * 1000);
+      }
+      
+      // Handle string dates in various formats
+      if (typeof dateInput === 'string') {
+        // Try direct parsing first
+        let parsedDate = new Date(dateInput);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+        
+        // Try parsing "Month Day, Year" format (e.g., "August 25, 2025")
+        const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'];
+        
+        const parts = dateInput.split(' ');
+        if (parts.length === 3) {
+          const monthName = parts[0];
+          const day = parseInt(parts[1].replace(',', ''));
+          const year = parseInt(parts[2]);
+          const monthIndex = monthNames.indexOf(monthName);
+          
+          if (monthIndex !== -1 && !isNaN(day) && !isNaN(year)) {
+            return new Date(year, monthIndex, day);
+          }
+        }
+        
+        // Try parsing "MM/DD/YYYY" format
+        const dateParts = dateInput.split('/');
+        if (dateParts.length === 3) {
+          const month = parseInt(dateParts[0]) - 1; // Month is 0-indexed
+          const day = parseInt(dateParts[1]);
+          const year = parseInt(dateParts[2]);
+          
+          if (!isNaN(month) && !isNaN(day) && !isNaN(year)) {
+            return new Date(year, month, day);
+          }
+        }
+      }
+      
+      // Handle Date objects
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+        return dateInput;
+      }
+      
+      return null;
+    } catch (error) {
+      console.warn('Date parsing error:', error);
+      return null;
+    }
   };
 
   const fetchDashboardData = async () => {
@@ -362,6 +435,133 @@ const Dashboard = () => {
       
       setLoanData(loanItems);
       setEarningsData(formattedFunds);
+      
+      // Process dividends data from real transactions
+      const dividendsItems = [];
+      
+      // Fetch all transaction types
+      const transactionTypes = ['Registrations', 'Deposits', 'Loans', 'Payments', 'Withdrawals'];
+      const allTransactions = {};
+      
+      const transactionPromises = transactionTypes.map(async (transactionType) => {
+        try {
+          const transactionSnapshot = await database.ref(`Transactions/${transactionType}`).once('value');
+          if (transactionSnapshot.exists()) {
+            const transactionData = transactionSnapshot.val();
+            Object.entries(transactionData).forEach(([memberId, memberTransactions]) => {
+              if (!allTransactions[memberId]) {
+                allTransactions[memberId] = [];
+              }
+              Object.entries(memberTransactions).forEach(([transactionId, transaction]) => {
+                allTransactions[memberId].push({
+                  ...transaction,
+                  type: transactionType,
+                  transactionId
+                });
+              });
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching ${transactionType} transactions:`, error);
+        }
+      });
+
+      // Wait for all transaction types to be fetched
+      await Promise.all(transactionPromises);
+      
+      // Process each member's transactions
+      Object.entries(membersData).forEach(([memberId, member]) => {
+        const memberTransactions = allTransactions[memberId] || [];
+        const monthlyDividends = Array(12).fill(0);
+        const monthlyTransactions = Array(12).fill(null).map(() => []); // Store actual transactions for each month
+        let totalInvestment = 0;
+        
+        // Filter transactions by selected year and process them
+        memberTransactions.forEach(transaction => {
+          const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
+          if (transactionDate && transactionDate.getFullYear() === parseInt(selectedYear)) {
+            const month = transactionDate.getMonth();
+            
+            // Extract amount using correct field name for each transaction type
+            let amount = 0;
+            switch (transaction.type) {
+              case 'Registrations':
+                // Registrations don't have monetary amounts, skip them
+                return;
+              case 'Deposits':
+                amount = parseFloat(transaction.amountToBeDeposited) || 0;
+                break;
+              case 'Loans':
+                amount = parseFloat(transaction.loanAmount) || 0;
+                break;
+              case 'Payments':
+                amount = parseFloat(transaction.amountToBePaid) || 0;
+                break;
+              case 'Withdrawals':
+                amount = parseFloat(transaction.amountWithdrawn) || 0;
+                break;
+              default:
+                // Fallback to generic amount field
+                amount = parseFloat(transaction.amount) || 0;
+            }
+            
+            // Debug logging
+            console.log(`Processing ${transaction.type} transaction:`, {
+              originalAmount: amount,
+              fieldUsed: transaction.type === 'Deposits' ? 'amountToBeDeposited' : 
+                         transaction.type === 'Loans' ? 'loanAmount' :
+                         transaction.type === 'Payments' ? 'amountToBePaid' :
+                         transaction.type === 'Withdrawals' ? 'amountWithdrawn' : 'amount',
+              transactionData: transaction
+            });
+            
+            // Determine if transaction is positive or negative
+            let adjustedAmount = amount;
+            if (transaction.type === 'Loans' || transaction.type === 'Withdrawals') {
+              adjustedAmount = -amount; // Loans and Withdrawals are negative (money going out)
+            } else {
+              adjustedAmount = amount; // Deposits and Payments are positive (money coming in)
+            }
+            
+            monthlyDividends[month] += adjustedAmount;
+            
+            // Store the actual transaction with processed amount
+            monthlyTransactions[month].push({
+              ...transaction,
+              adjustedAmount,
+              originalAmount: amount,
+              transactionDate: transactionDate,
+              formattedDate: transactionDate.toLocaleDateString('en-US', {
+                month: 'short',
+                day: 'numeric',
+                year: 'numeric'
+              })
+            });
+            
+            // Track total investment - consider initial deposits as investment
+            // Since registrations don't have amounts, we'll use first deposit as initial investment
+            if (transaction.type === 'Deposits' && adjustedAmount > 0) {
+              totalInvestment += adjustedAmount;
+            }
+          }
+        });
+        
+        const totalDividends = monthlyDividends.reduce((sum, dividend) => sum + dividend, 0);
+        
+        // Only include members who have transactions in the selected year
+        if (totalDividends !== 0 || totalInvestment > 0) {
+          dividendsItems.push({
+            memberId,
+            memberName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
+            investment: totalInvestment,
+            monthlyDividends,
+            monthlyTransactions, // Include the actual transactions
+            totalDividends
+          });
+        }
+      });
+      
+      setDividendsData(dividendsItems);
       setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -387,6 +587,25 @@ const Dashboard = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  };
+
+  const handleMonthClick = (member, monthIndex) => {
+    const monthTransactions = member.monthlyTransactions[monthIndex];
+    
+    if (monthTransactions && monthTransactions.length > 0) {
+      const monthNames = [
+        'January', 'February', 'March', 'April', 'May', 'June',
+        'July', 'August', 'September', 'October', 'November', 'December'
+      ];
+      
+      setSelectedMonthTransactions({
+        member: member,
+        month: monthNames[monthIndex],
+        year: selectedYear,
+        transactions: monthTransactions
+      });
+      setTransactionBreakdownModal(true);
+    }
   };
 
   const generateYears = () => {
@@ -842,6 +1061,70 @@ const Dashboard = () => {
       width: '36px',
       height: '36px',
       animation: 'spin 1s linear infinite'
+    },
+    
+    // Dividends Table Styles
+    dividendsTableContainer: {
+      overflowX: 'auto',
+      marginTop: '20px',
+      border: '1px solid #e0e0e0',
+      borderRadius: '8px',
+      backgroundColor: '#fff'
+    },
+    dividendsTable: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      fontSize: '14px'
+    },
+    dividendsHeaderRow: {
+      backgroundColor: '#f8f9fa',
+      borderBottom: '2px solid #e0e0e0'
+    },
+    dividendsHeaderCell: {
+      padding: '12px 8px',
+      textAlign: 'left',
+      fontWeight: '600',
+      color: '#2D5783',
+      borderRight: '1px solid #e0e0e0',
+      whiteSpace: 'nowrap',
+      minWidth: '80px'
+    },
+    dividendsDataRow: {
+      borderBottom: '1px solid #f0f0f0',
+      transition: 'background-color 0.2s',
+      ':hover': {
+        backgroundColor: '#f8f9fa'
+      }
+    },
+    dividendsDataCell: {
+      padding: '12px 8px',
+      borderRight: '1px solid #f0f0f0',
+      verticalAlign: 'middle'
+    },
+    memberInfo: {
+      display: 'flex',
+      flexDirection: 'column',
+      minWidth: '150px'
+    },
+    memberName: {
+      fontWeight: '600',
+      color: '#333',
+      marginBottom: '2px'
+    },
+    memberId: {
+      fontSize: '12px',
+      color: '#666'
+    },
+    dividendCell: {
+      padding: '6px 8px',
+      borderRadius: '4px',
+      textAlign: 'center',
+      color: '#fff',
+      fontWeight: '500',
+      minHeight: '24px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center'
     }
   };
 
@@ -916,6 +1199,15 @@ const Dashboard = () => {
           >
             Funds & Savings
           </button>
+          <button 
+            style={{
+              ...styles.chartButton,
+              ...(selectedChart === 'dividends' && styles.selectedChartButton)
+            }}
+            onClick={() => setSelectedChart('dividends')}
+          >
+            Dividends
+          </button>
         </div>
 
         <div style={styles.chartContainer}>
@@ -952,6 +1244,124 @@ const Dashboard = () => {
                   data={fundsLineData} 
                   options={fundsChartOptions}
                 />
+              </div>
+            </>
+          )}
+
+          {selectedChart === 'dividends' && (
+            <>
+              <div style={styles.chartHeader}>
+                <h3 style={styles.chartTitle}>Dividends Distribution ({selectedYear})</h3>
+                <select 
+                  value={selectedYear}
+                  onChange={(e) => setSelectedYear(e.target.value)}
+                  style={styles.yearSelect}
+                >
+                  {generateYears().map(year => (
+                    <option key={year} value={year}>{year}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={styles.dividendsTableContainer}>
+                <table style={styles.dividendsTable}>
+                  <thead>
+                    <tr style={styles.dividendsHeaderRow}>
+                      <th style={styles.dividendsHeaderCell}>Members</th>
+                      <th style={styles.dividendsHeaderCell}>Investment</th>
+                      <th style={styles.dividendsHeaderCell}>Jan</th>
+                      <th style={styles.dividendsHeaderCell}>Feb</th>
+                      <th style={styles.dividendsHeaderCell}>Mar</th>
+                      <th style={styles.dividendsHeaderCell}>Apr</th>
+                      <th style={styles.dividendsHeaderCell}>May</th>
+                      <th style={styles.dividendsHeaderCell}>Jun</th>
+                      <th style={styles.dividendsHeaderCell}>Jul</th>
+                      <th style={styles.dividendsHeaderCell}>Aug</th>
+                      <th style={styles.dividendsHeaderCell}>Sep</th>
+                      <th style={styles.dividendsHeaderCell}>Oct</th>
+                      <th style={styles.dividendsHeaderCell}>Nov</th>
+                      <th style={styles.dividendsHeaderCell}>Dec</th>
+                      <th style={styles.dividendsHeaderCell}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dividendsData.map((member, index) => (
+                      <tr key={member.memberId} style={styles.dividendsDataRow}>
+                        <td style={styles.dividendsDataCell}>
+                          <div style={styles.memberInfo}>
+                            <span style={styles.memberName}>{member.memberName}</span>
+                            <span style={styles.memberId}>ID: {member.memberId}</span>
+                          </div>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          ₱{formatCurrency(member.investment)}
+                        </td>
+                        {member.monthlyDividends.map((dividend, monthIndex) => {
+                          const hasTransactions = member.monthlyTransactions[monthIndex]?.length > 0;
+                          return (
+                            <td key={monthIndex} style={styles.dividendsDataCell}>
+                              <div 
+                                style={{
+                                  ...styles.dividendCell,
+                                  backgroundColor: dividend > 0 
+                                    ? `rgba(16, 185, 129, ${Math.min(Math.abs(dividend) / 1000, 0.8)})` 
+                                    : dividend < 0 
+                                      ? `rgba(239, 68, 68, ${Math.min(Math.abs(dividend) / 1000, 0.8)})` 
+                                      : '#f8f9fa',
+                                  color: dividend !== 0 ? '#fff' : '#666',
+                                  cursor: hasTransactions ? 'pointer' : 'default',
+                                  transition: 'all 0.2s ease',
+                                  border: hasTransactions ? '2px solid transparent' : 'none',
+                                  position: 'relative'
+                                }}
+                                onClick={() => hasTransactions && handleMonthClick(member, monthIndex)}
+                                onMouseEnter={(e) => {
+                                  if (hasTransactions) {
+                                    e.target.style.transform = 'scale(1.05)';
+                                    e.target.style.borderColor = dividend > 0 ? '#10B981' : '#EF4444';
+                                  }
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (hasTransactions) {
+                                    e.target.style.transform = 'scale(1)';
+                                    e.target.style.borderColor = 'transparent';
+                                  }
+                                }}
+                              >
+                                {dividend > 0 ? '+' : dividend < 0 ? '-' : ''}₱{formatCurrency(Math.abs(dividend))}
+                                {hasTransactions && member.monthlyTransactions[monthIndex].length > 1 && (
+                                  <span style={{
+                                    position: 'absolute',
+                                    top: '2px',
+                                    right: '2px',
+                                    fontSize: '10px',
+                                    backgroundColor: 'rgba(255,255,255,0.8)',
+                                    color: '#333',
+                                    borderRadius: '50%',
+                                    width: '16px',
+                                    height: '16px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    fontWeight: 'bold'
+                                  }}>
+                                    {member.monthlyTransactions[monthIndex].length}
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                          );
+                        })}
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{
+                            color: member.totalDividends > 0 ? '#10B981' : member.totalDividends < 0 ? '#EF4444' : '#666'
+                          }}>
+                            {member.totalDividends > 0 ? '+' : member.totalDividends < 0 ? '-' : ''}₱{formatCurrency(Math.abs(member.totalDividends))}
+                          </strong>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </>
           )}
@@ -1126,6 +1536,132 @@ const Dashboard = () => {
 {actionInProgress && (
   <div style={styles.centeredModal}>
     <div style={styles.spinner}></div>
+  </div>
+)}
+
+{/* Transaction Breakdown Modal */}
+{transactionBreakdownModal && (
+  <div style={styles.centeredModal}>
+    <div style={{...styles.modalCard, maxWidth: '800px', width: '90%'}}>
+      <button 
+        style={styles.closeButton} 
+        onClick={() => setTransactionBreakdownModal(false)}
+        aria-label="Close modal"
+        onFocus={(e) => e.target.style.outline = 'none'}
+      >
+        <FaTimes />
+      </button>
+      
+      <div style={{marginBottom: '20px'}}>
+        <h3 style={{margin: '0 0 10px 0', color: '#2D5783'}}>
+          Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
+        </h3>
+        <p style={{margin: '0', color: '#666', fontSize: '14px'}}>
+          <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
+        </p>
+      </div>
+
+      <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+        <table style={{...styles.dividendsTable, margin: '0'}}>
+          <thead>
+            <tr style={styles.dividendsHeaderRow}>
+              <th style={styles.dividendsHeaderCell}>Date</th>
+              <th style={styles.dividendsHeaderCell}>Type</th>
+              <th style={styles.dividendsHeaderCell}>Description</th>
+              <th style={styles.dividendsHeaderCell}>Amount</th>
+              <th style={styles.dividendsHeaderCell}>Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {selectedMonthTransactions.transactions.map((transaction, index) => (
+              <tr key={index} style={styles.dividendsDataRow}>
+                <td style={styles.dividendsDataCell}>
+                  {transaction.formattedDate}
+                </td>
+                <td style={styles.dividendsDataCell}>
+                  <span style={{
+                    backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
+                    color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
+                    padding: '4px 8px',
+                    borderRadius: '12px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {transaction.type}
+                  </span>
+                </td>
+                <td style={styles.dividendsDataCell}>
+                  {transaction.description || transaction.remarks || 
+                   transaction.purpose || transaction.loanPurpose || 'No description'}
+                </td>
+                <td style={styles.dividendsDataCell}>
+                  <div>
+                    <span style={{
+                      color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
+                      fontWeight: 'bold'
+                    }}>
+                      {transaction.adjustedAmount > 0 ? '+' : '-'}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
+                    </span>
+                    <div style={{fontSize: '11px', color: '#666', marginTop: '2px'}}>
+                      Original: ₱{formatCurrency(transaction.originalAmount)}
+                    </div>
+                  </div>
+                </td>
+                <td style={styles.dividendsDataCell}>
+                  <span style={{
+                    backgroundColor: transaction.status === 'approved' ? '#d1fae5' : '#fef3c7',
+                    color: transaction.status === 'approved' ? '#059669' : '#d97706',
+                    padding: '2px 6px',
+                    borderRadius: '8px',
+                    fontSize: '11px',
+                    textTransform: 'capitalize'
+                  }}>
+                    {transaction.status || 'Processed'}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{
+        marginTop: '20px', 
+        padding: '15px', 
+        backgroundColor: '#f8f9fa', 
+        borderRadius: '8px',
+        borderLeft: '4px solid #2D5783'
+      }}>
+        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+          <span style={{fontWeight: '600', color: '#2D5783'}}>
+            Month Total ({selectedMonthTransactions.transactions.length} transactions):
+          </span>
+          <span style={{
+            fontSize: '18px',
+            fontWeight: 'bold',
+            color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
+          }}>
+            {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : ''}
+            ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
+          </span>
+        </div>
+      </div>
+
+      <div style={{marginTop: '20px', textAlign: 'center'}}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            backgroundColor: '#2D5783',
+            color: '#fff',
+            minWidth: '100px'
+          }} 
+          onClick={() => setTransactionBreakdownModal(false)}
+          onFocus={(e) => e.target.style.outline = 'none'}
+        >
+          Close
+        </button>
+      </div>
+    </div>
   </div>
 )}
     </div>

@@ -9,6 +9,12 @@ import { FaEdit, FaSave } from 'react-icons/fa';
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
 
+  // Handle section change and reset edit mode
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    setEditMode(false); // Reset edit mode when switching sections
+  };
+
   // Add CSS styles for modals matching registration design
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -116,8 +122,13 @@ const SystemSettings = () => {
     InterestRate: {},
     AdvancedPayments: false,
     DividendDate: '',
-    PenaltyValue: '',
-    PenaltyType: 'percentage',
+    // Dividend Distribution Percentages
+    MembersDividendPercentage: '60',
+    FiveKiEarningsPercentage: '40',
+    // Members Dividend Breakdown
+    InvestmentSharePercentage: '60',
+    PatronageSharePercentage: '25',
+    ActiveMonthsPercentage: '15',
     ProcessingFee: '',
     OrientationCode: '',
     Accounts: {
@@ -166,6 +177,12 @@ const SystemSettings = () => {
 
   const db = getDatabase();
 
+  // Helper function to format peso amounts with at least 2 decimal places
+  const formatPesoAmount = (amount) => {
+    const num = parseFloat(amount) || 0;
+    return num.toFixed(2);
+  };
+
   useEffect(() => {
     const settingsRef = ref(db, 'Settings/');
     const unsubscribe = onValue(settingsRef, (snapshot) => {
@@ -180,8 +197,14 @@ const SystemSettings = () => {
           ),
           AdvancedPayments: data.AdvancedPayments || false,
           DividendDate: data.DividendDate || '',
-          PenaltyValue: data.PenaltyValue?.toString() || '',
-          PenaltyType: data.PenaltyType || 'fixed',
+          // Dividend Distribution Percentages
+          MembersDividendPercentage: data.MembersDividendPercentage?.toString() || '60',
+          FiveKiEarningsPercentage: data.FiveKiEarningsPercentage?.toString() || '40',
+          // Members Dividend Breakdown
+          InvestmentSharePercentage: data.InvestmentSharePercentage?.toString() || '60',
+          PatronageSharePercentage: data.PatronageSharePercentage?.toString() || '25',
+          ActiveMonthsPercentage: data.ActiveMonthsPercentage?.toString() || '15',
+
           ProcessingFee: data.ProcessingFee?.toString() || '',
           LoanTypes: data.LoanTypes || ['Regular Loan', 'Quick Cash'],
           LoanPercentage: data.LoanPercentage?.toString() || '80',
@@ -379,16 +402,31 @@ const SystemSettings = () => {
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
+      // Validate that dividend totals equal 100%
+      const distTotal = safeParseFloat(settings.MembersDividendPercentage, 0) + safeParseFloat(settings.FiveKiEarningsPercentage, 0);
+      const breakdownTotal = safeParseFloat(settings.InvestmentSharePercentage, 0) + safeParseFloat(settings.PatronageSharePercentage, 0) + safeParseFloat(settings.ActiveMonthsPercentage, 0);
+      if (distTotal !== 100) {
+        throw new Error('Dividend Distribution must total 100%.');
+      }
+      if (breakdownTotal !== 100) {
+        throw new Error('Members Dividend Breakdown must total 100%.');
+      }
+
       const updatedData = {
         LoanPercentage: safeParseFloat(settings.LoanPercentage, 80),
-        Funds: safeParseFloat(settings.Funds, 0),
-        Savings: safeParseFloat(settings.Savings, 0),
+        Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
+        Savings: parseFloat(parseFloat(settings.Savings || 0).toFixed(2)),
         InterestRate: parsedInterest,
         AdvancedPayments: settings.AdvancedPayments,
         DividendDate: settings.DividendDate,
-        PenaltyValue: safeParseFloat(settings.PenaltyValue, 0),
-        PenaltyType: 'fixed',
-        ProcessingFee: safeParseFloat(settings.ProcessingFee, 0),
+        // Dividend Distribution Percentages
+        MembersDividendPercentage: safeParseFloat(settings.MembersDividendPercentage, 60),
+        FiveKiEarningsPercentage: safeParseFloat(settings.FiveKiEarningsPercentage, 40),
+        // Members Dividend Breakdown
+        InvestmentSharePercentage: safeParseFloat(settings.InvestmentSharePercentage, 60),
+        PatronageSharePercentage: safeParseFloat(settings.PatronageSharePercentage, 25),
+        ActiveMonthsPercentage: safeParseFloat(settings.ActiveMonthsPercentage, 15),
+        ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
         LoanTypes: settings.LoanTypes,
         OrientationCode: settings.OrientationCode,
         Accounts: settings.Accounts,
@@ -403,7 +441,7 @@ const SystemSettings = () => {
       setEditMode(false);
       showMessage('Success', 'Settings updated successfully!');
     } catch (error) {
-      showMessage('Error', 'Failed to update settings: ' + error.message, true);
+      showMessage('Error', error.message || ('Failed to update settings: ' + error.message), true);
     } finally {
       setActionInProgress(false);
     }
@@ -454,8 +492,8 @@ const SystemSettings = () => {
 
     setSettings({
       ...settings,
-      Funds: newFunds.toString(),
-      Savings: newSavings.toString()
+      Funds: newFunds.toFixed(2),
+      Savings: newSavings.toFixed(2)
     });
 
     setFundsActionModal(null);
@@ -475,7 +513,7 @@ const SystemSettings = () => {
       return;
     }
 
-    const newSavings = (parseFloat(settings.Savings) + amount).toString();
+    const newSavings = (parseFloat(settings.Savings) + amount).toFixed(2);
     setSettings({
       ...settings,
       Savings: newSavings
@@ -502,7 +540,7 @@ const SystemSettings = () => {
               ...styles.sidebarButton,
               ...(activeSection === 'general' ? styles.sidebarButtonActive : {})
             }}
-            onClick={() => setActiveSection('general')}
+            onClick={() => handleSectionChange('general')}
           >
             General Settings
           </button>
@@ -511,7 +549,7 @@ const SystemSettings = () => {
               ...styles.sidebarButton,
               ...(activeSection === 'loan' ? styles.sidebarButtonActive : {})
             }}
-            onClick={() => setActiveSection('loan')}
+            onClick={() => handleSectionChange('loan')}
           >
             Loan & Dividend
           </button>
@@ -520,7 +558,7 @@ const SystemSettings = () => {
               ...styles.sidebarButton,
               ...(activeSection === 'content' ? styles.sidebarButtonActive : {})
             }}
-            onClick={() => setActiveSection('content')}
+            onClick={() => handleSectionChange('content')}
           >
             Content Management
           </button>
@@ -539,48 +577,44 @@ const SystemSettings = () => {
         {activeSection === 'general' && (
           <div style={styles.section}>
             {/* Loanable Amount Percentage */}
-            <InputRow
-              label="Loanable Amount Percentage"
-              value={settings.LoanPercentage}
-              onChange={(text) => handleInputChange('LoanPercentage', text)}
-              editable={editMode}
-              suffix="%"
-            />
+            <div style={styles.rateRow}>
+              <span style={styles.termText}>Loanable Amount Percentage</span>
+              {editMode ? (
+                <div style={styles.editRateRow}>
+                  <input
+                    style={styles.miniInput}
+                    value={settings.LoanPercentage}
+                    onChange={(e) => handleInputChange('LoanPercentage', e.target.value)}
+                    type="number"
+                    placeholder="80"
+                  />
+                  <span>%</span>
+                </div>
+              ) : (
+                <span style={styles.staticText}>{settings.LoanPercentage}%</span>
+              )}
+            </div>
             
             {/* Available Funds */}
-            <div style={styles.inputRow}>
-              <label style={styles.label}>Available Funds (₱)</label>
-              <input 
-                style={styles.staticInput} 
-                value={settings.Funds} 
-                readOnly 
-              />
+            <div style={styles.rateRow}>
+              <span style={styles.termText}>Available Funds</span>
+              <span style={styles.staticText}>₱{formatPesoAmount(settings.Funds)}</span>
             </div>
 
             {/* Savings */}
-            <div style={styles.inputRow}>
-              <label style={styles.label}>Savings (₱)</label>
-              {editMode ? (
-                <div style={styles.savingsInputContainer}>
-                  <input
-                    style={styles.staticInput}
-                    value={settings.Savings}
-                    readOnly
-                  />
-                  <button 
-                    style={styles.actionBtnAddFunds}
-                    onClick={handleAddSavings}
-                  >
-                    <FaPlus style={styles.buttonIcon} /> Add
-                  </button>
-                </div>
-              ) : (
-                <span style={styles.staticText}>₱{settings.Savings}</span>
-              )}
+            <div style={styles.rateRow}>
+              <span style={styles.termText}>Savings</span>
+              <span style={styles.staticText}>₱{formatPesoAmount(settings.Savings)}</span>
             </div>
 
             {editMode && (
               <div style={styles.fundsActions}>
+                <button 
+                  style={styles.actionBtnAddFunds}
+                  onClick={handleAddSavings}
+                >
+                  <FaPlus style={styles.buttonIcon} /> Add Savings
+                </button>
                 <button 
                   style={styles.actionBtnAddFunds}
                   onClick={() => handleFundsAction('add')}
@@ -600,7 +634,8 @@ const SystemSettings = () => {
 
             <div style={styles.divider}></div>
 
-            {/* Accounts */}
+            {/* Accounts Section */}
+            <h3 style={styles.contentTitle}>Accounts</h3>
             <div style={styles.accountRow}>
               <div style={styles.accountCard}>
                 <h3 style={styles.accountTitle}>Bank Account</h3>
@@ -695,29 +730,43 @@ const SystemSettings = () => {
               </label>
             </div>
             
-            <InputRow
-              label="Penalty Value (per day)"
-              value={settings.PenaltyValue}
-              onChange={(text) => handleInputChange('PenaltyValue', text)}
-              editable={editMode}
-              suffix="₱"
-            />
 
-            <InputRow
-              label="Processing Fee"
-              value={settings.ProcessingFee}
-              onChange={(text) => handleInputChange('ProcessingFee', text)}
-              editable={editMode}
-              suffix="₱"
-            />
 
-            <InputRow
-              label="Loanable Amount Percentage"
-              value={settings.LoanPercentage}
-              onChange={(text) => handleInputChange('LoanPercentage', text)}
-              editable={editMode}
-              suffix="%"
-            />
+            <div style={styles.rateRow}>
+              <span style={styles.termText}>Processing Fee</span>
+              {editMode ? (
+                <div style={styles.editRateRow}>
+                  <input
+                    style={styles.miniInput}
+                    value={settings.ProcessingFee}
+                    onChange={(e) => handleInputChange('ProcessingFee', e.target.value)}
+                    type="number"
+                    placeholder="0"
+                  />
+                  <span>₱</span>
+                </div>
+              ) : (
+                <span style={styles.staticText}>₱{formatPesoAmount(settings.ProcessingFee)}</span>
+              )}
+            </div>
+
+            <div style={styles.rateRow}>
+              <span style={styles.termText}>Loanable Amount Percentage</span>
+              {editMode ? (
+                <div style={styles.editRateRow}>
+                  <input
+                    style={styles.miniInput}
+                    value={settings.LoanPercentage}
+                    onChange={(e) => handleInputChange('LoanPercentage', e.target.value)}
+                    type="number"
+                    placeholder="80"
+                  />
+                  <span>%</span>
+                </div>
+              ) : (
+                <span style={styles.staticText}>{settings.LoanPercentage}%</span>
+              )}
+            </div>
 
             <div style={styles.loanTypesSection}>
               <h3 style={styles.subSectionTitle}>Types of Loans</h3>
@@ -801,6 +850,124 @@ const SystemSettings = () => {
 
             <div style={styles.dividendSection}>
               <h3 style={styles.subSectionTitle}>Dividend Settings</h3>
+              
+              {/* Dividend Distribution Percentages */}
+              <div style={styles.dividendDistributionSection}>
+                <h4 style={styles.subSectionTitle}>Dividend Distribution</h4>
+                <div style={styles.rateRow}>
+                  <span style={styles.termText}>Members Dividend</span>
+                  {editMode ? (
+                    <div style={styles.editRateRow}>
+                      <input
+                        style={styles.miniInput}
+                        value={settings.MembersDividendPercentage}
+                        onChange={(e) => handleInputChange('MembersDividendPercentage', e.target.value)}
+                        type="number"
+                        placeholder="60"
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                    </div>
+                  ) : (
+                    <span style={styles.staticText}>{settings.MembersDividendPercentage}%</span>
+                  )}
+                </div>
+                <div style={styles.rateRow}>
+                  <span style={styles.termText}>5Ki Earnings</span>
+                  {editMode ? (
+                    <div style={styles.editRateRow}>
+                      <input
+                        style={styles.miniInput}
+                        value={settings.FiveKiEarningsPercentage}
+                        onChange={(e) => handleInputChange('FiveKiEarningsPercentage', e.target.value)}
+                        type="number"
+                        placeholder="40"
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                    </div>
+                  ) : (
+                    <span style={styles.staticText}>{settings.FiveKiEarningsPercentage}%</span>
+                  )}
+                </div>
+                
+                {/* Validation message for distribution percentages */}
+                {editMode && (
+                  <div style={{
+                    ...styles.validationMessage,
+                    color: (parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? '#28a745' : '#dc3545'
+                  }}>
+                    Total: {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)).toFixed(1)}% 
+                    {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? ' ✓' : ' (Must equal 100%)'}
+                  </div>
+                )}
+              </div>
+
+              {/* Members Dividend Breakdown */}
+              <div style={styles.dividendBreakdownSection}>
+                <h4 style={styles.subSectionTitle}>Members Dividend Breakdown</h4>
+                <div style={styles.rateRow}>
+                  <span style={styles.termText}>Investment Share</span>
+                  {editMode ? (
+                    <div style={styles.editRateRow}>
+                      <input
+                        style={styles.miniInput}
+                        value={settings.InvestmentSharePercentage}
+                        onChange={(e) => handleInputChange('InvestmentSharePercentage', e.target.value)}
+                        type="number"
+                        placeholder="60"
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                    </div>
+                  ) : (
+                    <span style={styles.staticText}>{settings.InvestmentSharePercentage}%</span>
+                  )}
+                </div>
+                <div style={styles.rateRow}>
+                  <span style={styles.termText}>Patronage Share</span>
+                  {editMode ? (
+                    <div style={styles.editRateRow}>
+                      <input
+                        style={styles.miniInput}
+                        value={settings.PatronageSharePercentage}
+                        onChange={(e) => handleInputChange('PatronageSharePercentage', e.target.value)}
+                        type="number"
+                        placeholder="25"
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                    </div>
+                  ) : (
+                    <span style={styles.staticText}>{settings.PatronageSharePercentage}%</span>
+                  )}
+                </div>
+                <div style={styles.rateRow}>
+                  <span style={styles.termText}>Active Months</span>
+                  {editMode ? (
+                    <div style={styles.editRateRow}>
+                      <input
+                        style={styles.miniInput}
+                        value={settings.ActiveMonthsPercentage}
+                        onChange={(e) => handleInputChange('ActiveMonthsPercentage', e.target.value)}
+                        type="number"
+                        placeholder="15"
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                    </div>
+                  ) : (
+                    <span style={styles.staticText}>{settings.ActiveMonthsPercentage}%</span>
+                  )}
+                </div>
+                
+                {/* Validation message for breakdown percentages */}
+                {editMode && (
+                  <div style={{
+                    ...styles.validationMessage,
+                    color: (parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? '#28a745' : '#dc3545'
+                  }}>
+                    Total: {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)).toFixed(1)}% 
+                    {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? ' ✓' : ' (Must equal 100%)'}
+                  </div>
+                )}
+              </div>
+
               <label style={styles.label}>Dividend Date</label>
               {editMode ? (
                 <>
@@ -843,164 +1010,109 @@ const SystemSettings = () => {
         {/* Content Management Section */}
         {activeSection === 'content' && (
           <div style={styles.section}>
-            <div style={styles.contentSection}>
-         
-              {editMode ? (
-                <div style={styles.editSection}>
-                  <div style={styles.inputContainer}>
-                    <label>Title</label>
-                    <input
-                      style={styles.input}
-                      value={settings.TermsAndConditions.title}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        TermsAndConditions: {
-                          ...settings.TermsAndConditions,
-                          title: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                  <div style={styles.inputContainer}>
-                    <label>Content</label>
-                    <textarea
-                      style={styles.textarea}
-                      value={settings.TermsAndConditions.content}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        TermsAndConditions: {
-                          ...settings.TermsAndConditions,
-                          content: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={styles.textContent}>
-                    <h4 style={styles.contentTitle}>{settings.TermsAndConditions.title}</h4>
-                    <div style={styles.contentText}>{settings.TermsAndConditions.content}</div>
-                  </div>
-                </div>
-              )}
+            {/* Terms and Conditions */}
+            <div style={styles.contentCard}>
+              <h3 style={styles.accountTitle}>Terms and Conditions</h3>
+              <InputRow
+                label="Title"
+                value={settings.TermsAndConditions.title}
+                onChange={(text) => setSettings({
+                  ...settings,
+                  TermsAndConditions: {
+                    ...settings.TermsAndConditions,
+                    title: text
+                  }
+                })}
+                editable={editMode}
+              />
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Content</label>
+                {editMode ? (
+                  <textarea
+                    style={styles.textarea}
+                    value={settings.TermsAndConditions.content}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      TermsAndConditions: {
+                        ...settings.TermsAndConditions,
+                        content: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.contentText}>{settings.TermsAndConditions.content}</div>
+                )}
+              </div>
             </div>
 
-            <div style={styles.contentSection}>
-              {editMode ? (
-                <div style={styles.editSection}>
-                  <div style={styles.inputContainer}>
-                    <label>Title</label>
-                    <input
-                      style={styles.input}
-                      value={settings.PrivacyPolicy.title}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        PrivacyPolicy: {
-                          ...settings.PrivacyPolicy,
-                          title: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                  <div style={styles.inputContainer}>
-                    <label>Content</label>
-                    <textarea
-                      style={styles.textarea}
-                      value={settings.PrivacyPolicy.content}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        PrivacyPolicy: {
-                          ...settings.PrivacyPolicy,
-                          content: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={styles.textContent}>
-                    <h4 style={styles.contentTitle}>{settings.PrivacyPolicy.title}</h4>
-                    <div style={styles.contentText}>{settings.PrivacyPolicy.content}</div>
-                  </div>
-                </div>
-              )}
+            {/* About Us */}
+            <div style={styles.contentCard}>
+              <h3 style={styles.accountTitle}>About Us</h3>
+              <InputRow
+                label="Title"
+                value={settings.AboutUs.title}
+                onChange={(text) => setSettings({
+                  ...settings,
+                  AboutUs: {
+                    ...settings.AboutUs,
+                    title: text
+                  }
+                })}
+                editable={editMode}
+              />
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Content</label>
+                {editMode ? (
+                  <textarea
+                    style={styles.textarea}
+                    value={settings.AboutUs.content}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      AboutUs: {
+                        ...settings.AboutUs,
+                        content: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.contentText}>{settings.AboutUs.content}</div>
+                )}
+              </div>
             </div>
 
-            <div style={styles.contentSection}>
-
-              {editMode ? (
-                <div style={styles.editSection}>
-                  <div style={styles.inputContainer}>
-                    <label>About Us Title</label>
-                    <input
-                      style={styles.input}
-                      value={settings.AboutUs.title}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        AboutUs: {
-                          ...settings.AboutUs,
-                          title: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                  <div style={styles.inputContainer}>
-                    <label>About Us Content</label>
-                    <textarea
-                      style={styles.textarea}
-                      value={settings.AboutUs.content}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        AboutUs: {
-                          ...settings.AboutUs,
-                          content: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                  <div style={styles.inputContainer}>
-                    <label>Contact Us Title</label>
-                    <input
-                      style={styles.input}
-                      value={settings.ContactUs.title}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        ContactUs: {
-                          ...settings.ContactUs,
-                          title: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                  <div style={styles.inputContainer}>
-                    <label>Contact Us Content</label>
-                    <textarea
-                      style={styles.textarea}
-                      value={settings.ContactUs.content}
-                      onChange={(e) => setSettings({
-                        ...settings,
-                        ContactUs: {
-                          ...settings.ContactUs,
-                          content: e.target.value
-                        }
-                      })}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div>
-                  <div style={styles.textContent}>
-                    <h4 style={styles.contentTitle}>{settings.AboutUs.title}</h4>
-                    <div style={styles.contentText}>{settings.AboutUs.content}</div>
-                  </div>
-                  <div style={styles.textContent}>
-                    <h4 style={styles.contentTitle}>{settings.ContactUs.title}</h4>
-                    <div style={styles.contentText}>{settings.ContactUs.content}</div>
-                  </div>
-                </div>
-              )}
+            {/* Contact Us */}
+            <div style={styles.contentCard}>
+              <h3 style={styles.accountTitle}>Contact Us</h3>
+              <InputRow
+                label="Title"
+                value={settings.ContactUs.title}
+                onChange={(text) => setSettings({
+                  ...settings,
+                  ContactUs: {
+                    ...settings.ContactUs,
+                    title: text
+                  }
+                })}
+                editable={editMode}
+              />
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Content</label>
+                {editMode ? (
+                  <textarea
+                    style={styles.textarea}
+                    value={settings.ContactUs.content}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      ContactUs: {
+                        ...settings.ContactUs,
+                        content: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.contentText}>{settings.ContactUs.content}</div>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -1151,8 +1263,8 @@ const SystemSettings = () => {
               </p>
               <p className="modal-text">
                 {fundsActionModal === 'add' ? 
-                  `Available Savings: ₱${settings.Savings}` : 
-                  `Available Funds: ₱${settings.Funds}`}
+                  `Available Savings: ₱${formatPesoAmount(settings.Savings)}` : 
+                  `Available Funds: ₱${formatPesoAmount(settings.Funds)}`}
               </p>
               <input
                 style={{
@@ -1240,17 +1352,22 @@ const SystemSettings = () => {
 
         {/* Message Modal */}
         {messageModal.visible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
               {messageModal.isError ? (
-                <FiAlertCircle className="confirm-icon" />
+                <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
               ) : (
-                <FaCheckCircle className="confirm-icon" />
+                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
               )}
-              <p className="modal-text">{messageModal.message}</p>
+              <p style={styles.modalText}>{messageModal.message}</p>
               <button 
-                className={messageModal.isError ? "cancel-btn" : "confirm-btn"} 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }}
                 onClick={() => setMessageModal({ ...messageModal, visible: false })}
+                onFocus={(e) => e.target.style.outline = 'none'}
               >
                 OK
               </button>
@@ -1291,6 +1408,8 @@ const styles = {
   },
   sidebar: {
     width: '250px',
+    minWidth: '250px',
+    flexShrink: 0,
     backgroundColor: '#fff',
     padding: '20px',
     borderRight: '1px solid #e0e0e0',
@@ -1313,6 +1432,7 @@ const styles = {
     color: '#555',
     borderRadius: '4px',
     transition: 'all 0.2s',
+    whiteSpace: 'nowrap',
   },
   sidebarButtonActive: {
     backgroundColor: '#f0f7ff',
@@ -1324,6 +1444,8 @@ const styles = {
     flex: 1,
     padding: '30px',
     backgroundColor: '#fff',
+    minWidth: 0,
+    overflow: 'auto',
   },
 
   section: {
@@ -1338,13 +1460,22 @@ const styles = {
     display: 'flex',
     gap: '20px',
     marginBottom: '20px',
+    flexWrap: 'wrap',
   },
   accountCard: {
     flex: 1,
+    minWidth: '300px',
     padding: '20px',
     border: '1px solid #eee',
     borderRadius: '8px',
     backgroundColor: '#f9f9f9',
+  },
+  contentCard: {
+    padding: '20px',
+    border: '1px solid #eee',
+    borderRadius: '8px',
+    backgroundColor: '#f9f9f9',
+    marginBottom: '20px',
   },
   accountTitle: {
     fontSize: '16px',
@@ -1352,6 +1483,7 @@ const styles = {
     marginBottom: '15px',
     color: '#2D5783',
   },
+
   inputRow: {
     display: 'flex',
     alignItems: 'center',
@@ -1613,6 +1745,41 @@ const styles = {
     marginTop: '30px',
     paddingTop: '20px',
     borderTop: '1px solid #eee',
+  },
+  dividendDistributionSection: {
+    marginBottom: '25px',
+    padding: '20px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+  },
+  dividendBreakdownSection: {
+    marginBottom: '25px',
+    padding: '20px',
+    backgroundColor: '#f1f5f9',
+    borderRadius: '8px',
+    border: '1px solid #e2e8f0',
+  },
+  inputGroup: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+  },
+  validationMessage: {
+    fontSize: '12px',
+    fontWeight: '500',
+    marginTop: '10px',
+    padding: '8px 12px',
+    borderRadius: '4px',
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #dee2e6',
+  },
+  percentSymbol: {
+    fontSize: '14px',
+    color: '#334155',
+    fontWeight: '500',
+    marginLeft: '4px',
   },
   dateButton: {
     color: '#2D5783',

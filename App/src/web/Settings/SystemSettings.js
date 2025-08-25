@@ -23,8 +23,13 @@ const SystemSettings = () => {
     InterestRate: {},
     AdvancedPayments: false,
     DividendDate: '',
-    PenaltyValue: '',
-    PenaltyType: 'percentage',
+    // Dividend Distribution Percentages
+    MembersDividendPercentage: '60',
+    FiveKiEarningsPercentage: '40',
+    // Members Dividend Breakdown
+    InvestmentSharePercentage: '60',
+    PatronageSharePercentage: '25',
+    ActiveMonthsPercentage: '15',
   });
 
   const [newTerm, setNewTerm] = useState('');
@@ -34,6 +39,12 @@ const SystemSettings = () => {
   const [loading, setLoading] = useState(true);
 
   const db = getDatabase();
+
+  // Helper function to format peso amounts with at least 2 decimal places
+  const formatPesoAmount = (amount) => {
+    const num = parseFloat(amount) || 0;
+    return num.toFixed(2);
+  };
 
   useEffect(() => {
     const settingsRef = ref(db, 'Settings/');
@@ -48,8 +59,13 @@ const SystemSettings = () => {
           ),
           AdvancedPayments: data.AdvancedPayments || false,
           DividendDate: data.DividendDate || '',
-          PenaltyValue: data.PenaltyValue?.toString() || '',
-          PenaltyType: data.PenaltyType || 'percentage',
+          // Dividend Distribution Percentages
+          MembersDividendPercentage: data.MembersDividendPercentage?.toString() || '60',
+          FiveKiEarningsPercentage: data.FiveKiEarningsPercentage?.toString() || '40',
+          // Members Dividend Breakdown
+          InvestmentSharePercentage: data.InvestmentSharePercentage?.toString() || '60',
+          PatronageSharePercentage: data.PatronageSharePercentage?.toString() || '25',
+          ActiveMonthsPercentage: data.ActiveMonthsPercentage?.toString() || '15',
         });
       }
       setLoading(false);
@@ -117,6 +133,21 @@ const SystemSettings = () => {
   };
 
   const confirmSave = () => {
+    // Validate that dividend totals equal 100%
+    const distTotal = parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0);
+    const breakdownTotal = parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0);
+    
+    if (distTotal !== 100) {
+      Alert.alert('Validation Error', 'Dividend Distribution must total 100%.');
+      setConfirmationModalVisible(false);
+      return;
+    }
+    if (breakdownTotal !== 100) {
+      Alert.alert('Validation Error', 'Members Dividend Breakdown must total 100%.');
+      setConfirmationModalVisible(false);
+      return;
+    }
+
     const settingsRef = ref(db, 'Settings/');
 
     const parsedInterest = {};
@@ -127,12 +158,17 @@ const SystemSettings = () => {
 
     const updatedData = {
       LoanPercentage: parseFloat(settings.LoanPercentage),
-      Funds: parseFloat(settings.Funds),
+      Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
       InterestRate: parsedInterest,
       AdvancedPayments: settings.AdvancedPayments,
       DividendDate: settings.DividendDate,
-      PenaltyValue: parseFloat(settings.PenaltyValue),
-      PenaltyType: settings.PenaltyType,
+      // Dividend Distribution Percentages
+      MembersDividendPercentage: parseFloat(settings.MembersDividendPercentage) || 60,
+      FiveKiEarningsPercentage: parseFloat(settings.FiveKiEarningsPercentage) || 40,
+      // Members Dividend Breakdown
+      InvestmentSharePercentage: parseFloat(settings.InvestmentSharePercentage) || 60,
+      PatronageSharePercentage: parseFloat(settings.PatronageSharePercentage) || 25,
+      ActiveMonthsPercentage: parseFloat(settings.ActiveMonthsPercentage) || 15,
     };
 
     update(settingsRef, updatedData)
@@ -179,7 +215,7 @@ const SystemSettings = () => {
             {editMode ? (
               <TextInput style={styles.input} value={settings.Funds} onChangeText={(text) => handleInputChange('Funds', text)} keyboardType="numeric" />
             ) : (
-              <Text style={styles.staticText}>₱{settings.Funds}</Text>
+              <Text style={styles.staticText}>₱{formatPesoAmount(settings.Funds)}</Text>
             )}
           </View>
         </View>
@@ -230,16 +266,119 @@ const SystemSettings = () => {
           </View>
         </View>
 
-        {/* Penalty Value Card */}
+
+
+        {/* Dividend Distribution Percentages */}
         <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Dividend Distribution</Text>
           <View style={styles.row}>
-            <Text style={styles.label}>Penalty Value</Text>
+            <Text style={styles.label}>Members Dividend</Text>
             {editMode ? (
-              <TextInput style={styles.input} value={settings.PenaltyValue} onChangeText={(text) => handleInputChange('PenaltyValue', text)} keyboardType="numeric" />
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { width: 80 }]}
+                  value={settings.MembersDividendPercentage}
+                  onChangeText={(text) => handleInputChange('MembersDividendPercentage', text)}
+                  keyboardType="numeric"
+                  placeholder="60"
+                />
+                <Text style={styles.label}>%</Text>
+              </View>
             ) : (
-              <Text style={styles.staticText}>₱{settings.PenaltyValue}</Text>
+              <Text style={styles.staticText}>{settings.MembersDividendPercentage}%</Text>
             )}
           </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>5Ki Earnings</Text>
+            {editMode ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { width: 80 }]}
+                  value={settings.FiveKiEarningsPercentage}
+                  onChangeText={(text) => handleInputChange('FiveKiEarningsPercentage', text)}
+                  keyboardType="numeric"
+                  placeholder="40"
+                />
+                <Text style={styles.label}>%</Text>
+              </View>
+            ) : (
+              <Text style={styles.staticText}>{settings.FiveKiEarningsPercentage}%</Text>
+            )}
+          </View>
+          {editMode && (
+            <Text style={[
+              styles.validationText,
+              {color: (parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? '#4CAF50' : '#f44336'}
+            ]}>
+              Total: {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)).toFixed(1)}% 
+              {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? ' ✓' : ' (Must equal 100%)'}
+            </Text>
+          )}
+        </View>
+
+        {/* Members Dividend Breakdown */}
+        <View style={styles.card}>
+          <Text style={styles.sectionTitle}>Members Dividend Breakdown</Text>
+          <View style={styles.row}>
+            <Text style={styles.label}>Investment Share</Text>
+            {editMode ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { width: 80 }]}
+                  value={settings.InvestmentSharePercentage}
+                  onChangeText={(text) => handleInputChange('InvestmentSharePercentage', text)}
+                  keyboardType="numeric"
+                  placeholder="60"
+                />
+                <Text style={styles.label}>%</Text>
+              </View>
+            ) : (
+              <Text style={styles.staticText}>{settings.InvestmentSharePercentage}%</Text>
+            )}
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Patronage Share</Text>
+            {editMode ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { width: 80 }]}
+                  value={settings.PatronageSharePercentage}
+                  onChangeText={(text) => handleInputChange('PatronageSharePercentage', text)}
+                  keyboardType="numeric"
+                  placeholder="25"
+                />
+                <Text style={styles.label}>%</Text>
+              </View>
+            ) : (
+              <Text style={styles.staticText}>{settings.PatronageSharePercentage}%</Text>
+            )}
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>Active Months</Text>
+            {editMode ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                <TextInput
+                  style={[styles.input, { width: 80 }]}
+                  value={settings.ActiveMonthsPercentage}
+                  onChangeText={(text) => handleInputChange('ActiveMonthsPercentage', text)}
+                  keyboardType="numeric"
+                  placeholder="15"
+                />
+                <Text style={styles.label}>%</Text>
+              </View>
+            ) : (
+              <Text style={styles.staticText}>{settings.ActiveMonthsPercentage}%</Text>
+            )}
+          </View>
+          {editMode && (
+            <Text style={[
+              styles.validationText,
+              {color: (parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? '#4CAF50' : '#f44336'}
+            ]}>
+              Total: {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)).toFixed(1)}% 
+              {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? ' ✓' : ' (Must equal 100%)'}
+            </Text>
+          )}
         </View>
 
         {/* Dividend Date */}
@@ -391,6 +530,20 @@ const styles = StyleSheet.create({
     marginTop: 50,
     fontSize: 18,
     color: '#888',
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: 15,
+    textAlign: 'center',
+  },
+  validationText: {
+    fontSize: 12,
+    fontWeight: '500',
+    marginTop: 10,
+    textAlign: 'center',
+    paddingHorizontal: 10,
   },
 });
 

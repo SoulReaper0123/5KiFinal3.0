@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaDownload, FaTrashAlt, FaUndo } from 'react-icons/fa';
+import { FaDownload, FaTrashAlt, FaUndo, FaCheckCircle, FaTimes } from 'react-icons/fa';
 import ExcelJS from 'exceljs';
 import { database } from '../../../../Database/firebaseConfig';
 
@@ -15,6 +15,7 @@ const DataManagement = () => {
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [isError, setIsError] = useState(false);
   const [editMode, setEditMode] = useState(false);
 
   // Fetch settings and archived data
@@ -363,12 +364,15 @@ const DataManagement = () => {
         setSuccessMessage('Settings saved successfully!');
       }
 
+      setIsError(false);
       setShowSuccessModal(true);
       setLoading(false);
     } catch (error) {
       console.error('Error saving settings:', error);
+      setSuccessMessage('Error saving settings: ' + error.message);
+      setIsError(true);
+      setShowSuccessModal(true);
       setLoading(false);
-      setError(error.message);
     }
   };
 
@@ -376,8 +380,14 @@ const DataManagement = () => {
     try {
       await database.ref(`ArchivedData/${id}`).remove();
       setArchivedData(prev => prev.filter(item => item.id !== id));
+      setSuccessMessage('Archive deleted successfully!');
+      setIsError(false);
+      setShowSuccessModal(true);
     } catch (error) {
       console.error('Error deleting archive:', error);
+      setSuccessMessage('Error deleting archive: ' + error.message);
+      setIsError(true);
+      setShowSuccessModal(true);
     }
   };
 
@@ -440,18 +450,25 @@ const DataManagement = () => {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalContent}>
-            <h3 style={styles.modalTitle}>Success</h3>
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            {isError ? (
+              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
+            ) : (
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+            )}
             <p style={styles.modalText}>{successMessage}</p>
-            <div style={styles.modalButtons}>
-              <button 
-                style={styles.confirmButton}
-                onClick={() => setShowSuccessModal(false)}
-              >
-                OK
-              </button>
-            </div>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }}
+              onClick={() => setShowSuccessModal(false)}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              OK
+            </button>
           </div>
         </div>
       )}
@@ -1019,6 +1036,49 @@ const styles = {
     borderRadius: '4px',
     cursor: 'pointer',
     fontSize: '14px',
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCardSmall: {
+    width: '250px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    textAlign: 'center'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none'
   },
 };
 
