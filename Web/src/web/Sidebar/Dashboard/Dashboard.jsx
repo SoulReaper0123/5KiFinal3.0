@@ -470,11 +470,12 @@ const Dashboard = () => {
       await Promise.all(transactionPromises);
       
       // Process each member's transactions
-      Object.entries(membersData).forEach(([memberId, member]) => {
+      const memberProcessingPromises = Object.entries(membersData).map(async ([memberId, member]) => {
         const memberTransactions = allTransactions[memberId] || [];
         const monthlyDividends = Array(12).fill(0);
         const monthlyTransactions = Array(12).fill(null).map(() => []); // Store actual transactions for each month
-        let totalInvestment = 0;
+        // Use member's balance from Members table as investment
+        const totalInvestment = parseFloat(member.balance) || 0;
         
         // Filter transactions by selected year and process them
         memberTransactions.forEach(transaction => {
@@ -537,27 +538,59 @@ const Dashboard = () => {
                 year: 'numeric'
               })
             });
-            
-            // Track total investment - consider initial deposits as investment
-            // Since registrations don't have amounts, we'll use first deposit as initial investment
-            if (transaction.type === 'Deposits' && adjustedAmount > 0) {
-              totalInvestment += adjustedAmount;
-            }
           }
         });
         
         const totalDividends = monthlyDividends.reduce((sum, dividend) => sum + dividend, 0);
         
-        // Only include members who have transactions in the selected year
+        // Count approved loans and calculate total loan amount for this member from Transactions/Loans
+        let approvedLoansCount = 0;
+        let totalLoanAmount = 0;
+        try {
+          const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
+          if (memberLoansSnapshot.exists()) {
+            const memberLoans = memberLoansSnapshot.val();
+            // Count transactions with dateApproved field and sum loan amounts
+            Object.values(memberLoans).forEach(loan => {
+              if (loan.dateApproved) {
+                // Check if the loan was approved in the selected year
+                const approvedDate = parseTransactionDate(loan.dateApproved);
+                if (approvedDate && approvedDate.getFullYear() === parseInt(selectedYear)) {
+                  approvedLoansCount++;
+                  // Add the loan amount to the total
+                  const loanAmount = parseFloat(loan.loanAmount) || 0;
+                  totalLoanAmount += loanAmount;
+                }
+              }
+            });
+          }
+        } catch (error) {
+          console.error(`Error fetching approved loans count for member ${memberId}:`, error);
+        }
+        
+        // Only include members who have transactions in the selected year or have investment
         if (totalDividends !== 0 || totalInvestment > 0) {
-          dividendsItems.push({
+          return {
             memberId,
             memberName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
             investment: totalInvestment,
             monthlyDividends,
             monthlyTransactions, // Include the actual transactions
-            totalDividends
-          });
+            totalDividends,
+            approvedLoansCount,
+            totalLoanAmount
+          };
+        }
+        return null;
+      });
+      
+      // Wait for all member processing to complete
+      const processedMembers = await Promise.all(memberProcessingPromises);
+      
+      // Filter out null values and add to dividendsItems
+      processedMembers.forEach(member => {
+        if (member) {
+          dividendsItems.push(member);
         }
       });
       
@@ -748,7 +781,8 @@ const Dashboard = () => {
       width: '100%',
       height: '100%',
       padding: '20px',
-      overflow: 'auto',
+      overflowY: 'auto',
+      overflowX: 'hidden',
       backgroundColor: '#f5f7fa',
     },
     header: {
@@ -764,20 +798,51 @@ const Dashboard = () => {
     },
     metricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+      gridTemplateColumns: '1fr 1fr',
       gap: '20px',
-      marginBottom: '20px'
+      marginBottom: '20px',
+      width: '100%',
+      alignItems: 'stretch'
+    },
+    secondaryMetricsGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(4, 1fr)',
+      gap: '20px',
+      marginBottom: '40px',
+      marginTop: '50px',
+      width: '100%',
+      alignItems: 'stretch',
+      '@media (max-width: 768px)': {
+        gridTemplateColumns: 'repeat(2, 1fr)'
+      },
+      '@media (max-width: 480px)': {
+        gridTemplateColumns: '1fr'
+      }
+    },
+    primaryCard: {
+      padding: '12px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
+      height: '100%',
+      minHeight: '70px'
+    },
+    secondaryCard: {
+      height: '100%',
+      minHeight: '60px',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between'
     },
     metricCard: {
       backgroundColor: 'white',
       borderRadius: '8px',
-      padding: '20px',
+      padding: '10px',
       boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
     },
     fundsCard: {
       background: 'linear-gradient(135deg, #2D5783 0%, #1E3A8A 100%)',
-      color: 'white',
-      gridColumn: '1 / -1'
+      color: 'white'
     },
     metricContent: {
       marginBottom: '10px'
@@ -805,21 +870,22 @@ const Dashboard = () => {
       color: 'rgba(255,255,255,0.8)'
     },
     healthIndicator: {
-      padding: '8px',
-      fontSize: '12px',
+      padding: '4px 8px',
+      fontSize: '11px',
       fontWeight: '600',
       textAlign: 'center',
       backgroundColor: healthColor,
       color: 'white',
       borderRadius: '4px',
-      marginTop: '10px'
+      marginTop: '6px'
     },
     chartsSection: {
       marginBottom: '20px'
     },
     chartSelector: {
       display: 'flex',
-      gap: '10px',
+      gap: '20px',
+      marginTop: '30px',
       marginBottom: '15px'
     },
     chartButton: {
@@ -867,7 +933,10 @@ const Dashboard = () => {
       backgroundColor: 'white',
       borderRadius: '8px',
       padding: '20px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      width: '100%',
+      boxSizing: 'border-box',
+      overflow: 'hidden'
     },
     sectionHeader: {
       display: 'flex',
@@ -875,26 +944,34 @@ const Dashboard = () => {
       alignItems: 'center',
       marginBottom: '15px',
       flexWrap: 'wrap',
-      gap: '10px'
+      gap: '10px',
+      width: '100%'
     },
     sectionTitle: {
       fontSize: '18px',
       fontWeight: '600',
-      color: '#1F2937'
+      color: '#1F2937',
+      flex: '1 1 auto',
+      minWidth: '0'
     },
     searchBox: {
-      minWidth: '300px'
+      minWidth: '200px',
+      maxWidth: '300px',
+      flex: '0 0 auto'
     },
     searchInput: {
       width: '100%',
       padding: '10px 15px',
       border: '1px solid #E5E7EB',
       borderRadius: '6px',
-      fontSize: '14px'
+      fontSize: '14px',
+      boxSizing: 'border-box',
+      outline: 'none'
     },
     tableContainer: {
       overflowX: 'auto',
-      marginTop: '15px'
+      marginTop: '15px',
+      maxWidth: '100%'
     },
     loansTable: {
       width: '100%',
@@ -938,18 +1015,6 @@ const Dashboard = () => {
       fontSize: '12px',
       transition: 'background-color 0.2s'
     },
-    centeredModal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000
-  },
   modalCardSmall: {
     width: '250px',
     backgroundColor: 'white',
@@ -1018,6 +1083,18 @@ const Dashboard = () => {
       color: '#6B7280',
       padding: '20px'
     },
+    centeredModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000
+    },
     modal: {
       position: 'fixed',
       top: 0,
@@ -1031,11 +1108,30 @@ const Dashboard = () => {
       zIndex: 1000
     },
     modalCard: {
+      width: '90%',
+      maxWidth: '800px',
       backgroundColor: 'white',
       borderRadius: '8px',
       padding: '20px',
-      width: '300px',
-      textAlign: 'center'
+      position: 'relative',
+      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      maxHeight: '90vh',
+      height: '80vh',
+      display: 'flex',
+      flexDirection: 'column',
+      overflowX: 'hidden'
+    },
+    modalContent: {
+      paddingBottom: '12px',
+      overflowY: 'auto',
+      flex: 1
+    },
+    modalTitle: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: '#2D5783',
+      margin: '0 0 20px 0',
+      textAlign: 'left'
     },
     modalIcon: {
       fontSize: '32px',
@@ -1069,12 +1165,14 @@ const Dashboard = () => {
       marginTop: '20px',
       border: '1px solid #e0e0e0',
       borderRadius: '8px',
-      backgroundColor: '#fff'
+      backgroundColor: '#fff',
+      maxWidth: '100%'
     },
     dividendsTable: {
       width: '100%',
       borderCollapse: 'collapse',
-      fontSize: '14px'
+      fontSize: '14px',
+      minWidth: '1400px'
     },
     dividendsHeaderRow: {
       backgroundColor: '#f8f9fa',
@@ -1135,8 +1233,8 @@ const Dashboard = () => {
       </div>
 
       <div style={styles.metricsGrid}>
-        <div style={{...styles.metricCard, ...styles.fundsCard}}>
-          <div style={styles.metricContent}>
+        <div style={{...styles.metricCard, ...styles.fundsCard, ...styles.primaryCard}}>
+          <div style={{...styles.metricContent, marginBottom: '4px'}}>
             <h3 style={{...styles.metricTitle, color: 'rgba(255,255,255,0.9)'}}>Available Funds</h3>
             <div style={{...styles.metricValue, ...styles.fundsMetricValue}}>₱{formatCurrency(fundsData.availableFunds)}</div>
             <div style={{...styles.metricDescription, ...styles.fundsMetricDescription}}>Capital available for new loans</div>
@@ -1146,7 +1244,20 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard}>
+        <div style={{...styles.metricCard, ...styles.primaryCard}}>
+          <div style={styles.metricContent}>
+            <h3 style={styles.metricTitle}>Total Yields</h3>
+            <div style={styles.metricValue}>₱{formatCurrency(fundsData.availableFunds + fundsData.fiveKISavings)}</div>
+            <div style={styles.metricDescription}>Funds plus savings</div>
+          </div>
+          <div style={{...styles.healthIndicator, backgroundColor: '#10B981', opacity: 0}}>
+            Placeholder
+          </div>
+        </div>
+      </div>
+
+      <div style={styles.secondaryMetricsGrid}>
+        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Members</h3>
             <div style={styles.metricValue}>{fundsData.totalMembers}</div>
@@ -1154,7 +1265,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard}>
+        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Loans</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalLoans)}</div>
@@ -1162,7 +1273,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard}>
+        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Receivables</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalReceivables)}</div>
@@ -1170,7 +1281,7 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={styles.metricCard}>
+        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>5KI Savings</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.fiveKISavings)}</div>
@@ -1263,6 +1374,12 @@ const Dashboard = () => {
                 </select>
               </div>
               <div style={styles.dividendsTableContainer}>
+                {(() => {
+                  // Calculate total loan amount across all members for patronage share calculation
+                  const totalAllMembersLoanAmount = dividendsData.reduce((sum, member) => sum + (member.totalLoanAmount || 0), 0);
+                  window.totalAllMembersLoanAmount = totalAllMembersLoanAmount; // Store for use in table rows
+                  return null;
+                })()}
                 <table style={styles.dividendsTable}>
                   <thead>
                     <tr style={styles.dividendsHeaderRow}>
@@ -1281,6 +1398,10 @@ const Dashboard = () => {
                       <th style={styles.dividendsHeaderCell}>Nov</th>
                       <th style={styles.dividendsHeaderCell}>Dec</th>
                       <th style={styles.dividendsHeaderCell}>Total</th>
+                      <th style={styles.dividendsHeaderCell}>Count</th>
+                      <th style={styles.dividendsHeaderCell}>Amount</th>
+                      <th style={styles.dividendsHeaderCell}>Investment Share</th>
+                      <th style={styles.dividendsHeaderCell}>Patronage Share</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1356,6 +1477,23 @@ const Dashboard = () => {
                             color: member.totalDividends > 0 ? '#10B981' : member.totalDividends < 0 ? '#EF4444' : '#666'
                           }}>
                             {member.totalDividends > 0 ? '+' : member.totalDividends < 0 ? '-' : ''}₱{formatCurrency(Math.abs(member.totalDividends))}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#2D5783'}}>
+                            {member.approvedLoansCount || 0}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#059669'}}>
+                            ₱{formatCurrency(member.totalLoanAmount || 0)}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#7C3AED'}}>
+                            {fundsData.availableFunds > 0 
+                              ? ((member.investment / fundsData.availableFunds) * 100).toFixed(2) + '%' 
+                              : '0.00%'}
                           </strong>
                         </td>
                       </tr>
@@ -1542,7 +1680,7 @@ const Dashboard = () => {
 {/* Transaction Breakdown Modal */}
 {transactionBreakdownModal && (
   <div style={styles.centeredModal}>
-    <div style={{...styles.modalCard, maxWidth: '800px', width: '90%'}}>
+    <div style={styles.modalCard}>
       <button 
         style={styles.closeButton} 
         onClick={() => setTransactionBreakdownModal(false)}
@@ -1552,16 +1690,15 @@ const Dashboard = () => {
         <FaTimes />
       </button>
       
-      <div style={{marginBottom: '20px'}}>
-        <h3 style={{margin: '0 0 10px 0', color: '#2D5783'}}>
-          Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
-        </h3>
-        <p style={{margin: '0', color: '#666', fontSize: '14px'}}>
-          <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
-        </p>
+      <h3 style={styles.modalTitle}>
+        Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
+      </h3>
+      
+      <div style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
+        <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
       </div>
 
-      <div style={{maxHeight: '400px', overflowY: 'auto'}}>
+      <div style={styles.modalContent}>
         <table style={{...styles.dividendsTable, margin: '0'}}>
           <thead>
             <tr style={styles.dividendsHeaderRow}>
@@ -1623,31 +1760,32 @@ const Dashboard = () => {
             ))}
           </tbody>
         </table>
-      </div>
-
-      <div style={{
-        marginTop: '20px', 
-        padding: '15px', 
-        backgroundColor: '#f8f9fa', 
-        borderRadius: '8px',
-        borderLeft: '4px solid #2D5783'
-      }}>
-        <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-          <span style={{fontWeight: '600', color: '#2D5783'}}>
-            Month Total ({selectedMonthTransactions.transactions.length} transactions):
-          </span>
-          <span style={{
-            fontSize: '18px',
-            fontWeight: 'bold',
-            color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
-          }}>
-            {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : ''}
-            ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
-          </span>
+        
+        <div style={{
+          marginTop: '20px', 
+          padding: '15px', 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: '8px',
+          borderLeft: '4px solid #2D5783'
+        }}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span style={{fontWeight: '600', color: '#2D5783'}}>
+              Month Total ({selectedMonthTransactions.transactions.length} transactions):
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
+            }}>
+              {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
+               selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
+              ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
+            </span>
+          </div>
         </div>
       </div>
 
-      <div style={{marginTop: '20px', textAlign: 'center'}}>
+      <div style={{marginTop: '20px', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '20px'}}>
         <button 
           style={{
             ...styles.actionButton,

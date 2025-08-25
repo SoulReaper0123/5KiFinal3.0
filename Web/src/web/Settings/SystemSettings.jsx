@@ -116,7 +116,6 @@ const SystemSettings = () => {
     };
   }, []);
   const [settings, setSettings] = useState({
-    LoanPercentage: '',
     Funds: '',
     Savings: '',
     InterestRate: {},
@@ -189,7 +188,6 @@ const SystemSettings = () => {
       if (snapshot.exists()) {
         const data = snapshot.val();
         setSettings({
-          LoanPercentage: data.LoanPercentage?.toString() || '',
           Funds: data.Funds?.toString() || '',
           Savings: data.Savings?.toString() || '',
           InterestRate: Object.fromEntries(

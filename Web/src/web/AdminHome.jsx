@@ -904,6 +904,7 @@ const fetchRelevantData = async (userMessage) => {
       margin: 0,
       padding: 0,
       overflow: 'hidden',
+      overflowX: 'hidden',
       position: 'relative',
     },
     sidebar: {
@@ -1009,7 +1010,8 @@ const fetchRelevantData = async (userMessage) => {
     },
 content: {
   flex: 1,
-  overflow: 'auto',
+  overflowY: 'auto',
+  overflowX: 'hidden',
   height: '100vh',
   padding: '20px',
   backgroundColor: '#f5f7fa',
