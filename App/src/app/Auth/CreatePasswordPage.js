@@ -169,7 +169,7 @@ const CreatePasswordPage = () => {
         dateCreated: formatDate(now),
         timeCreated: formatTime(now),
         status: 'pending',
-        registrationFee: 5000,
+        registrationFee: registrationData.registrationFee || 0,
         paymentStatus: registrationData.proofOfPayment ? 'paid' : 'unpaid'
       };
 

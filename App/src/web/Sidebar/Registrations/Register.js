@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   SafeAreaView,
+  Platform,
 } from 'react-native';
 import Registrations from './Registrations';
 import RejectedRegistrations from '../Registrations/RejectedRegistrations';
@@ -45,6 +46,12 @@ const Register = () => {
 
   const handleDownload = async () => {
     try {
+      // Avoid web-only APIs on native
+      if (Platform.OS !== 'web') {
+        console.log('Export to Excel is only available on web.');
+        return;
+      }
+
       let dataToDownload = [];
       let tableName =
         activeSection === 'rejectedRegistrations'

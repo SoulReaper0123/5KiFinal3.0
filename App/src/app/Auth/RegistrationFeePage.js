@@ -35,6 +35,8 @@ const RegistrationFeePage = () => {
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
   });
+  const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
+  const [amount, setAmount] = useState('');
   
   // State for image selection
   const [showImageOptions, setShowImageOptions] = useState(false);
@@ -42,15 +44,17 @@ const RegistrationFeePage = () => {
   const [alertMessage, setAlertMessage] = useState('');
   const [alertType, setAlertType] = useState('error');
 
-  const registrationData = route.params;
+  const registrationData = route.params || {};
 
   useEffect(() => {
     fetchPaymentSettings();
+    fetchMinRegistrationFee();
   }, []);
 
   useEffect(() => {
-    setIsSubmitDisabled(!paymentOption || !proofOfPayment);
-  }, [paymentOption, proofOfPayment]);
+    const validAmount = parseFloat(amount) >= parseFloat(minRegistrationFee);
+    setIsSubmitDisabled(!paymentOption || !proofOfPayment || !validAmount);
+  }, [paymentOption, proofOfPayment, amount, minRegistrationFee]);
 
   const fetchPaymentSettings = async () => {
     try {
@@ -68,6 +72,20 @@ const RegistrationFeePage = () => {
       }
     } catch (error) {
       console.error('Error fetching payment settings:', error);
+    }
+  };
+
+  const fetchMinRegistrationFee = async () => {
+    try {
+      const feeRef = dbRef(database, 'Settings/RegistrationMinimumFee');
+      const snapshot = await get(feeRef);
+      if (snapshot.exists()) {
+        const val = snapshot.val();
+        const num = parseFloat(val);
+        if (!isNaN(num)) setMinRegistrationFee(num);
+      }
+    } catch (error) {
+      console.error('Error fetching minimum registration fee:', error);
     }
   };
 
@@ -97,6 +115,14 @@ const RegistrationFeePage = () => {
       return;
     }
 
+    const amt = parseFloat(amount);
+    if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
+      setAlertMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
     setLoading(true);
     
     // Navigate to CreatePassword page with all registration data including payment proof
@@ -106,7 +132,7 @@ const RegistrationFeePage = () => {
       accountNumber,
       accountName,
       proofOfPayment,
-      registrationFee: 5000 // Adding the registration fee amount
+      registrationFee: amt // Use entered amount
     });
     
     setLoading(false);
@@ -125,7 +151,15 @@ const RegistrationFeePage = () => {
         <Text style={styles.title}>Registration Fee</Text>
 
         <View style={styles.content}>
-          <Text style={styles.label}>Registration Fee: ₱5000.00</Text>
+          <Text style={styles.label}>Minimum Registration Fee: ₱{minRegistrationFee.toFixed(2)}</Text>
+          <Text style={styles.label}>Enter Amount<Text style={styles.required}>*</Text></Text>
+          <TextInput
+            value={amount}
+            onChangeText={setAmount}
+            style={styles.input}
+            keyboardType="numeric"
+            placeholder={`Enter amount (min ₱${minRegistrationFee.toFixed(2)})`}
+          />
 
           <Text style={styles.label}>Payment Option<Text style={styles.required}>*</Text></Text>
           <ModalSelector

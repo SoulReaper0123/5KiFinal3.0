@@ -67,12 +67,10 @@ const ApplyLoan = () => {
 
   const accountNumberInput = useRef(null);
 
-  const termsOptions = [
-    { key: '3', label: '3 Months', interestRate: 0.01 },
-    { key: '6', label: '6 Months', interestRate: 0.015 },
-    { key: '9', label: '9 Months', interestRate: 0.02 },
-    { key: '12', label: '12 Months', interestRate: 0.03 },
-  ];
+  // Dynamic terms and rates from System Settings
+  const [interestRatesMap, setInterestRatesMap] = useState({}); // e.g., { '3': 1.5, '6': 2 }
+  const [loanTermsMapping, setLoanTermsMapping] = useState({}); // e.g., { 'Regular Loan': ['3','6'], 'Quick Cash': ['1'] }
+  const [availableTerms, setAvailableTerms] = useState([]); // [{ key, label, interestRate }]
 
 
 
@@ -114,10 +112,23 @@ const ApplyLoan = () => {
   };
 
   const handleLoanTypeChange = (option) => {
-    setLoanType(option.key);
-    if (option.key === 'Quick Cash') {
-      setTerm('1');
-      setInterestRate(0.03);
+    const selectedType = option.key;
+    setLoanType(selectedType);
+
+    // Build available terms based on mapping from settings
+    const allowedTerms = (loanTermsMapping && loanTermsMapping[selectedType]) || [];
+    const sortedAllowed = [...allowedTerms].sort((a,b)=>Number(a)-Number(b));
+    const computed = sortedAllowed.map((t) => ({
+      key: t,
+      label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
+      interestRate: (Number(interestRatesMap[t]) || 0) / 100 // Convert percent to decimal
+    }));
+    setAvailableTerms(computed);
+
+    // Auto-pick first allowed term (if any) and set rate
+    if (computed.length > 0) {
+      setTerm(computed[0].key);
+      setInterestRate(computed[0].interestRate);
     } else {
       setTerm('');
       setInterestRate(0);
@@ -128,6 +139,30 @@ const ApplyLoan = () => {
     setTerm(option.key);
     setInterestRate(option.interestRate);
   };
+
+  // Update available terms when loanType changes externally (e.g., initial load)
+  useEffect(() => {
+    if (!loanType) return;
+
+    const allowed = (loanTermsMapping && loanTermsMapping[loanType]) || Object.keys(interestRatesMap || {});
+    const sorted = [...allowed].sort((a,b)=>Number(a)-Number(b));
+    const computed = sorted.map((t) => ({
+      key: t,
+      label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
+      interestRate: (Number(interestRatesMap[t]) || 0) / 100
+    }));
+    setAvailableTerms(computed);
+
+    if (!computed.find(o => o.key === term)) {
+      if (computed.length > 0) {
+        setTerm(computed[0].key);
+        setInterestRate(computed[0].interestRate);
+      } else {
+        setTerm('');
+        setInterestRate(0);
+      }
+    }
+  }, [loanType, loanTermsMapping, interestRatesMap]);
 
   const validateAccountNumber = (value) => {
     const maxLength = disbursement === 'GCash' ? 11 : disbursement === 'Bank' ? 16 : 0;
@@ -153,17 +188,47 @@ const ApplyLoan = () => {
         const loanPercentage = settings.LoanPercentage || 80; // Default to 80%
         setLoanableAmountPercentage(loanPercentage);
         
-        // Fetch processing fee from settings
+        // Processing fee
         const processingFeeValue = settings.ProcessingFee || 0; // Default to 0
         setProcessingFee(processingFeeValue);
         
-        // Fetch loan types from settings
+        // Loan types
         const loanTypes = settings.LoanTypes || ['Regular Loan', 'Quick Cash'];
-        const formattedLoanTypes = loanTypes.map(type => ({
-          key: type,
-          label: type
-        }));
+        const formattedLoanTypes = loanTypes.map(type => ({ key: type, label: type }));
         setLoanTypeOptions(formattedLoanTypes);
+
+        // Interest rates map from settings.InterestRate: store as { term: percentNumber }
+        const ir = settings.InterestRate || {};
+        setInterestRatesMap(ir);
+
+        // Loan terms mapping
+        const ltm = settings.LoanTermsMapping || {};
+        setLoanTermsMapping(ltm);
+
+        // Initialize available terms for current loanType
+        const allowed = (ltm && ltm[loanType]) ? ltm[loanType] : Object.keys(ir);
+        const sorted = [...allowed].sort((a,b)=>Number(a)-Number(b));
+        const computed = sorted.map((t) => ({
+          key: t,
+          label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
+          interestRate: (Number(ir[t]) || 0) / 100
+        }));
+        setAvailableTerms(computed);
+
+        // If current selected term isn't allowed anymore, reset it
+        if (!computed.find(o => o.key === term)) {
+          if (computed.length > 0) {
+            setTerm(computed[0].key);
+            setInterestRate(computed[0].interestRate);
+          } else {
+            setTerm('');
+            setInterestRate(0);
+          }
+        } else {
+          // Ensure interest matches selected term
+          const current = computed.find(o => o.key === term);
+          if (current) setInterestRate(current.interestRate);
+        }
       }
     } catch (error) {
       console.error('Error fetching system settings:', error?.message || error || 'Unknown error');
@@ -596,11 +661,10 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 
         <Text style={styles.label}><RequiredField>Term</RequiredField></Text>
         <ModalSelector
-          data={termsOptions}
+          data={availableTerms}
           initValue="Select Loan Term"
           onChange={handleTermChange}
           style={styles.picker}
-          disabled={loanType === 'Quick Cash'}
           modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
           overlayStyle={{ justifyContent: 'flex-end' }}
         >

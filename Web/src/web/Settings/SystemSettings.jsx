@@ -129,6 +129,7 @@ const SystemSettings = () => {
     PatronageSharePercentage: '25',
     ActiveMonthsPercentage: '15',
     ProcessingFee: '',
+    RegistrationMinimumFee: '5000',
     OrientationCode: '',
     Accounts: {
       Bank: { accountName: '', accountNumber: '' },
@@ -149,7 +150,9 @@ const SystemSettings = () => {
     ContactUs: {
       title: 'Contact Us',
       content: ''
-    }
+    },
+    // Mapping of loan types to allowed terms (e.g., { "Regular Loan": ["3","6"], "Quick Cash": ["1"] })
+    LoanTermsMapping: {}
   });
 
   const [newTerm, setNewTerm] = useState('');
@@ -204,7 +207,9 @@ const SystemSettings = () => {
           ActiveMonthsPercentage: data.ActiveMonthsPercentage?.toString() || '15',
 
           ProcessingFee: data.ProcessingFee?.toString() || '',
+          RegistrationMinimumFee: data.RegistrationMinimumFee?.toString() || '5000',
           LoanTypes: data.LoanTypes || ['Regular Loan', 'Quick Cash'],
+          LoanTermsMapping: data.LoanTermsMapping || {},
           LoanPercentage: data.LoanPercentage?.toString() || '80',
           OrientationCode: data.OrientationCode || generateOrientationCode(),
           Accounts: data.Accounts || {
@@ -425,7 +430,9 @@ const SystemSettings = () => {
         PatronageSharePercentage: safeParseFloat(settings.PatronageSharePercentage, 25),
         ActiveMonthsPercentage: safeParseFloat(settings.ActiveMonthsPercentage, 15),
         ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
+        RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 5000).toFixed(2)),
         LoanTypes: settings.LoanTypes,
+        LoanTermsMapping: settings.LoanTermsMapping || {},
         OrientationCode: settings.OrientationCode,
         Accounts: settings.Accounts,
         TermsAndConditions: settings.TermsAndConditions,
@@ -574,22 +581,22 @@ const SystemSettings = () => {
         {/* General Settings Section */}
         {activeSection === 'general' && (
           <div style={styles.section}>
-            {/* Loanable Amount Percentage */}
+            {/* Minimum Registration Fee */}
             <div style={styles.rateRow}>
-              <span style={styles.termText}>Loanable Amount Percentage</span>
+              <span style={styles.termText}>Minimum Registration Fee</span>
               {editMode ? (
                 <div style={styles.editRateRow}>
                   <input
                     style={styles.miniInput}
-                    value={settings.LoanPercentage}
-                    onChange={(e) => handleInputChange('LoanPercentage', e.target.value)}
+                    value={settings.RegistrationMinimumFee}
+                    onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
                     type="number"
-                    placeholder="80"
+                    placeholder="5000"
                   />
-                  <span>%</span>
+                  <span>₱</span>
                 </div>
               ) : (
-                <span style={styles.staticText}>{settings.LoanPercentage}%</span>
+                <span style={styles.staticText}>₱{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
               )}
             </div>
             
@@ -748,23 +755,7 @@ const SystemSettings = () => {
               )}
             </div>
 
-            <div style={styles.rateRow}>
-              <span style={styles.termText}>Loanable Amount Percentage</span>
-              {editMode ? (
-                <div style={styles.editRateRow}>
-                  <input
-                    style={styles.miniInput}
-                    value={settings.LoanPercentage}
-                    onChange={(e) => handleInputChange('LoanPercentage', e.target.value)}
-                    type="number"
-                    placeholder="80"
-                  />
-                  <span>%</span>
-                </div>
-              ) : (
-                <span style={styles.staticText}>{settings.LoanPercentage}%</span>
-              )}
-            </div>
+
 
             <div style={styles.loanTypesSection}>
               <h3 style={styles.subSectionTitle}>Types of Loans</h3>
@@ -844,6 +835,61 @@ const SystemSettings = () => {
                   </button>
                 </div>
               )}
+
+              {/* Loan Term Assignment */}
+              <div style={{ ...styles.interestRatesSection, marginTop: '20px' }}>
+                <h3 style={styles.subSectionTitle}>Assign Terms to Loan Types</h3>
+                {settings.LoanTypes.map((lt) => {
+                  const allTerms = Object.keys(settings.InterestRate).sort((a,b)=>Number(a)-Number(b));
+                  const selected = settings.LoanTermsMapping?.[lt] || [];
+                  const toggle = (term) => {
+                    setSettings(prev => {
+                      const prevMap = prev.LoanTermsMapping || {};
+                      const prevSel = new Set(prevMap[lt] || []);
+                      if (prevSel.has(term)) prevSel.delete(term); else prevSel.add(term);
+                      return {
+                        ...prev,
+                        LoanTermsMapping: {
+                          ...prevMap,
+                          [lt]: Array.from(prevSel).sort((a,b)=>Number(a)-Number(b))
+                        }
+                      };
+                    });
+                  };
+                  return (
+                    <div key={lt} style={{ marginBottom: '12px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                      <div style={{ fontWeight: 600, marginBottom: '8px', color: '#2D5783' }}>{lt}</div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                        {allTerms.length === 0 ? (
+                          <span style={{ color: '#64748b' }}>No terms available. Add interest terms first.</span>
+                        ) : (
+                          allTerms.map((t) => {
+                            const isSel = selected.includes(t);
+                            return (
+                              <button
+                                key={t}
+                                type="button"
+                                onClick={() => toggle(t)}
+                                disabled={!editMode}
+                                style={{
+                                  padding: '6px 10px',
+                                  borderRadius: '16px',
+                                  border: isSel ? '1px solid #2D5783' : '1px solid #cbd5e1',
+                                  background: isSel ? '#e0f2fe' : '#fff',
+                                  color: isSel ? '#2D5783' : '#334155',
+                                  cursor: editMode ? 'pointer' : 'default'
+                                }}
+                              >
+                                {t} mo
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
 
             <div style={styles.dividendSection}>
@@ -1011,18 +1057,24 @@ const SystemSettings = () => {
             {/* Terms and Conditions */}
             <div style={styles.contentCard}>
               <h3 style={styles.accountTitle}>Terms and Conditions</h3>
-              <InputRow
-                label="Title"
-                value={settings.TermsAndConditions.title}
-                onChange={(text) => setSettings({
-                  ...settings,
-                  TermsAndConditions: {
-                    ...settings.TermsAndConditions,
-                    title: text
-                  }
-                })}
-                editable={editMode}
-              />
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Title</label>
+                {editMode ? (
+                  <input
+                    style={styles.input}
+                    value={settings.TermsAndConditions.title}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      TermsAndConditions: {
+                        ...settings.TermsAndConditions,
+                        title: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.staticText}>{settings.TermsAndConditions.title}</div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
                 {editMode ? (
@@ -1038,7 +1090,7 @@ const SystemSettings = () => {
                     })}
                   />
                 ) : (
-                  <div style={styles.contentText}>{settings.TermsAndConditions.content}</div>
+                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.TermsAndConditions.content}</div>
                 )}
               </div>
             </div>
@@ -1046,18 +1098,24 @@ const SystemSettings = () => {
             {/* About Us */}
             <div style={styles.contentCard}>
               <h3 style={styles.accountTitle}>About Us</h3>
-              <InputRow
-                label="Title"
-                value={settings.AboutUs.title}
-                onChange={(text) => setSettings({
-                  ...settings,
-                  AboutUs: {
-                    ...settings.AboutUs,
-                    title: text
-                  }
-                })}
-                editable={editMode}
-              />
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Title</label>
+                {editMode ? (
+                  <input
+                    style={styles.input}
+                    value={settings.AboutUs.title}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      AboutUs: {
+                        ...settings.AboutUs,
+                        title: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.staticText}>{settings.AboutUs.title}</div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
                 {editMode ? (
@@ -1073,7 +1131,7 @@ const SystemSettings = () => {
                     })}
                   />
                 ) : (
-                  <div style={styles.contentText}>{settings.AboutUs.content}</div>
+                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.AboutUs.content}</div>
                 )}
               </div>
             </div>
@@ -1081,18 +1139,24 @@ const SystemSettings = () => {
             {/* Contact Us */}
             <div style={styles.contentCard}>
               <h3 style={styles.accountTitle}>Contact Us</h3>
-              <InputRow
-                label="Title"
-                value={settings.ContactUs.title}
-                onChange={(text) => setSettings({
-                  ...settings,
-                  ContactUs: {
-                    ...settings.ContactUs,
-                    title: text
-                  }
-                })}
-                editable={editMode}
-              />
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Title</label>
+                {editMode ? (
+                  <input
+                    style={styles.input}
+                    value={settings.ContactUs.title}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      ContactUs: {
+                        ...settings.ContactUs,
+                        title: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.staticText}>{settings.ContactUs.title}</div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
                 {editMode ? (
@@ -1108,7 +1172,7 @@ const SystemSettings = () => {
                     })}
                   />
                 ) : (
-                  <div style={styles.contentText}>{settings.ContactUs.content}</div>
+                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.ContactUs.content}</div>
                 )}
               </div>
             </div>

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApproveDeposits, RejectDeposits } from '../../../../../Server/api';
 import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
+import Tesseract from 'tesseract.js';
 
 const styles = {
   container: {
@@ -522,6 +523,120 @@ const ApplyDeposits = ({
     setModalVisible(true);
   };
 
+  // Lightweight OCR status store
+  const [validationStatus, setValidationStatus] = useState({});
+  const getValidationText = (label) => {
+    const status = validationStatus[label];
+    if (!status) return null;
+    const color = status.status === 'valid' ? 'green'
+      : (status.status === 'invalid' || status.status === 'error') ? 'red'
+      : status.status === 'partial' ? '#e67e22'
+      : '#666';
+    return (
+      <div style={{ marginTop: 6, fontSize: 12, color }}>
+        {status.message}
+      </div>
+    );
+  };
+
+  const parsePaymentText = (raw) => {
+    const text = (raw || '').replace(/\s+/g, ' ').replace(/[|]/g, ' ').trim();
+
+    const amountPatterns = [
+      /(?:amount|amt|paid)\s*[:\-]?\s*(?:php|₱)?\s*([\d.,]+)\b/i,
+      /(?:php|₱)\s*([\d.,]+)\b/i
+    ];
+    const refPatterns = [
+      /(ref(?:erence)?\s*(?:no\.?|#)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
+      /(ref(?:erence)?\s*(?:no\.?|#)?|gcash\s*ref(?:erence)?|txn\s*id|transaction\s*(?:id|no\.?))\s*[:\-]?\s*([A-Z0-9\-]{6,})/i,
+      /\b(?:ref(?:erence)?\s*(?:no\.?|#)?)\s*([A-Z0-9\-]{6,})\b/i,
+      /\b([A-Z0-9]{10,})\b/
+    ];
+    const datePatterns = [
+      /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},\s+\d{4}\b\s*(?:\d{1,2}:\d{2}\s*(?:am|pm))?/i,
+      /\b\d{4}-\d{2}-\d{2}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i,
+      /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i
+    ];
+
+    let amount = null;
+    for (const re of amountPatterns) {
+      const m = text.match(re);
+      if (m && m[1]) {
+        amount = m[1].replace(/,/g, '');
+        const dotCount = (amount.match(/\./g) || []).length;
+        const commaCount = (amount.match(/,/g) || []).length;
+        if (commaCount && !dotCount) amount = amount.replace(/,/g, '');
+        if (commaCount && dotCount) amount = amount.replace(/,/g, '');
+        break;
+      }
+    }
+
+    let refNo = null;
+    for (const re of refPatterns) {
+      const m = text.match(re);
+      if (m) {
+        refNo = (m[2] || m[1] || '').toString().trim();
+        refNo = refNo.replace(/\s{2,}/g, ' ').trim();
+        break;
+      }
+    }
+    if (!refNo) {
+      const fallback = text.match(/ref(?:erence)?\s*(?:no\.?|#)?\s*[:\-]?\s*([A-Z0-9\s\-]{8,30})/i);
+      if (fallback && fallback[1]) {
+        refNo = fallback[1].replace(/[^A-Z0-9\s\-]/gi, '').replace(/\s{2,}/g, ' ').trim();
+      }
+    }
+    if (!refNo) {
+      const spacedDigits = text.match(/\b\d{3,6}(?:\s+\d{3,6}){1,5}\b/);
+      if (spacedDigits) {
+        refNo = spacedDigits[0].replace(/\s{2,}/g, ' ').trim();
+      }
+    }
+
+    let dateTime = null;
+    for (const re of datePatterns) {
+      const m = text.match(re);
+      if (m) { dateTime = m[0]; break; }
+    }
+
+    return { amount, refNo, dateTime };
+  };
+
+  const verifyDepositProof = async (imageUrl, label) => {
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Extracting payment details...' }
+    }));
+    try {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = imageUrl;
+      });
+
+      const { data: { text, confidence } } = await Tesseract.recognize(img, 'eng');
+      const parsed = parsePaymentText(text);
+      const foundAny = parsed.amount || parsed.refNo;
+
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: {
+          status: foundAny ? 'valid' : (confidence > 30 ? 'partial' : 'manual'),
+          message: foundAny
+            ? `Amount: ${parsed.amount || 'N/A'}, Ref No: ${parsed.refNo || 'N/A'}${parsed.dateTime ? `, Date: ${parsed.dateTime}` : ''}`
+            : 'Text detected but could not find Amount/Ref No'
+        }
+      }));
+    } catch (e) {
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Payment OCR failed' }
+      }));
+    }
+  };
+
   const closeModal = () => {
     setModalVisible(false);
     setErrorModalVisible(false);
@@ -961,9 +1076,10 @@ const ApplyDeposits = ({
                           src={selectedDeposit.proofOfDepositUrl}
                           alt="Proof of Deposit"
                           style={styles.imageThumbnail}
-                          onClick={() => openImageViewer(selectedDeposit.proofOfDepositUrl, 'Proof of Deposit', 0)}
+                          onClick={() => openImageViewer(selectedDeposit.proofOfDepositUrl, 'Proof of Deposit')}
                           onFocus={(e) => e.target.style.outline = 'none'}
                         />
+
                       </div>
                     )}
                   </div>
@@ -1191,6 +1307,17 @@ const ApplyDeposits = ({
               <FaTimes />
             </button>
             <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+            {currentImage?.label === 'Proof of Deposit' && (
+              <div style={{ position: 'absolute', bottom: 24, left: 24 }}>
+                <button
+                  style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
+                  onClick={() => verifyDepositProof(currentImage.url, 'Proof of Deposit')}
+                >
+                  Verify
+                </button>
+                {getValidationText('Proof of Deposit')}
+              </div>
+            )}
           </div>
         </div>
       )}

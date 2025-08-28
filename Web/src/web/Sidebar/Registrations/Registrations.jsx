@@ -6,6 +6,7 @@ import { FaTimes, FaCheckCircle, FaExclamationCircle, FaChevronLeft, FaChevronRi
 import * as tf from '@tensorflow/tfjs';
 import * as mobilenet from '@tensorflow-models/mobilenet';
 import * as blazeface from '@tensorflow-models/blazeface';
+import Tesseract from 'tesseract.js';
 
 const styles = {
   container: {
@@ -748,152 +749,46 @@ const Registrations = ({
   };
 
   const manualVerifyID = async (imageUrl, label) => {
+    // For Valid ID Front: run OCR and display only extracted text
+    // For other labels, keep existing minimal status
     setIsValidating(true);
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Analyzing ID document with AI...' }
+      [label]: { status: 'verifying', message: 'Verifying...' }
     }));
 
     try {
-      // Load image to verify it's accessible
       const loadedImg = await loadImageWithCORS(imageUrl);
-      console.log('Image loaded for ID verification');
-      
-      // Enhanced TensorFlow analysis if models are available
-      if (tfModels.mobilenet || tfModels.blazeface) {
-        console.log('Using TensorFlow models for enhanced ID verification');
-        
-        let documentScore = 0;
-        let faceCount = 0;
-        let predictions = [];
-        let isLikelyID = false;
-        
-        // Try MobileNet classification with enhanced keywords
-        if (tfModels.mobilenet) {
-          try {
-            predictions = await tfModels.mobilenet.classify(loadedImg);
-            console.log('MobileNet predictions for ID:', predictions);
-            
-            // Enhanced document detection keywords
-            const documentKeywords = [
-              'document', 'paper', 'card', 'license', 'passport', 'id', 'certificate',
-              'plastic', 'laminated', 'official', 'government', 'identification',
-              'driver', 'national', 'security', 'photo', 'book', 'page', 'text'
-            ];
-            
-            // Calculate document score with better logic
-            documentScore = predictions.reduce((score, pred) => {
-              const hasDocumentKeyword = documentKeywords.some(keyword => 
-                pred.className.toLowerCase().includes(keyword)
-              );
-              return hasDocumentKeyword ? Math.max(score, pred.probability) : score;
-            }, 0);
-            
-            // Check for non-document items that should be rejected
-            const nonDocumentKeywords = [
-              'person', 'selfie', 'portrait', 'human', 'man', 'woman',
-              'anime', 'cartoon', 'drawing', 'illustration', 'art', 'painting',
-              'screen', 'monitor', 'computer', 'phone', 'device', 'face'
-            ];
-            
-            const hasNonDocumentItems = predictions.some(pred => 
-              nonDocumentKeywords.some(keyword => 
-                pred.className.toLowerCase().includes(keyword) && pred.probability > 0.3
-              )
-            );
-            
-            isLikelyID = documentScore > 0.15 && !hasNonDocumentItems;
-            
-            console.log(`Enhanced ID analysis - Document score: ${documentScore}, Likely ID: ${isLikelyID}`);
-          } catch (error) {
-            console.warn('MobileNet classification failed:', error);
-          }
+
+      // If this is the front side, extract text using Tesseract
+      if (label && label.toLowerCase().includes('front')) {
+        try {
+          const result = await Tesseract.recognize(loadedImg, 'eng');
+          const text = (result?.data?.text || '').trim();
+          setValidationStatus(prev => ({
+            ...prev,
+            [label]: {
+              status: text ? 'valid' : 'invalid',
+              message: text ? text : 'No text detected'
+            }
+          }));
+        } catch (ocrErr) {
+          setValidationStatus(prev => ({
+            ...prev,
+            [label]: { status: 'error', message: 'No text detected' }
+          }));
         }
-        
-        // Try BlazeFace detection
-        if (tfModels.blazeface) {
-          try {
-            const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
-            faceCount = faces.length;
-            console.log(`BlazeFace detected ${faceCount} faces in ID`);
-          } catch (error) {
-            console.warn('BlazeFace detection failed:', error);
-          }
-        }
-        
-        // Enhanced validation logic
-        let status = 'manual';
-        let message = 'Manual ID verification required';
-        let details = '';
-        
-        if (isLikelyID && faceCount === 1) {
-          // Perfect case: looks like ID document with exactly one face
-          status = 'valid';
-          message = 'Valid ID document detected';
-          details = `✅ AI Analysis Results:
-• Document confidence: ${(documentScore * 100).toFixed(1)}%
-• Faces detected: ${faceCount} (expected for ID)
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Appears to be a valid ID document`;
-        } else if (isLikelyID && faceCount === 0) {
-          // ID document but no face detected
-          status = 'partial';
-          message = 'ID document detected - Face unclear';
-          details = `⚠️ AI Analysis Results:
-• Document confidence: ${(documentScore * 100).toFixed(1)}%
-• Faces detected: ${faceCount} (face may be unclear or small)
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Appears to be ID document but face detection unclear`;
-        } else if (faceCount > 1) {
-          // Multiple faces detected - likely not a proper ID
-          status = 'invalid';
-          message = 'Multiple faces detected - Not a valid ID';
-          details = `❌ AI Analysis Results:
-• Faces detected: ${faceCount} (IDs should have exactly 1 face)
-• Document confidence: ${(documentScore * 100).toFixed(1)}%
-• Status: Multiple faces suggest this is not a proper ID document`;
-        } else if (documentScore > 0.1) {
-          // Some document-like features but not conclusive
-          status = 'partial';
-          message = 'Possible ID document - Manual review needed';
-          details = `⚠️ AI Analysis Results:
-• Document confidence: ${(documentScore * 100).toFixed(1)}%
-• Faces detected: ${faceCount}
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Some document features detected, manual verification recommended`;
-        } else {
-          // Low confidence - manual review required
-          details = `🔍 AI Analysis Results:
-• Document confidence: ${(documentScore * 100).toFixed(1)}% (low)
-• Faces detected: ${faceCount}
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: AI analysis inconclusive, manual verification required`;
-        }
-        
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status, message, details }
-        }));
       } else {
-        // No models available at all
+        // Leave Valid ID Back as-is (no change requested): keep minimal
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'Manual ID verification required',
-            details: 'AI models unavailable. Please verify manually that this is a valid ID document.'
-          }
+          [label]: { status: 'manual', message: 'Manual review required' }
         }));
       }
     } catch (error) {
-      console.error('ID verification failed:', error);
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { 
-          status: 'error', 
-          message: 'Image analysis failed', 
-          details: `Error: ${error.message}. Please try again or verify manually.`
-        }
+        [label]: { status: 'error', message: 'Verification failed' }
       }));
     } finally {
       setIsValidating(false);
@@ -907,389 +802,137 @@ const Registrations = ({
   };
 
   const manualVerifyFace = async (imageUrl, label) => {
+    // Minimal result: only show whether a face is detected or not
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Analyzing selfie with AI...' }
+      [label]: { status: 'verifying', message: 'Verifying...' }
     }));
 
     try {
-      // Load image to verify it's accessible
       const loadedImg = await loadImageWithCORS(imageUrl);
-      console.log('Image loaded for face verification');
-      
-      // Enhanced TensorFlow analysis if models are available
-      if (tfModels.blazeface || tfModels.mobilenet) {
-        console.log('Using TensorFlow models for enhanced face verification');
-        
-        let faceCount = 0;
-        let faceQuality = 0;
-        let predictions = [];
-        let isLikelySelfie = false;
-        
-        // Try BlazeFace for face detection
-        if (tfModels.blazeface) {
-          try {
-            const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
-            faceCount = faces.length;
-            
-            // Calculate face quality based on detection confidence
-            if (faces.length > 0) {
-              faceQuality = faces.reduce((avg, face) => avg + (face.probability || 0.5), 0) / faces.length;
+      if (tfModels.blazeface) {
+        try {
+          const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
+          const faceCount = faces.length;
+          setValidationStatus(prev => ({
+            ...prev,
+            [label]: {
+              status: faceCount > 0 ? 'valid' : 'invalid',
+              message: faceCount > 0 ? 'Face detected' : 'No face detected'
             }
-            
-            console.log(`BlazeFace detected ${faceCount} faces with average quality: ${faceQuality}`);
-          } catch (error) {
-            console.warn('BlazeFace detection failed:', error);
-          }
+          }));
+        } catch (err) {
+          setValidationStatus(prev => ({
+            ...prev,
+            [label]: { status: 'invalid', message: 'No face detected' }
+          }));
         }
-        
-        // Try MobileNet for image classification
-        if (tfModels.mobilenet) {
-          try {
-            predictions = await tfModels.mobilenet.classify(loadedImg);
-            console.log('MobileNet predictions for selfie:', predictions);
-            
-            // Look for person/face-related classifications
-            const personKeywords = [
-              'person', 'face', 'human', 'man', 'woman', 'boy', 'girl',
-              'portrait', 'selfie', 'head', 'people'
-            ];
-            
-            // Look for non-person items that should be rejected
-            const nonPersonKeywords = [
-              'document', 'paper', 'card', 'license', 'passport', 'id',
-              'anime', 'cartoon', 'drawing', 'illustration', 'art', 'painting',
-              'screen', 'monitor', 'computer', 'phone', 'device'
-            ];
-            
-            const personScore = predictions.reduce((score, pred) => {
-              const hasPersonKeyword = personKeywords.some(keyword => 
-                pred.className.toLowerCase().includes(keyword)
-              );
-              return hasPersonKeyword ? Math.max(score, pred.probability) : score;
-            }, 0);
-            
-            const hasNonPersonItems = predictions.some(pred => 
-              nonPersonKeywords.some(keyword => 
-                pred.className.toLowerCase().includes(keyword) && pred.probability > 0.3
-              )
-            );
-            
-            isLikelySelfie = personScore > 0.2 && !hasNonPersonItems;
-            
-            console.log(`Selfie analysis - Person score: ${personScore}, Likely selfie: ${isLikelySelfie}`);
-          } catch (error) {
-            console.warn('MobileNet classification failed:', error);
-          }
-        }
-        
-        // Enhanced validation logic
-        let status = 'manual';
-        let message = 'Manual verification required';
-        let details = '';
-        
-        if (faceCount === 1 && isLikelySelfie && faceQuality > 0.6) {
-          // Perfect case: exactly one face with good quality
-          status = 'valid';
-          message = 'Valid selfie detected';
-          details = `✅ AI Analysis Results:
-• Faces detected: ${faceCount} (perfect for selfie)
-• Face quality: ${(faceQuality * 100).toFixed(1)}%
-• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Clear selfie with good face detection`;
-        } else if (faceCount === 1 && (isLikelySelfie || faceQuality > 0.4)) {
-          // Good case: one face but lower quality or confidence
-          status = 'partial';
-          message = 'Face detected - Quality check needed';
-          details = `⚠️ AI Analysis Results:
-• Faces detected: ${faceCount}
-• Face quality: ${(faceQuality * 100).toFixed(1)}%
-• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Face detected but please verify image quality`;
-        } else if (faceCount > 1) {
-          // Multiple faces - not ideal for selfie
-          status = 'invalid';
-          message = 'Multiple faces detected';
-          details = `❌ AI Analysis Results:
-• Faces detected: ${faceCount} (selfies should have exactly 1 face)
-• Average face quality: ${(faceQuality * 100).toFixed(1)}%
-• Status: Multiple faces detected - not suitable for ID verification`;
-        } else if (faceCount === 0 && isLikelySelfie) {
-          // Looks like person but no face detected
-          status = 'partial';
-          message = 'Person detected - Face unclear';
-          details = `⚠️ AI Analysis Results:
-• Faces detected: ${faceCount} (face may be unclear, turned away, or too small)
-• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Person detected but face is not clear`;
-        } else {
-          // No clear face or person detected
-          details = `🔍 AI Analysis Results:
-• Faces detected: ${faceCount}
-• Person confidence: ${predictions.length > 0 ? (predictions.find(p => p.className.toLowerCase().includes('person'))?.probability * 100 || 0).toFixed(1) : 'N/A'}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: No clear face detected - manual verification required`;
-        }
-        
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status, message, details }
-        }));
       } else {
-        // No models available
+        // Model unavailable -> fallback to minimal message
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'Manual verification required',
-            details: 'AI models unavailable. Please verify manually that this is a clear selfie.'
-          }
+          [label]: { status: 'manual', message: 'No face detected' }
         }));
       }
     } catch (error) {
-      console.error('Face verification failed:', error);
-      
-      // Check if it's a CORS-related error
-      const isCORSError = error.message && (
-        error.message.includes('CORS') || 
-        error.message.includes('Tainted canvases') ||
-        error.message.includes('cross-origin')
-      );
-      
-      if (isCORSError) {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'Image accessible - Manual review required', 
-            details: 'Automatic face detection unavailable due to browser security restrictions. Please verify manually.'
-          }
-        }));
-      } else {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { 
-            status: 'error', 
-            message: 'Image analysis failed', 
-            details: `Error: ${error.message}. Please try again or verify manually.`
-          }
-        }));
-      }
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'No face detected' }
+      }));
     }
   };
 
   const verifyPaymentProof = async (imageUrl, label) => {
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Analyzing payment proof with AI...' }
+      [label]: { status: 'verifying', message: 'Extracting payment details...' }
     }));
 
     try {
-      // Load image to verify it's accessible
       const loadedImg = await loadImageWithCORS(imageUrl);
-      console.log('Image loaded for payment proof verification');
-      
-      // Enhanced TensorFlow analysis if models are available
-      if (tfModels.mobilenet) {
-        console.log('Using TensorFlow models for payment proof verification');
-        
-        let predictions = [];
-        let paymentScore = 0;
-        let textScore = 0;
-        let screenScore = 0;
-        let isLikelyPaymentProof = false;
-        
-        try {
-          predictions = await tfModels.mobilenet.classify(loadedImg);
-          console.log('MobileNet predictions for payment proof:', predictions);
-          
-          // Keywords that indicate payment/transaction receipts
-          const paymentKeywords = [
-            'receipt', 'document', 'paper', 'text', 'page', 'book',
-            'screen', 'monitor', 'display', 'phone', 'mobile', 'app',
-            'interface', 'application', 'digital', 'electronic'
-          ];
-          
-          // Keywords that indicate text/numbers (important for receipts)
-          const textKeywords = [
-            'text', 'writing', 'print', 'number', 'digit', 'character',
-            'letter', 'word', 'line', 'paragraph', 'document'
-          ];
-          
-          // Keywords that indicate digital screens (GCash, banking apps)
-          const screenKeywords = [
-            'screen', 'monitor', 'display', 'phone', 'mobile', 'smartphone',
-            'tablet', 'computer', 'laptop', 'interface', 'app', 'application'
-          ];
-          
-          // Keywords that should be rejected (not payment proofs)
-          const nonPaymentKeywords = [
-            'person', 'face', 'human', 'man', 'woman', 'selfie', 'portrait',
-            'anime', 'cartoon', 'drawing', 'illustration', 'art', 'painting',
-            'animal', 'nature', 'landscape', 'food', 'vehicle'
-          ];
-          
-          // Calculate scores
-          paymentScore = predictions.reduce((score, pred) => {
-            const hasPaymentKeyword = paymentKeywords.some(keyword => 
-              pred.className.toLowerCase().includes(keyword)
-            );
-            return hasPaymentKeyword ? Math.max(score, pred.probability) : score;
-          }, 0);
-          
-          textScore = predictions.reduce((score, pred) => {
-            const hasTextKeyword = textKeywords.some(keyword => 
-              pred.className.toLowerCase().includes(keyword)
-            );
-            return hasTextKeyword ? Math.max(score, pred.probability) : score;
-          }, 0);
-          
-          screenScore = predictions.reduce((score, pred) => {
-            const hasScreenKeyword = screenKeywords.some(keyword => 
-              pred.className.toLowerCase().includes(keyword)
-            );
-            return hasScreenKeyword ? Math.max(score, pred.probability) : score;
-          }, 0);
-          
-          const hasNonPaymentItems = predictions.some(pred => 
-            nonPaymentKeywords.some(keyword => 
-              pred.className.toLowerCase().includes(keyword) && pred.probability > 0.3
-            )
-          );
-          
-          // Enhanced logic for payment proof detection
-          const hasGoodPaymentScore = paymentScore > 0.2;
-          const hasGoodTextScore = textScore > 0.3;
-          const hasGoodScreenScore = screenScore > 0.25;
-          const combinedScore = (paymentScore * 0.4) + (textScore * 0.4) + (screenScore * 0.2);
-          
-          isLikelyPaymentProof = (hasGoodPaymentScore || hasGoodTextScore || hasGoodScreenScore) && 
-                                !hasNonPaymentItems && 
-                                combinedScore > 0.25;
-          
-          console.log(`Payment proof analysis - Payment: ${paymentScore}, Text: ${textScore}, Screen: ${screenScore}, Combined: ${combinedScore}, Likely proof: ${isLikelyPaymentProof}`);
-          
-        } catch (error) {
-          console.warn('MobileNet classification failed for payment proof:', error);
-        }
-        
-        // Enhanced validation logic for payment proofs
-        let status = 'manual';
-        let message = 'Manual payment verification required';
-        let details = '';
-        
-        if (isLikelyPaymentProof && (paymentScore > 0.3 || textScore > 0.4)) {
-          // High confidence payment proof
-          status = 'valid';
-          message = 'Valid payment proof detected';
-          details = `✅ AI Analysis Results:
-• Payment confidence: ${(paymentScore * 100).toFixed(1)}%
-• Text/Receipt confidence: ${(textScore * 100).toFixed(1)}%
-• Digital screen confidence: ${(screenScore * 100).toFixed(1)}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Appears to be a valid payment receipt/proof
+      const { data: { text, confidence } } = await Tesseract.recognize(loadedImg, 'eng');
 
-💡 Verification Tips:
-• Check for reference/transaction number
-• Verify amount matches registration fee
-• Confirm date is recent
-• Look for GCash/Bank/Payment platform branding`;
-        } else if (isLikelyPaymentProof || paymentScore > 0.15 || textScore > 0.25) {
-          // Moderate confidence - needs manual review
-          status = 'partial';
-          message = 'Possible payment proof - Manual review needed';
-          details = `⚠️ AI Analysis Results:
-• Payment confidence: ${(paymentScore * 100).toFixed(1)}%
-• Text/Receipt confidence: ${(textScore * 100).toFixed(1)}%
-• Digital screen confidence: ${(screenScore * 100).toFixed(1)}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Some payment-related features detected
+      const parsePaymentText = (raw) => {
+        const normalized = raw.replace(/\s+/g, ' ').replace(/[|]/g, ' ').trim();
 
-🔍 Manual Verification Required:
-• Check for reference/transaction number
-• Verify payment amount and date
-• Confirm it's from legitimate payment platform
-• Look for complete transaction details`;
-        } else {
-          // Low confidence or likely not a payment proof
-          const topPrediction = predictions[0];
-          const isPersonOrFace = topPrediction && 
-            ['person', 'face', 'human', 'man', 'woman', 'selfie', 'portrait'].some(keyword => 
-              topPrediction.className.toLowerCase().includes(keyword)
-            );
-          
-          if (isPersonOrFace) {
-            status = 'invalid';
-            message = 'Not a payment proof - Person/Face detected';
-            details = `❌ AI Analysis Results:
-• Detected: ${topPrediction.className} (${(topPrediction.probability * 100).toFixed(1)}%)
-• Payment confidence: ${(paymentScore * 100).toFixed(1)}% (low)
-• Status: This appears to be a photo of a person, not a payment receipt
+        const amountPatterns = [
+          /(?:amount|amt|paid)\s*[:\-]?\s*(?:php|₱)?\s*([\d.,]+)\b/i,
+          /(?:php|₱)\s*([\d.,]+)\b/i
+        ];
+        const refPatterns = [
+          /(ref(?:erence)?\s*(?:no\.?|#)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
+          /(ref(?:erence)?\s*(?:no\.?|#)?|gcash\s*ref(?:erence)?|txn\s*id|transaction\s*(?:id|no\.?))\s*[:\-]?\s*([A-Z0-9\-]{6,})/i,
+          /\b(?:ref(?:erence)?\s*(?:no\.?|#)?)\s*([A-Z0-9\-]{6,})\b/i,
+          /\b([A-Z0-9]{10,})\b/
+        ];
+        const datePatterns = [
+          /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},\s+\d{4}\b\s*(?:\d{1,2}:\d{2}\s*(?:am|pm))?/i,
+          /\b\d{4}-\d{2}-\d{2}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i,
+          /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i
+        ];
 
-❗ Please upload:
-• Screenshot of GCash/Bank transaction
-• Receipt with reference number
-• Payment confirmation from legitimate platform`;
-          } else {
-            details = `🔍 AI Analysis Results:
-• Payment confidence: ${(paymentScore * 100).toFixed(1)}% (low)
-• Text confidence: ${(textScore * 100).toFixed(1)}%
-• Top classifications: ${predictions.slice(0, 3).map(p => `${p.className} (${(p.probability * 100).toFixed(1)}%)`).join(', ')}
-• Status: Unable to identify as payment proof
-
-📋 Manual Verification Required:
-• Check if image shows transaction details
-• Look for reference/transaction number
-• Verify payment platform (GCash, Bank, etc.)
-• Confirm amount and date are correct`;
+        let amount = null;
+        for (const re of amountPatterns) {
+          const m = normalized.match(re);
+          if (m && m[1]) {
+            amount = m[1].replace(/,/g, '');
+            const dotCount = (amount.match(/\./g) || []).length;
+            const commaCount = (amount.match(/,/g) || []).length;
+            if (commaCount && !dotCount) amount = amount.replace(/,/g, '');
+            if (commaCount && dotCount) amount = amount.replace(/,/g, '');
+            break;
           }
         }
-        
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status, message, details }
-        }));
-      } else {
-        // No AI models available - basic manual verification
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'Manual payment verification required',
-            details: `📋 Manual Verification Checklist:
-• Reference/Transaction Number present
-• Payment amount matches registration fee
-• Date is recent and valid
-• From legitimate payment platform (GCash, Bank, etc.)
-• Shows complete transaction details
-• Clear and readable image
 
-💡 Common Payment Platforms:
-• GCash, PayMaya, Coins.ph
-• BPI, BDO, Metrobank, etc.
-• Online banking screenshots
-• ATM/Bank receipts`
+        let refNo = null;
+        for (const re of refPatterns) {
+          const m = normalized.match(re);
+          if (m) {
+            refNo = (m[2] || m[1] || '').toString().trim();
+            refNo = refNo.replace(/\s{2,}/g, ' ').trim();
+            break;
           }
-        }));
-      }
-    } catch (error) {
-      console.error('Payment proof verification failed:', error);
+        }
+        if (!refNo) {
+          const fallback = normalized.match(/ref(?:erence)?\s*(?:no\.?|#)?\s*[:\-]?\s*([A-Z0-9\s\-]{8,30})/i);
+          if (fallback && fallback[1]) {
+            refNo = fallback[1].replace(/[^A-Z0-9\s\-]/gi, '').replace(/\s{2,}/g, ' ').trim();
+          }
+        }
+        if (!refNo) {
+          const spacedDigits = normalized.match(/\b\d{3,6}(?:\s+\d{3,6}){1,5}\b/);
+          if (spacedDigits) {
+            refNo = spacedDigits[0].replace(/\s{2,}/g, ' ').trim();
+          }
+        }
+
+        let dateTime = null;
+        for (const re of datePatterns) {
+          const m = normalized.match(re);
+          if (m) { dateTime = m[0]; break; }
+        }
+
+        return { amount, refNo, dateTime };
+      };
+
+      const parsed = parsePaymentText(text || '');
+      const foundAny = parsed.amount || parsed.refNo;
+
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { 
-          status: 'error', 
-          message: 'Image analysis failed', 
-          details: `Error: ${error.message}. Please try again or verify manually.
-
-📋 For manual verification, check:
-• Reference/Transaction number
-• Payment amount and date
-• Legitimate payment platform
-• Complete transaction details`
+        [label]: {
+          status: foundAny ? 'valid' : (confidence > 30 ? 'partial' : 'manual'),
+          message: foundAny
+            ? `Amount: ${parsed.amount || 'N/A'}, Ref No: ${parsed.refNo || 'N/A'}${parsed.dateTime ? `, Date: ${parsed.dateTime}` : ''}`
+            : 'Text detected but could not find Amount/Ref No',
+          details: `OCR Confidence: ${confidence?.toFixed ? confidence.toFixed(1) : confidence}%`
         }
+      }));
+    } catch (error) {
+      console.error('Payment proof OCR failed:', error);
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Payment OCR failed' }
       }));
     }
   };
@@ -1752,7 +1395,7 @@ const Registrations = ({
       );
 
       if (memberEntry) {
-        return { exists: true, id: memberEntry[0], data: memberEntry[1] };
+        return { exists: true, source: 'member', id: memberEntry[0], data: memberEntry[1] };
       }
 
       const adminsSnap = await database.ref('Users/Admin').once('value');
@@ -1765,7 +1408,7 @@ const Registrations = ({
       );
 
       if (adminEntry) {
-        return { exists: true, id: adminEntry[0], data: adminEntry[1] };
+        return { exists: true, source: 'admin', id: adminEntry[0], data: adminEntry[1] };
       }
 
       return { exists: false };
@@ -1805,27 +1448,37 @@ const processDatabaseApprove = async (reg) => {
     const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
     
     if (samePersonCheck.exists) {
-      // If user already exists, update their data but don't create new auth account
+      // If user already exists (Member or Admin), update their data but don't create new auth account
       const now = new Date();
       const approvedDate = formatDate(now);
       const approvedTime = formatTime(now);
-      
+
       const updateData = {};
-      
+
       Object.keys(rest).forEach(key => {
         if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
           updateData[key] = rest[key];
         }
       });
-      
-      // Add registration fee to existing balance
+
+      // Add registration fee to existing balance (fallback to 0 if not present)
       const currentBalance = samePersonCheck.data.balance || 0;
       updateData.balance = currentBalance + parseFloat(registrationFee);
-      
+
       updateData.dateApproved = approvedDate;
       updateData.approvedTime = approvedTime;
-      updateData.status = 'active';
-      
+
+      // Preserve Admin role/status if the match source is Admin or existing member has role admin/coadmin
+      const existingRole = samePersonCheck.data.role;
+      const existingStatus = samePersonCheck.data.status;
+      const isAdminLike = samePersonCheck.source === 'admin' || existingRole === 'admin' || existingRole === 'coadmin';
+      if (isAdminLike) {
+        updateData.role = existingRole || 'admin';
+        updateData.status = existingStatus || 'active'; // keep Admin status as is
+      } else {
+        updateData.status = 'active';
+      }
+
       // Create transaction record
       const transactionData = {
         type: 'registration',
@@ -1840,11 +1493,47 @@ const processDatabaseApprove = async (reg) => {
         transactionId: `REG-${Date.now()}`,
         description: 'Registration fee payment'
       };
-      
+
       await database.ref(`Transactions/Registrations/${samePersonCheck.id}/${transactionData.transactionId}`).set(transactionData);
-      await database.ref(`Members/${samePersonCheck.id}`).update(updateData);
+
+      // If the matched person is an Admin or has admin/coadmin role, also log under Transactions/Admins
+      if (isAdminLike) {
+        const adminTxnRef = database.ref(`Transactions/Admins/${samePersonCheck.id}`).push();
+        await adminTxnRef.set({
+          transactionId: adminTxnRef.key,
+          type: 'AdminRegistrationApproval',
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          firstName,
+          lastName,
+          email,
+          memberId: parseInt(samePersonCheck.id),
+          status: 'completed',
+          description: 'Registration approved for existing Admin'
+        });
+      }
+
+      // Ensure a Members record exists; if not, create it preserving admin role/status
+      const memberRef = database.ref(`Members/${samePersonCheck.id}`);
+      const memberSnap = await memberRef.once('value');
+      if (!memberSnap.exists()) {
+        await memberRef.set({
+          id: parseInt(samePersonCheck.id),
+          firstName,
+          lastName,
+          email,
+          ...rest,
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          balance: updateData.balance || parseFloat(registrationFee) || 0,
+          status: isAdminLike ? (existingStatus || 'active') : 'active',
+          role: isAdminLike ? (existingRole || 'admin') : (rest?.role || 'member')
+        });
+      } else {
+        await memberRef.update(updateData);
+      }
       await updateFunds(registrationFee);
-      
+
       await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
         firstName,
         lastName,
@@ -1855,7 +1544,7 @@ const processDatabaseApprove = async (reg) => {
         memberId: parseInt(samePersonCheck.id),
         status: 'approved'
       });
-      
+
       return parseInt(samePersonCheck.id);
     }
 
@@ -1926,6 +1615,25 @@ const processDatabaseApprove = async (reg) => {
 
     // Save transaction record
     await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+
+    // If the registration explicitly sets admin/coadmin role, also log under Transactions/Admins for the new member
+    const roleFromReg = (rest && rest.role) || (reg && reg.role);
+    if (roleFromReg === 'admin' || roleFromReg === 'coadmin') {
+      const adminTxnRef = database.ref(`Transactions/Admins/${newId}`).push();
+      await adminTxnRef.set({
+        transactionId: adminTxnRef.key,
+        type: 'AdminRegistrationApproval',
+        dateApproved: approvedDate,
+        approvedTime: approvedTime,
+        firstName,
+        lastName,
+        email,
+        memberId: newId,
+        status: 'completed',
+        description: 'Registration approved for Admin'
+      });
+    }
+
     await updateFunds(registrationFee);
     
     // Add to approved registrations

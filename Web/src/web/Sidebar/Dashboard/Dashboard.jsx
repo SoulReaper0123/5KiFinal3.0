@@ -354,6 +354,8 @@ const Dashboard = () => {
       const investmentSharePercentage = parseFloat(settingsData.InvestmentSharePercentage || 0) / 100;
       const patronageSharePercentage = parseFloat(settingsData.PatronageSharePercentage || 0) / 100;
       const activeMonthsPercentage = parseFloat(settingsData.ActiveMonthsPercentage || 0) / 100;
+      const membersDividendPercentage = parseFloat(settingsData.MembersDividendPercentage || 0) / 100;
+      const fiveKiEarningsPercentage = parseFloat(settingsData.FiveKiEarningsPercentage || 0) / 100;
       
       let totalLoans = 0;
       let totalReceivables = 0;
@@ -441,7 +443,9 @@ const Dashboard = () => {
         fundsHistory,
         investmentSharePercentage,
         patronageSharePercentage,
-        activeMonthsPercentage
+        activeMonthsPercentage,
+        membersDividendPercentage,
+        fiveKiEarningsPercentage
       });
       
       setLoanData(loanItems);
@@ -578,6 +582,38 @@ const Dashboard = () => {
         } catch (error) {
           console.error(`Error fetching approved loans count for member ${memberId}:`, error);
         }
+
+        // Determine Active Months based on registration dateApproved in Transactions/Registrations
+        let activeMonthsCount = 12; // default full year
+        try {
+          const regsSnapshot = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
+          if (regsSnapshot.exists()) {
+            const regs = regsSnapshot.val();
+            let earliestApprovedDate = null;
+            Object.values(regs).forEach(reg => {
+              const d = parseTransactionDate(reg.dateApproved);
+              if (d) {
+                if (!earliestApprovedDate || d < earliestApprovedDate) {
+                  earliestApprovedDate = d;
+                }
+              }
+            });
+            if (earliestApprovedDate) {
+              const regYear = earliestApprovedDate.getFullYear();
+              const regMonthIdx = earliestApprovedDate.getMonth(); // 0-11
+              const selYear = parseInt(selectedYear);
+              if (regYear < selYear) {
+                activeMonthsCount = 12;
+              } else if (regYear > selYear) {
+                activeMonthsCount = 0;
+              } else {
+                activeMonthsCount = Math.max(0, 12 - regMonthIdx);
+              }
+            }
+          }
+        } catch (error) {
+          console.error(`Error fetching registration for member ${memberId}:`, error);
+        }
         
         // Only include members who have transactions in the selected year or have investment
         if (totalDividends !== 0 || totalInvestment > 0) {
@@ -589,7 +625,8 @@ const Dashboard = () => {
             monthlyTransactions, // Include the actual transactions
             totalDividends,
             approvedLoansCount,
-            totalLoanAmount
+            totalLoanAmount,
+            activeMonthsCount
           };
         }
         return null;
@@ -1384,11 +1421,32 @@ const Dashboard = () => {
                   ))}
                 </select>
               </div>
+              {/* Centered summary labels directly under title */}
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '10px', marginTop: '4px', textAlign: 'center', flexWrap: 'wrap' }}>
+                {(() => {
+                  const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
+                  const membersDividendValue = totalYields * (fundsData.membersDividendPercentage || 0);
+                  const fiveKiEarningsValue = totalYields * (fundsData.fiveKiEarningsPercentage || 0);
+                  return (
+                    <>
+                      <div style={{ padding: '6px 10px', background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', borderRadius: '8px', fontWeight: 600 }}>
+                        Members Dividend: ₱{formatCurrency(membersDividendValue)} ({((fundsData.membersDividendPercentage || 0) * 100).toFixed(0)}%)
+                      </div>
+                      <div style={{ padding: '6px 10px', background: '#EFF6FF', color: '#1E3A8A', border: '1px solid #BFDBFE', borderRadius: '8px', fontWeight: 600 }}>
+                        5ki Earnings: ₱{formatCurrency(fiveKiEarningsValue)} ({((fundsData.fiveKiEarningsPercentage || 0) * 100).toFixed(0)}%)
+                      </div>
+                    </>
+                  );
+                })()}
+              </div>
               <div style={styles.dividendsTableContainer}>
                 {(() => {
-                  // Calculate total loan amount across all members for patronage share calculation
+                  // Calculate totals for patronage share and active months distribution
                   const totalAllMembersLoanAmount = dividendsData.reduce((sum, member) => sum + (member.totalLoanAmount || 0), 0);
                   window.totalAllMembersLoanAmount = totalAllMembersLoanAmount; // Store for use in table rows
+
+                  const totalActiveMonths = dividendsData.reduce((sum, member) => sum + (member.activeMonthsCount || 0), 0);
+                  window.totalActiveMonths = totalActiveMonths;
                   return null;
                 })()}
                 <table style={styles.dividendsTable}>
@@ -1416,6 +1474,7 @@ const Dashboard = () => {
                       <th style={styles.dividendsHeaderCell}>Active Month</th>
                       <th style={styles.dividendsHeaderCell}>Active Month %</th>
                       <th style={styles.dividendsHeaderCell}>Total %</th>
+                      <th style={styles.dividendsHeaderCell}>Total Share</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1519,14 +1578,16 @@ const Dashboard = () => {
                         </td>
                         <td style={styles.dividendsDataCell}>
                           <strong style={{color: '#059669'}}>
-                            12
+                            {member.activeMonthsCount ?? 0}
                           </strong>
                         </td>
                         <td style={styles.dividendsDataCell}>
                           <strong style={{color: '#7C3AED'}}>
-                            {dividendsData.length > 0 
-                              ? (12 / (dividendsData.length * 12) * 100).toFixed(2) + '%' 
-                              : '0.00%'}
+                            {(() => {
+                              const totalActiveMonths = window.totalActiveMonths || 1; // avoid divide by 0
+                              const activeMonthShareDecimal = (member.activeMonthsCount ?? 0) / totalActiveMonths;
+                              return (activeMonthShareDecimal * 100).toFixed(2) + '%';
+                            })()}
                           </strong>
                         </td>
                         <td style={styles.dividendsDataCell}>
@@ -1540,7 +1601,7 @@ const Dashboard = () => {
                                 ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount)) 
                                 : 0;
                               const activeMonthShareDecimal = dividendsData.length > 0 
-                                ? (12 / (dividendsData.length * 12)) 
+                                ? ((member.activeMonthsCount ?? 0) / (dividendsData.length * 12)) 
                                 : 0;
                               
                               // Settings percentages are already converted to decimal in fetchDashboardData
@@ -1550,6 +1611,31 @@ const Dashboard = () => {
                                 (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
                               
                               return (totalPercentage * 100).toFixed(2) + '%';
+                            })()}
+                          </strong>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <strong style={{color: '#111827'}}>
+                            {(() => {
+                              // Total Share = Total% (decimal) * Total Yields * MembersDividendPercentage (decimal)
+                              const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
+                              
+                              const investmentShareDecimal = fundsData.availableFunds > 0 
+                                ? ((member.investment / fundsData.availableFunds)) 
+                                : 0;
+                              const patronageShareDecimal = window.totalAllMembersLoanAmount > 0 
+                                ? (((member.totalLoanAmount || 0) / window.totalAllMembersLoanAmount)) 
+                                : 0;
+                              const activeMonthShareDecimal = dividendsData.length > 0 
+                                ? ((member.activeMonthsCount ?? 0) / (dividendsData.length * 12)) 
+                                : 0;
+                              const totalPercentageDecimal = 
+                                (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
+                                (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
+                                (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
+                              const membersDividendDecimal = fundsData.membersDividendPercentage || 0;
+                              const totalShare = totalPercentageDecimal * totalYields * membersDividendDecimal;
+                              return `₱${formatCurrency(totalShare)}`;
                             })()}
                           </strong>
                         </td>
