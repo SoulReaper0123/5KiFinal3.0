@@ -489,8 +489,44 @@ const Dashboard = () => {
         const memberTransactions = allTransactions[memberId] || [];
         const monthlyDividends = Array(12).fill(0);
         const monthlyTransactions = Array(12).fill(null).map(() => []); // Store actual transactions for each month
-        // Use member's balance from Members table as investment
-        const totalInvestment = parseFloat(member.balance) || 0;
+        
+        // Compute Investment from Transactions within the selected year
+        let totalInvestment = 0;
+        try {
+          // Sum registration amount(s) within selected year
+          const regsSnapForInvestment = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
+          if (regsSnapForInvestment.exists()) {
+            Object.values(regsSnapForInvestment.val()).forEach(reg => {
+              const d = parseTransactionDate(reg.dateApproved || reg.date);
+              if (d && d.getFullYear() === parseInt(selectedYear)) {
+                const amt = parseFloat(reg.amount) || 0;
+                totalInvestment += amt;
+              }
+            });
+          }
+        } catch (e) {
+          console.error(`Error computing registration part of investment for member ${memberId}:`, e);
+        }
+        
+        try {
+          // Sum approved deposit amounts within selected year
+          const depsSnapForInvestment = await database.ref(`Transactions/Deposits/${memberId}`).once('value');
+          if (depsSnapForInvestment.exists()) {
+            Object.values(depsSnapForInvestment.val()).forEach(dep => {
+              const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
+              if (d && d.getFullYear() === parseInt(selectedYear)) {
+                // Only consider deposits that were approved/completed if such a field exists
+                const status = (dep.status || '').toLowerCase();
+                if (!status || status === 'approved' || status === 'completed') {
+                  const amt = parseFloat(dep.amountToBeDeposited || dep.amount) || 0;
+                  totalInvestment += amt;
+                }
+              }
+            });
+          }
+        } catch (e) {
+          console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
+        }
         
         // Filter transactions by selected year and process them
         memberTransactions.forEach(transaction => {
@@ -1466,7 +1502,7 @@ const Dashboard = () => {
                       <th style={styles.dividendsHeaderCell}>Oct</th>
                       <th style={styles.dividendsHeaderCell}>Nov</th>
                       <th style={styles.dividendsHeaderCell}>Dec</th>
-                      <th style={styles.dividendsHeaderCell}>Total Loans</th>
+                      <th style={styles.dividendsHeaderCell}>Total</th>
                       <th style={styles.dividendsHeaderCell}>Loan Count</th>
                       <th style={styles.dividendsHeaderCell}>Amount</th>
                       <th style={styles.dividendsHeaderCell}>Investment Share</th>
@@ -1842,23 +1878,23 @@ const Dashboard = () => {
       </div>
 
       <div style={styles.modalContent}>
-        <table style={{...styles.dividendsTable, margin: '0'}}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', tableLayout: 'fixed', margin: 0 }}>
           <thead>
             <tr style={styles.dividendsHeaderRow}>
-              <th style={styles.dividendsHeaderCell}>Date</th>
-              <th style={styles.dividendsHeaderCell}>Type</th>
-              <th style={styles.dividendsHeaderCell}>Description</th>
-              <th style={styles.dividendsHeaderCell}>Amount</th>
-              <th style={styles.dividendsHeaderCell}>Status</th>
+              <th style={{...styles.dividendsHeaderCell, width: '110px'}}>Date</th>
+              <th style={{...styles.dividendsHeaderCell, width: '100px'}}>Type</th>
+              <th style={{...styles.dividendsHeaderCell, width: 'auto'}}>Description</th>
+              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Amount</th>
+              <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Status</th>
             </tr>
           </thead>
           <tbody>
             {selectedMonthTransactions.transactions.map((transaction, index) => (
               <tr key={index} style={styles.dividendsDataRow}>
-                <td style={styles.dividendsDataCell}>
+                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   {transaction.formattedDate}
                 </td>
-                <td style={styles.dividendsDataCell}>
+                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   <span style={{
                     backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
                     color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
@@ -1870,11 +1906,11 @@ const Dashboard = () => {
                     {transaction.type}
                   </span>
                 </td>
-                <td style={styles.dividendsDataCell}>
+                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis'}}>
                   {transaction.description || transaction.remarks || 
                    transaction.purpose || transaction.loanPurpose || 'No description'}
                 </td>
-                <td style={styles.dividendsDataCell}>
+                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   <div>
                     <span style={{
                       color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
@@ -1887,7 +1923,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </td>
-                <td style={styles.dividendsDataCell}>
+                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   <span style={{
                     backgroundColor: transaction.status === 'approved' ? '#d1fae5' : '#fef3c7',
                     color: transaction.status === 'approved' ? '#059669' : '#d97706',

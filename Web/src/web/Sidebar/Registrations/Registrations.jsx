@@ -1428,10 +1428,10 @@ const Registrations = ({
       // Update the current funds
       await fundsRef.set(newFundsAmount);
       
-      // Log to FundsHistory for dashboard chart
+      // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
       const now = new Date();
-      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
       await fundsHistoryRef.set(newFundsAmount);
       
     } catch (error) {
@@ -1587,7 +1587,7 @@ const processDatabaseApprove = async (reg) => {
     const transactionData = {
       type: 'registration',
       amount: parseFloat(registrationFee),
-      date: approvedDate,
+      dateApproved: approvedDate,
       time: approvedTime,
       status: 'completed',
       memberId: newId,

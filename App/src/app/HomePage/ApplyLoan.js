@@ -19,6 +19,14 @@ import ModalSelector from 'react-native-modal-selector';
 import { ref as dbRef, set, get } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
 
+// Safely extract an error message without assuming shape
+const getErrorMessage = (err) => {
+  if (!err) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (typeof err.message === 'string') return err.message;
+  try { return JSON.stringify(err); } catch { return 'Unknown error'; }
+};
+
 const ApplyLoan = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -231,7 +239,7 @@ const ApplyLoan = () => {
         }
       }
     } catch (error) {
-      console.error('Error fetching system settings:', error?.message || error || 'Unknown error');
+      console.error('Error fetching system settings:', getErrorMessage(error));
       // Keep defaults if error
     }
   };
@@ -273,7 +281,7 @@ const ApplyLoan = () => {
         setAlertModalVisible(true);
       }
     } catch (error) {
-      console.error('Error fetching user data:', error?.message || error || 'Unknown error');
+      console.error('Error fetching user data:', getErrorMessage(error));
       setAlertMessage('Error loading user information.');
       setAlertType('error');
       setAlertModalVisible(true);
@@ -420,7 +428,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     await set(applicationRef, applicationDataWithMeta);
     return true;
   } catch (error) {
-    console.error('Failed to store loan application:', error?.message || error || 'Unknown error');
+    console.error('Failed to store loan application:', getErrorMessage(error));
     setAlertMessage('Failed to submit loan application');
     setAlertType('error');
     setAlertModalVisible(true);
@@ -799,17 +807,19 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           onPress={handleSubmit}
           disabled={!isFormValid()}
         >
-          <Text style={styles.submitButtonText}>Submit</Text>
+          {isLoading ? (
+            <>
+              <ActivityIndicator size="small" color="#000" />
+              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>Submitting...</Text>
+            </>
+          ) : (
+            <Text style={styles.submitButtonText}>Submit</Text>
+          )}
         </TouchableOpacity>
       </View>
       </ScrollView>
 
-      <Modal transparent={true} visible={isLoading}>
-        <View style={styles.modalContainer}>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.modalText}>Please wait...</Text>
-        </View>
-      </Modal>
+
 
       {/* Custom Alert Modal */}
       <CustomModal
@@ -828,15 +838,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         type={alertType}
       />
 
-      {/* Loading Overlay */}
-      {isLoading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#4FE7AF" />
-            <Text style={styles.loadingText}>Processing...</Text>
-          </View>
-        </View>
-      )}
+
 
       {/* Detailed Confirmation Modal */}
       <Modal visible={confirmModalVisible} transparent animationType="fade">

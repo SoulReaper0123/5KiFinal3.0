@@ -790,9 +790,9 @@ const ApplyDeposits = ({
         const updatedFund = (parseFloat(fundSnap.val()) || 0) + parseFloat(deposit.amountToBeDeposited);
         await fundsRef.set(updatedFund);
         
-        // Log to FundsHistory for dashboard chart
-        const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
+        const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
         await fundsHistoryRef.set(updatedFund);
 
         // Remove from pending AFTER all other operations succeed

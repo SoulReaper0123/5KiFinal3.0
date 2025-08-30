@@ -734,16 +734,26 @@ const ApplyLoans = ({
       const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
       await fundsHistoryRef.set(newFundsAmount);
       
-      // Add processing fee to Settings/Savings
+      // Update Savings and SavingsHistory (daily aggregate) like PaymentApplications
+      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
       const savingsRef = database.ref('Settings/Savings');
-      const savingsSnap = await savingsRef.once('value');
+      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+
+      const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
+        savingsRef.once('value'),
+        savingsHistoryRef.child(dateKey).once('value')
+      ]);
+
       const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const newSavingsAmount = currentSavings + processingFee;
+      const newSavingsAmount = Math.ceil((currentSavings + processingFee) * 100) / 100;
       await savingsRef.set(newSavingsAmount);
-      
-      // Log processing fee to SavingsHistory for tracking
-      const savingsHistoryRef = database.ref(`Settings/SavingsHistory/${timestamp}`);
-      await savingsHistoryRef.set(newSavingsAmount);
+
+      // Increment daily savings history by processing fee
+      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+      const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
+      const savingsHistoryUpdate = {};
+      savingsHistoryUpdate[dateKey] = newDaySavings;
+      await savingsHistoryRef.update(savingsHistoryUpdate);
       
       await memberRef.set(memberBalance - amount);
 
@@ -1076,61 +1086,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                       <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
                     </div>
 
-                    {selectedLoan.dateApproved && (
-                      <>
-                        <div style={styles.sectionTitle}>Approval Information</div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Date Approved:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Time Approved:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.timeApproved}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Interest Rate:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.interestRate || 'N/A'}%</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Monthly Payment:</span>
-                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.monthlyPayment)}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Total Term Payment:</span>
-                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.totalTermPayment)}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Release Amount:</span>
-                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.releaseAmount)}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Processing Fee:</span>
-                          <span style={styles.fieldValue}>{formatCurrency(selectedLoan.processingFee)}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Due Date:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.dueDate || 'N/A'}</span>
-                        </div>
-                      </>
-                    )}
 
-                    {selectedLoan.dateRejected && (
-                      <>
-                        <div style={styles.sectionTitle}>Rejection Information</div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Date Rejected:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Time Rejected:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.timeRejected}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Rejection Reason:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
-                        </div>
-                      </>
-                    )}
                   </div>
                   
                 </div>
@@ -1180,61 +1136,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                     <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
                   </div>
 
-                  {selectedLoan.dateApproved && (
-                    <>
-                      <div style={styles.sectionTitle}>Approval Information</div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Date Approved:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Time Approved:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.timeApproved}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Interest Rate:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.interestRate || 'N/A'}%</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Monthly Payment:</span>
-                        <span style={styles.fieldValue}>{formatCurrency(selectedLoan.monthlyPayment)}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Total Term Payment:</span>
-                        <span style={styles.fieldValue}>{formatCurrency(selectedLoan.totalTermPayment)}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Release Amount:</span>
-                        <span style={styles.fieldValue}>{formatCurrency(selectedLoan.releaseAmount)}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Processing Fee:</span>
-                        <span style={styles.fieldValue}>{formatCurrency(selectedLoan.processingFee)}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Due Date:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.dueDate || 'N/A'}</span>
-                      </div>
-                    </>
-                  )}
 
-                  {selectedLoan.dateRejected && (
-                    <>
-                      <div style={styles.sectionTitle}>Rejection Information</div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Date Rejected:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Time Rejected:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.timeRejected}</span>
-                      </div>
-                      <div style={styles.compactField}>
-                        <span style={styles.fieldLabel}>Rejection Reason:</span>
-                        <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
             </div>
