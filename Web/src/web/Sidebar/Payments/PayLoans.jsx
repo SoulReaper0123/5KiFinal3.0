@@ -22,7 +22,8 @@ import { ApprovePayments } from '../../../../../Server/api';
 // Constants
 const paymentOptions = [
   { key: 'Bank', label: 'Bank' },
-  { key: 'GCash', label: 'GCash' }
+  { key: 'GCash', label: 'GCash' },
+  { key: 'Cash', label: 'Cash on Hand' }
 ];
 
 const pageSize = 10;
@@ -212,7 +213,8 @@ const PayLoans = () => {
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [paymentAccounts, setPaymentAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
-    GCash: { accountName: '', accountNumber: '' }
+    GCash: { accountName: '', accountNumber: '' },
+    Cash: { accountName: '', accountNumber: '' }
   });
   const [isProcessing, setIsProcessing] = useState(false);
 

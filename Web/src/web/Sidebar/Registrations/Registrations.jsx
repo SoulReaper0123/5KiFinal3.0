@@ -498,7 +498,7 @@ const rejectionReasons = [
   "Incomplete information",
   "Poor quality images",
   "Suspicious activity",
-  "Other (please specify)"
+  "Other"
 ];
 
 const Registrations = ({ 
@@ -1479,12 +1479,14 @@ const processDatabaseApprove = async (reg) => {
         updateData.status = 'active';
       }
 
-      // Create transaction record
+      // Create transaction record (use consistent fields for Transactions.jsx)
       const transactionData = {
         type: 'registration',
         amount: parseFloat(registrationFee),
-        date: approvedDate,
-        time: approvedTime,
+        // Provide both applied and approved dates for sorting/display
+        dateApplied: rest?.dateCreated || rest?.dateApplied || '',
+        dateApproved: approvedDate,
+        approvedTime: approvedTime,
         status: 'completed',
         memberId: parseInt(samePersonCheck.id),
         firstName,
@@ -1539,6 +1541,8 @@ const processDatabaseApprove = async (reg) => {
         lastName,
         ...rest,
         email,
+        // Keep original application date for tables
+        dateCreated: rest?.dateCreated || rest?.dateApplied || '',
         dateApproved: approvedDate,
         approvedTime: approvedTime,
         memberId: parseInt(samePersonCheck.id),
@@ -1583,12 +1587,14 @@ const processDatabaseApprove = async (reg) => {
     // Set initial balance to the registration fee
     const initialBalance = parseFloat(registrationFee) || 0;
     
-    // Create transaction record
+    // Create transaction record (use consistent fields for Transactions.jsx)
     const transactionData = {
       type: 'registration',
       amount: parseFloat(registrationFee),
+      // Provide both applied and approved dates for sorting/display
+      dateApplied: rest?.dateCreated || rest?.dateApplied || '',
       dateApproved: approvedDate,
-      time: approvedTime,
+      approvedTime: approvedTime,
       status: 'completed',
       memberId: newId,
       firstName,
@@ -1642,6 +1648,8 @@ const processDatabaseApprove = async (reg) => {
       lastName,
       ...rest,
       email,
+      // Keep original application date for tables
+      dateCreated: rest?.dateCreated || rest?.dateApplied || '',
       dateApproved: approvedDate,
       approvedTime: approvedTime,
       memberId: newId,
@@ -2184,23 +2192,25 @@ const processDatabaseApprove = async (reg) => {
                 style={styles.reasonOption}
                 onClick={() => handleReasonSelect(reason)}
               >
-                <input
-                  type="radio"
-                  name="rejectionReason"
-                  checked={selectedReason === reason}
-                  onChange={() => handleReasonSelect(reason)}
-                  style={styles.reasonRadio}
-                />
-                <span style={styles.reasonText}>{reason}</span>
-                {reason === "Other (please specify)" && selectedReason === reason && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
                   <input
-                    type="text"
-                    value={customReason}
-                    onChange={(e) => setCustomReason(e.target.value)}
-                    placeholder="Please specify reason"
-                    style={styles.customReasonInput}
+                    type="radio"
+                    name="rejectionReason"
+                    checked={selectedReason === reason}
+                    onChange={() => handleReasonSelect(reason)}
+                    style={styles.reasonRadio}
                   />
-                )}
+                  <span style={styles.reasonText}>{reason}</span>
+                  {reason === "Other" && selectedReason === reason && (
+                    <input
+                      type="text"
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Please specify reason"
+                      style={{ ...styles.customReasonInput, marginTop: 0, maxWidth: '60%' }}
+                    />
+                  )}
+                </div>
               </div>
             ))}
             <div style={styles.rejectionButtons}>

@@ -467,7 +467,7 @@ const rejectionReasons = [
   "Incorrect amount",
   "Unclear image",
   "Suspicious activity",
-  "Other (please specify)"
+  "Other"
 ];
 
 const PaymentApplications = ({ 
@@ -1597,23 +1597,25 @@ const openImageViewer = (url, label) => {
                 style={styles.reasonOption}
                 onClick={() => handleReasonSelect(reason)}
               >
-                <input
-                  type="radio"
-                  name="rejectionReason"
-                  checked={selectedReason === reason}
-                  onChange={() => handleReasonSelect(reason)}
-                  style={styles.reasonRadio}
-                />
-                <span style={styles.reasonText}>{reason}</span>
-                {reason === "Other (please specify)" && selectedReason === reason && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
                   <input
-                    type="text"
-                    value={customReason}
-                    onChange={(e) => setCustomReason(e.target.value)}
-                    placeholder="Please specify reason"
-                    style={styles.customReasonInput}
+                    type="radio"
+                    name="rejectionReason"
+                    checked={selectedReason === reason}
+                    onChange={() => handleReasonSelect(reason)}
+                    style={styles.reasonRadio}
                   />
-                )}
+                  <span style={styles.reasonText}>{reason}</span>
+                  {reason === "Other" && selectedReason === reason && (
+                    <input
+                      type="text"
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Please specify reason"
+                      style={{ ...styles.customReasonInput, marginTop: 0, maxWidth: '60%' }}
+                    />
+                  )}
+                </div>
               </div>
             ))}
             <div style={styles.rejectionButtons}>

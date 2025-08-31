@@ -438,7 +438,7 @@ const rejectionReasons = [
   "Insufficient funds (below ₱5,000 threshold)",
   "Existing unpaid loan balance",
   "Suspicious activity",
-  "Other (please specify)"
+  "Other"
 ];
 
 const ApplyLoans = ({ 
@@ -468,6 +468,9 @@ const ApplyLoans = ({
   const [actionInProgress, setActionInProgress] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  // New: member financials for modal display
+  const [memberBalance, setMemberBalance] = useState(null);
+  const [existingLoanInfo, setExistingLoanInfo] = useState({ hasExisting: false, outstanding: 0 });
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -506,9 +509,46 @@ const ApplyLoans = ({
     }));
   };
 
-  const openModal = (loan) => {
+  const openModal = async (loan) => {
     setSelectedLoan(loan);
     setModalVisible(true);
+
+    try {
+      // Fetch current balance
+      const balanceSnap = await database.ref(`Members/${loan.id}/balance`).once('value');
+      const balance = parseFloat(balanceSnap.val()) || 0;
+      setMemberBalance(balance);
+
+      // Fetch existing current loans and compute outstanding
+      const currentLoansSnap = await database.ref(`Loans/CurrentLoans/${loan.id}`).once('value');
+      let hasExisting = false;
+      let outstanding = 0;
+
+      if (currentLoansSnap.exists()) {
+        hasExisting = true;
+        const loansObj = currentLoansSnap.val() || {};
+        // Sum remaining balances across all current loans for this member
+        Object.values(loansObj).forEach(l => {
+          const totalTermPayment = parseFloat(l.totalTermPayment) || 0;
+          const amountPaid = parseFloat(l.amountPaid) || 0; // fallback if tracked
+          const paymentsMade = parseFloat(l.paymentsMade) || 0; // number of payments made
+          const perMonth = parseFloat(l.totalMonthlyPayment) || 0;
+          // Compute remaining: prefer totalTermPayment - amountPaid, fallback to perMonth*(term - paymentsMade)
+          let remaining = totalTermPayment - amountPaid;
+          if (!isFinite(remaining) || remaining <= 0) {
+            const term = parseFloat(l.term) || 0;
+            remaining = Math.max(0, (perMonth * Math.max(0, term - paymentsMade)));
+          }
+          outstanding += Math.max(0, remaining);
+        });
+      }
+
+      setExistingLoanInfo({ hasExisting, outstanding: Math.round(outstanding * 100) / 100 });
+    } catch (e) {
+      console.error('Failed fetching member financials:', e);
+      setMemberBalance(null);
+      setExistingLoanInfo({ hasExisting: false, outstanding: 0 });
+    }
   };
 
   const closeModal = () => {
@@ -982,11 +1022,10 @@ We recommend settling outstanding balances first before reapplying. Once cleared
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
+               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Term</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Disbursement</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
@@ -996,11 +1035,10 @@ We recommend settling outstanding balances first before reapplying. Once cleared
             {loans.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
-                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
+                <td style={styles.tableCell}>{`${item.firstName}`}</td>
+                  <td style={styles.tableCell}>{`${item.lastName}`}</td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.loanAmount)}</td>
-                <td style={styles.tableCell}>{item.term} months</td>
-                <td style={styles.tableCell}>{item.disbursement}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>
                 <td style={{
                   ...styles.tableCell,
@@ -1055,6 +1093,16 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                       <span style={styles.fieldLabel}>Email:</span>
                       <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
                     </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Current Balance:</span>
+                      <span style={styles.fieldValue}>{memberBalance !== null ? formatCurrency(memberBalance) : 'Loading...'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Existing Loan:</span>
+                      <span style={styles.fieldValue}>
+                        {existingLoanInfo.hasExisting ? `Yes — Outstanding: ${formatCurrency(existingLoanInfo.outstanding)}` : 'No'}
+                      </span>
+                    </div>
 
                     <div style={styles.sectionTitle}>Loan Details</div>
                     <div style={styles.compactField}>
@@ -1104,6 +1152,16 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Email:</span>
                     <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Current Balance:</span>
+                    <span style={styles.fieldValue}>{memberBalance !== null ? formatCurrency(memberBalance) : 'Loading...'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Existing Loan:</span>
+                    <span style={styles.fieldValue}>
+                      {existingLoanInfo.hasExisting ? `Yes — Outstanding: ${formatCurrency(existingLoanInfo.outstanding)}` : 'No'}
+                    </span>
                   </div>
 
                   <div style={styles.sectionTitle}>Loan Details</div>
@@ -1250,23 +1308,25 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                 style={styles.reasonOption}
                 onClick={() => handleReasonSelect(reason)}
               >
-                <input
-                  type="radio"
-                  name="rejectionReason"
-                  checked={selectedReason === reason}
-                  onChange={() => handleReasonSelect(reason)}
-                  style={styles.reasonRadio}
-                />
-                <span style={styles.reasonText}>{reason}</span>
-                {reason === "Other (please specify)" && selectedReason === reason && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
                   <input
-                    type="text"
-                    value={customReason}
-                    onChange={(e) => setCustomReason(e.target.value)}
-                    placeholder="Please specify reason"
-                    style={styles.customReasonInput}
+                    type="radio"
+                    name="rejectionReason"
+                    checked={selectedReason === reason}
+                    onChange={() => handleReasonSelect(reason)}
+                    style={styles.reasonRadio}
                   />
-                )}
+                  <span style={styles.reasonText}>{reason}</span>
+                  {reason === "Other" && selectedReason === reason && (
+                    <input
+                      type="text"
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Please specify reason"
+                      style={{ ...styles.customReasonInput, marginTop: 0, maxWidth: '60%' }}
+                    />
+                  )}
+                </div>
               </div>
             ))}
             <div style={styles.rejectionButtons}>
