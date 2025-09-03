@@ -1477,7 +1477,10 @@ const Dashboard = () => {
               </div>
               <div style={styles.dividendsTableContainer}>
                 {(() => {
-                  // Calculate totals for patronage share and active months distribution
+                  // Calculate totals for investment, patronage share and active months distribution
+                  const totalAllMembersInvestment = dividendsData.reduce((sum, member) => sum + (member.investment || 0), 0);
+                  window.totalAllMembersInvestment = totalAllMembersInvestment; // Store for use in table rows
+
                   const totalAllMembersLoanAmount = dividendsData.reduce((sum, member) => sum + (member.totalLoanAmount || 0), 0);
                   window.totalAllMembersLoanAmount = totalAllMembersLoanAmount; // Store for use in table rows
 
@@ -1600,8 +1603,8 @@ const Dashboard = () => {
                         </td>
                         <td style={styles.dividendsDataCell}>
                           <strong style={{color: '#7C3AED'}}>
-                            {fundsData.availableFunds > 0 
-                              ? ((member.investment / fundsData.availableFunds) * 100).toFixed(2) + '%' 
+                            {window.totalAllMembersInvestment > 0 
+                              ? ((member.investment / window.totalAllMembersInvestment) * 100).toFixed(2) + '%' 
                               : '0.00%'}
                           </strong>
                         </td>
@@ -1629,23 +1632,27 @@ const Dashboard = () => {
                         <td style={styles.dividendsDataCell}>
                           <strong style={{color: '#DC2626'}}>
                             {(() => {
-                              // Get percentages as decimal values (divide by 100)
-                              const investmentShareDecimal = fundsData.availableFunds > 0 
-                                ? ((member.investment / fundsData.availableFunds)) 
+                              // Member shares based on totals
+                              const totalInvestments = window.totalAllMembersInvestment || 0;
+                              const totalLoans = window.totalAllMembersLoanAmount || 0;
+                              const totalActiveMonths = window.totalActiveMonths || 0;
+
+                              const investmentShareDecimal = totalInvestments > 0
+                                ? (member.investment / totalInvestments)
                                 : 0;
-                              const patronageShareDecimal = totalAllMembersLoanAmount > 0 
-                                ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount)) 
+                              const patronageShareDecimal = totalLoans > 0
+                                ? (((member.totalLoanAmount || 0) / totalLoans))
                                 : 0;
-                              const activeMonthShareDecimal = dividendsData.length > 0 
-                                ? ((member.activeMonthsCount ?? 0) / (dividendsData.length * 12)) 
+                              const activeMonthShareDecimal = totalActiveMonths > 0
+                                ? ((member.activeMonthsCount ?? 0) / totalActiveMonths)
                                 : 0;
-                              
-                              // Settings percentages are already converted to decimal in fetchDashboardData
-                              const totalPercentage = 
+
+                              // Weights (already decimals) from settings
+                              const totalPercentage =
                                 (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
                                 (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
                                 (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
-                              
+
                               return (totalPercentage * 100).toFixed(2) + '%';
                             })()}
                           </strong>
@@ -1653,24 +1660,30 @@ const Dashboard = () => {
                         <td style={styles.dividendsDataCell}>
                           <strong style={{color: '#111827'}}>
                             {(() => {
-                              // Total Share = Total% (decimal) * Total Yields * MembersDividendPercentage (decimal)
+                              // Total Share = Total Yields * Total% * MembersDividendPercentage (all decimals)
                               const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
-                              
-                              const investmentShareDecimal = fundsData.availableFunds > 0 
-                                ? ((member.investment / fundsData.availableFunds)) 
+
+                              // Use totals-based shares (consistent with Total % cell)
+                              const totalInvestments = window.totalAllMembersInvestment || 0;
+                              const totalLoans = window.totalAllMembersLoanAmount || 0;
+                              const totalActiveMonths = window.totalActiveMonths || 0;
+
+                              const investmentShareDecimal = totalInvestments > 0 
+                                ? (member.investment / totalInvestments) 
                                 : 0;
-                              const patronageShareDecimal = window.totalAllMembersLoanAmount > 0 
-                                ? (((member.totalLoanAmount || 0) / window.totalAllMembersLoanAmount)) 
+                              const patronageShareDecimal = totalLoans > 0 
+                                ? (((member.totalLoanAmount || 0) / totalLoans)) 
                                 : 0;
-                              const activeMonthShareDecimal = dividendsData.length > 0 
-                                ? ((member.activeMonthsCount ?? 0) / (dividendsData.length * 12)) 
+                              const activeMonthShareDecimal = totalActiveMonths > 0 
+                                ? ((member.activeMonthsCount ?? 0) / totalActiveMonths) 
                                 : 0;
+
                               const totalPercentageDecimal = 
                                 (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
                                 (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
                                 (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
-                              const membersDividendDecimal = fundsData.membersDividendPercentage || 0;
-                              const totalShare = totalPercentageDecimal * totalYields * membersDividendDecimal;
+                              const membersDividendDecimal = fundsData.membersDividendPercentage || 0; // settings already /100
+                              const totalShare = totalYields * totalPercentageDecimal * membersDividendDecimal;
                               return `₱${formatCurrency(totalShare)}`;
                             })()}
                           </strong>
@@ -1962,21 +1975,6 @@ const Dashboard = () => {
             </span>
           </div>
         </div>
-      </div>
-
-      <div style={{marginTop: '20px', textAlign: 'center', borderTop: '1px solid #eee', paddingTop: '20px'}}>
-        <button 
-          style={{
-            ...styles.actionButton,
-            backgroundColor: '#2D5783',
-            color: '#fff',
-            minWidth: '100px'
-          }} 
-          onClick={() => setTransactionBreakdownModal(false)}
-          onFocus={(e) => e.target.style.outline = 'none'}
-        >
-          Close
-        </button>
       </div>
     </div>
   </div>

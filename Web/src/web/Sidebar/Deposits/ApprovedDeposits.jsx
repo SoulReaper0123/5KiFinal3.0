@@ -349,10 +349,9 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
   };
 
   if (!deposits.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No approved deposits available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No approved deposits available.</p>
     );
   }
 

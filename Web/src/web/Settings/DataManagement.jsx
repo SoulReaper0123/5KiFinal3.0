@@ -1,22 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { FaDownload, FaTrashAlt, FaUndo, FaCheckCircle, FaTimes } from 'react-icons/fa';
+import { FaDownload, FaTrashAlt, FaCheckCircle, FaTimes, FaEdit, FaSave } from 'react-icons/fa';
+import { FiAlertCircle } from 'react-icons/fi';
 import ExcelJS from 'exceljs';
 import { database } from '../../../../Database/firebaseConfig';
 
 const DataManagement = () => {
   const [activeSection, setActiveSection] = useState('archiving');
+
+  // Handle section change and reset edit mode
+  const handleSectionChange = (section) => {
+    setActiveSection(section);
+    setEditMode(false); // Reset edit mode when switching sections
+  };
   const [autoArchive, setAutoArchive] = useState(false);
   const [archiveInterval, setArchiveInterval] = useState(0);
   const [lastArchiveDate, setLastArchiveDate] = useState(null);
   const [archivedData, setArchivedData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
+
   const [error, setError] = useState(null);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [isError, setIsError] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   // Fetch settings and archived data
   useEffect(() => {
@@ -339,15 +348,11 @@ const DataManagement = () => {
     }
   };
 
-  const handleSaveSettings = async () => {
-    // Show confirmation modal instead of immediately saving
-    setShowConfirmModal(true);
-  };
+  const handleSave = () => setConfirmationModalVisible(true);
 
-  const confirmSaveSettings = async () => {
+  const confirmSave = async () => {
+    setActionInProgress(true);
     try {
-      setShowConfirmModal(false);
-      setLoading(true);
       const settingsRef = database.ref('Settings/DataArchiving');
       
       await settingsRef.set({
@@ -356,23 +361,25 @@ const DataManagement = () => {
         lastArchiveDate
       });
 
-      // If interval is 0, perform immediate archive
-      if (archiveInterval === 0) {
+      // If auto archive is enabled and interval is 0, perform immediate archive
+      if (autoArchive && archiveInterval === 0) {
         await performAutoArchive();
         setSuccessMessage('Settings saved and data archived successfully!');
       } else {
         setSuccessMessage('Settings saved successfully!');
       }
 
+      setEditMode(false);
+      setConfirmationModalVisible(false);
       setIsError(false);
       setShowSuccessModal(true);
-      setLoading(false);
     } catch (error) {
       console.error('Error saving settings:', error);
       setSuccessMessage('Error saving settings: ' + error.message);
       setIsError(true);
       setShowSuccessModal(true);
-      setLoading(false);
+    } finally {
+      setActionInProgress(false);
     }
   };
 
@@ -391,12 +398,7 @@ const DataManagement = () => {
     }
   };
 
-  const filteredArchives = archivedData.filter(item => {
-    const type = item.type?.toLowerCase() || '';
-    const date = item.date?.toLowerCase() || '';
-    const query = searchQuery.toLowerCase();
-    return type.includes(query) || date.includes(query);
-  });
+
 
   if (error) {
     return (
@@ -448,6 +450,40 @@ const DataManagement = () => {
         </div>
       )}
 
+      {/* Save Confirmation Modal */}
+      {confirmationModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmSave}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Saving...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#6c757d',
+                  color: '#fff'
+                }}
+                onClick={() => setConfirmationModalVisible(false)}
+                disabled={actionInProgress}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Success Modal */}
       {showSuccessModal && (
         <div style={styles.centeredModal}>
@@ -480,7 +516,7 @@ const DataManagement = () => {
             ...styles.sidebarButton,
             ...(activeSection === 'archiving' ? styles.sidebarButtonActive : {})
           }}
-          onClick={() => setActiveSection('archiving')}
+          onClick={() => handleSectionChange('archiving')}
         >
           <span style={styles.sidebarButtonText}>Data Archiving</span>
         </button>
@@ -490,34 +526,43 @@ const DataManagement = () => {
             ...styles.sidebarButton,
             ...(activeSection === 'archived' ? styles.sidebarButtonActive : {})
           }}
-          onClick={() => setActiveSection('archived')}
+          onClick={() => handleSectionChange('archived')}
         >
           <span style={styles.sidebarButtonText}>Archived Data</span>
         </button>
       </div>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <div style={styles.contentArea}>
+        <h2 style={styles.contentTitle}>
+          {activeSection === 'archiving' && 'Data Archiving Settings'}
+          {activeSection === 'archived' && 'Archived Data Management'}
+        </h2>
+
+        {/* Data Archiving Section */}
         {activeSection === 'archiving' && (
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Data Archiving</h2>
 
             <div style={styles.formRow}>
+              <span style={styles.label}>Enable Automatic Archiving</span>
               <label style={styles.switch}>
                 <input 
                   type="checkbox" 
                   checked={autoArchive} 
                   onChange={(e) => setAutoArchive(e.target.checked)} 
+                  disabled={!editMode}
                   style={styles.switchInput}
                 />
                 <span style={{
                   ...styles.slider,
                   ...(autoArchive ? styles.sliderChecked : {})
                 }}>
-                  <span style={styles.sliderBefore}></span>
+                  <span style={{
+                    ...styles.sliderBefore,
+                    ...(autoArchive ? styles.sliderBeforeChecked : {})
+                  }}></span>
                 </span>
               </label>
-              <span style={styles.label}>Enable Automatic Archiving</span>
             </div>
 
             <div style={styles.formRow}>
@@ -528,6 +573,7 @@ const DataManagement = () => {
                 style={styles.input}
                 value={archiveInterval}
                 onChange={(e) => setArchiveInterval(e.target.value)}
+                disabled={!editMode}
                 min="0"
               />
               <span style={styles.label}>days (0 = archive now)</span>
@@ -537,35 +583,35 @@ const DataManagement = () => {
               <div style={styles.formRow}>
                 <span style={styles.label}>Last Archive:</span>
                 <span style={styles.label}>
-                  {new Date(lastArchiveDate).toLocaleString()}
+                  {new Date(lastArchiveDate).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
                 </span>
               </div>
             )}
 
             <button 
-              style={styles.saveButton}
-              onClick={handleSaveSettings}
+              style={{
+                ...styles.saveButton,
+                ...(editMode ? styles.saveBtnSaveMode : {})
+              }}
+              onClick={editMode ? handleSave : () => setEditMode(true)}
               disabled={loading}
             >
               <span style={styles.saveButtonText}>
-                {loading ? 'Processing...' : 'Save Settings'}
+                {editMode ? <FaSave style={{ marginRight: '8px' }} /> : <FaEdit style={{ marginRight: '8px' }} />}
+                {loading ? 'Processing...' : (editMode ? 'Save Settings' : 'Edit Settings')}
               </span>
             </button>
           </div>
         )}
 
+        {/* Archived Data Section */}
         {activeSection === 'archived' && (
           <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>Archived Data</h2>
-
-            <div style={styles.searchRow}>
-              <input 
-                type="text" 
-                placeholder="Search archives..." 
-                style={styles.searchInput}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
+            <div style={styles.sectionHeader}>
               <button 
                 style={styles.exportButton}
                 onClick={() => {
@@ -658,14 +704,18 @@ const DataManagement = () => {
               <span style={styles.tableHeaderText}>Actions</span>
             </div>
 
-            {filteredArchives.length === 0 ? (
+            {archivedData.length === 0 ? (
               <div style={styles.noDataMessage}>No archived data found</div>
             ) : (
-              filteredArchives.map(item => (
+              archivedData.map(item => (
                 <div key={item.id} style={styles.tableRow}>
                   <span style={styles.tableCell}>{item.type || 'Full Archive'}</span>
                   <span style={styles.tableCell}>
-                    {new Date(item.date).toLocaleDateString()}
+                    {new Date(item.date).toLocaleDateString('en-US', { 
+                      year: 'numeric', 
+                      month: 'long', 
+                      day: 'numeric' 
+                    })}
                   </span>
                   <span style={{...styles.tableCell, ...styles.archivedStatus}}>{item.status}</span>
                   <span style={styles.tableCell}>
@@ -698,15 +748,6 @@ const DataManagement = () => {
                     ) : 'N/A'}
                   </span>
                   <div style={styles.actions}>
-                    <button 
-                      style={styles.restoreButton}
-                      onClick={() => {
-                        // Implement restore functionality if needed
-                        console.log('Restore archive:', item.id);
-                      }}
-                    >
-                      <FaUndo style={styles.actionIcon} />
-                    </button>
                     <button 
                       style={styles.deleteButton}
                       onClick={() => handleDeleteArchive(item.id)}
@@ -763,6 +804,16 @@ const styles = {
     flex: 1,
     padding: '30px',
     backgroundColor: '#fff',
+    minWidth: 0,
+    overflow: 'auto',
+  },
+  contentTitle: {
+    fontSize: '24px',
+    fontWeight: '600',
+    marginBottom: '30px',
+    color: '#2D5783',
+    borderBottom: '2px solid #f0f7ff',
+    paddingBottom: '15px',
   },
   section: {
     marginBottom: '30px',
@@ -815,6 +866,10 @@ const styles = {
     backgroundColor: 'white',
     transition: '.4s',
     borderRadius: '50%',
+    transform: 'translateX(0px)',
+  },
+  sliderBeforeChecked: {
+    transform: 'translateX(26px)',
   },
   label: {
     fontSize: '14px',
@@ -844,6 +899,11 @@ const styles = {
   },
   saveButtonText: {
     color: 'white',
+    display: 'flex',
+    alignItems: 'center',
+  },
+  saveBtnSaveMode: {
+    backgroundColor: '#28a745',
   },
   searchRow: {
     display: 'flex',

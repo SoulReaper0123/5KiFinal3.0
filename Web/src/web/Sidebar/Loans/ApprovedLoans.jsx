@@ -359,10 +359,9 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
   };
 
   if (!loans.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No approved loans available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No approved loans available.</p>
     );
   }
 

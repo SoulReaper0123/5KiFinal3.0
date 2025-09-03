@@ -670,7 +670,6 @@ const Transactions = () => {
                           <span className="transaction-type">{transaction.type}</span>
                           <span className="transaction-date">
                             {transaction.dateApproved || transaction.dateApplied || 'No date'}
-                            {transaction.timeApproved && ` at ${transaction.timeApproved}`}
                           </span>
                         </div>
                         <div className="transaction-detail">

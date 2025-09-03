@@ -690,10 +690,9 @@ const processDatabaseApprove = async (withdrawal) => {
   }
 
   if (!withdrawals.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No membership withdrawal requests available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No membership withdrawal requests available.</p>
     );
   }
 

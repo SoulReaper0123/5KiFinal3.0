@@ -1008,10 +1008,9 @@ We recommend settling outstanding balances first before reapplying. Once cleared
   };
 
   if (!loans.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No loan applications available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No loan applications available.</p>
     );
   }
 

@@ -500,9 +500,8 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
   };
 
   if (!members || members.length === 0) return (
-    <div style={styles.loadingView}>
-      <p style={styles.noDataMessage}>No member data available.</p>
-    </div>
+    // Show only the text, no container box
+    <p style={styles.noDataMessage}>No member data available.</p>
   );
 
   return (

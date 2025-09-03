@@ -19,7 +19,7 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { auth, database } from '../../firebaseConfig';
 import { ref as dbRef, get } from 'firebase/database';
-import { generateAIResponse, checkAIServiceStatus } from '../../services/firebaseAI';
+import { generateEnhancedAIResponse, checkEnhancedAIServiceStatus } from '../../services/enhancedFirebaseAI';
 
 // Firebase AI is now initialized in the service
 console.log('Using Firebase AI with Gemini 2.0 Flash');
@@ -274,7 +274,7 @@ export default function Bot() {
     const checkFirebaseAI = async () => {
       console.log('Checking Firebase AI service...');
       try {
-        const status = await checkAIServiceStatus();
+        const status = await checkEnhancedAIServiceStatus();
         if (status.available) {
           setUseAI(true);
           console.log('Firebase AI connected successfully:', status.model);
@@ -438,7 +438,7 @@ ${userDataContext}`;
         const prompt = `${context}\n\nUser question: ${userQuery}`;
         
         console.log('Sending query to Google AI...');
-        const result = await generateAIResponse(prompt, {
+        const result = await generateEnhancedAIResponse(userQuery, userEmail, {
           maxOutputTokens: 512,
           temperature: 0.7
         });

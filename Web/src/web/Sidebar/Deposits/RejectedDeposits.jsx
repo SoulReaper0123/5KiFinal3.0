@@ -349,10 +349,9 @@ const RejectedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
   };
 
   if (!deposits.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No rejected deposits available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No rejected deposits available.</p>
     );
   }
 

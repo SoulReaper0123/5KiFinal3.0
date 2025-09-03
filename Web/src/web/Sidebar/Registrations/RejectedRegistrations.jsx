@@ -339,9 +339,7 @@ const RejectedRegistrations = ({
   };
 
   if (!rejectedRegistrations.length) return (
-    <div style={styles.loadingView}>
-      <p style={styles.noDataMessage}>No rejected registration applications available.</p>
-    </div>
+    <p style={styles.noDataMessage}>No rejected registration applications available.</p>
   );
 
   return (

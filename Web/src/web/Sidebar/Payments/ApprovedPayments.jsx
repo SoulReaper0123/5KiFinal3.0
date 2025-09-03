@@ -372,10 +372,9 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
   };
 
   if (!payments.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No approved payments available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No approved payments available.</p>
     );
   }
 

@@ -281,9 +281,11 @@ const styles = {
     position: 'relative',
     width: '90%',
     maxWidth: '800px',
+    height: '90vh',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   largeImage: {
     maxWidth: '100%',
@@ -748,6 +750,58 @@ const Registrations = ({
     });
   };
 
+  // Function to extract name from ID text
+  const extractNameFromIDText = (text) => {
+    if (!text) return null;
+    
+    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
+    
+    // Common patterns for names in Philippine IDs
+    const namePatterns = [
+      // Look for "NAME:" or "FULL NAME:" followed by the name
+      /(?:FULL\s+)?NAME\s*[:\-]\s*(.+)/i,
+      // Look for "SURNAME, GIVEN NAME" pattern
+      /([A-Z][A-Z\s]+),\s*([A-Z][A-Z\s]+)/,
+      // Look for lines with multiple capitalized words (likely names)
+      /^([A-Z][A-Z\s]{2,}\s+[A-Z][A-Z\s]{2,})$/
+    ];
+    
+    for (const line of lines) {
+      for (const pattern of namePatterns) {
+        const match = line.match(pattern);
+        if (match) {
+          if (match[1] && match[2]) {
+            // Surname, Given name format
+            return `${match[2].trim()} ${match[1].trim()}`;
+          } else if (match[1]) {
+            // Single capture group
+            return match[1].trim();
+          }
+        }
+      }
+    }
+    
+    // Fallback: look for the longest line with capitalized words
+    const potentialNames = lines.filter(line => 
+      line.length > 5 && 
+      line.length < 50 && 
+      /^[A-Z][A-Z\s]+$/.test(line) &&
+      !line.includes('REPUBLIC') &&
+      !line.includes('PHILIPPINES') &&
+      !line.includes('DRIVER') &&
+      !line.includes('LICENSE')
+    );
+    
+    if (potentialNames.length > 0) {
+      // Return the longest potential name
+      return potentialNames.reduce((longest, current) => 
+        current.length > longest.length ? current : longest
+      );
+    }
+    
+    return null;
+  };
+
   const manualVerifyID = async (imageUrl, label) => {
     // For Valid ID Front: run OCR and display only extracted text
     // For other labels, keep existing minimal status
@@ -760,22 +814,26 @@ const Registrations = ({
     try {
       const loadedImg = await loadImageWithCORS(imageUrl);
 
-      // If this is the front side, extract text using Tesseract
+      // If this is the front side, extract only the name using Tesseract
       if (label && label.toLowerCase().includes('front')) {
         try {
           const result = await Tesseract.recognize(loadedImg, 'eng');
           const text = (result?.data?.text || '').trim();
+          
+          // Extract name from the text
+          const extractedName = extractNameFromIDText(text);
+          
           setValidationStatus(prev => ({
             ...prev,
             [label]: {
-              status: text ? 'valid' : 'invalid',
-              message: text ? text : 'No text detected'
+              status: extractedName ? 'valid' : 'invalid',
+              message: extractedName ? `Name: ${extractedName}` : 'No name detected'
             }
           }));
         } catch (ocrErr) {
           setValidationStatus(prev => ({
             ...prev,
-            [label]: { status: 'error', message: 'No text detected' }
+            [label]: { status: 'error', message: 'No name detected' }
           }));
         }
       } else {
@@ -1823,7 +1881,14 @@ const processDatabaseApprove = async (reg) => {
     }
 
     return (
-      <div>
+      <div style={{ 
+        textAlign: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        maxWidth: '300px',
+        wordWrap: 'break-word'
+      }}>
         <div style={{ ...styles.validationText, ...statusStyle }}>
           {status.message}
         </div>
@@ -1853,9 +1918,8 @@ const processDatabaseApprove = async (reg) => {
   };
 
   if (!registrations.length) return (
-    <div style={styles.loadingView}>
-      <p style={styles.noDataMessage}>No registration applications available.</p>
-    </div>
+    // Show only the text, no container box
+    <p style={styles.noDataMessage}>No registration applications available.</p>
   );
 
   return (
@@ -2313,17 +2377,34 @@ const processDatabaseApprove = async (reg) => {
             >
               <FaTimes />
             </button>
-            <div style={styles.imageViewerHeader}>
-              <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+            <div style={{ 
+              position: 'fixed', 
+              bottom: '20px', 
+              left: '50%', 
+              transform: 'translateX(-50%)',
+              backgroundColor: 'rgba(0,0,0,0.8)',
+              padding: '15px 20px',
+              borderRadius: '8px',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: '10px',
+              zIndex: 2001
+            }}>
               <button
-                style={styles.verifyButton}
+                style={{
+                  ...styles.verifyButton,
+                  minWidth: '120px',
+                  padding: '10px 20px'
+                }}
                 onClick={handleManualVerification}
                 disabled={(currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof')) ? isValidating : (!modelsLoaded || isValidating)}
                 onFocus={(e) => e.target.style.outline = 'none'}
               >
                 {isValidating ? (
                   <>
-                    <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+                    <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
                     Verifying...
                   </>
                 ) : (

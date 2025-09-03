@@ -875,10 +875,9 @@ const WithdrawApplications = ({
   };
 
   if (!withdraws.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No withdrawal applications available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No withdrawal applications available.</p>
     );
   }
 

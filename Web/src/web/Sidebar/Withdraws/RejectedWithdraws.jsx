@@ -390,10 +390,9 @@ const RejectedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
   };
 
   if (!withdraws.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No rejected withdrawals available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No rejected withdrawals available.</p>
     );
   }
 

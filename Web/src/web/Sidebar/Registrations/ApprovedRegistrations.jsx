@@ -339,9 +339,8 @@ const ApprovedRegistrations = ({
   };
 
   if (!approvedRegistrations.length) return (
-    <div style={styles.loadingView}>
-      <p style={styles.noDataMessage}>No approved registration applications available.</p>
-    </div>
+    // Show only the text, no container box
+    <p style={styles.noDataMessage}>No approved registration applications available.</p>
   );
 
   return (

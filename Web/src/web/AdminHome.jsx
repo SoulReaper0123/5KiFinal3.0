@@ -44,7 +44,7 @@ import {
 import { GrTransaction } from "react-icons/gr";
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { database } from '../../../Database/firebaseConfig';
-import { generateAdminAIResponse, checkAdminAIServiceStatus } from '../services/adminAI';
+import { generateEnhancedAdminAIResponse } from '../services/enhancedAdminAI';
 
 const AdminHome = () => {
   const [activeSection, setActiveSection] = useState('dashboard');
@@ -507,7 +507,7 @@ const handleAIQuery = async (userMessage) => {
     console.log('Processing admin AI query:', userMessage);
     
     // Use the enhanced admin AI service
-    const result = await generateAdminAIResponse(userMessage);
+    const result = await generateEnhancedAdminAIResponse(userMessage);
     
     if (!result.success) {
       throw new Error(result.message || 'AI service unavailable');

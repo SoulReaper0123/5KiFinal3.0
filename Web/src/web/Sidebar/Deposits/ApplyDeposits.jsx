@@ -309,9 +309,11 @@ const styles = {
     position: 'relative',
     width: '90%',
     maxWidth: '800px',
+    height: '90vh',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center'
+    alignItems: 'center',
+    justifyContent: 'center'
   },
   largeImage: {
     maxWidth: '100%',
@@ -528,12 +530,23 @@ const ApplyDeposits = ({
   const getValidationText = (label) => {
     const status = validationStatus[label];
     if (!status) return null;
-    const color = status.status === 'valid' ? 'green'
-      : (status.status === 'invalid' || status.status === 'error') ? 'red'
-      : status.status === 'partial' ? '#e67e22'
-      : '#666';
+    const color = status.status === 'valid' ? '#4CAF50'
+      : (status.status === 'invalid' || status.status === 'error') ? '#f44336'
+      : status.status === 'partial' ? '#ff9800'
+      : status.status === 'verifying' ? '#2196F3'
+      : '#fff';
     return (
-      <div style={{ marginTop: 6, fontSize: 12, color }}>
+      <div style={{ 
+        marginTop: 8, 
+        fontSize: 13, 
+        color: color,
+        textAlign: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        maxWidth: '300px',
+        wordWrap: 'break-word'
+      }}>
         {status.message}
       </div>
     );
@@ -931,10 +944,9 @@ const ApplyDeposits = ({
   };
 
   if (!deposits.length) {
+    // Show only the text, no container box
     return (
-      <div style={styles.loadingView}>
-        <p style={styles.noDataMessage}>No deposit applications available.</p>
-      </div>
+      <p style={styles.noDataMessage}>No deposit applications available.</p>
     );
   }
 
@@ -1310,12 +1322,38 @@ const ApplyDeposits = ({
             </button>
             <p style={styles.imageViewerLabel}>{currentImage.label}</p>
             {currentImage?.label === 'Proof of Deposit' && (
-              <div style={{ position: 'absolute', bottom: 24, left: 24 }}>
+              <div style={{ 
+                position: 'fixed', 
+                bottom: '20px', 
+                left: '50%', 
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                padding: '15px 20px',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                zIndex: 2001
+              }}>
                 <button
-                  style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
+                  style={{ 
+                    ...styles.actionButton, 
+                    backgroundColor: '#2D5783', 
+                    color: '#fff',
+                    minWidth: '100px',
+                    padding: '10px 20px'
+                  }}
                   onClick={() => verifyDepositProof(currentImage.url, 'Proof of Deposit')}
                 >
-                  Verify
+                  {validationStatus['Proof of Deposit']?.status === 'verifying' ? (
+                    <>
+                      <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify Deposit'
+                  )}
                 </button>
                 {getValidationText('Proof of Deposit')}
               </div>
