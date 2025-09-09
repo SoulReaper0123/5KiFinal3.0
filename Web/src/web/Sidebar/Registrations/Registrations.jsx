@@ -750,55 +750,180 @@ const Registrations = ({
     });
   };
 
-  // Function to extract name from ID text
-  const extractNameFromIDText = (text) => {
-    if (!text) return null;
-    
-    const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-    
-    // Common patterns for names in Philippine IDs
-    const namePatterns = [
-      // Look for "NAME:" or "FULL NAME:" followed by the name
-      /(?:FULL\s+)?NAME\s*[:\-]\s*(.+)/i,
-      // Look for "SURNAME, GIVEN NAME" pattern
-      /([A-Z][A-Z\s]+),\s*([A-Z][A-Z\s]+)/,
-      // Look for lines with multiple capitalized words (likely names)
-      /^([A-Z][A-Z\s]{2,}\s+[A-Z][A-Z\s]{2,})$/
-    ];
-    
-    for (const line of lines) {
-      for (const pattern of namePatterns) {
-        const match = line.match(pattern);
-        if (match) {
-          if (match[1] && match[2]) {
-            // Surname, Given name format
-            return `${match[2].trim()} ${match[1].trim()}`;
-          } else if (match[1]) {
-            // Single capture group
-            return match[1].trim();
-          }
+  // Image preprocessing for OCR: scale up, grayscale, contrast/threshold
+  const preprocessForOCR = (img, scale = 2, binary = false) => {
+    try {
+      const srcW = img.width || img.naturalWidth || 0;
+      const srcH = img.height || img.naturalHeight || 0;
+      if (!srcW || !srcH) return img; // fallback if dimensions missing
+
+      // Ensure minimum width for better OCR
+      const minTargetW = Math.max(1200, Math.floor(srcW * scale));
+      const factor = minTargetW / srcW;
+      const targetW = Math.floor(srcW * factor);
+      const targetH = Math.floor(srcH * factor);
+
+      const canvas = document.createElement('canvas');
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext('2d');
+
+      // Draw scaled image
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+
+      // Get pixels and apply grayscale + enhancement
+      const imageData = ctx.getImageData(0, 0, targetW, targetH);
+      const d = imageData.data;
+
+      // contrast factor: moderate + threshold if binary
+      const contrast = binary ? 80 : 50; // 0..100
+      const c = (259 * (contrast + 255)) / (255 * (259 - contrast));
+      const thresh = 180; // threshold level when binary
+
+      for (let i = 0; i < d.length; i += 4) {
+        const r = d[i], g = d[i + 1], b = d[i + 2];
+        let y = 0.299 * r + 0.587 * g + 0.114 * b; // grayscale
+        // apply contrast
+        y = c * (y - 128) + 128;
+        if (binary) {
+          y = y >= thresh ? 255 : 0;
+        }
+        d[i] = d[i + 1] = d[i + 2] = Math.max(0, Math.min(255, y));
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    } catch (e) {
+      console.warn('preprocessForOCR failed, using original image', e);
+      return img;
+    }
+  };
+  
+  // Function to extract name from ID text (robust for PH IDs like LTO Driver's License)
+  const extractNameFromIDText = (rawText) => {
+    if (!rawText) return null;
+
+    // Normalize common OCR artifacts
+    const text = rawText.replace(/[|]/g, 'I');
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    const upperLines = lines.map(l => l.toUpperCase());
+
+    const clean = (s) => (s || '')
+      .toUpperCase()
+      .replace(/[^A-Z,'\-\s]/g, ' ') // keep letters, comma, hyphen, apostrophe
+      .replace(/\s{2,}/g, ' ')
+      .trim();
+
+    const toTitleCase = (name) => {
+      const keepUpper = new Set(['MC', 'MAC']);
+      const minor = new Set(['DE', 'DEL', 'DA', 'DI', 'LA', 'LE', 'VON', 'VAN', 'DY', 'DU']);
+      return name.split(/\s+/).map(w => {
+        if (keepUpper.has(w)) return w;
+        if (minor.has(w)) return w.charAt(0) + w.slice(1).toLowerCase();
+        return w.charAt(0) + w.slice(1).toLowerCase();
+      }).join(' ');
+    };
+
+    const plausible = (s) => {
+      const t = (s || '').split(/\s+/).filter(Boolean);
+      if (t.length < 2) return false; // need at least first + last
+      if ((s || '').length < 8) return false;
+      if (t.some(w => /\d/.test(w))) return false;
+      return true;
+    };
+
+    // 1) PhilID layout: APELYIDO/LAST NAME, MGA PANGALAN/GIVEN NAMES, GITNANG APELYIDO/MIDDLE NAME
+    let philIdx = upperLines.findIndex(l => /(APELYIDO|LAST\s*NAME)/.test(l));
+    if (philIdx !== -1) {
+      // collect next few uppercase content lines that are not label lines
+      const collected = [];
+      for (let j = philIdx + 1; j < Math.min(philIdx + 8, upperLines.length); j++) {
+        const raw = upperLines[j];
+        if (/(APELYIDO|LAST\s*NAME|MGA\s*PANGALAN|GIVEN\s*NAMES|GITNANG\s*APELYIDO|MIDDLE\s*NAME|DATE\s*OF\s*BIRTH|ADDRESS|TIRAHAN)/.test(raw)) continue;
+        let cand = clean(raw);
+        if (!cand) continue;
+        // stop if we hit obvious non-name content
+        if (/(PHILIPPINES|REPUBLIC|DRIVER|LICENSE|NUMBER|SEX|WEIGHT|HEIGHT|EYES|CODE|EXPIRATION|AGENCY|BIRTH)/.test(cand)) break;
+        // Only accept lines that look like names
+        if (/^[A-Z' \-]+$/.test(cand)) collected.push(cand);
+        if (collected.length >= 3) break;
+      }
+      if (collected.length >= 1) {
+        const last = collected[0];
+        const given = collected[1] || '';
+        const middle = collected[2] || '';
+        const result = `${given} ${middle} ${last}`.replace(/\s+/g, ' ').trim();
+        if (plausible(result)) return toTitleCase(result);
+      }
+    }
+
+    // 2) LTO layout cue: line contains both LAST NAME and FIRST NAME on same line
+    let idx = upperLines.findIndex(l => /LAST\s*NAME.*FIRST\s*NAME/.test(l));
+    if (idx !== -1) {
+      for (let j = idx + 1; j < Math.min(idx + 4, upperLines.length); j++) {
+        let cand = clean(upperLines[j]);
+        if (!cand) continue;
+        // Handle case where surname line ends with comma and given is on next line
+        if (/,$/.test(cand) && upperLines[j + 1]) {
+          cand = `${cand.replace(/,+$/, '')}, ${clean(upperLines[j + 1])}`;
+        }
+        if (cand.includes(',')) {
+          const [last, rest] = cand.split(',').map(s => clean(s));
+          const result = `${rest} ${last}`.replace(/\s+/g, ' ').trim();
+          if (plausible(result)) return toTitleCase(result);
+        } else if (plausible(cand)) {
+          return toTitleCase(cand);
         }
       }
     }
-    
-    // Fallback: look for the longest line with capitalized words
-    const potentialNames = lines.filter(line => 
-      line.length > 5 && 
-      line.length < 50 && 
-      /^[A-Z][A-Z\s]+$/.test(line) &&
-      !line.includes('REPUBLIC') &&
-      !line.includes('PHILIPPINES') &&
-      !line.includes('DRIVER') &&
-      !line.includes('LICENSE')
-    );
-    
-    if (potentialNames.length > 0) {
-      // Return the longest potential name
-      return potentialNames.reduce((longest, current) => 
-        current.length > longest.length ? current : longest
-      );
+
+    // 2) Explicit comma pattern anywhere: "LAST, FIRST [MIDDLE ...]"
+    for (const l of upperLines) {
+      const candLine = clean(l);
+      if (/(APELYIDO|LAST\s*NAME|GIVEN\s*NAMES|MIDDLE\s*NAME|ADDRESS|TIRAHAN|DATE\s*OF\s*BIRTH|DRIVER|LICENSE)/.test(candLine)) continue;
+      if (candLine.includes(',')) {
+        const parts = candLine.split(',');
+        const last = clean(parts.shift());
+        const rest = clean(parts.join(' '));
+        const result = `${rest} ${last}`.replace(/\s+/g, ' ').trim();
+        if (plausible(result)) return toTitleCase(result);
+      }
     }
-    
+
+    // 3) Combine two consecutive lines when first ends with a comma
+    for (let i = 0; i < upperLines.length - 1; i++) {
+      const a = clean(upperLines[i]);
+      const b = clean(upperLines[i + 1]);
+      if (/(APELYIDO|LAST\s*NAME|ADDRESS|TIRAHAN|DRIVER|LICENSE)/.test(a)) continue;
+      if (a.endsWith(',') && b) {
+        const cand = `${a.replace(/,+$/, '')}, ${b}`;
+        const [last, rest] = cand.split(',').map(s => clean(s));
+        const result = `${rest} ${last}`.trim();
+        if (plausible(result)) return toTitleCase(result);
+      }
+    }
+
+    // 4) Fallback: choose a reasonable uppercase multi-word line, avoid common non-name words
+    const blacklist = /(REPUBLIC|PHILIPPINES|DEPARTMENT|TRANSPORTATION|OFFICE|DRIVER|LICENSE|DL|CONDITIONS|NATIONALITY|SEX|WEIGHT|HEIGHT|EYES|ADDRESS|TIRAHAN|DATE|BIRTH|LICENSEE|SIGNATURE|ASSISTANT|SECRETARY|AGENCY|CODE|EXPIRATION|NUMBER|AGENCY|G06|OO\+|BLACK)/;
+    const candidates = upperLines
+      .map(clean)
+      .filter(l => l && /^[A-Z\s'\-]+$/.test(l) && !blacklist.test(l))
+      .filter(l => {
+        const words = l.split(/\s+/).filter(Boolean);
+        const minorSet = new Set(['DE','DEL','DA','DI','LA','LE','VON','VAN','DY','DU']);
+        const longWords = words.filter(w => w.length >= 3 || minorSet.has(w));
+        const singleLetters = words.filter(w => w.length === 1).length;
+        if (singleLetters / Math.max(words.length, 1) > 0.4) return false;
+        return words.length >= 2 && words.length <= 6 && longWords.length >= 2;
+      })
+      .sort((a, b) => (b.split(' ').length - a.split(' ').length) || (b.length - a.length));
+
+    if (candidates.length) {
+      const best = candidates[0];
+      if (plausible(best)) return toTitleCase(best);
+    }
+
     return null;
   };
 
@@ -817,8 +942,20 @@ const Registrations = ({
       // If this is the front side, extract only the name using Tesseract
       if (label && label.toLowerCase().includes('front')) {
         try {
-          const result = await Tesseract.recognize(loadedImg, 'eng');
-          const text = (result?.data?.text || '').trim();
+          // Preprocess and run OCR; retry with binary threshold if needed
+          const pre1 = preprocessForOCR(loadedImg, 2.2, false);
+          let { data: { text: ocrText1 } } = await Tesseract.recognize(pre1, 'eng', {
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,-'
+          });
+          let text = (ocrText1 || '').trim();
+
+          if (!text || text.length < 8) {
+            const pre2 = preprocessForOCR(loadedImg, 2.4, true);
+            const { data: { text: ocrText2 } } = await Tesseract.recognize(pre2, 'eng', {
+              tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,-'
+            });
+            text = (ocrText2 || '').trim();
+          }
           
           // Extract name from the text
           const extractedName = extractNameFromIDText(text);
@@ -1545,7 +1682,8 @@ const processDatabaseApprove = async (reg) => {
         dateApplied: rest?.dateCreated || rest?.dateApplied || '',
         dateApproved: approvedDate,
         approvedTime: approvedTime,
-        status: 'completed',
+        timestamp: now.getTime(),
+        status: 'approved',
         memberId: parseInt(samePersonCheck.id),
         firstName,
         lastName,
@@ -1653,6 +1791,7 @@ const processDatabaseApprove = async (reg) => {
       dateApplied: rest?.dateCreated || rest?.dateApplied || '',
       dateApproved: approvedDate,
       approvedTime: approvedTime,
+      timestamp: now.getTime(),
       status: 'completed',
       memberId: newId,
       firstName,
@@ -2392,29 +2531,34 @@ const processDatabaseApprove = async (reg) => {
               gap: '10px',
               zIndex: 2001
             }}>
-              <button
-                style={{
-                  ...styles.verifyButton,
-                  minWidth: '120px',
-                  padding: '10px 20px'
-                }}
-                onClick={handleManualVerification}
-                disabled={(currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof')) ? isValidating : (!modelsLoaded || isValidating)}
-                onFocus={(e) => e.target.style.outline = 'none'}
-              >
-                {isValidating ? (
-                  <>
-                    <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
-                    Verifying...
-                  </>
-                ) : (
-                  <>
-                    {currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof') ? 'Verify Payment' : 
-                     currentImage.label?.includes('ID') ? 'Verify ID' : 'Verify Face'}
-                  </>
-                )}
-              </button>
-              {getValidationText(currentImage.label)}
+              {/* Hide Verify for Valid ID Back and Selfie with ID */}
+              {!(currentImage.label?.toLowerCase().includes('valid id back') || currentImage.label?.toLowerCase().includes('selfie with id')) && (
+                <>
+                  <button
+                    style={{
+                      ...styles.verifyButton,
+                      minWidth: '120px',
+                      padding: '10px 20px'
+                    }}
+                    onClick={handleManualVerification}
+                    disabled={(currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof')) ? isValidating : (!modelsLoaded || isValidating)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    {isValidating ? (
+                      <>
+                        <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
+                        Verifying...
+                      </>
+                    ) : (
+                      <>
+                        {currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof') ? 'Verify Payment' : 
+                         currentImage.label?.includes('ID') ? 'Verify ID' : 'Verify Face'}
+                      </>
+                    )}
+                  </button>
+                  {getValidationText(currentImage.label)}
+                </>
+              )}
             </div>
           </div>
         </div>

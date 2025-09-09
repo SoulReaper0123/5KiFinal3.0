@@ -42,7 +42,7 @@ const Transactions = () => {
         const data = snapshot.val();
         const parsedTransactions = parseTransactions(data);
 
-        const filteredTransactions = parsedTransactions.filter(transaction => transaction.email === email);
+        const filteredTransactions = parsedTransactions.filter(transaction => (transaction.email || '').toLowerCase() === (email || '').toLowerCase());
 
         // Sort by timestamp in descending order (newest first)
         filteredTransactions.sort((a, b) => b.timestamp - a.timestamp);
@@ -143,9 +143,9 @@ const Transactions = () => {
               transactionData.withdrawOption = details.withdrawOption;
               break;
             case 'Registrations':
-              transactionData.amount = parseFloat(details.amount || 0).toFixed(2);
-              transactionData.label = 'Registration Fee';
-              transactionData.description = details.description;
+              transactionData.amount = parseFloat(details.amount || details.registrationFee || 0).toFixed(2);
+              transactionData.label = 'Registration';
+              transactionData.description = details.description || 'Registration application';
               break;
             default:
               transactionData.amount = 0;
@@ -206,7 +206,9 @@ const Transactions = () => {
       <View style={styles.transactionInfo}>
         <Text style={styles.transactionTitle}>{transaction.label}</Text>
         <Text style={styles.transactionDate}>
-          {formatDate(transaction.dateApproved || transaction.dateApplied)}
+          {(transaction.status && transaction.status.toLowerCase() === 'pending')
+            ? `Applied: ${formatDate(transaction.dateApplied)}`
+            : `Approved: ${formatDate(transaction.dateApproved || transaction.dateApplied)}`}
         </Text>
       </View>
       <Text style={[

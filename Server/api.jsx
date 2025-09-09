@@ -33,6 +33,35 @@ export const sendAdminDeleteData = async (adminData) => {
   }
 };
 
+// Co-Admin Emails
+export const sendCoAdminCredentialsEmail = async (adminData) => {
+  try {
+    const response = await axios.post(`${API_URL}/send-coadmin-email`, {
+      ...adminData,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending co-admin credentials email:', error);
+    throw error;
+  }
+};
+
+export const sendCoAdminDeleteData = async (adminData) => {
+  try {
+    const response = await axios.post(`${API_URL}/send-delete-coadmin-email`, {
+      ...adminData,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending co-admin delete email:', error);
+    throw error;
+  }
+};
+
 // Two-Factor Authentication
 export const sendVerificationCode = async (emailData) => {
   try {

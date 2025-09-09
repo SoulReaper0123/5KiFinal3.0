@@ -233,12 +233,15 @@ const Register = () => {
     dateOfBirth: '',
     placeOfBirth: '',
     address: '',
-    governmentId: ''
+    governmentId: '',
+    registrationFee: ''
   });
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
   const [validIdBackFile, setValidIdBackFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
   const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
+  const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
+  const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
   const [uploading, setUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -780,6 +783,17 @@ const Register = () => {
 
   useEffect(() => {
     fetchAllData();
+    // fetch minimum registration fee from Settings if available
+    (async () => {
+      try {
+        const feeSnap = await database.ref('Settings/RegistrationMinimumFee').once('value');
+        const val = feeSnap.val();
+        const num = parseFloat(val);
+        if (!isNaN(num)) setMinRegistrationFee(num);
+      } catch (e) {
+        console.warn('Failed to fetch minimum registration fee, using default.', e);
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -919,12 +933,14 @@ const Register = () => {
       dateOfBirth: '',
       placeOfBirth: '',
       address: '',
-      governmentId: ''
+      governmentId: '',
+      registrationFee: ''
     });
     setValidIdFrontFile(null);
     setValidIdBackFile(null);
     setSelfieFile(null);
     setSelfieWithIdFile(null);
+    setProofOfPaymentFile(null);
   };
 
   const handleInputChange = (name, value) => {
@@ -992,6 +1008,18 @@ const Register = () => {
       setErrorModalVisible(true);
       return false;
     }
+    // Amount and proof validation (like App RegistrationFeePage)
+    const amt = parseFloat(formData.registrationFee);
+    if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
+      setErrorMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!proofOfPaymentFile) {
+      setErrorMessage('Proof of payment is required');
+      setErrorModalVisible(true);
+      return false;
+    }
     return true;
   };
 
@@ -1012,6 +1040,8 @@ const Register = () => {
       throw error;
     }
   };
+  
+  const toPeso = (n) => `₱${Number(n).toFixed(2)}`;
 
   const submitManualMember = async () => {
     setConfirmModalVisible(false);
@@ -1019,7 +1049,7 @@ const Register = () => {
 
     try {
       const password = generateRandomPassword();
-      const { email, firstName, middleName, lastName, ...rest } = pendingAdd;
+      const { email, firstName, middleName, lastName, registrationFee, ...rest } = pendingAdd;
       
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const userId = userCredential.user.uid;
@@ -1065,6 +1095,12 @@ const Register = () => {
         `member_docs/${newId}/selfie_with_id_${Date.now()}`
       );
 
+      // Upload proof of payment
+      const proofOfPaymentUrl = await uploadImageToStorage(
+        proofOfPaymentFile,
+        `member_docs/${newId}/registration_payment_proof_${Date.now()}`
+      );
+
       const memberData = {
         id: newId,
         authUid: userId,
@@ -1081,7 +1117,9 @@ const Register = () => {
         validIdFront: validIdFrontUrl,
         validIdBack: validIdBackUrl,
         selfie: selfieUrl,
-        selfieWithId: selfieWithIdUrl
+        selfieWithId: selfieWithIdUrl,
+        registrationFee: parseFloat(registrationFee),
+        registrationPaymentProof: proofOfPaymentUrl
       };
 
       await database.ref(`Members/${newId}`).set(memberData);
@@ -1483,6 +1521,22 @@ const Register = () => {
                         />
                       </label>
                     </div>
+
+                    {/* Registration Fee moved to left column */}
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Registration Fee (min {toPeso(minRegistrationFee)})<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder={`Enter amount (min ${toPeso(minRegistrationFee)})`}
+                        value={formData.registrationFee}
+                        onChange={(e) => handleInputChange('registrationFee', e.target.value)}
+                        type="number"
+                        min={minRegistrationFee}
+                        step="0.01"
+                      />
+                    </div>
                   </div>
 
                   <div style={styles.formColumn}>
@@ -1600,6 +1654,23 @@ const Register = () => {
                           type="file"
                           onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
                           accept="image/*"
+                        />
+                      </label>
+                    </div>
+
+
+
+                    <div style={styles.formGroup}>
+                      <label style={styles.formLabel}>
+                        Proof of Payment<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <label style={styles.fileInputLabel}>
+                        {proofOfPaymentFile ? proofOfPaymentFile.name : 'Choose file'}
+                        <input
+                          style={styles.fileInput}
+                          type="file"
+                          onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                          accept="image/*,application/pdf"
                         />
                       </label>
                     </div>

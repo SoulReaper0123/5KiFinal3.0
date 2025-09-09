@@ -158,8 +158,8 @@ export default function Inbox() {
               displayDate = getRawDateFromFirebase(details.dateRejected);
               timestamp = getReliableTimestamp(details.dateRejected, details);
             } else {
-              // For pending items, use dateApplied if available, otherwise current time
-              displayDate = 'Pending approval';
+              // For pending items, show the date applied instead of a placeholder
+              displayDate = getRawDateFromFirebase(details.dateApplied);
               timestamp = getReliableTimestamp(details.dateApplied, details);
             }
 
@@ -205,9 +205,14 @@ export default function Inbox() {
                 title = 'Payment';
                 message = getStatusMessage(status, `₱${amount}`, 'payment', rejectionReason);
                 break;
+              case 'Registrations':
+                amount = parseFloat(details.amount || 0).toFixed(2);
+                title = 'Registration';
+                message = getStatusMessage(status, `₱${amount}`, 'registration', rejectionReason);
+                break;
               default:
-                title = 'Transaction';
-                message = 'Transaction update';
+                title = type;
+                message = `${type} update`;
             }
 
             parsed.push({

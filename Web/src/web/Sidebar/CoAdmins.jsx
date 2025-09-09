@@ -13,7 +13,7 @@ import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
 import { database, auth, storage } from '../../../../Database/firebaseConfig';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { sendAdminCredentialsEmail, sendAdminDeleteData } from '../../../../Server/api';
+import { sendCoAdminCredentialsEmail, sendCoAdminDeleteData } from '../../../../Server/api';
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -844,7 +844,6 @@ const CoAdmins = () => {
       });
 
       await auth.currentUser.updatePassword(password);
-      await auth.currentUser.sendEmailVerification();
 
       await database.ref(`Users/CoAdmin/${newId}`).set({
         id: newId,
@@ -926,7 +925,7 @@ const CoAdmins = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('CoAdmins');
 
-      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added', 'Time Added'];
+      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added'];
       worksheet.addRow(headers);
 
       filteredData.forEach(admin => {
@@ -938,7 +937,6 @@ const CoAdmins = () => {
           admin.email,
           admin.contactNumber,
           admin.dateAdded,
-          admin.timeAdded || ''
         ];
         worksheet.addRow(row);
       });
@@ -969,33 +967,48 @@ const CoAdmins = () => {
     setSuccessVisible(false);
   
     if (pendingAdd) {
-      sendAdminCredentialsEmail({
+      // Send credentials email
+      sendCoAdminCredentialsEmail({
         email: pendingAdd.email,
         password: pendingAdd.password,
         firstName: pendingAdd.firstName,
         middleName: pendingAdd.middleName,
         lastName: pendingAdd.lastName
-      }).catch(error => console.error('Error sending admin credentials email:', error));
+      }).catch(error => console.error('Error sending co-admin credentials email:', error));
       
+      // Reset all form fields like in Admins.jsx and close modal
       setFirstName('');
       setMiddleName('');
       setLastName('');
       setEmail('');
       setContactNumber('');
+      setGender('');
+      setCivilStatus('');
+      setPlaceOfBirth('');
+      setAddress('');
+      setAge('');
+      setDateOfBirth(new Date());
+
+      setGovernmentId('');
+      setValidIdFrontFile(null);
+      setValidIdBackFile(null);
+      setSelfieFile(null);
+      setSelfieWithIdFile(null);
       setModalVisible(false);
     } 
     else if (pendingDelete) {
-      sendAdminDeleteData({
+      sendCoAdminDeleteData({
         email: pendingDelete.email,
         firstName: pendingDelete.firstName || '',
         middleName: pendingDelete.middleName || '',
         lastName: pendingDelete.lastName || ''
-      }).catch(error => console.error('Error sending admin delete notification:', error));
+      }).catch(error => console.error('Error sending co-admin delete notification:', error));
     }
 
     setPendingAdd(null);
     setPendingDelete(null);
     
+    // Refresh the list after action completes
     const fetchAdmins = async () => {
       try {
         const snapshot = await database.ref('Users/CoAdmin').once('value');
@@ -1484,6 +1497,7 @@ const CoAdmins = () => {
                   color: '#fff'
                 }} 
                 onClick={handleSuccessOk}
+                autoFocus
               >
                 OK
               </button>

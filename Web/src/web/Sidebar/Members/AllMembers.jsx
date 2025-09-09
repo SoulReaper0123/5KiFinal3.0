@@ -510,13 +510,12 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '13%' }}>First Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '13%' }}>Last Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '18%' }}>Email</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>First Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Last Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Savings</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
-              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Role</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -527,7 +526,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                 <td style={styles.tableCell}>{member.id || 'N/A'}</td>
                 <td style={styles.tableCell}>{member.firstName || 'N/A'}</td>
                 <td style={styles.tableCell}>{member.lastName || 'N/A'}</td>
-                <td style={styles.tableCell}>{member.email || 'N/A'}</td>
                 <td style={{
                   ...styles.tableCell,
                   ...styles.savingsAmount

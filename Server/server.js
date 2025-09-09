@@ -2446,6 +2446,272 @@ app.post('/send-loan-reminder', async (req, res) => {
 });
 
 // ==============================================
+// CO-ADMIN EMAILS
+// ==============================================
+
+app.post('/send-coadmin-email', async (req, res) => {
+    console.log('[NOTIFICATION] Initiating co-admin creation emails', req.body);
+    const { email, firstName, middleName = '', lastName, password, websiteLink, facebookLink } = req.body;
+
+    if (!email || !firstName || !lastName || !password) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for co-admin creation');
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, lastName, and password are required'
+        });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    try {
+        // Email to system owner
+        console.log('[NOTIFICATION] Sending co-admin creation notification to owner');
+        const ownerMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'New Co-Admin Account Created',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        New Co-Admin Account Created
+                    </h2>
+                    <p>A new co-admin account has been successfully created in the system.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Co-Admin Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Created</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        // Email to new co-admin
+        console.log('[NOTIFICATION] Sending co-admin credentials to new co-admin');
+        const coAdminMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Your 5KI Financial Services Co-Admin Account',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Welcome to 5KI Financial Services
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    <p>Your co-administrator account has been successfully created. Below are your login credentials:</p>
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Account Information:</h3>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Email</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Temporary Password</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${password}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Type</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Co-Administrator</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Security Notice:</h3>
+                    <ul style="margin-bottom: 20px;">
+                        <li>Change your password immediately after first login</li>
+                        <li>Never share your credentials with anyone</li>
+                        <li>Always log out after your session</li>
+                    </ul>
+                    <p>
+                        <a href="${websiteLink || WEBSITE_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
+                            Login to your account
+                        </a>
+                    </p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(ownerMailOptions);
+        await transporter.sendMail(coAdminMailOptions);
+
+        console.log('[NOTIFICATION SUCCESS] Co-admin creation emails sent successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Co-admin creation emails sent successfully',
+            data: {
+                adminEmail: email,
+                dateSent: currentDate
+            }
+        });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending co-admin creation emails:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send co-admin creation emails',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+app.post('/send-delete-coadmin-email', async (req, res) => {
+    console.log('[NOTIFICATION] Initiating co-admin deletion emails', req.body);
+    const { email, firstName, middleName = '', lastName, websiteLink, facebookLink } = req.body;
+
+    if (!email || !firstName || !lastName) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for co-admin deletion');
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, and lastName are required'
+        });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    try {
+        // Email to system owner
+        console.log('[NOTIFICATION] Sending co-admin deletion notification to owner');
+        const ownerMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'Co-Admin Account Deleted',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Co-Admin Account Deletion Notification
+                    </h2>
+                    <p>A co-administrator account has been permanently removed from the system.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Account Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Deleted</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
+                    <p style="font-weight: bold; color: #e74c3c;">
+                        Note: This action is irreversible. All access privileges have been revoked.
+                    </p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        // Email to deleted co-admin
+        console.log('[NOTIFICATION] Sending co-admin deletion notification to deleted user');
+        const coAdminMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Your 5KI Financial Services Co-Admin Access Has Been Removed',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Account Access Update
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    <p>We're writing to inform you that your co-admin access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
+                    <p>If you believe this is a mistake, please contact the system administrator immediately.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
+                    </ul>
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(ownerMailOptions);
+        await transporter.sendMail(coAdminMailOptions);
+
+        console.log('[NOTIFICATION SUCCESS] Co-admin deletion emails sent successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Co-admin deletion emails sent successfully',
+            data: {
+                adminEmail: email,
+                dateSent: currentDate
+            }
+        });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending co-admin deletion emails:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send co-admin deletion emails',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+// ==============================================
 // SERVER INITIALIZATION
 // ==============================================
 

@@ -57,20 +57,6 @@ const ContactUs = () => {
         <Text style={styles.title}>{contactUs?.title || 'Contact Us'}</Text>
         <Text style={styles.content}>{contactUs?.content || 'No contact information available.'}</Text>
         
-        {/* Optional action buttons */}
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={() => handleLinkPress('tel:+1234567890')} // Replace with your phone number
-        >
-          <Text style={styles.buttonText}>Call Us</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.button}
-          onPress={() => handleLinkPress('mailto:info@example.com')} // Replace with your email
-        >
-          <Text style={styles.buttonText}>Email Us</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
