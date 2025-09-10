@@ -725,10 +725,14 @@ const PaymentApplications = ({
         console.log('No current loans found for member:', id);
       }
 
+      // Generate a new transaction ID for approved/transactions records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
       // Database references for Payment and Logs
-      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
-      const approvedRef = database.ref(`Payments/ApprovedPayments/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
+      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${originalTransactionId}`);
+      const approvedRef = database.ref(`Payments/ApprovedPayments/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${id}/${newTransactionId}`);
 
       // 4. Fetch current values
       const [paymentSnap, fundsSnap, savingsSnap, penaltySnap] = await Promise.all([
@@ -921,6 +925,8 @@ const PaymentApplications = ({
       // 10. Write approved/transaction records
       const approvedData = {
         ...paymentData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         dateApproved: formatDate(now),
         timeApproved: formatTime(now),
         timestamp: now.getTime(),
@@ -955,9 +961,13 @@ const PaymentApplications = ({
       const rejectionDate = formatDate(now);
       const rejectionTime = formatTime(now);
 
-      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${transactionId}`);
-      const rejectedRef = database.ref(`Payments/RejectedPayments/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Payments/${id}/${transactionId}`);
+      // Generate a new transaction ID for rejected/transactions records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${originalTransactionId}`);
+      const rejectedRef = database.ref(`Payments/RejectedPayments/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${id}/${newTransactionId}`);
 
       const paymentSnap = await paymentRef.once('value');
       if (!paymentSnap.exists()) {
@@ -966,6 +976,8 @@ const PaymentApplications = ({
 
       const rejectedPayment = { 
         ...paymentSnap.val(), 
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
         timestamp: now.getTime(),
@@ -976,6 +988,8 @@ const PaymentApplications = ({
       await rejectedRef.set(rejectedPayment);
       await transactionRef.set(rejectedPayment);
       await paymentRef.remove();
+
+      return newTransactionId;
 
     } catch (err) {
       console.error('Rejection DB error:', err);

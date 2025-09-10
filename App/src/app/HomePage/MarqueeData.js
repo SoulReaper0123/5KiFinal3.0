@@ -21,11 +21,11 @@ const TRANSACTION_TYPES = {
   Loan: {
     paths: {
       Application: 'Loans/LoanApplications',
-      Approved: 'Loans/ApprovedLoans',
+      Approved: 'Loans/CurrentLoans',
       Rejected: 'Loans/RejectedLoans'
     },
     amountField: 'loanAmount',
-    monthlyPaymentField: 'monthlyPayment',
+    monthlyPaymentField: 'totalMonthlyPayment',
     dueDateField: 'dueDate'
   },
   Withdrawal: {
@@ -48,10 +48,17 @@ const TRANSACTION_TYPES = {
 
 const parseDateTime = (dateTimeStr) => {
   if (!dateTimeStr) return Date.now();
+  if (typeof dateTimeStr === 'number') {
+    // Already a timestamp (ms)
+    return dateTimeStr;
+  }
   if (typeof dateTimeStr === 'object' && dateTimeStr.seconds) {
+    // Firestore-like timestamp
     return dateTimeStr.seconds * 1000;
   }
-  return Date.parse(dateTimeStr.replace(' at ', ' ')) || Date.now();
+  // Normalize common string formats
+  const normalized = String(dateTimeStr).replace(' at ', ' ');
+  return Date.parse(normalized) || Date.now();
 };
 
 const formatDueDate = (timestamp) => {
@@ -68,6 +75,23 @@ const getDaysUntilDue = (dueDate) => {
   return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
 };
 
+// Prefer nextDueDate when it's later or more relevant than dueDate
+const pickDueTimestamp = (record) => {
+  const hasDue = !!record?.dueDate;
+  const hasNext = !!record?.nextDueDate;
+  if (!hasDue && !hasNext) return Date.now();
+
+  const dueTs = hasDue ? parseDateTime(record.dueDate) : null;
+  const nextTs = hasNext ? parseDateTime(record.nextDueDate) : null;
+
+  // If only one exists, return it
+  if (dueTs && !nextTs) return dueTs;
+  if (!dueTs && nextTs) return nextTs;
+
+  // If both exist, prefer the later/next one
+  return nextTs >= dueTs ? nextTs : dueTs;
+};
+
 const MarqueeData = (callback) => {
   const userEmail = auth.currentUser?.email?.toLowerCase();
   if (!userEmail) return () => {};
@@ -78,44 +102,15 @@ const MarqueeData = (callback) => {
   let isFirstMessage = true;
 
   const startMarquee = () => {
-    if (allMessages.length === 0) {
-      callback([]);
-      return;
-    }
-
-    // Calculate the approximate time it takes for a message to scroll completely
-    // Assuming average scrolling speed of 100px per second and message width of ~500px
-    const scrollDuration = 5000; // 5 seconds per message
-
-    const showNextMessage = () => {
-      if (allMessages.length === 0) return;
-
-      // Get the current message
-      const currentMessage = allMessages[currentMessageIndex];
-      
-      // Send the current message to the callback
-      callback([currentMessage]);
-
-      // Move to the next message
-      currentMessageIndex = (currentMessageIndex + 1) % allMessages.length;
-
-      // Schedule the next message
-      setTimeout(showNextMessage, scrollDuration);
-    };
-
-    // Start the marquee
-    showNextMessage();
+    // For Recent Activity list: always send newest-first stable list, no rotation
+    callback([...allMessages]);
   };
 
   const updateMessages = (newMessages) => {
     // Sort messages by timestamp (newest first)
     allMessages = [...newMessages].sort((a, b) => b.timestamp - a.timestamp);
-
-    // If this is the first update, start the marquee
-    if (isFirstMessage && allMessages.length > 0) {
-      isFirstMessage = false;
-      startMarquee();
-    }
+    // Always emit full newest-first list for a stable Recent Activity section
+    callback([...allMessages]);
   };
 
   const handleTransactionData = (type, config) => {
@@ -182,7 +177,8 @@ const MarqueeData = (callback) => {
               messageData.monthlyPayment = config.monthlyPaymentField
                 ? parseFloat(record[config.monthlyPaymentField] || 0).toFixed(2)
                 : null;
-              messageData.dueDate = parseDateTime(record[config.dueDateField]);
+              // Align with ExistingLoan: prefer the later of dueDate or nextDueDate
+              messageData.dueDate = pickDueTimestamp(record);
               
               // Add payment reminder if applicable
               const daysUntilDue = getDaysUntilDue(messageData.dueDate);
@@ -192,7 +188,7 @@ const MarqueeData = (callback) => {
                   type: 'Loan Payment',
                   status: 'reminder',
                   message: `Your payment of ₱${messageData.monthlyPayment} is due on ${formatDueDate(messageData.dueDate)}`,
-                  timestamp: Date.now() - daysUntilDue,
+                  timestamp: messageData.dueDate,
                   amount: messageData.monthlyPayment,
                   daysUntilDue,
                   isReminder: true
@@ -214,6 +210,62 @@ const MarqueeData = (callback) => {
   Object.entries(TRANSACTION_TYPES).forEach(([type, config]) => {
     handleTransactionData(type, config);
   });
+
+  // Additionally, listen to Loans/CurrentLoans to generate payment reminders from the live current loan data
+  // This ensures reminders reflect the latest dueDate and totalMonthlyPayment
+  const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+  const currentLoansListener = onValue(currentLoansRef, (snapshot) => {
+    const data = snapshot.val();
+    if (!data) return;
+
+    const userEmail = auth.currentUser?.email?.toLowerCase();
+    if (!userEmail) return;
+
+    let reminderMessages = [];
+
+    Object.values(data).forEach(userRecords => {
+      if (typeof userRecords !== 'object') return;
+
+      Object.values(userRecords).forEach(record => {
+        if (!record?.email || record.email.toLowerCase() !== userEmail) return;
+
+        const dueTs = pickDueTimestamp(record);
+        const monthly = parseFloat(record.totalMonthlyPayment || record.monthlyPayment || 0).toFixed(2);
+
+        // Create/refresh a reminder message for this current loan
+        const daysUntilDue = getDaysUntilDue(dueTs);
+        if (daysUntilDue >= 0) {
+          reminderMessages.push({
+            id: `currentloan-reminder-${record.transactionId || dueTs}`,
+            type: 'Loan Payment',
+            status: 'reminder',
+            message: `Your payment of ₱${monthly} is due on ${formatDueDate(dueTs)}`,
+            timestamp: dueTs, // Use due date timestamp for stable ordering
+            amount: monthly,
+            isReminder: true
+          });
+        }
+      });
+    });
+
+    // Merge with existing messages and re-sort newest-first
+    const merged = [...reminderMessages];
+    // Include previously gathered non-reminder messages
+    // allMessages might include deposit/withdraw/loan status messages from other listeners
+    // Keep unique by id
+    const existing = allMessages.filter(m => !m.isReminder);
+    const combined = [...existing, ...merged]
+      .reduce((acc, cur) => {
+        if (!acc.find(x => x.id === cur.id)) acc.push(cur);
+        return acc;
+      }, [])
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    allMessages = combined;
+    callback([...allMessages]);
+  });
+
+  listeners.push({ ref: currentLoansRef, listener: currentLoansListener });
 
   return () => {
     listeners.forEach(({ ref, listener }) => off(ref, listener));

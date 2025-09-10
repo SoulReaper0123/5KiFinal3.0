@@ -73,8 +73,8 @@ const Transactions = () => {
     for (const [type, members] of Object.entries(data)) {
       for (const [memberId, transactionsList] of Object.entries(members)) {
         for (const [transactionId, details] of Object.entries(transactionsList)) {
-          // Skip rejected applications
-          if (details.status === 'rejected') {
+          // Only include approved transactions
+          if ((details.status || '').toLowerCase() !== 'approved') {
             continue;
           }
 
@@ -161,8 +161,13 @@ const Transactions = () => {
   };
 
   const handleTransactionPress = (transaction) => {
-    setSelectedTransaction(transaction);
-    setModalVisible(true);
+    // Navigate to GCASH-like details screen
+    navigation.navigate('TransactionDetails', { item: {
+      ...transaction,
+      label: transaction.label,
+      type: transaction.label,
+      approvedAt: transaction.dateApproved || transaction.dateApplied,
+    }});
   };
 
   const formatDate = (dateString) => {
@@ -222,59 +227,18 @@ const Transactions = () => {
     </TouchableOpacity>
   );
 
-  const renderTransactionModal = () => {
-    if (!selectedTransaction) return null;
-
-    const details = [];
-    details.push({ label: 'Transaction ID', value: selectedTransaction.transactionId });
-    details.push({ label: 'Type', value: selectedTransaction.label });
-    details.push({ label: 'Amount', value: `₱${Math.abs(parseFloat(selectedTransaction.amount)).toFixed(2)}` });
-    details.push({ label: 'Date Applied', value: selectedTransaction.dateApplied || 'N/A' });
-    details.push({ label: 'Date Approved', value: selectedTransaction.dateApproved || 'N/A' });
-    
-    if (selectedTransaction.disbursement) details.push({ label: 'Disbursement', value: selectedTransaction.disbursement });
-    if (selectedTransaction.depositOption) details.push({ label: 'Deposit Method', value: selectedTransaction.depositOption });
-    if (selectedTransaction.paymentOption) details.push({ label: 'Payment Method', value: selectedTransaction.paymentOption });
-    if (selectedTransaction.withdrawOption) details.push({ label: 'Withdraw Method', value: selectedTransaction.withdrawOption });
-    if (selectedTransaction.description) details.push({ label: 'Description', value: selectedTransaction.description });
-
-    return (
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Transaction Details</Text>
-              <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <MaterialIcons name="close" size={24} color="#666" />
-              </TouchableOpacity>
-            </View>
-            
-            <ScrollView style={styles.modalContent}>
-              {details.map((detail, index) => (
-                <View key={index} style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>{detail.label}:</Text>
-                  <Text style={styles.detailValue}>{detail.value}</Text>
-                </View>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
+  // Modal no longer needed; we navigate to details screen.
+  const renderTransactionModal = () => null;
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="#2D5783" />
-      </TouchableOpacity>
-
-      <Text style={styles.headerTitle}>Transactions</Text>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitleText}>Transactions</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
       {loading ? (
         <ActivityIndicator size="large" color="#234E70" style={{ marginTop: 30 }} />
@@ -299,21 +263,33 @@ const Transactions = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: 50,
+    backgroundColor: '#F8FAFC',
+    paddingTop: 30,
   },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
+  headerBar: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#E8F1FB',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#2D5783',
-    textAlign: 'center',
-    marginBottom: 20,
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E3A5F',
   },
   scrollContainer: {
     paddingHorizontal: 15,

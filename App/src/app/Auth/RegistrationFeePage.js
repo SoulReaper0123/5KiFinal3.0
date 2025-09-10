@@ -145,12 +145,18 @@ const RegistrationFeePage = () => {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={30} color="white" />
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Registration Fee</Text>
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.title}>Registration Fee</Text>
+          <Text style={styles.subLabel}>Step 3 of 4 • Deposit and provide proof</Text>
+          <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
+            <View style={{ width: '75%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+          </View>
+        </View>
 
-        <View style={styles.content}>
+        <View style={styles.card}>
           <Text style={styles.label}>Minimum Registration Fee: ₱{minRegistrationFee.toFixed(2)}</Text>
           <Text style={styles.label}>Enter Amount<Text style={styles.required}>*</Text></Text>
           <TextInput
@@ -212,7 +218,7 @@ const RegistrationFeePage = () => {
             style={[
               styles.submitButton, 
               isSubmitDisabled && styles.disabledButton,
-              { backgroundColor: isSubmitDisabled ? '#cccccc' : '#4FE7AF' }
+              { backgroundColor: isSubmitDisabled ? '#94A3B8' : '#1E3A5F' }
             ]} 
             onPress={handleSubmit}
             disabled={isSubmitDisabled}
@@ -256,30 +262,38 @@ const RegistrationFeePage = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#F8FAFC',
   },
   scrollContainer: {
     flexGrow: 1,
+    padding: 16,
+    paddingBottom: 32,
   },
   backButton: {
-    marginTop: 40,
-    marginStart: 20,
-  },
-  content: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    padding: 40,
-    paddingBottom: 60,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
     marginTop: 20,
-    minHeight: '100%',
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+  },
+  subLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: '#475569',
   },
   label: {
     fontSize: 16,
@@ -331,19 +345,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   submitButton: {
-    backgroundColor: '#4FE7AF',
+    backgroundColor: '#1E3A5F',
     borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
+    paddingVertical: 14,
+    paddingHorizontal: 20,
     alignItems: 'center',
     marginTop: 20,
-    width: '50%',
+    width: '100%',
     alignSelf: 'center',
   },
   submitButtonText: {
-    color: 'black',
-    fontWeight: 'bold',
-    fontSize: 18,
+    color: 'white',
+    fontWeight: '700',
+    fontSize: 16,
   },
   modalOverlay: {
     position: 'absolute',
@@ -370,8 +384,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   uploadPromptText: {
-    color: '#2D5783',
-    fontWeight: 'bold',
+    color: '#1E3A5F',
+    fontWeight: '700',
     marginTop: 10,
     fontSize: 16,
   },

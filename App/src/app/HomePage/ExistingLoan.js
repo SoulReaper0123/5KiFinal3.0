@@ -479,14 +479,14 @@ const ExistingLoan = () => {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity 
-        onPress={() => navigation.goBack()} 
-        style={styles.backButton}
-      >
-        <MaterialIcons name="arrow-back" size={30} color="#2D5783" />
-      </TouchableOpacity>
-
-      <Text style={styles.headerTitle}>Loan Details</Text>
+      {/* Header with centered title and left back button using invisible spacers */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitleText}>Loan Details</Text>
+        <View style={styles.headerSide} />
+      </View>
 
       <ScrollView 
         contentContainerStyle={styles.scrollContent}
@@ -608,22 +608,31 @@ const ExistingLoan = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F8FAFC',
     paddingTop: 60,
-    paddingHorizontal: 16
+    paddingHorizontal: 16,
+    paddingBottom: 32,
   },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10
+  // Header styles for centered title with left back button
+  headerRow: {
+    marginTop: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#2D5783',
+  headerSide: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitleText: {
+    flex: 1,
     textAlign: 'center',
-    marginBottom: 20
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   loadingContainer: {
     flex: 1,

@@ -257,86 +257,83 @@ const RegisterPage2 = () => {
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-                    <MaterialIcons name="arrow-back" size={30} color="white" />
+                    <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
                 </TouchableOpacity>
 
-                <Text style={styles.title}>Complete Registration</Text>
-
-                <View style={styles.section}>
-                    <Text style={styles.label}>Valid ID Front</Text>
-                    <TouchableOpacity 
-                        onPress={() => setShowIdFrontOptions(true)} 
-                        style={styles.imagePreviewContainer}
-                    >
-                        {validIdFront ? (
-                            <Image source={{ uri: validIdFront }} style={styles.imagePreview} />
-                        ) : (
-                            <View style={styles.iconContainer}>
-                                <Icon name="add" size={50} color="#2D5783" />
-                            </View>
-                        )}
-                    </TouchableOpacity>
+                <View style={{ marginBottom: 16 }}>
+                    <Text style={styles.title}>Identity Verification</Text>
+                    <Text style={styles.subLabel}>Step 2 of 4 • Provide ID and selfie</Text>
+                    <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
+                        <View style={{ width: '50%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+                    </View>
                 </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.label}>Valid ID Back</Text>
-                    <TouchableOpacity 
-                        onPress={() => setShowIdBackOptions(true)} 
-                        style={styles.imagePreviewContainer}
-                    >
-                        {validIdBack ? (
-                            <Image source={{ uri: validIdBack }} style={styles.imagePreview} />
-                        ) : (
-                            <View style={styles.iconContainer}>
-                                <Icon name="add" size={50} color="#2D5783" />
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                </View>
+                <View style={styles.card}>
+                    <View style={styles.grid}>
+                        <View style={styles.tile}>
+                            <Text style={styles.label}>Valid ID - Front</Text>
+                            <TouchableOpacity onPress={() => setShowIdFrontOptions(true)} style={styles.imagePreviewContainer}>
+                                {validIdFront ? (
+                                    <Image source={{ uri: validIdFront }} style={styles.imagePreview} />
+                                ) : (
+                                    <View style={styles.iconContainer}>
+                                        <Icon name="add" size={40} color="#1E3A5F" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.label}>Selfie</Text>
-                    <TouchableOpacity 
-                        onPress={() => setShowSelfieOptions(true)} 
-                        style={styles.imagePreviewContainer}
-                    >
-                        {selfie ? (
-                            <Image source={{ uri: selfie }} style={styles.imagePreview} />
-                        ) : (
-                            <View style={styles.iconContainer}>
-                                <Icon name="photo-camera" size={50} color="#2D5783" />
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                </View>
+                        <View style={styles.tile}>
+                            <Text style={styles.label}>Valid ID - Back</Text>
+                            <TouchableOpacity onPress={() => setShowIdBackOptions(true)} style={styles.imagePreviewContainer}>
+                                {validIdBack ? (
+                                    <Image source={{ uri: validIdBack }} style={styles.imagePreview} />
+                                ) : (
+                                    <View style={styles.iconContainer}>
+                                        <Icon name="add" size={40} color="#1E3A5F" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
 
-                <View style={styles.section}>
-                    <Text style={styles.label}>Selfie with ID</Text>
-                    <Text style={styles.subLabel}>Hold your ID next to your face</Text>
-                    <TouchableOpacity 
-                        onPress={() => setShowSelfieWithIdOptions(true)} 
-                        style={styles.imagePreviewContainer}
-                    >
-                        {selfieWithId ? (
-                            <Image source={{ uri: selfieWithId }} style={styles.imagePreview} />
-                        ) : (
-                            <View style={styles.iconContainer}>
-                                <Icon name="photo-camera" size={50} color="#2D5783" />
-                            </View>
-                        )}
-                    </TouchableOpacity>
+                        <View style={styles.tile}>
+                            <Text style={styles.label}>Selfie</Text>
+                            <TouchableOpacity onPress={() => setShowSelfieOptions(true)} style={styles.imagePreviewContainer}>
+                                {selfie ? (
+                                    <Image source={{ uri: selfie }} style={styles.imagePreview} />
+                                ) : (
+                                    <View style={styles.iconContainer}>
+                                        <Icon name="photo-camera" size={40} color="#1E3A5F" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+
+                        <View style={styles.tile}>
+                            <Text style={styles.label}>Selfie with ID</Text>
+                            <TouchableOpacity onPress={() => setShowSelfieWithIdOptions(true)} style={styles.imagePreviewContainer}>
+                                {selfieWithId ? (
+                                    <Image source={{ uri: selfieWithId }} style={styles.imagePreview} />
+                                ) : (
+                                    <View style={styles.iconContainer}>
+                                        <Icon name="photo-camera" size={40} color="#1E3A5F" />
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        </View>
+                    </View>
                 </View>
 
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity
                         onPress={handleNext}
                         style={[
-                            styles.registerButton,
-                            (!validIdFront || !validIdBack || !selfie || !selfieWithId) && styles.disabledButton
+                            styles.primaryButton,
+                            (!validIdFront || !validIdBack || !selfie || !selfieWithId) && styles.buttonDisabled
                         ]}
                         disabled={!validIdFront || !validIdBack || !selfie || !selfieWithId}
                     >
-                        <Text style={styles.registerButtonText}>Next</Text>
+                        <Text style={styles.primaryButtonText}>Next</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -400,52 +397,68 @@ const RegisterPage2 = () => {
 const styles = StyleSheet.create({
     scrollContainer: {
         flexGrow: 1,
-        justifyContent: 'space-between',
-        padding: 15,
-        paddingBottom: 30,
-        backgroundColor: '#2C5282',
+        justifyContent: 'flex-start',
+        padding: 16,
+        paddingBottom: 32,
+        backgroundColor: '#F8FAFC', // light neutral background
     },
-    // We've removed the custom crop styles since we're using the built-in image picker cropping
     container: {
         flex: 1,
-        justifyContent: 'space-between',
     },
     backButton: {
-        marginBottom: 10,
-        marginTop: 20,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    marginTop: 20,
     },
     title: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        color: 'white',
-        marginBottom: 20,
+        fontSize: 22,
+        fontWeight: '700',
+        color: '#0F172A', // slate-900
+        textAlign: 'left',
     },
     section: {
-        alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 16,
     },
     label: {
-        fontSize: 16,
+        fontSize: 15,
         marginBottom: 8,
-        color: 'white',
-        fontWeight: 'bold',
+        color: '#0F172A',
+        fontWeight: '600',
     },
     subLabel: {
-        fontSize: 14,
-        marginBottom: 8,
-        color: 'white',
-        fontStyle: 'italic',
+        fontSize: 13,
+        marginTop: 2,
+        color: '#475569', // slate-600
+    },
+    // Card container that wraps all tiles
+    card: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        padding: 16,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 8,
+        elevation: 2,
+    },
+    grid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        justifyContent: 'space-between',
+    },
+    tile: {
+        width: '48%',
+        marginBottom: 14,
     },
     imagePreviewContainer: {
-        backgroundColor: '#F6F6F6',
-        borderWidth: 2,
-        borderColor: '#ccc',
-        borderRadius: 8,
-        width: 230,
+        backgroundColor: '#F1F5F9',
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        borderRadius: 12,
         height: 150,
         justifyContent: 'center',
         alignItems: 'center',
+        overflow: 'hidden',
     },
     iconContainer: {
         justifyContent: 'center',
@@ -454,63 +467,61 @@ const styles = StyleSheet.create({
     imagePreview: {
         width: '100%',
         height: '100%',
-        borderRadius: 8,
     },
     buttonContainer: {
-        alignItems: 'center',
-        marginTop: 20,
+        marginTop: 8,
     },
-    registerButton: {
-        backgroundColor: '#4FE7AF',
+    // Primary button style (reusable)
+    primaryButton: {
+        backgroundColor: '#1E3A5F',
         borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 30,
-        marginBottom: 40,
+        paddingVertical: 14,
+        paddingHorizontal: 20,
         alignItems: 'center',
-        width: '50%',
+        width: '100%',
         alignSelf: 'center',
-        marginTop: 20,
+        marginTop: 12,
     },
-    disabledButton: {
-        backgroundColor: '#cccccc',
+    buttonDisabled: {
+        backgroundColor: '#94A3B8',
     },
-    registerButtonText: {
-        color: 'black',
-        fontSize: 18,
-        fontWeight: 'bold',
+    primaryButtonText: {
+        color: 'white',
+        fontSize: 16,
+        fontWeight: '700',
+        letterSpacing: 0.3,
     },
     modalBackground: {
         flex: 1,
         justifyContent: 'flex-end',
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        backgroundColor: 'rgba(15, 23, 42, 0.5)',
     },
     optionsModal: {
         backgroundColor: 'white',
-        padding: 20,
+        padding: 18,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         width: '100%',
     },
     modalTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 20,
+        fontSize: 16,
+        fontWeight: '700',
+        marginBottom: 12,
         textAlign: 'center',
-        color: '#2D5783',
+        color: '#1E3A5F',
     },
     optionButtonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 10,
     },
-    // New styles for crop options modal
     previewImage: {
         width: '100%',
         height: 200,
         borderRadius: 8,
         marginBottom: 20,
         borderWidth: 1,
-        borderColor: '#ddd',
+        borderColor: '#E2E8F0',
     },
     cropButtonsContainer: {
         flexDirection: 'row',
@@ -519,7 +530,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     cropButton: {
-        backgroundColor: '#2D5783',
+        backgroundColor: '#1E3A5F',
         borderRadius: 8,
         paddingVertical: 12,
         paddingHorizontal: 20,
@@ -528,22 +539,22 @@ const styles = StyleSheet.create({
         marginHorizontal: 5,
     },
     useAsIsButton: {
-        backgroundColor: '#4FE7AF',
+        backgroundColor: '#059669', // emerald accent
     },
     cropButtonText: {
         color: 'white',
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 15,
+        fontWeight: '700',
     },
     optionButton: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 15,
+        padding: 14,
         borderWidth: 1,
-        borderColor: '#2D5783',
-        borderRadius: 8,
+        borderColor: '#1E3A5F',
+        borderRadius: 10,
         marginHorizontal: 5,
     },
     fullWidthOption: {
@@ -551,29 +562,31 @@ const styles = StyleSheet.create({
         marginHorizontal: 0,
     },
     optionText: {
-        fontSize: 16,
+        fontSize: 15,
         marginLeft: 10,
-        color: '#2D5783',
+        color: '#1E3A5F',
+        fontWeight: '600',
     },
     optionIcon: {
         marginRight: 5,
     },
     cancelButton: {
-        padding: 15,
+        padding: 14,
         marginTop: 10,
-        backgroundColor: '#f0f0f0',
-        borderRadius: 8,
+        backgroundColor: '#F1F5F9',
+        borderRadius: 10,
         alignItems: 'center',
     },
     cancelText: {
-        fontSize: 16,
-        color: 'red',
+        fontSize: 15,
+        color: '#DC2626',
+        fontWeight: '600',
     },
     cropInstructions: {
-        fontSize: 14,
-        color: '#666',
+        fontSize: 13,
+        color: '#64748B',
         textAlign: 'center',
-        marginBottom: 15,
+        marginBottom: 12,
         paddingHorizontal: 10,
     },
 });

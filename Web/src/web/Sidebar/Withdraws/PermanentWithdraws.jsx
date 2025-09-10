@@ -577,8 +577,13 @@ const processDatabaseApprove = async (withdrawal) => {
     const approvalTime = formatTime(now);
     const status = 'approved';
 
+    // Generate a new transaction ID for approved/transactions records
+    const originalTransactionId = withdrawal.transactionId || withdrawal.memberId;
+    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
     // Database references
-    const approvedRef = database.ref(`MembershipWithdrawal/ApprovedWithdrawals/${withdrawal.memberId}`);
+    const approvedRef = database.ref(`MembershipWithdrawal/ApprovedWithdrawals/${withdrawal.memberId}/${newTransactionId}`);
+    const transactionRef = database.ref(`Transactions/MembershipWithdrawals/${withdrawal.memberId}/${newTransactionId}`);
     const memberRef = database.ref(`Members/${withdrawal.memberId}`);
     const pendingRef = database.ref(`MembershipWithdrawal/PendingWithdrawals/${withdrawal.memberId}`);
     const fundsRef = database.ref('Settings/Funds');
@@ -600,6 +605,8 @@ const processDatabaseApprove = async (withdrawal) => {
     // Prepare approved withdrawal data
     const approvedWithdrawal = { 
       ...withdrawal, 
+      transactionId: newTransactionId,
+      originalTransactionId: originalTransactionId,
       dateApproved: approvalDate,
       timeApproved: approvalTime,
       timestamp: now.getTime(),
@@ -609,18 +616,21 @@ const processDatabaseApprove = async (withdrawal) => {
     // Execute all database operations
     await Promise.all([
       approvedRef.set(approvedWithdrawal),
+      transactionRef.set(approvedWithdrawal),
       fundsRef.set(newFunds),
       memberRef.update({ 
         status: 'inactive',
         balance: newMemberBalance // Update member's balance to 0
       }),
-      // pendingRef.remove() // Remove from pending after approval
+      pendingRef.remove() // Remove from pending after approval
     ]);
     
     // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
     const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
     const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
     await fundsHistoryRef.set(newFunds);
+
+    return newTransactionId;
 
   } catch (err) {
     console.error('Approval DB error:', err);
@@ -650,7 +660,7 @@ const processDatabaseApprove = async (withdrawal) => {
 
       await Promise.all([
         rejectedRef.set(rejectedWithdrawal),
-        //pendingRef.remove()
+      pendingRef.remove()
       ]);
 
     } catch (err) {

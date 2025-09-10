@@ -163,28 +163,35 @@ export default function Inbox() {
               timestamp = getReliableTimestamp(details.dateApplied, details);
             }
 
+            // normalized payload for each message item
             let amount = 0;
             let title = '';
+            let label = '';
+            let method = null; // payment/deposit/withdraw option
             let message = '';
             let rejectionReason = details.rejectionReason || 'No reason provided';
 
             switch (type) {
               case 'Deposits':
-                amount = parseFloat(details.amountToBeDeposited || 0).toFixed(2);
+                amount = Number(details.amountToBeDeposited || 0);
                 title = 'Deposit';
-                message = getStatusMessage(status, `₱${amount}`, 'deposit', rejectionReason);
+                label = 'Deposit';
+                method = details.depositOption || null;
+                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'deposit', rejectionReason);
                 break;
               case 'Loans':
-                amount = parseFloat(details.loanAmount || 0).toFixed(2);
-                const monthlyPayment = parseFloat(details.monthlyPayment || 0).toFixed(2);
+                amount = Number(details.loanAmount || 0);
+                const monthlyPayment = Number(details.monthlyPayment || 0).toFixed(2);
                 title = 'Loan';
-                message = getStatusMessage(status, `₱${amount}`, 'loan', rejectionReason);
+                label = 'Loan';
+                message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
                 
                 if (status === 'approved' && details.dueDate) {
                   const dueDate = getRawDateFromFirebase(details.dueDate);
                   parsed.push({
                     id: `${type}-${transactionId}-reminder`,
                     title: 'Loan Payment Reminder',
+                    label: 'Loan Payment Reminder',
                     message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
                     timestamp: getReliableTimestamp(details.dueDate, details), // Use due date timestamp for proper sorting
                     displayDate: 'Reminder',
@@ -192,32 +199,41 @@ export default function Inbox() {
                     icon: 'alarm',
                     color: '#FF9800',
                     status: 'reminder',
+                    transactionId,
                   });
                 }
                 break;
               case 'Withdrawals':
-                amount = parseFloat(details.amountWithdrawn || 0).toFixed(2);
+                amount = Number(details.amountWithdrawn || 0);
                 title = 'Withdrawal';
-                message = getStatusMessage(status, `₱${amount}`, 'withdrawal', rejectionReason);
+                label = 'Withdrawal';
+                method = details.withdrawOption || null;
+                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'withdrawal', rejectionReason);
                 break;
               case 'Payments':
-                amount = parseFloat(details.amountToBePaid || 0).toFixed(2);
+                amount = Number(details.amountToBePaid || 0);
                 title = 'Payment';
-                message = getStatusMessage(status, `₱${amount}`, 'payment', rejectionReason);
+                label = 'Loan Payment';
+                method = details.paymentOption || null;
+                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'payment', rejectionReason);
                 break;
               case 'Registrations':
-                amount = parseFloat(details.amount || 0).toFixed(2);
+                amount = Number(details.amount || details.registrationFee || 0);
                 title = 'Registration';
-                message = getStatusMessage(status, `₱${amount}`, 'registration', rejectionReason);
+                label = 'Registration';
+                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'registration', rejectionReason);
                 break;
               default:
                 title = type;
+                label = type;
                 message = `${type} update`;
             }
 
             parsed.push({
               id: `${type}-${transactionId}`,
               title,
+              label,
+              type: title,
               message,
               timestamp,
               displayDate,
@@ -226,6 +242,17 @@ export default function Inbox() {
               color: getColor(status),
               rejectionReason,
               status,
+              amount,
+              paymentOption: details.paymentOption,
+              depositOption: details.depositOption,
+              withdrawOption: details.withdrawOption,
+              // Bare DB key for this Transactions entry
+              transactionId,
+              // Preserve originalTransactionId if explicitly stored in DB; fallback to details.transactionId or the key
+              originalTransactionId: details.originalTransactionId || details.transactionId || transactionId,
+              dateApplied: details.dateApplied || null,
+              dateApproved: details.dateApproved || null,
+              dateRejected: details.dateRejected || null,
             });
           } catch (error) {
             console.error(`Error parsing ${type} transaction ${transactionId}:`, error);
@@ -278,8 +305,33 @@ export default function Inbox() {
   }, [userEmail]);
 
   const handleMessagePress = (message) => {
-    setSelectedMessage(message);
-    setModalVisible(true);
+    // Prefer explicit originalTransactionId from DB; fallback to key; finally derive from id
+    const originalTxnId = message.originalTransactionId || message.transactionId || (() => {
+      const raw = String(message.id || '');
+      let core = raw.endsWith('-reminder') ? raw.slice(0, -'-reminder'.length) : raw;
+      const firstDash = core.indexOf('-');
+      return firstDash >= 0 ? core.slice(firstDash + 1) : core;
+    })();
+
+    // Navigate to Inbox Details (separate from Transaction Details)
+    const item = {
+      id: message.id, // new reference for the notification
+      transactionId: message.transactionId, // bare DB key under Transactions
+      originalTransactionId: originalTxnId, // exact original id to show on top line
+      label: message.label || (message.title === 'Payment' ? 'Loan Payment' : message.title),
+      title: message.title,
+      type: message.label || message.title,
+      amount: typeof message.amount === 'number' ? message.amount : 0,
+      timeApproved: message.timeApproved,
+      dateApproved: message.dateApproved || (message.status === 'approved' ? message.displayDate : null),
+      dateApplied: message.dateApplied || message.displayDate,
+      message: message.message,
+      status: message.status,
+      paymentOption: message.paymentOption || null,
+      depositOption: message.depositOption || null,
+      withdrawOption: message.withdrawOption || null,
+    };
+    navigation.navigate('InboxDetails', { item });
   };
 
   const formatDisplayTime = (displayDate) => {
@@ -298,30 +350,43 @@ export default function Inbox() {
     }
   };
 
-  const renderItem = ({ item }) => (
-    <TouchableOpacity 
-      style={[styles.compactCard, { borderLeftWidth: 4, borderLeftColor: item.color }]}
-      onPress={() => handleMessagePress(item)}
-    >
-      <View style={styles.iconContainer}>
-        <MaterialIcons name={item.icon} size={24} color={item.color} />
-      </View>
-      <View style={styles.messageInfo}>
-        <Text style={styles.messageTitle} numberOfLines={1}>
-          {item.title} - {item.status.toUpperCase()}
-        </Text>
-        <Text style={styles.messagePreview} numberOfLines={2}>
-          {item.message}
-        </Text>
-        <Text style={styles.messageTime}>
-          {formatDisplayTime(item.displayDate)}
-        </Text>
-      </View>
-      <View style={styles.statusIndicator}>
-        <MaterialIcons name="chevron-right" size={20} color="#666" />
-      </View>
-    </TouchableOpacity>
-  );
+  const renderItem = ({ item }) => {
+    const ts = typeof item.timestamp === 'number' ? new Date(item.timestamp) : new Date();
+    const timeStr = ts.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+
+    const peso = (n) => `₱${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+    const title = item.title === 'Payment' ? 'Loan Payment' : item.title;
+    const amount = item.amount || item.amountToBePaid || item.amountToBeDeposited || item.amountWithdrawn || 0;
+    const method = item.paymentOption || item.depositOption || item.withdrawOption || 'N/A';
+    const txnId = item.transactionId || (item.id && String(item.id).split('-').slice(-1)[0]) || '';
+
+    const dateObj = ts;
+    const dateStr = dateObj.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+    // Simplified summary like Transactions list
+    let summary;
+    if (item.status === 'approved') {
+      summary = `Approved: ${dateStr}`;
+    } else if (item.status === 'rejected') {
+      summary = 'Rejected';
+    } else {
+      summary = `Applied: ${dateStr}`;
+    }
+
+    return (
+      <TouchableOpacity 
+        style={[styles.compactCard, { borderLeftWidth: 4, borderLeftColor: item.color }]}
+        onPress={() => handleMessagePress(item)}
+      >
+        <View style={styles.centeredIconWrap}>
+          <MaterialIcons name={item.icon} size={28} color={item.color} />
+          <Text style={styles.smallTimeCenter}>{timeStr}</Text>
+        </View>
+        <Text style={styles.centeredTitle}>{title}</Text>
+      </TouchableOpacity>
+    );
+  };
 
   const renderMessageModal = () => {
     if (!selectedMessage) return null;
@@ -374,11 +439,13 @@ export default function Inbox() {
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="#2D5783" />
-      </TouchableOpacity>
-
-      <Text style={styles.headerTitle}>Inbox</Text>
+      <View style={styles.headerBar}>
+        <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitleText}>Inbox</Text>
+        <View style={{ width: 40 }} />
+      </View>
 
       {loading ? (
         <ActivityIndicator size="large" color="#234E70" style={{ marginTop: 30 }} />
@@ -393,8 +460,6 @@ export default function Inbox() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         />
       )}
-
-      {renderMessageModal()}
     </View>
   );
 }
@@ -402,24 +467,35 @@ export default function Inbox() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-    paddingTop: 50,
+    backgroundColor: '#F8FAFC',
+    paddingTop: 30,
   },
-  backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 10,
+  headerBar: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#E8F1FB',
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  headerTitle: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#2D5783',
-    textAlign: 'center',
-    marginBottom: 20,
+  headerIconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerTitleText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1E3A5F',
   },
   compactCard: {
-    flexDirection: 'row',
     backgroundColor: 'white',
     borderRadius: 8,
     padding: 16,
@@ -431,6 +507,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
+  centeredIconWrap: { alignItems: 'center' },
+  smallTimeCenter: { marginTop: 4, fontSize: 12, color: '#64748B' },
+  centeredTitle: { marginTop: 8, fontSize: 16, fontWeight: '700', color: '#1E3A5F', textAlign: 'center' },
+  divider: { height: 1, backgroundColor: '#E2E8F0', width: '100%', marginVertical: 10 },
+  messageBody: { fontSize: 14, color: '#0F172A', lineHeight: 20, textAlign: 'left', width: '100%' },
   iconContainer: {
     width: 40,
     height: 40,

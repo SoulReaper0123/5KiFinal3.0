@@ -769,10 +769,14 @@ const ApplyDeposits = ({
       const approvalTime = formatTime(now);
       const status = 'approved';
 
+      // Generate a new transaction ID for approved/transactions records
+      const originalTransactionId = deposit.transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
       // Get references to all needed paths
-      const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${deposit.transactionId}`);
-      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${deposit.id}/${deposit.transactionId}`);
-      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${deposit.transactionId}`);
+      const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${originalTransactionId}`);
+      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${deposit.id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${newTransactionId}`);
       const memberRef = database.ref(`Members/${deposit.id}`);
       const fundsRef = database.ref('Settings/Funds');
 
@@ -784,6 +788,8 @@ const ApplyDeposits = ({
         // First create a copy of the deposit data with approval info
         const approvedDeposit = { 
           ...deposit, 
+          transactionId: newTransactionId,
+          originalTransactionId: originalTransactionId,
           dateApproved: approvalDate,
           timeApproved: approvalTime,
           timestamp: now.getTime(),
@@ -811,6 +817,9 @@ const ApplyDeposits = ({
         // Remove from pending AFTER all other operations succeed
         await pendingRef.remove();
       }
+
+      // Return the new transaction ID so caller can propagate it (API, UI)
+      return newTransactionId;
     } catch (err) {
       console.error('Approval DB error:', err);
       throw new Error(err.message || 'Failed to approve deposit');
@@ -824,14 +833,20 @@ const ApplyDeposits = ({
       const rejectionTime = formatTime(now);
       const status = 'rejected';
 
+      // Generate a new transaction ID for rejected/transactions records
+      const originalTransactionId = deposit.transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
       // Get references to all needed paths
-      const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${deposit.transactionId}`);
-      const rejectedRef = database.ref(`Deposits/RejectedDeposits/${deposit.id}/${deposit.transactionId}`);
-      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${deposit.transactionId}`);
+      const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${originalTransactionId}`);
+      const rejectedRef = database.ref(`Deposits/RejectedDeposits/${deposit.id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${newTransactionId}`);
 
       // First create a copy of the deposit data with rejection info
       const rejectedDeposit = { 
         ...deposit, 
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
         timestamp: now.getTime(),
@@ -845,6 +860,8 @@ const ApplyDeposits = ({
       
       // Remove from pending AFTER saving to rejected
       await pendingRef.remove();
+
+      return newTransactionId;
     } catch (err) {
       console.error('Rejection DB error:', err);
       throw new Error(err.message || 'Failed to reject deposit');

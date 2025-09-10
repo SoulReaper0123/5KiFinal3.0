@@ -145,12 +145,14 @@ const RegisterPage = () => {
   };
 
   const validateEmail = (value) => {
-    if (!value || !value.trim()) {
-      setEmailError('Email is required');
-      return false;
+    const email = (value || '').trim();
+    if (!email) {
+      setEmailError(''); // No "is required" message
+      return true; // Don't block form on empty; rely on asterisk and final check
     }
-    if (!value.includes('@') || !value.endsWith('.com')) {
-      setEmailError('Please provide a valid email address (e.g., example@domain.com)');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setEmailError('Please enter a valid email address (e.g., name@example.com)');
       return false;
     }
     setEmailError('');
@@ -158,12 +160,13 @@ const RegisterPage = () => {
   };
 
   const validatePhoneNumber = (value) => {
-    if (!value || !value.trim()) {
-      setPhoneNumberError('Phone number is required');
-      return false;
+    const digits = String(value || '').replace(/\D/g, '');
+    if (!digits) {
+      setPhoneNumberError(''); // No "is required" message
+      return true; // Don't block form on empty; rely on asterisk and final check
     }
-    if (value.length < 11) {
-      setPhoneNumberError('Phone number should be at least 11 digits long');
+    if (digits.length < 11) {
+      setPhoneNumberError('Phone number should be at least 11 digits');
       return false;
     }
     setPhoneNumberError('');
@@ -189,10 +192,6 @@ const RegisterPage = () => {
   };
 
   const validatePlaceOfBirth = (value) => {
-    if (!value || !value.trim()) {
-      setPlaceOfBirthError('Place of birth is required');
-      return false;
-    }
     setPlaceOfBirthError('');
     return true;
   };
@@ -207,10 +206,6 @@ const RegisterPage = () => {
   };
 
   const validateGovernmentId = (value) => {
-    if (!value) {
-      setGovernmentIdError('Government ID is required');
-      return false;
-    }
     setGovernmentIdError('');
     return true;
   };
@@ -429,12 +424,18 @@ const RegisterPage = () => {
         keyboardShouldPersistTaps="handled"
       >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={30} color="white" />
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
         </TouchableOpacity>
 
-        <Text style={styles.title}>Register</Text>
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.title}>Basic Information</Text>
+          <Text style={styles.subLabel}>Step 1 of 4 • Tell us about you</Text>
+          <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
+            <View style={{ width: '25%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+          </View>
+        </View>
 
-        <View style={styles.formContainer}>
+        <View style={styles.card}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>First Name <Text style={styles.required}>*</Text> </Text>
             <TextInput
@@ -447,7 +448,7 @@ const RegisterPage = () => {
               blurOnSubmit={false}
               onSubmitEditing={() => middleNameInput.current?.focus()}
             />
-            {firstNameError ? <Text style={styles.errorText}>{firstNameError}</Text> : null}
+
           </View>
 
           <View style={styles.inputContainer}>
@@ -477,7 +478,7 @@ const RegisterPage = () => {
               ref={lastNameInput}
               onSubmitEditing={() => placeOfBirthInput.current?.focus()}
             />
-            {lastNameError ? <Text style={styles.errorText}>{lastNameError}</Text> : null}
+
           </View>
 
           <View style={styles.inputContainer}>
@@ -501,7 +502,7 @@ const RegisterPage = () => {
                 <MaterialIcons name="arrow-drop-down" size={24} color="black" />
               </TouchableOpacity>
             </ModalSelector>
-            {genderError ? <Text style={styles.errorText}>{genderError}</Text> : null}
+
           </View>
 
           <View style={styles.inputContainer}>
@@ -549,7 +550,7 @@ const RegisterPage = () => {
               ref={placeOfBirthInput}
               onSubmitEditing={() => addressInput.current?.focus()}
             />
-            {placeOfBirthError ? <Text style={styles.errorText}>{placeOfBirthError}</Text> : null}
+
           </View>
 
           <View style={styles.inputContainer}>
@@ -565,7 +566,7 @@ const RegisterPage = () => {
               ref={addressInput}
               onSubmitEditing={() => emailInput.current?.focus()}
             />
-            {addressError ? <Text style={styles.errorText}>{addressError}</Text> : null}
+
           </View>
 
           <View style={styles.inputContainer}>
@@ -589,7 +590,7 @@ const RegisterPage = () => {
                 <MaterialIcons name="arrow-drop-down" size={24} color="black" />
               </TouchableOpacity>
             </ModalSelector>
-            {civilStatusError ? <Text style={styles.errorText}>{civilStatusError}</Text> : null}
+
           </View>
 
           <View style={styles.inputContainer}>
@@ -650,7 +651,7 @@ const RegisterPage = () => {
                 <MaterialIcons name="arrow-drop-down" size={24} color="black" />
               </TouchableOpacity>
             </ModalSelector>
-            {governmentIdError ? <Text style={styles.errorText}>{governmentIdError}</Text> : null}
+
           </View>
 
           <View style={styles.radioContainer}>
@@ -754,13 +755,13 @@ const RegisterPage = () => {
 
           <TouchableOpacity
             style={[
-              styles.nextButton,
-              { backgroundColor: isFormComplete() ? '#4FE7AF' : '#B0B0B0' }
+              styles.primaryButton,
+              !isFormComplete() && styles.buttonDisabled
             ]}
             onPress={handleNext}
             disabled={!isFormComplete()}
           >
-            <Text style={styles.nextButtonText}>Next</Text>
+            <Text style={styles.primaryButtonText}>Next</Text>
           </TouchableOpacity>
           
           <View style={styles.loginRedirect}>
@@ -798,25 +799,33 @@ const RegisterPage = () => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#2C5282',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
   formContainer: {
-    backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flexGrow: 1,
-    paddingStart: 40,
-    paddingEnd: 40,
-    paddingTop: 40,
-    paddingBottom: 40,
+    // deprecated in favor of card style
+  },
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    marginTop: 80,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+  },
+  subLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: '#475569',
   },
   label: {
     fontSize: 16,
@@ -867,24 +876,28 @@ const styles = StyleSheet.create({
     marginLeft: 10,
   },
   backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    marginTop: 20,
   },
-  nextButton: {
-    backgroundColor: '#4FE7AF',
+  // Primary button style (shared)
+  primaryButton: {
+    backgroundColor: '#1E3A5F',
     borderRadius: 10,
-    paddingVertical: 10,
+    paddingVertical: 14,
     paddingHorizontal: 20,
     alignItems: 'center',
-    marginTop: 10,
-    width: '50%',
+    marginTop: 12,
+    width: '100%',
     alignSelf: 'center',
   },
-  nextButtonText: {
-    color: 'black',
-    fontSize: 18,
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  buttonDisabled: {
+    backgroundColor: '#94A3B8',
   },
   loginRedirect: {
     flexDirection: 'row',
@@ -896,8 +909,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 3,
   },
   loginText: {
-    color: '#4FE7AF',
-    fontWeight: 'bold',
+    color: '#1E3A5F',
+    fontWeight: '700',
   },
   required: {
     color: 'red',
@@ -934,13 +947,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   radioButtonSelected: {
-    borderColor: '#4FE7AF',
+    borderColor: '#1E3A5F',
   },
   radioButtonInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#4FE7AF',
+    backgroundColor: '#1E3A5F',
   },
   checkingText: {
     color: '#666',

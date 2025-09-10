@@ -1,903 +1,670 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  FaSearch, 
-  FaDownload, 
-  FaChevronLeft, 
-  FaChevronRight,
-  FaCheckCircle,
-  FaTimes,
-  FaEdit,
-  FaSave
-} from 'react-icons/fa';
-import { FiAlertCircle } from 'react-icons/fi';
+import React, { useEffect, useMemo, useState } from 'react';
+import { FaSearch, FaSave, FaTimes, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 import { AiOutlineClose } from 'react-icons/ai';
-import ExcelJS from 'exceljs';
-import { getDatabase, ref, onValue, set, update } from 'firebase/database';
+import { database, auth, storage } from '../../../../Database/firebaseConfig';
+import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { sendMemberCredentialsEmail } from '../../../../Server/api';
 
-const styles = {
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  header: {
-    fontSize: '32px',
-    fontWeight: 'bold',
-    margin: '20px 25px 10px 25px',
-    color: '#2D5783',
-  },
-  settingsSection: {
-    backgroundColor: 'white',
-    margin: '0 25px 20px 25px',
-    borderRadius: '8px',
-    padding: '20px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  },
-  sectionTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '20px',
-    color: '#2D5783',
-  },
-  inputRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '15px',
-    padding: '10px 0',
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#333',
-    flex: 1,
-  },
-  input: {
-    padding: '8px 12px',
-    border: '1px solid #ddd',
-    borderRadius: '4px',
-    fontSize: '14px',
-    width: '200px',
-    outline: 'none',
-  },
-  inputDisabled: {
-    backgroundColor: '#f5f5f5',
-    cursor: 'not-allowed',
-  },
-  switch: {
-    position: 'relative',
-    display: 'inline-block',
-    width: '50px',
-    height: '24px',
-  },
-  switchInput: {
-    opacity: '0',
-    width: '0',
-    height: '0',
-  },
-  slider: {
-    position: 'absolute',
-    cursor: 'pointer',
-    top: '0',
-    left: '0',
-    right: '0',
-    bottom: '0',
-    backgroundColor: '#ccc',
-    transition: '.4s',
-    borderRadius: '24px',
-  },
-  sliderChecked: {
-    backgroundColor: '#4CAF50',
-  },
-  sliderBefore: {
-    position: 'absolute',
-    content: '""',
-    height: '16px',
-    width: '16px',
-    left: '4px',
-    bottom: '4px',
-    backgroundColor: 'white',
-    transition: '.4s',
-    borderRadius: '50%',
-    transform: 'translateX(0px)',
-  },
-  sliderBeforeChecked: {
-    transform: 'translateX(26px)',
-  },
-  editSaveButton: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#2D5783',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-    margin: '20px 0',
-  },
-  editSaveButtonSave: {
-    backgroundColor: '#4CAF50',
-  },
-  tableContainer: {
-    borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
-  },
-  table: {
-    width: '100%',
-    borderCollapse: 'collapse',
-    tableLayout: 'fixed',
-    minWidth: '800px'
-  },
-  tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
-  },
-  tableHeaderCell: {
-    whiteSpace: 'nowrap'
-  },
-  tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
-    }
-  },
-  tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
-  },
+// Options (match Register.jsx)
+const genderOptions = [
+  { key: 'Male', label: 'Male' },
+  { key: 'Female', label: 'Female' }
+];
+
+const civilStatusOptions = [
+  { key: 'Single', label: 'Single' },
+  { key: 'Married', label: 'Married' },
+  { key: 'Widowed', label: 'Widowed' },
+  { key: 'Separated', label: 'Separated' }
+];
+
+const governmentIdOptions = [
+  { key: 'national', label: 'National ID (PhilSys)' },
+  { key: 'sss', label: 'SSS ID' },
+  { key: 'philhealth', label: 'PhilHealth ID' },
+  { key: 'drivers_license', label: 'Drivers License' }
+];
+
+// Modal styles copied to match Register.jsx
+const modalStyles = {
   centeredModal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
   },
-  modalCardSmall: {
-    width: '250px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
+  modalCard: {
+    width: '40%', maxWidth: '800px', backgroundColor: 'white', borderRadius: '8px', padding: '20px', position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)', maxHeight: '90vh', height: '80vh', display: 'flex', flexDirection: 'column'
   },
   closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
+    position: 'absolute', top: '10px', right: '10px', cursor: 'pointer', fontSize: '18px', color: 'grey', backgroundColor: 'transparent', border: 'none', padding: '4px', outline: 'none'
   },
-  topControls: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    margin: '0 25px',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '10px',
-  },
-  searchDownloadContainer: {
-    display: 'flex',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '10px',
-  },
-  searchBar: {
-    display: 'flex',
-    border: '1px solid #ccc',
-    borderRadius: '25px',
-    backgroundColor: '#fff',
-    padding: '0 10px',
-    alignItems: 'center',
-    height: '40px',
-    width: '250px',
-  },
-  searchInput: {
-    height: '36px',
-    width: '100%',
-    fontSize: '16px',
-    paddingLeft: '8px',
-    border: 'none',
-    outline: 'none',
-    background: 'transparent',
-  },
-  searchIcon: {
-    padding: '4px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#666',
-  },
-  downloadIcon: {
-    padding: '6px',
-    background: 'none',
-    border: 'none',
-    cursor: 'pointer',
-    color: '#2D5783',
-  },
-  uploadButton: {
-    backgroundColor: '#2D5783',
-    padding: '0 16px',
-    borderRadius: '30px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '40px',
-    border: 'none',
-    cursor: 'pointer',
-  },
-  uploadButtonText: {
-    color: '#fff',
-    fontSize: '14px',
-    fontWeight: 'bold',
-  },
-  fileInput: {
-    display: 'none',
-  },
-  dataContainer: {
-    flex: 1,
-    margin: '0 25px',
-    marginTop: '10px',
-    backgroundColor: '#fff',
-    borderRadius: '8px',
-    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
-  },
-  noMatchText: {
-    textAlign: 'center',
-    marginTop: '20px',
-    fontSize: '16px',
-    color: '#666',
-  },
-  paginationContainer: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    margin: '0 25px',
-    marginTop: '10px',
-    alignItems: 'center',
-  },
-  paginationInfo: {
-    fontSize: '12px',
-    marginRight: '10px',
-    color: '#333',
-  },
-  paginationButton: {
-    padding: '0',
-    backgroundColor: '#2D5783',
-    borderRadius: '5px',
-    margin: '0 3px',
-    color: 'white',
-    border: 'none',
-    cursor: 'pointer',
-    width: '20px',
-    height: '20px',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-  },
+  modalHeader: { borderBottom: '1px solid #eee', paddingBottom: '12px', marginBottom: '12px' },
+  modalTitle: { fontSize: '18px', fontWeight: 'bold', marginBottom: '16px', color: '#2D5783', textAlign: 'center' },
+  modalContent: { paddingBottom: '12px', overflowY: 'auto', flex: 1 },
+  formColumns: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '30px', flex: 1 },
+  formColumn: { display: 'flex', flexDirection: 'column' },
+  formGroup: { marginBottom: '20px', width: '100%' },
+  formLabel: { fontWeight: 600, marginBottom: '5px', display: 'block', fontSize: 14, color: '#333' },
+  requiredAsterisk: { color: 'red', marginLeft: '3px' },
+  formInput: { width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '5px', boxSizing: 'border-box', fontSize: '14px' },
+  formSelect: { width: '100%', padding: '10px', border: '1px solid #ccc', borderRadius: '5px', boxSizing: 'border-box', backgroundColor: 'white', fontSize: '14px' },
+  fileInputLabel: { display: 'block', padding: '10px', border: '1px solid #ccc', borderRadius: '5px', backgroundColor: '#f8f9fa', cursor: 'pointer', textAlign: 'center', fontSize: '14px', color: '#495057' },
+  fileInput: { display: 'none' },
+  bottomButtons: { display: 'flex', justifyContent: 'center', marginTop: '16px', gap: '12px', paddingTop: '12px', borderTop: '1px solid #eee' },
+  actionButton: { padding: '8px 16px', borderRadius: '4px', border: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', transition: 'all 0.2s', minWidth: '100px', outline: 'none' }
 };
 
-const DataMigration = () => {
+const tableStyles = {
+  tableContainer: { borderRadius: 8, overflow: 'auto', boxShadow: '0 1px 4px rgba(0,0,0,0.1)' },
+  table: { width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed', minWidth: 900 },
+  tableHeader: { backgroundColor: '#2D5783', color: '#fff', height: 50, textAlign: 'center', fontWeight: 'bold', fontSize: 16 },
+  tableHeaderCell: { whiteSpace: 'nowrap' },
+  tableRow: { height: 50 },
+  tableCell: { textAlign: 'center', fontSize: 14, borderBottom: '1px solid #ddd', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  viewText: { color: '#2D5783', fontSize: 14, textDecoration: 'underline', cursor: 'pointer', fontWeight: 500 }
+};
+
+const emptyForm = {
+  email: '', phoneNumber: '', firstName: '', middleName: '', lastName: '',
+  gender: '', civilStatus: '', age: '', dateOfBirth: '', placeOfBirth: '', address: '',
+  governmentId: '', registrationFee: '', balance: '', loans: ''
+};
+
+const generateRandomPassword = () => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let pwd = ''; for (let i = 0; i < 6; i++) pwd += chars.charAt(Math.floor(Math.random() * chars.length));
+  if (!/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/\d/.test(pwd)) return generateRandomPassword();
+  return pwd;
+};
+
+const MembersManagement = () => {
+  // Data
   const [members, setMembers] = useState([]);
-  const [excelData, setExcelData] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [confirmMigrateVisible, setConfirmMigrateVisible] = useState(false);
-  const [confirmSaveVisible, setConfirmSaveVisible] = useState(false);
-  const [successVisible, setSuccessVisible] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [actionInProgress, setActionInProgress] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [filteredData, setFilteredData] = useState([]);
-  const [noMatch, setNoMatch] = useState(false);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [selectedMember, setSelectedMember] = useState(null);
-  const [memberModalVisible, setMemberModalVisible] = useState(false);
-  const [fileName, setFileName] = useState('');
-  const [statusList, setStatusList] = useState([]);
-  const [editMode, setEditMode] = useState(false);
-  
-  // Data Management Settings
-  const [settings, setSettings] = useState({
-    autoArchiving: false,
-    archiveDays: 365,
-    autoBackup: false,
-    backupFrequency: 'weekly',
-    dataRetentionDays: 1095, // 3 years
-    exportFormat: 'xlsx',
-    maxFileSize: 50, // MB
-    compressionEnabled: true,
-  });
+  const [search, setSearch] = useState('');
+  const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
 
+  // Pagination
   const pageSize = 10;
+  const [currentPage, setCurrentPage] = useState(0);
 
+  // Add/Edit modal
+  const [addOpen, setAddOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingMember, setEditingMember] = useState(null);
+  const [form, setForm] = useState(emptyForm);
+
+  // Files
+  const [validIdFrontFile, setValidIdFrontFile] = useState(null);
+  const [validIdBackFile, setValidIdBackFile] = useState(null);
+  const [selfieFile, setSelfieFile] = useState(null);
+  const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
+  const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
+
+  // UX
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState('');
+
+  // Inject page styles that mimic Admins.jsx header/controls
   useEffect(() => {
-    const styleElement = document.createElement('style');
-    styleElement.innerHTML = `
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
+    const styleEl = document.createElement('style');
+    styleEl.innerHTML = `
+      .safe-area-view { flex: 1; background-color: #F5F5F5; height: 100%; width: 100%; overflow: auto; }
+      .main-container { flex: 1; }
+      .header-text { font-weight: bold; font-size: 40px; margin-bottom: 10px; margin-left: 25px; margin-right: 25px; margin-top: 100px; }
+      .top-controls { display: flex; justify-content: space-between; margin: 0 25px; align-items: center; flex-wrap: wrap; gap: 10px; }
+      .search-download-container { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+      .search-bar { display: flex; border: 1px solid #ccc; border-radius: 25px; background-color: #fff; padding: 0 10px; align-items: center; height: 40px; width: 250px; }
+      .search-input { height: 36px; width: 100%; font-size: 16px; padding-left: 8px; border: none; outline: none; background: transparent; }
+      .search-icon { padding: 4px; background: none; border: none; cursor: pointer; color: #666; }
+      .create-button { background-color: #2D5783; padding: 0 16px; border-radius: 30px; display: flex; justify-content: center; align-items: center; height: 40px; border: none; cursor: pointer; }
+      .create-button-text { color: #fff; font-size: 14px; font-weight: bold; }
+      .pagination-container { display: flex; justify-content: flex-end; margin: 0 25px; margin-top: 10px; align-items: center; }
+      .pagination-info { font-size: 12px; margin-right: 10px; color: #333; }
+      .pagination-button { padding: 0; background-color: #2D5783; border-radius: 5px; margin: 0 3px; color: white; border: none; cursor: pointer; width: 20px; height: 20px; display: flex; justify-content: center; align-items: center; }
+      .pagination-button svg { font-size: 10px; display: block; margin: 0 auto; }
+      .disabled-button { background-color: #ccc; cursor: not-allowed; }
+      .data-container { flex: 1; margin: 0 25px; margin-top: 10px; background-color: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+      .no-match-text { text-align: center; margin-top: 20px; font-size: 16px; color: #666; }
     `;
-    document.head.appendChild(styleElement);
+    document.head.appendChild(styleEl);
 
-    // Load settings from Firebase
-    loadSettings();
-    loadMembers();
+    (async () => {
+      try {
+        const feeSnap = await database.ref('Settings/RegistrationMinimumFee').once('value');
+        const val = feeSnap.val();
+        const num = parseFloat(val);
+        if (!isNaN(num)) setMinRegistrationFee(num);
+      } catch (_) {}
 
-    return () => {
-      if (document.head.contains(styleElement)) {
-        document.head.removeChild(styleElement);
-      }
-    };
+      await fetchMembers();
+    })();
+
+    return () => { document.head.removeChild(styleEl); };
   }, []);
 
-  const loadSettings = () => {
-    const db = getDatabase();
-    const settingsRef = ref(db, 'Settings/DataManagement');
-    onValue(settingsRef, (snapshot) => {
-      if (snapshot.exists()) {
-        setSettings({ ...settings, ...snapshot.val() });
-      }
-      setLoading(false);
-    });
-  };
-
-  const loadMembers = () => {
-    const db = getDatabase();
-    const membersRef = ref(db, 'Members');
-    onValue(membersRef, (snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        const membersList = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key]
-        }));
-        setMembers(membersList);
-        setFilteredData(membersList);
-      }
-    });
-  };
-
-  const handleSave = () => {
-    setConfirmSaveVisible(true);
-  };
-
-  const confirmSave = async () => {
-    setActionInProgress(true);
+  const fetchMembers = async () => {
+    setLoading(true);
     try {
-      const db = getDatabase();
-      const settingsRef = ref(db, 'Settings/DataManagement');
-      await update(settingsRef, settings);
-      
-      setConfirmSaveVisible(false);
-      setEditMode(false);
-      setSuccessMessage('Data management settings updated successfully!');
-      setSuccessVisible(true);
-    } catch (error) {
-      setErrorMessage('Failed to update settings: ' + error.message);
-      setErrorModalVisible(true);
-    } finally {
-      setActionInProgress(false);
-    }
+      const snap = await database.ref('Members').once('value');
+      const data = snap.val() || {};
+      const list = Object.values(data).sort((a, b) => Number(a.id) - Number(b.id));
+      setMembers(list);
+    } catch (e) {
+      console.error(e);
+      setMessage('Failed to load members');
+    } finally { setLoading(false); }
   };
 
-  const handleInputChange = (key, value) => {
-    setSettings(prev => ({ ...prev, [key]: value }));
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return members;
+    return members.filter(m => (
+      `${m.firstName || ''} ${m.middleName || ''} ${m.lastName || ''}`.toLowerCase().includes(q) ||
+      `${m.email || ''}`.toLowerCase().includes(q) || `${m.phoneNumber || ''}`.toLowerCase().includes(q) || String(m.id || '').includes(q)
+    ));
+  }, [search, members]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  useEffect(() => { if (currentPage > totalPages - 1) setCurrentPage(0); }, [totalPages]);
+
+  const toPeso = (n) => `₱${Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+  const openAdd = () => {
+    setForm({ ...emptyForm, registrationFee: String(minRegistrationFee) });
+    setValidIdFrontFile(null); setValidIdBackFile(null); setSelfieFile(null); setSelfieWithIdFile(null); setProofOfPaymentFile(null);
+    setAddOpen(true);
   };
 
-  const handleToggleChange = (key, checked) => {
-    setSettings(prev => ({ ...prev, [key]: checked }));
+  const openEdit = (member) => {
+    setEditingMember(member);
+    setForm({
+      email: member.email || '',
+      phoneNumber: member.phoneNumber || '',
+      firstName: member.firstName || '',
+      middleName: member.middleName || '',
+      lastName: member.lastName || '',
+      gender: member.gender || '',
+      civilStatus: member.civilStatus || '',
+      age: member.age || '',
+      dateOfBirth: member.dateOfBirth || '',
+      placeOfBirth: member.placeOfBirth || '',
+      address: member.address || '',
+      governmentId: member.governmentId || '',
+      registrationFee: String(member.registrationFee ?? minRegistrationFee),
+      balance: String(member.balance ?? 0),
+      loans: String(member.loans ?? 0)
+    });
+    setValidIdFrontFile(null); setValidIdBackFile(null); setSelfieFile(null); setSelfieWithIdFile(null); setProofOfPaymentFile(null);
+    setEditOpen(true);
   };
 
-  const handleSuccessOk = () => {
-    setSuccessVisible(false);
+  const closeModals = () => { setAddOpen(false); setEditOpen(false); setEditingMember(null); setMessage(''); };
+
+  // Upload helper
+  const uploadImageToStorage = async (file, path) => {
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file);
+    return await getDownloadURL(fileRef);
   };
 
-  const handleSearch = (query) => {
-    setSearchQuery(query);
-    if (!query.trim()) {
-      setFilteredData(members);
-      setNoMatch(false);
-      return;
-    }
-
-    const filtered = members.filter(member =>
-      member.firstName?.toLowerCase().includes(query.toLowerCase()) ||
-      member.lastName?.toLowerCase().includes(query.toLowerCase()) ||
-      member.email?.toLowerCase().includes(query.toLowerCase()) ||
-      member.id?.toLowerCase().includes(query.toLowerCase())
-    );
-
-    setFilteredData(filtered);
-    setNoMatch(filtered.length === 0);
-    setCurrentPage(0);
+  // Compute next available numeric member id starting at 5001
+  const getNextMemberId = async () => {
+    const membersSnap = await database.ref('Members').once('value');
+    const membersData = membersSnap.val() || {};
+    const existingIds = Object.keys(membersData).map(Number).filter(n => !Number.isNaN(n)).sort((a, b) => a - b);
+    let newId = 5001; for (const id of existingIds) { if (id === newId) newId++; else if (id > newId) break; }
+    return newId;
   };
 
-  const exportToExcel = async () => {
+  // Add member (Register.jsx flow + same layout)
+  const onSubmitAdd = async () => {
+    setBusy(true); setMessage('');
     try {
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet('Members Data');
+      if (!form.email || !form.firstName || !form.lastName || !form.phoneNumber || !form.placeOfBirth || !form.gender || !form.dateOfBirth || !form.address || !form.age || !form.civilStatus || !form.governmentId) {
+        throw new Error('Please complete all required fields.');
+      }
+      if (!validIdFrontFile || !validIdBackFile || !selfieFile || !selfieWithIdFile || !proofOfPaymentFile) throw new Error('Please upload all required images/documents.');
 
-      // Add headers
-      worksheet.columns = [
-        { header: 'ID', key: 'id', width: 15 },
-        { header: 'First Name', key: 'firstName', width: 20 },
-        { header: 'Last Name', key: 'lastName', width: 20 },
-        { header: 'Email', key: 'email', width: 30 },
-        { header: 'Phone', key: 'phone', width: 15 },
-        { header: 'Status', key: 'status', width: 15 },
-        { header: 'Balance', key: 'balance', width: 15 },
-        { header: 'Date Registered', key: 'dateRegistered', width: 20 },
-      ];
+      const password = generateRandomPassword();
+      const userCredential = await createUserWithEmailAndPassword(auth, form.email, password);
+      const userId = userCredential.user.uid;
 
-      // Add data
-      filteredData.forEach(member => {
-        worksheet.addRow({
-          id: member.id,
-          firstName: member.firstName || '',
-          lastName: member.lastName || '',
-          email: member.email || '',
-          phone: member.phone || '',
-          status: member.status || '',
-          balance: member.balance || 0,
-          dateRegistered: member.dateRegistered || '',
-        });
+      const newId = await getNextMemberId();
+
+      const now = new Date();
+      const dateAdded = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const timeAdded = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+
+      // Upload images
+      const validIdFrontUrl = await uploadImageToStorage(validIdFrontFile, `member_docs/${newId}/valid_id_front_${Date.now()}`);
+      const validIdBackUrl  = await uploadImageToStorage(validIdBackFile,  `member_docs/${newId}/valid_id_back_${Date.now()}`);
+      const selfieUrl       = await uploadImageToStorage(selfieFile,       `member_docs/${newId}/selfie_${Date.now()}`);
+      const selfieWithIdUrl = await uploadImageToStorage(selfieWithIdFile, `member_docs/${newId}/selfie_with_id_${Date.now()}`);
+      const proofOfPaymentUrl = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${newId}/registration_payment_proof_${Date.now()}`);
+
+      const memberData = {
+        id: newId, authUid: userId, email: form.email,
+        firstName: form.firstName, middleName: form.middleName || '', lastName: form.lastName,
+        phoneNumber: form.phoneNumber, gender: form.gender, civilStatus: form.civilStatus,
+        age: form.age, dateOfBirth: form.dateOfBirth, placeOfBirth: form.placeOfBirth, address: form.address,
+        governmentId: form.governmentId,
+        dateAdded, timeAdded, status: 'active',
+        balance: 0.0, loans: 0.0,
+        validIdFront: validIdFrontUrl, validIdBack: validIdBackUrl,
+        selfie: selfieUrl, selfieWithId: selfieWithIdUrl,
+        registrationFee: parseFloat(form.registrationFee || minRegistrationFee),
+        registrationPaymentProof: proofOfPaymentUrl
+      };
+
+      await database.ref(`Members/${newId}`).set(memberData);
+
+      await sendMemberCredentialsEmail({
+        firstName: memberData.firstName, lastName: memberData.lastName,
+        email: memberData.email, password, memberId: memberData.id, dateAdded: memberData.dateAdded
       });
 
-      // Style the header
-      worksheet.getRow(1).font = { bold: true };
-      worksheet.getRow(1).fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FF2D5783' }
-      };
-      worksheet.getRow(1).font = { color: { argb: 'FFFFFFFF' }, bold: true };
-
-      // Generate buffer and download
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `members_data_${new Date().toISOString().split('T')[0]}.xlsx`;
-      link.click();
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      setErrorMessage('Failed to export data: ' + error.message);
-      setErrorModalVisible(true);
-    }
+      setMessage('Member added successfully.');
+      closeModals();
+      await fetchMembers();
+    } catch (e) {
+      console.error(e);
+      setMessage(e.message || 'Failed to add member');
+    } finally { setBusy(false); }
   };
 
-  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-  const totalPages = Math.ceil(filteredData.length / pageSize);
+  // Edit member (update fields; optionally replace images). Balance and Loans editable here.
+  const onSubmitEdit = async () => {
+    if (!editingMember) return;
+    setBusy(true); setMessage('');
+    try {
+      const id = editingMember.id;
+      const updates = {
+        phoneNumber: form.phoneNumber || '', firstName: form.firstName || '', middleName: form.middleName || '', lastName: form.lastName || '',
+        gender: form.gender || '', civilStatus: form.civilStatus || '', age: form.age || '', dateOfBirth: form.dateOfBirth || '',
+        placeOfBirth: form.placeOfBirth || '', address: form.address || '', governmentId: form.governmentId || '',
+        registrationFee: parseFloat(form.registrationFee || editingMember.registrationFee || 0),
+        balance: parseFloat(form.balance || editingMember.balance || 0),
+        loans: parseFloat(form.loans || editingMember.loans || 0)
+      };
+
+      if (validIdFrontFile) updates.validIdFront = await uploadImageToStorage(validIdFrontFile, `member_docs/${id}/valid_id_front_${Date.now()}`);
+      if (validIdBackFile)  updates.validIdBack  = await uploadImageToStorage(validIdBackFile,  `member_docs/${id}/valid_id_back_${Date.now()}`);
+      if (selfieFile)       updates.selfie       = await uploadImageToStorage(selfieFile,       `member_docs/${id}/selfie_${Date.now()}`);
+      if (selfieWithIdFile) updates.selfieWithId = await uploadImageToStorage(selfieWithIdFile, `member_docs/${id}/selfie_with_id_${Date.now()}`);
+      if (proofOfPaymentFile) updates.registrationPaymentProof = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${id}/registration_payment_proof_${Date.now()}`);
+
+      await database.ref(`Members/${id}`).update(updates);
+
+      setMessage('Member updated successfully.');
+      closeModals();
+      await fetchMembers();
+    } catch (e) {
+      console.error(e);
+      setMessage(e.message || 'Failed to update member');
+    } finally { setBusy(false); }
+  };
+
+  const renderModal = (mode /* 'add' | 'edit' */) => (
+    <div style={modalStyles.centeredModal}>
+      <div style={modalStyles.modalCard}>
+        <button style={modalStyles.closeButton} onClick={closeModals} aria-label="Close">
+          <AiOutlineClose />
+        </button>
+        <div style={modalStyles.modalHeader}>
+          <h2 style={modalStyles.modalTitle}>{mode === 'add' ? 'New Member' : `Edit Member #${editingMember?.id}`}</h2>
+        </div>
+        <div style={modalStyles.modalContent}>
+          <div style={modalStyles.formColumns}>
+            {/* Left Column (match Register.jsx order) */}
+            <div style={modalStyles.formColumn}>
+              {mode === 'add' ? (
+                <>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>First Name<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="First Name" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Last Name<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Last Name" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Email<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Email" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Birth Place<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Birth Place" value={form.placeOfBirth} onChange={e => setForm({ ...form, placeOfBirth: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Gender<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <select style={modalStyles.formSelect} value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
+                      <option value="">Select Gender</option>
+                      {genderOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Date of Birth<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} type="date" value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Valid ID Front<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {validIdFrontFile ? validIdFrontFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setValidIdFrontFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Selfie<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {selfieFile ? selfieFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setSelfieFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Registration Fee (min {toPeso(minRegistrationFee)})<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder={`Enter amount (min ${toPeso(minRegistrationFee)})`} type="number" min={minRegistrationFee} step="0.01" value={form.registrationFee} onChange={e => setForm({ ...form, registrationFee: e.target.value })} />
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>First Name<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="First Name" value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Last Name<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Last Name" value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Email</label>
+                    <input disabled style={modalStyles.formInput} type="email" value={form.email} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Birth Place<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Birth Place" value={form.placeOfBirth} onChange={e => setForm({ ...form, placeOfBirth: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Gender<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <select style={modalStyles.formSelect} value={form.gender} onChange={e => setForm({ ...form, gender: e.target.value })}>
+                      <option value="">Select Gender</option>
+                      {genderOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Date of Birth<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} type="date" value={form.dateOfBirth} onChange={e => setForm({ ...form, dateOfBirth: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Valid ID Front</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {validIdFrontFile ? validIdFrontFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setValidIdFrontFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Selfie</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {selfieFile ? selfieFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setSelfieFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Registration Fee</label>
+                    <input style={modalStyles.formInput} type="number" step="0.01" value={form.registrationFee} onChange={e => setForm({ ...form, registrationFee: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Balance</label>
+                    <input style={modalStyles.formInput} type="number" step="0.01" value={form.balance} onChange={e => setForm({ ...form, balance: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Loans</label>
+                    <input style={modalStyles.formInput} type="number" step="0.01" value={form.loans} onChange={e => setForm({ ...form, loans: e.target.value })} />
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Right Column (match Register.jsx order) */}
+            <div style={modalStyles.formColumn}>
+              {mode === 'add' ? (
+                <>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Middle Name</label>
+                    <input style={modalStyles.formInput} placeholder="Middle Name" value={form.middleName} onChange={e => setForm({ ...form, middleName: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Phone Number<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Phone Number" type="tel" value={form.phoneNumber} onChange={e => setForm({ ...form, phoneNumber: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Address<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} placeholder="Address" value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Age<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <input style={modalStyles.formInput} type="number" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Civil Status<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <select style={modalStyles.formSelect} value={form.civilStatus} onChange={e => setForm({ ...form, civilStatus: e.target.value })}>
+                      <option value="">Select Civil Status</option>
+                      {civilStatusOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Government ID<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <select style={modalStyles.formSelect} value={form.governmentId} onChange={e => setForm({ ...form, governmentId: e.target.value })}>
+                      <option value="">Select Government ID</option>
+                      {governmentIdOptions.map(option => <option key={option.key} value={option.label}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Valid ID Back<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {validIdBackFile ? validIdBackFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setValidIdBackFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Selfie with ID<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {selfieWithIdFile ? selfieWithIdFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setSelfieWithIdFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Proof of Payment<span style={modalStyles.requiredAsterisk}>*</span></label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {proofOfPaymentFile ? proofOfPaymentFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*,application/pdf" onChange={e => setProofOfPaymentFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Edit column right */}
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Middle Name</label>
+                    <input style={modalStyles.formInput} value={form.middleName} onChange={e => setForm({ ...form, middleName: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Phone Number</label>
+                    <input style={modalStyles.formInput} value={form.phoneNumber} onChange={e => setForm({ ...form, phoneNumber: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Address</label>
+                    <input style={modalStyles.formInput} value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Age</label>
+                    <input style={modalStyles.formInput} type="number" value={form.age} onChange={e => setForm({ ...form, age: e.target.value })} />
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Civil Status</label>
+                    <select style={modalStyles.formSelect} value={form.civilStatus} onChange={e => setForm({ ...form, civilStatus: e.target.value })}>
+                      <option value="">Select Civil Status</option>
+                      {civilStatusOptions.map(option => <option key={option.key} value={option.key}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Government ID</label>
+                    <select style={modalStyles.formSelect} value={form.governmentId} onChange={e => setForm({ ...form, governmentId: e.target.value })}>
+                      <option value="">Select Government ID</option>
+                      {governmentIdOptions.map(option => <option key={option.key} value={option.label}>{option.label}</option>)}
+                    </select>
+                  </div>
+                  {/* Optional replace documents */}
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Valid ID Front</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {validIdFrontFile ? validIdFrontFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setValidIdFrontFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Valid ID Back</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {validIdBackFile ? validIdBackFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setValidIdBackFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Selfie</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {selfieFile ? selfieFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setSelfieFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Selfie with ID</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {selfieWithIdFile ? selfieWithIdFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*" onChange={e => setSelfieWithIdFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                  <div style={modalStyles.formGroup}>
+                    <label style={modalStyles.formLabel}>Replace Proof of Payment</label>
+                    <label style={modalStyles.fileInputLabel}>
+                      {proofOfPaymentFile ? proofOfPaymentFile.name : 'Choose file'}
+                      <input style={modalStyles.fileInput} type="file" accept="image/*,application/pdf" onChange={e => setProofOfPaymentFile(e.target.files?.[0] || null)} />
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div style={modalStyles.bottomButtons}>
+            <button
+              style={{ ...modalStyles.actionButton, backgroundColor: '#2D5783', color: '#FFF' }}
+              onClick={mode === 'add' ? onSubmitAdd : onSubmitEdit}
+              disabled={busy}
+            >
+              <FaSave /> {busy ? 'Saving...' : (mode === 'add' ? 'Add Member' : 'Update Member')}
+            </button>
+            <button
+              style={{ ...modalStyles.actionButton, backgroundColor: '#6c757d', color: '#FFF' }}
+              onClick={closeModals}
+            >
+              <FaTimes /> Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
-      <div style={styles.container}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-          <div style={styles.spinner}></div>
-        </div>
+      <div className="loading-container">
+        <div style={{ border: '4px solid rgba(0,0,0,0.1)', borderLeftColor: '#2D5783', borderRadius: '50%', width: 36, height: 36, animation: 'spin 1s linear infinite' }} />
       </div>
     );
   }
 
+  const noMatch = filtered.length === 0;
+
   return (
-    <div style={styles.container}>
-      <h1 style={styles.header}>Data Management</h1>
+    <div className="safe-area-view">
+      <div className="main-container">
+        <h2 className="header-text">Members</h2>
 
-      {/* Settings Section */}
-      <div style={styles.settingsSection}>
-        <h2 style={styles.sectionTitle}>Data Management Settings</h2>
-        
-        {/* Auto Archiving */}
-        <div style={styles.inputRow}>
-          <label style={styles.label}>Enable Auto Archiving</label>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.autoArchiving}
-              onChange={(e) => handleToggleChange('autoArchiving', e.target.checked)}
-              disabled={!editMode}
-              style={styles.switchInput}
-            />
-            <span style={{
-              ...styles.slider,
-              ...(settings.autoArchiving ? styles.sliderChecked : {})
-            }}>
-              <span style={{
-                ...styles.sliderBefore,
-                ...(settings.autoArchiving ? styles.sliderBeforeChecked : {})
-              }}></span>
-            </span>
-          </label>
-        </div>
-
-        {/* Archive Days */}
-        <div style={styles.inputRow}>
-          <label style={styles.label}>Archive After (Days)</label>
-          <input
-            type="number"
-            value={settings.archiveDays}
-            onChange={(e) => handleInputChange('archiveDays', parseInt(e.target.value) || 365)}
-            disabled={!editMode}
-            style={{
-              ...styles.input,
-              ...(editMode ? {} : styles.inputDisabled)
-            }}
-          />
-        </div>
-
-        {/* Auto Backup */}
-        <div style={styles.inputRow}>
-          <label style={styles.label}>Enable Auto Backup</label>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.autoBackup}
-              onChange={(e) => handleToggleChange('autoBackup', e.target.checked)}
-              disabled={!editMode}
-              style={styles.switchInput}
-            />
-            <span style={{
-              ...styles.slider,
-              ...(settings.autoBackup ? styles.sliderChecked : {})
-            }}>
-              <span style={{
-                ...styles.sliderBefore,
-                ...(settings.autoBackup ? styles.sliderBeforeChecked : {})
-              }}></span>
-            </span>
-          </label>
-        </div>
-
-        {/* Backup Frequency */}
-        <div style={styles.inputRow}>
-          <label style={styles.label}>Backup Frequency</label>
-          <select
-            value={settings.backupFrequency}
-            onChange={(e) => handleInputChange('backupFrequency', e.target.value)}
-            disabled={!editMode}
-            style={{
-              ...styles.input,
-              ...(editMode ? {} : styles.inputDisabled)
-            }}
-          >
-            <option value="daily">Daily</option>
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-          </select>
-        </div>
-
-        {/* Data Retention */}
-        <div style={styles.inputRow}>
-          <label style={styles.label}>Data Retention (Days)</label>
-          <input
-            type="number"
-            value={settings.dataRetentionDays}
-            onChange={(e) => handleInputChange('dataRetentionDays', parseInt(e.target.value) || 1095)}
-            disabled={!editMode}
-            style={{
-              ...styles.input,
-              ...(editMode ? {} : styles.inputDisabled)
-            }}
-          />
-        </div>
-
-        {/* Compression */}
-        <div style={styles.inputRow}>
-          <label style={styles.label}>Enable Compression</label>
-          <label style={styles.switch}>
-            <input
-              type="checkbox"
-              checked={settings.compressionEnabled}
-              onChange={(e) => handleToggleChange('compressionEnabled', e.target.checked)}
-              disabled={!editMode}
-              style={styles.switchInput}
-            />
-            <span style={{
-              ...styles.slider,
-              ...(settings.compressionEnabled ? styles.sliderChecked : {})
-            }}>
-              <span style={{
-                ...styles.sliderBefore,
-                ...(settings.compressionEnabled ? styles.sliderBeforeChecked : {})
-              }}></span>
-            </span>
-          </label>
-        </div>
-
-        {/* Edit/Save Button */}
-        <button 
-          style={{
-            ...styles.editSaveButton,
-            ...(editMode ? styles.editSaveButtonSave : {})
-          }}
-          onClick={editMode ? handleSave : () => setEditMode(true)}
-        >
-          {editMode ? <FaSave /> : <FaEdit />}
-          {editMode ? 'Save Settings' : 'Edit Settings'}
-        </button>
-      </div>
-
-      {/* Search and Controls */}
-      <div style={styles.topControls}>
-        <div style={styles.searchDownloadContainer}>
-          <div style={styles.searchBar}>
-            <input
-              style={styles.searchInput}
-              placeholder="Search members..."
-              value={searchQuery}
-              onChange={(e) => handleSearch(e.target.value)}
-            />
-            <button style={styles.searchIcon}>
-              <FaSearch />
-            </button>
-          </div>
-          <button style={styles.downloadIcon} onClick={exportToExcel}>
-            <FaDownload size={20} />
+        <div className="top-controls">
+          <button onClick={openAdd} className="create-button">
+            <span className="create-button-text">Add Member</span>
           </button>
-        </div>
-      </div>
 
-      {/* Data Table */}
-      <div style={styles.dataContainer}>
-        {noMatch ? (
-          <div style={styles.noMatchText}>No matching records found</div>
-        ) : (
-          <div style={styles.tableContainer}>
-            <table style={styles.table}>
-              <thead>
-                <tr style={styles.tableHeader}>
-                  <th style={styles.tableHeaderCell}>ID</th>
-                  <th style={styles.tableHeaderCell}>Name</th>
-                  <th style={styles.tableHeaderCell}>Email</th>
-                  <th style={styles.tableHeaderCell}>Status</th>
-                  <th style={styles.tableHeaderCell}>Balance</th>
-                  <th style={styles.tableHeaderCell}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {paginatedData.map((member, index) => (
-                  <tr key={member.id} style={{
-                    ...styles.tableRow,
-                    backgroundColor: index % 2 === 0 ? '#f5f5f5' : '#fff'
-                  }}>
-                    <td style={styles.tableCell}>{member.id}</td>
-                    <td style={styles.tableCell}>
-                      {`${member.firstName || ''} ${member.lastName || ''}`.trim()}
-                    </td>
-                    <td style={styles.tableCell}>{member.email || ''}</td>
-                    <td style={styles.tableCell}>{member.status || ''}</td>
-                    <td style={styles.tableCell}>₱{(member.balance || 0).toLocaleString()}</td>
-                    <td style={styles.tableCell}>
-                      <span 
-                        style={styles.viewText}
-                        onClick={() => {
-                          setSelectedMember(member);
-                          setMemberModalVisible(true);
-                        }}
-                      >
-                        View
-                      </span>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Pagination */}
-      {!noMatch && totalPages > 1 && (
-        <div style={styles.paginationContainer}>
-          <span style={styles.paginationInfo}>
-            Page {currentPage + 1} of {totalPages}
-          </span>
-          <button
-            style={{
-              ...styles.paginationButton,
-              ...(currentPage === 0 ? styles.disabledButton : {})
-            }}
-            onClick={() => setCurrentPage(Math.max(0, currentPage - 1))}
-            disabled={currentPage === 0}
-          >
-            <FaChevronLeft />
-          </button>
-          <button
-            style={{
-              ...styles.paginationButton,
-              ...(currentPage >= totalPages - 1 ? styles.disabledButton : {})
-            }}
-            onClick={() => setCurrentPage(Math.min(totalPages - 1, currentPage + 1))}
-            disabled={currentPage >= totalPages - 1}
-          >
-            <FaChevronRight />
-          </button>
-        </div>
-      )}
-
-      {/* Save Confirmation Modal */}
-      {confirmSaveVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>Are you sure you want to save these data management settings?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={confirmSave}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Saving...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
-                }} 
-                onClick={() => setConfirmSaveVisible(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
+          <div className="search-download-container">
+            <div className="search-bar">
+              <input className="search-input" placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
+              <button className="search-icon"><FaSearch /></button>
             </div>
           </div>
         </div>
-      )}
 
-      {/* Success Modal */}
-      {successVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={handleSuccessOk}
-            >
-              OK
+        {!noMatch && (
+          <div className="pagination-container">
+            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
+            <button onClick={() => setCurrentPage(p => Math.max(p - 1, 0))} disabled={currentPage === 0} className={`pagination-button ${currentPage === 0 ? 'disabled-button' : ''}`}>
+              <FaChevronLeft />
+            </button>
+            <button onClick={() => setCurrentPage(p => Math.min(p + 1, totalPages - 1))} disabled={currentPage === totalPages - 1} className={`pagination-button ${currentPage === totalPages - 1 ? 'disabled-button' : ''}`}>
+              <FaChevronRight />
             </button>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Error Modal */}
-      {errorModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-            <p style={styles.modalText}>{errorMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={() => setErrorModalVisible(false)}
-              autoFocus
-            >
-              OK
-            </button>
-          </div>
+        <div className="data-container">
+          {noMatch ? (
+            <span className="no-match-text">No Matches Found</span>
+          ) : (
+            <div style={tableStyles.tableContainer}>
+              <table style={tableStyles.table}>
+                <thead>
+                  <tr style={tableStyles.tableHeader}>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '10%' }}>ID</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '16%' }}>First Name</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '14%' }}>Middle Name</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '16%' }}>Last Name</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '18%' }}>Email</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '14%' }}>Phone</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '12%' }}>Balance</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '12%' }}>Loans</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '14%' }}>Date Added</th>
+                    <th style={{ ...tableStyles.tableHeaderCell, width: '10%' }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginated.map(m => (
+                    <tr key={m.id} style={tableStyles.tableRow}>
+                      <td style={tableStyles.tableCell}>{m.id}</td>
+                      <td style={tableStyles.tableCell}>{m.firstName || 'N/A'}</td>
+                      <td style={tableStyles.tableCell}>{m.middleName || 'N/A'}</td>
+                      <td style={tableStyles.tableCell}>{m.lastName || 'N/A'}</td>
+                      <td style={tableStyles.tableCell}>{m.email || 'N/A'}</td>
+                      <td style={tableStyles.tableCell}>{m.phoneNumber || m.contactNumber || 'N/A'}</td>
+                      <td style={tableStyles.tableCell}>{toPeso(m.balance)}</td>
+                      <td style={tableStyles.tableCell}>{toPeso(m.loans)}</td>
+                      <td style={tableStyles.tableCell}>{m.dateAdded || m.dateApproved ||'N/A'}</td>
+                      <td style={tableStyles.tableCell}>
+                        <span style={tableStyles.viewText} onClick={() => openEdit(m)}>Edit</span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
-      )}
 
-      {/* Processing Spinner */}
-      {isProcessing && (
-        <div style={styles.centeredModal}>
-          <div style={styles.spinner}></div>
-        </div>
-      )}
+        {addOpen && renderModal('add')}
+        {editOpen && renderModal('edit')}
+      </div>
     </div>
   );
 };
 
-export default DataMigration;
+export default MembersManagement;

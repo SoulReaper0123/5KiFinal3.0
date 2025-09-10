@@ -6,6 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as Keychain from 'react-native-keychain';
@@ -108,96 +111,129 @@ export default function VerifyCode({ route, navigation }) {
   };
 
   return (
-    <View style={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+    >
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+        </TouchableOpacity>
 
-      <Text style={styles.infoText}>
-        A 6-digit verification code has been sent to your email. Please enter the code to continue.
-      </Text>
-      
-      <View style={styles.codeInputContainer}>
-        {digits.map((digit, index) => (
-          <TextInput
-            key={index}
-            ref={el => inputRefs.current[index] = el}
-            style={styles.codeInput}
-            maxLength={1}
-            keyboardType="number-pad"
-            value={digit}
-            onChangeText={(text) => handleChange(text, index)}
-            onKeyPress={(e) => handleKeyPress(e, index)}
-            autoFocus={index === 0}
-            selectTextOnFocus
-          />
-        ))}
-      </View>
+        <View style={styles.contentWrapper}>
+          <View style={{ marginBottom: 16 }}>
+            <Text style={styles.title}>Enter Verification Code</Text>
+            <Text style={styles.subLabel}>We sent a 6-digit code to your email</Text>
+          </View>
 
-      <TouchableOpacity
-        style={[styles.button, digits.join('').length < 6 && styles.disabledButton]}
-        onPress={handleVerify}
-        disabled={digits.join('').length < 6}
-      >
-        <Text style={styles.buttonText}>Continue</Text>
-      </TouchableOpacity>
-    </View>
+          <View style={styles.card}>
+            <View style={styles.codeInputContainer}>
+              {digits.map((digit, index) => (
+                <TextInput
+                  key={index}
+                  ref={el => (inputRefs.current[index] = el)}
+                  style={styles.codeInput}
+                  maxLength={1}
+                  keyboardType="number-pad"
+                  value={digit}
+                  onChangeText={(text) => handleChange(text, index)}
+                  onKeyPress={(e) => handleKeyPress(e, index)}
+                  autoFocus={index === 0}
+                  selectTextOnFocus
+                />
+              ))}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.primaryButton, digits.join('').length < 6 && styles.disabledButton]}
+              onPress={handleVerify}
+              disabled={digits.join('').length < 6}
+            >
+              <Text style={styles.primaryButtonText}>Continue</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#2D5783',
-    padding: 20,
+    backgroundColor: '#F8FAFC',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 16,
+    paddingBottom: 24,
   },
   backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    marginTop: 20,
   },
-  infoText: {
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 30,
+  title: {
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+  },
+  subLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: '#475569',
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   codeInputContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 20,
-    width: '80%',
-    marginBottom: 40,
+    justifyContent: 'space-between',
+    marginTop: 8,
+    width: '100%',
+    marginBottom: 16,
+    gap: 8,
   },
   codeInput: {
-    width: 50,
-    height: 65,
+    flex: 1, // allow boxes to shrink to fit small screens
+    minWidth: 40,
+    maxWidth: 56,
+    height: 56,
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    backgroundColor: '#F5F5F5',
+    borderColor: '#E2E8F0',
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
     textAlign: 'center',
     fontSize: 18,
-    color: '#333',
-    marginHorizontal: 5,
+    color: '#0F172A',
   },
-  button: {
-    backgroundColor: '#A8D5BA',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+  primaryButton: {
+    backgroundColor: '#1E3A5F',
+    paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
-    width: '50%',
+    width: '100%',
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.6,
   },
-  buttonText: {
-    color: 'black',
+  primaryButtonText: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 16,
   },
 });

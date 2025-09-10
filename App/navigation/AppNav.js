@@ -252,7 +252,9 @@ const AppNav = () => (
       <Stack.Screen name="VerifyCode" component={VerifyCode} options={{ headerShown: false }} />
       <Stack.Screen name="Bot" component={Bot} options={{ headerShown: false }} />
       <Stack.Screen name="Inbox" component={Inbox} options={{ headerShown: false }} />
+      <Stack.Screen name="InboxDetails" component={require('../src/app/HomePage/InboxDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="Transactions" component={Transactions} options={{ headerShown: false }} />
+      <Stack.Screen name="TransactionDetails" component={require('../src/app/HomePage/TransactionDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="WithdrawMembership" component={WithdrawMembership} options={{ headerShown: false }} />
       <Stack.Screen name="ChangePassword" component={ChangePassword} options={{ headerShown: false }} />
       <Stack.Screen name="AboutUs" component={AboutUs} options={{ headerShown: false }} />

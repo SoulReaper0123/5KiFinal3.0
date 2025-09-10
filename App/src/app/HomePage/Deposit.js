@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   View, Text, TextInput, StyleSheet, 
   TouchableOpacity, Alert, ScrollView, Image, 
-  ActivityIndicator, Modal, BackHandler 
+  ActivityIndicator, Modal, BackHandler, KeyboardAvoidingView, Platform 
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
 import CustomConfirmModal from '../../components/CustomConfirmModal';
@@ -235,6 +235,15 @@ const Deposit = () => {
       
       // Store the data in the database
       await set(newDepositRef, depositData);
+
+      // Also log into Transactions for unified feed (Applications table)
+      const txnRef = dbRef(database, `Transactions/Deposits/${memberId}/${txnId}`);
+      await set(txnRef, {
+        ...depositData,
+        amountToBeDeposited: parseFloat(depositAmount).toFixed(2),
+        label: 'Deposit',
+        type: 'Deposits',
+      });
       
       // Return the transaction ID in case it was generated here
       return txnId;
@@ -341,13 +350,22 @@ const Deposit = () => {
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
-      <Text style={styles.title}>Deposit</Text>
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Header with centered title and left back button using invisible spacers */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Deposit</Text>
+          {/* Right spacer to balance the back button width */}
+          <View style={styles.headerSide} />
+        </View>
 
-      <View style={styles.content}>
+        <View style={styles.content}>
         <Text style={styles.label}>Balance</Text>
         <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
@@ -405,7 +423,28 @@ const Deposit = () => {
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.submitButton} onPress={handleSubmit}>
+        <TouchableOpacity 
+          style={[
+            styles.submitButton,
+            (
+              !depositOption ||
+              !amountToBeDeposited ||
+              isNaN(parseFloat(amountToBeDeposited)) ||
+              parseFloat(amountToBeDeposited) <= 0 ||
+              !proofOfDeposit ||
+              loading
+            ) && styles.disabledButton
+          ]}
+          onPress={handleSubmit}
+          disabled={
+            !depositOption ||
+            !amountToBeDeposited ||
+            isNaN(parseFloat(amountToBeDeposited)) ||
+            parseFloat(amountToBeDeposited) <= 0 ||
+            !proofOfDeposit ||
+            loading
+          }
+        >
           <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
@@ -482,34 +521,54 @@ const Deposit = () => {
         buttonText="OK"
       />
     </ScrollView>
+    </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
-  backButton: {
-    marginTop: 40,
-    marginStart: 20,
+  // Header styles for centered title with left back button
+  headerRow: {
+    marginTop: 10, // not too upper
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerSide: {
+    width: 44, // balances the icon width and touch area
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   content: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flex: 1,
-    paddingStart: 40,
-    paddingEnd: 40,
-    paddingTop: 20,
-    paddingBottom: 40,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
@@ -520,10 +579,11 @@ const styles = StyleSheet.create({
     color: 'red',
   },
   balanceText: {
-    fontSize: 30,
-    marginBottom: 15,
+    fontSize: 28,
+    marginBottom: 12,
     textAlign: 'center',
-    color: '#008000',
+    color: '#1E3A5F',
+    fontWeight: '700',
   },
   input: {
     height: 50,
@@ -562,7 +622,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     height: 150,
     marginBottom: 15,
-    backgroundColor: '#f5f5f5',
   },
   uploadPlaceholder: {
     alignItems: 'center',
@@ -598,13 +657,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
-    width: '50%',
+    width: '100%',
     alignSelf: 'center',
   },
   submitButtonText: {
     color: 'black',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
+    opacity: 0.6,
   },
   loadingOverlay: {
     position: 'absolute',

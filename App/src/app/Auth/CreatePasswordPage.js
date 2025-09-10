@@ -259,12 +259,18 @@ const CreatePasswordPage = () => {
         keyboardDismissMode="on-drag"
       >
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={30} color="white" />
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
         </TouchableOpacity>
         
-        <Text style={styles.title}>Create Password</Text>
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.title}>Create Password</Text>
+          <Text style={styles.subLabel}>Step 4 of 4 • Secure your account</Text>
+          <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
+            <View style={{ width: '100%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+          </View>
+        </View>
         
-        <View style={styles.formContainer}>
+        <View style={styles.card}>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>
               Password <Text style={styles.required}>*</Text>
@@ -430,33 +436,36 @@ const CreatePasswordPage = () => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#2C5282',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
-  formContainer: {
+  card: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flexGrow: 1,
-    paddingStart: 40,
-    paddingEnd: 40,
-    paddingBottom: 40,
-    marginTop: 30,
-    minHeight: 300,
-    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   backButton: {
-    position: 'absolute',
-    top: 50,
-    left: 20,
-    zIndex: 1,
+    alignSelf: 'flex-start',
+    marginBottom: 10,
+    marginTop: 20,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    marginTop: 80,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    marginBottom: 4,
+    color: '#0F172A',
+    textAlign: 'left',
+  },
+  subLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: '#475569',
   },
   inputContainer: {
     marginBottom: 18,

@@ -609,13 +609,19 @@ const PayLoan = () => {
     }
   };
 
-  const storePaymentDataInDatabase = async (proofOfPaymentUrl) => {
-    const transactionId = generateTransactionId();
+  const storePaymentDataInDatabase = async (proofOfPaymentUrl, transactionId = null) => {
+    const txnId = transactionId || generateTransactionId();
     try {
-      const paymentRef = dbRef(database, `Payments/PaymentApplications/${memberId}/${transactionId}`);
+      const currentDate = new Date();
+      const formattedDate = currentDate
+        .toLocaleString('en-US', { month: 'long', day: '2-digit', year: 'numeric' })
+        .replace(',', '')
+        .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${String(h).padStart(2, '0')}:${m.padStart(2, '0')}`)
+        .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2');
 
-      await set(paymentRef, {
-        transactionId,
+      // Unified payload used for both application and transactions feed
+      const paymentData = {
+        transactionId: txnId,
         id: memberId,
         email,
         firstName,
@@ -626,16 +632,20 @@ const PayLoan = () => {
         accountNumber,
         amountToBePaid: parseFloat(amountToBePaid),
         proofOfPaymentUrl,
-        dateApplied: new Date().toLocaleString('en-US', {
-          month: 'long',
-          day: '2-digit',
-          year: 'numeric',
-        })
-        .replace(',', '')
-        .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-        .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
-        status: 'Pending',
-      });
+        dateApplied: formattedDate,
+        timestamp: currentDate.getTime(),
+        status: 'pending',
+      };
+
+      // Save application record
+      const paymentRef = dbRef(database, `Payments/PaymentApplications/${memberId}/${txnId}`);
+      await set(paymentRef, paymentData);
+
+      // Also log into Transactions for unified feed (shows immediately in Transactions screen)
+      const txnRef = dbRef(database, `Transactions/Payments/${memberId}/${txnId}`);
+      await set(txnRef, paymentData);
+
+      return txnId;
     } catch (error) {
       console.error('Failed to store payment data in Realtime Database:', error);
       setErrorMessage('Failed to store payment data');
@@ -758,10 +768,14 @@ const PayLoan = () => {
           />
         }
       >
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={30} color="white" />
+        {/* Header with centered title and left back button using invisible spacers */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.title}>Pay Loan</Text>
+        <Text style={styles.headerTitle}>Pay Loan</Text>
+        <View style={styles.headerSide} />
+      </View>
         <View style={styles.content}>
           <Text style={styles.label}>Balance</Text>
           <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
@@ -1067,29 +1081,47 @@ const PayLoan = () => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
-  backButton: {
-    marginTop: 40,
-    marginStart: 20,
+  // Header styles for centered title with left back button
+  headerRow: {
+    marginTop: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerSide: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   content: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flex: 1,
-    paddingStart: 50,
-    paddingEnd: 50,
-    paddingTop: 20,
-    paddingBottom: 40,
-    minHeight: '100%',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
@@ -1097,10 +1129,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   balanceText: {
-    fontSize: 30,
-    marginBottom: 15,
+    fontSize: 28,
+    marginBottom: 12,
     textAlign: 'center',
-    color: '#008000',
+    color: '#1E3A5F',
+    fontWeight: '700',
   },
   input: {
     height: 50,
@@ -1152,7 +1185,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
-    width: '50%',
+    width: '100%',
     alignSelf: 'center',
   },
   submitButtonText: {

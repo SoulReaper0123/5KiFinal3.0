@@ -703,10 +703,14 @@ const ApplyLoans = ({
       }
 
       // Continue with approval process
-      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Loans/${id}/${transactionId}`);
-      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${transactionId}`);
-      const memberLoanRef = database.ref(`Members/${id}/loans/${transactionId}`);
+      // Generate a new transaction ID for approved/transactions/current loans records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
+      const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
       const fundsRef = database.ref('Settings/Funds');
       const interestRateRef = database.ref(`Settings/InterestRate/${term}`);
       const processingFeeRef = database.ref('Settings/ProcessingFee');
@@ -744,6 +748,8 @@ const ApplyLoans = ({
 
       const approvedData = {
         ...loanData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         interestRate: (interestRate * 100),
         interest: interest,
         monthlyPayment: monthlyPayment,
@@ -813,13 +819,19 @@ const ApplyLoans = ({
       const rejectionTime = formatTime(now);
       const status = 'rejected';
 
-      const loanRef = database.ref(`Loans/LoanApplications/${loan.id}/${loan.transactionId}`);
-      const rejectedRef = database.ref(`Loans/RejectedLoans/${loan.id}/${loan.transactionId}`);
-      const transactionRef = database.ref(`Transactions/Loans/${loan.id}/${loan.transactionId}`);
+      // Generate a new transaction ID for rejected/transactions records
+      const originalTransactionId = loan.transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const loanRef = database.ref(`Loans/LoanApplications/${loan.id}/${originalTransactionId}`);
+      const rejectedRef = database.ref(`Loans/RejectedLoans/${loan.id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Loans/${loan.id}/${newTransactionId}`);
 
       // First create a copy of the loan data with rejection info
       const rejectedLoan = { 
         ...loan, 
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
         timestamp: now.getTime(),

@@ -200,6 +200,14 @@ useEffect(() => {
       const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
       await set(newWithdrawRef, withdrawalData);
 
+      // Also log into Transactions for unified feed (Applications table)
+      const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
+      await set(txnRef, {
+        ...withdrawalData,
+        label: 'Withdraw',
+        type: 'Withdrawals',
+      });
+
       // Prepare withdrawal data for API call to run when user clicks OK
       const apiData = {
         email,
@@ -237,13 +245,14 @@ useEffect(() => {
             style={styles.container}
           >
     <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity
-        style={styles.backButton}
-        onPress={() => navigation.goBack()}
-      >
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
-      <Text style={styles.title}>Withdraw</Text>
+      {/* Header with centered title and left back button using invisible spacers */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Withdraw</Text>
+        <View style={styles.headerSide} />
+      </View>
       <View style={styles.content}>
 
 
@@ -416,29 +425,47 @@ useEffect(() => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
-  backButton: {
-    marginTop: 40,
-    marginStart: 20,
+  // Header styles for centered title with left back button
+  headerRow: {
+    marginTop: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerSide: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   content: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flex: 1, // To make it take the full height up to the bottom
-    paddingStart: 50,
-    paddingEnd: 50,
-    paddingTop: 20,
-    paddingBottom: 40,
-    minHeight: '100%',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 20,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+    marginBottom: 16,
   },
   label: {
     fontSize: 16,
@@ -446,10 +473,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   balanceText: {
-    fontSize: 30,
-    marginBottom: 15,
+    fontSize: 28,
+    marginBottom: 12,
     textAlign: 'center',
-    color: '#008000',
+    color: '#1E3A5F',
+    fontWeight: '700',
   },
   picker: {
     marginBottom: 10,
@@ -483,7 +511,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
-    width: '50%',
+    width: '100%',
     alignSelf: 'center',
   },
   submitButtonText: {

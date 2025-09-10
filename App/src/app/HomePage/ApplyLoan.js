@@ -114,6 +114,13 @@ const ApplyLoan = () => {
     return basicFieldsValid;
   };
 
+  const logTransactionApplication = async (memberId, transactionId, payload) => {
+    try {
+      const txnRef = dbRef(database, `Transactions/Loans/${memberId}/${transactionId}`);
+      await set(txnRef, { ...payload, label: 'Loan', type: 'Loans' });
+    } catch (e) { /* ignore */ }
+  };
+
   // Check if all collateral fields are filled
   const isCollateralValid = () => {
     return collateralType && collateralValue && collateralDescription;
@@ -426,6 +433,11 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 
     const applicationRef = dbRef(database, `Loans/LoanApplications/${userId}/${transactionId}`);
     await set(applicationRef, applicationDataWithMeta);
+
+    // Log into Transactions for unified feed (Applications table)
+    const txnRef = dbRef(database, `Transactions/Loans/${userId}/${transactionId}`);
+    await set(txnRef, { ...applicationDataWithMeta, label: 'Loan', type: 'Loans' });
+
     return true;
   } catch (error) {
     console.error('Failed to store loan application:', getErrorMessage(error));
@@ -590,8 +602,14 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     
     // Check if loan amount exceeds loanable amount (based on percentage)
     if (loanAmountNum > maxLoanableAmount) {
-      setConfirmMessage(`Your loan amount exceeds the maximum loanable amount of ₱${maxLoanableAmount.toFixed(2)} (${loanableAmountPercentage}% of your balance). You need to provide collateral to proceed.`);
+      // Show a clear confirm dialog requiring user action
+      // Include the phrase 'Collateral Required' to drive the modal UI label/ icon
+      setConfirmMessage(
+        `Collateral Required: Loan Amount exceeds the loanable amount (₱${maxLoanableAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).\n` +
+        `This requires collateral. Do you want to continue?`
+      );
       setConfirmAction(() => () => {
+        // User chose Yes: proceed to fill collateral, but do NOT submit yet
         setRequiresCollateral(true);
         setShowCollateralModal(true);
       });
@@ -631,10 +649,14 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         style={styles.container}
       >
     <ScrollView contentContainerStyle={styles.container}>
-      <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="white" />
-      </TouchableOpacity>
-      <Text style={styles.title}>Apply Loan</Text>
+      {/* Header with centered title and left back button using invisible spacers */}
+      <View style={styles.headerRow}>
+        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Apply Loan</Text>
+        <View style={styles.headerSide} />
+      </View>
 
       <View style={styles.content}>
         <Text style={styles.label}>Balance</Text>
@@ -781,8 +803,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
                 onPress={() => {
                   if (isCollateralValid()) {
                     setRequiresCollateral(true);
+                    // Close the collateral modal and return to the main form
+                    // The final confirmation will show only when user taps Submit
                     setShowCollateralModal(false);
-                    showConfirmationAlert();
                   }
                 }}
                 disabled={!isCollateralValid()}
@@ -911,29 +934,47 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 const styles = StyleSheet.create({
   container: {
     flexGrow: 1,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
-  backButton: {
-    marginTop: 40,
-    marginStart: 20,
+  // Header styles for centered title with left back button
+  headerRow: {
+    marginTop: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerSide: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   content: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flex: 1,
-    paddingStart: 50,
-    paddingEnd: 50,
-    paddingTop: 20,
-    paddingBottom: 40,
-    minHeight: '100%',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+    marginBottom: 16,
   },
   sectionHeader: {
     fontSize: 18,
@@ -948,10 +989,11 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   balanceText: {
-    fontSize: 30,
-    marginBottom: 15,
+    fontSize: 28,
+    marginBottom: 12,
     textAlign: 'center',
-    color: '#008000',
+    color: '#1E3A5F',
+    fontWeight: '700',
   },
   input: {
     borderWidth: 1,
@@ -985,7 +1027,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
-    width: '50%',
+    width: '100%',
     alignSelf: 'center',
   },
   disabledButton: {

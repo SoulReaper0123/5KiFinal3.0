@@ -87,18 +87,6 @@ const Settings = () => {
             </Text>
           </View>
           
-          {/* Notifications Section */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Notifications</Text>
-            
-            <TouchableOpacity style={styles.comingSoonButton}>
-              <Text style={styles.comingSoonText}>Coming Soon</Text>
-            </TouchableOpacity>
-            
-            <Text style={styles.settingDescription}>
-              Notification settings will be available in a future update.
-            </Text>
-          </View>
           
           {/* About Section */}
           <View style={styles.section}>

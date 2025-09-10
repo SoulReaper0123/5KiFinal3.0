@@ -46,38 +46,35 @@ const ForgotPassword = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Back Button */}
       <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-        <MaterialIcons name="arrow-back" size={30} color="white" />
+        <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
       </TouchableOpacity>
 
-     
-      <Text style={styles.title}>Change Password</Text>
-      <Text style={styles.desc}>
-      Enter your email and check for a reset link to get back in.
-        </Text>
+      <View style={styles.contentWrapper}>
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.title}>Reset Password</Text>
+          <Text style={styles.subLabel}>Enter your email to receive a reset link</Text>
+        </View>
 
-      {/* Email Label and Input */}
-      <Text style={styles.label}>Email</Text>
-      <View style={styles.inputContainer}>
-        <Icon name="envelope" size={20} color="#666" style={styles.icon} />
-        <TextInput
-          placeholder="Enter your email address"
-          value={email}
-          onChangeText={setEmail}
-          style={styles.input}
-          keyboardType="email-address"
-          autoCapitalize="none"
-        />
+        <View style={styles.card}>
+          <Text style={[styles.label, { marginBottom: 6 }]}>Email</Text>
+          <View style={styles.inputContainer}>
+            <Icon name="envelope" size={20} color="#666" style={styles.icon} />
+            <TextInput
+              placeholder="Enter your email address"
+              value={email}
+              onChangeText={setEmail}
+              style={styles.input}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+          </View>
+
+          <TouchableOpacity style={styles.primaryButton} onPress={handleResetPassword}>
+            <Text style={styles.primaryButtonText}>Send Link</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-
-      {/* Reset Password Button */}
-      <TouchableOpacity style={styles.resetButton} onPress={handleResetPassword}>
-        <Text style={styles.resetButtonText}>Send Link</Text>
-      </TouchableOpacity>
-
-      {/* Additional spacing to push the button up */}
-      <View style={{ flex: 1 }} />
     </View>
   );
 };
@@ -85,64 +82,76 @@ const ForgotPassword = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2C5282',
-    paddingHorizontal: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    position: 'relative',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
   backButton: {
     position: 'absolute',
-    top: 40,
-    left: 20,
-    zIndex: 1,
+    top: 16,
+    left: 16,
+    zIndex: 10,
   },
-
   title: {
-    fontSize: 43,
-    fontWeight: 'bold',
-    color: 'white',
-    textAlign: 'center',
-    marginBottom: 50, 
-    marginTop: 150,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
   },
-  desc: {
-    display: 'none', 
+  subLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: '#475569',
   },
   label: {
-    display: 'none', 
+    fontSize: 15,
+    color: '#0F172A',
+  },
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   inputContainer: {
-    backgroundColor: '#E2E8F0', 
+    backgroundColor: '#F1F5F9',
     borderRadius: 10,
     flexDirection: 'row',
     alignItems: 'center',
-    width: '80%',
-    marginBottom: 35,
-    paddingHorizontal: 10,
+    width: '100%',
+    marginBottom: 16,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   input: {
     flex: 1,
-    height: 45,
+    height: 48,
     fontSize: 16,
-    color: '#333',
+    color: '#0F172A',
   },
   icon: {
     marginRight: 10,
   },
-  resetButton: {
-    backgroundColor: '#A7F3D0', 
+  primaryButton: {
+    backgroundColor: '#1E3A5F',
     borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 25,
+    paddingVertical: 14,
     alignItems: 'center',
-    width: '60%',
-    elevation: 2,
+    width: '100%',
   },
-  resetButtonText: {
-    color: '#2F855A',
+  primaryButtonText: {
+    color: 'white',
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
   },
 });
 

@@ -772,7 +772,7 @@ You can apply for a loan in the Apply Loan section.
         >
           <MaterialIcons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>ChatBot</Text>
+        <Text style={styles.headerTitle}>AI Assistant</Text>
       </View>
 
       {/* Chat Body */}

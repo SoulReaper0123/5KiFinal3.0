@@ -18,6 +18,7 @@ import {
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDatabase, ref, get } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -36,6 +37,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [selfie, setSelfie] = useState(null);
   const [biometricPromptShown, setBiometricPromptShown] = useState(false);
+  const [amountHidden, setAmountHidden] = useState(false);
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -289,69 +291,135 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
           contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.topContainer}>
-            <View style={styles.header}>
-              <TouchableOpacity
-                style={styles.iconButton}
-                onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
-              >
-                {selfie ? (
-                  <Image source={{ uri: selfie }} style={{ width: 50, height: 50, borderRadius: 25 }} />
-                ) : (
-                  <MaterialIcons name="person" size={50} color="#2D5783" />
-                )}
+          {/* Header Bar */}
+          <View style={styles.headerBar}>
+            <TouchableOpacity
+              style={styles.avatarButton}
+              onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+            >
+              {selfie ? (
+                <Image source={{ uri: selfie }} style={{ width: 46, height: 46, borderRadius: 23 }} />
+              ) : (
+                <MaterialIcons name="person" size={46} color="#1E3A5F" />
+              )}
+            </TouchableOpacity>
+
+            <View style={styles.greetGroup}>
+              <Text style={styles.greetSubtitle}>Welcome back,</Text>
+              <Text style={styles.greetTitle}>{firstName}</Text>
+            </View>
+
+            <TouchableOpacity
+              style={styles.bellButton}
+              onPress={() => navigation.navigate('InboxTab')}
+            >
+              <Ionicons name="notifications-outline" size={26} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Wallet Card */}
+          <View style={styles.walletCard}>
+            <Text style={styles.walletLabel}>SAVINGS</Text>
+            <View style={styles.balanceRow}>
+              <Text style={styles.walletAmount}>{amountHidden ? '******' : formatBalance(balance)}</Text>
+              <TouchableOpacity onPress={() => setAmountHidden((v) => !v)} style={styles.eyeBtn}>
+                <MaterialIcons name={amountHidden ? 'visibility' : 'visibility-off'} size={22} color="#FFFFFF" />
               </TouchableOpacity>
-              <Text style={styles.welcomeText}>Welcome, {firstName}!</Text>
             </View>
 
-            <View style={styles.balanceWrapper}>
-              <Text style={styles.balanceLabel}>SAVINGS</Text>
-              <Text style={styles.balanceAmount}>{formatBalance(balance)}</Text>
-            </View>
+            <View style={styles.walletActionsRow}>
+              <TouchableOpacity
+                style={styles.primaryAction}
+                onPress={() =>
+                  navigation.navigate('Deposit', {
+                    user: { email, memberId, firstName, balance },
+                  })
+                }
+              >
+                <Entypo name="download" size={18} color="#fff" />
+                <Text style={styles.primaryActionText}>Deposit</Text>
+              </TouchableOpacity>
 
-            <View style={styles.marqueeContainer}>
-              <Animated.Text style={[styles.reviewText, { transform: [{ translateX: scrollAnim }] }]}>
-                {marqueeMessages.length > 0
-                  ? marqueeMessages.map((m) => m.message).join('   •   ')
-                  : 'No recent application activity.'}
-              </Animated.Text>
+              <TouchableOpacity
+                style={styles.secondaryAction}
+                onPress={() => setWithdrawModalVisible(true)}
+              >
+                <Entypo name="upload" size={18} color="#1E3A5F" />
+                <Text style={styles.secondaryActionText}>Withdraw</Text>
+              </TouchableOpacity>
             </View>
           </View>
 
-          <View style={styles.bottomContainer}>
-            <View style={styles.iconGrid}>
-              {[
-                { pack: Entypo, name: 'download', label: 'Deposit', route: 'Deposit' },
-                { pack: Entypo, name: 'upload', label: 'Withdraw', route: 'Withdraw' },
-                { pack: MaterialIcons, name: 'edit-document', label: 'Apply Loan', route: 'ApplyLoan' },
-                { pack: Ionicons, name: 'cash', label: 'Pay Loan', route: 'PayLoan' },
-                { pack: FontAwesome, name: 'book', label: 'Existing Loan', route: 'ExistingLoan' },
-                { pack: Ionicons, name: 'swap-horizontal', label: 'Transaction', route: 'Transactions' },
-              ].map(({ pack: IconPack, name, label, route }) => (
-                <TouchableOpacity
-                  key={label}
-                  style={styles.iconContainer}
-                  onPress={() => {
-                    if (label === 'Withdraw') {
-                      setWithdrawModalVisible(true);
-                    } else {
-                      // Pass complete user data
-                      navigation.navigate(route, { 
-                        user: { 
-                          email, 
-                          memberId, 
-                          firstName,
-                          balance 
-                        } 
-                      });
-                    }
-                  }}
-                >
-                  <IconPack name={name} size={40} color="#2D5783" />
-                  <Text style={styles.iconText}>{label}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+          {/* Services */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Services</Text>
+          </View>
+
+          <View style={styles.serviceGrid}>
+            <TouchableOpacity
+              style={styles.serviceCard}
+              onPress={() =>
+                navigation.navigate('ApplyLoan', { user: { email, memberId, firstName, balance } })
+              }
+            >
+              <View style={styles.serviceIconCircle}>
+                <MaterialIcons name="edit-document" size={20} color="#fff" />
+              </View>
+              <Text style={styles.serviceText}>Apply Loan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.serviceCard}
+              onPress={() =>
+                navigation.navigate('PayLoan', { user: { email, memberId, firstName, balance } })
+              }
+            >
+              <View style={styles.serviceIconCircle}>
+                <Ionicons name="cash" size={20} color="#fff" />
+              </View>
+              <Text style={styles.serviceText}>Pay Loan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.serviceCard}
+              onPress={() =>
+                navigation.navigate('ExistingLoan', { user: { email, memberId, firstName, balance } })
+              }
+            >
+              <View style={styles.serviceIconCircle}>
+                <FontAwesome name="book" size={20} color="#fff" />
+              </View>
+              <Text style={styles.serviceText}>Existing Loan</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.serviceCard}
+              onPress={() =>
+                navigation.navigate('Transactions', { user: { email, memberId, firstName, balance } })
+              }
+            >
+              <View style={styles.serviceIconCircle}>
+                <Ionicons name="swap-horizontal" size={20} color="#fff" />
+              </View>
+              <Text style={styles.serviceText}>Transactions</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Recent Activity */}
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Recent Activity</Text>
+          </View>
+          <View style={styles.activityCard}>
+            {marqueeMessages && marqueeMessages.length > 0 ? (
+              marqueeMessages.slice(0, 5).map((m, idx) => (
+                <View key={idx} style={styles.activityItem}>
+                  <View style={styles.activityDot} />
+                  <Text style={styles.activityText}>{m.message}</Text>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.emptyStateText}>No recent application activity.</Text>
+            )}
           </View>
         </ScrollView>
       )}
@@ -404,6 +472,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 };
 
 export default function AppHome() {
+  const insets = useSafeAreaInsets();
   const [memberId, setMemberId] = useState(null);
   const [email, setEmail] = useState(null);
   const route = useRoute();
@@ -417,6 +486,17 @@ export default function AppHome() {
     }
   }, [route.params, email]);
 
+  const CenterTabButton = ({ onPress, accessibilityState }) => {
+    const focused = !!accessibilityState?.selected;
+    return (
+      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.centerTabButton, { bottom: Math.max(insets.bottom + 8, 20) }] }>
+        <View style={[styles.centerTabButtonInner, focused && styles.centerTabButtonInnerActive]}>
+          <MaterialIcons name="smart-toy" size={26} color={'#2D5783'} />
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -428,8 +508,18 @@ export default function AppHome() {
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
         headerShown: false,
-        tabBarActiveTintColor: '#2D5783',
-        tabBarInactiveTintColor: 'gray',
+        tabBarActiveTintColor: '#FFFFFF',
+        tabBarInactiveTintColor: 'rgba(255,255,255,0.7)',
+        tabBarStyle: {
+          backgroundColor: '#1E3A5F',
+          borderTopColor: 'transparent',
+          height: 84 + Math.max(insets.bottom, 0),
+          paddingBottom: Math.max(insets.bottom, 16),
+          paddingTop: 10,
+        },
+        tabBarLabelStyle: {
+          fontWeight: '600',
+        },
       })}
     >
       <Tab.Screen
@@ -444,7 +534,14 @@ export default function AppHome() {
           />
         )}
       />
-      <Tab.Screen name="BotTab" component={Bot} options={{ tabBarLabel: 'Bot' }} />
+      <Tab.Screen 
+        name="BotTab" 
+        component={Bot} 
+        options={{ 
+          tabBarLabel: 'AI',
+          tabBarButton: (props) => <CenterTabButton {...props} />
+        }} 
+      />
       <Tab.Screen
         name="InboxTab"
         options={{ tabBarLabel: 'Inbox' }}
@@ -456,9 +553,11 @@ export default function AppHome() {
 }
 
 const styles = StyleSheet.create({
+  // Layout
   container: {
     flex: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#F8FAFC',
+    marginTop: 30,
   },
   loaderContainer: {
     flex: 1,
@@ -466,70 +565,263 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#f0f4f8',
   },
+
+  // New Header Bar
+  headerBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#1E3A5F',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+  },
+  avatarButton: {
+    backgroundColor: '#fff',
+    borderRadius: 24,
+    padding: 2,
+    overflow: 'hidden',
+  },
+  greetGroup: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  greetSubtitle: {
+    fontSize: 12,
+    color: '#CFE1F7',
+  },
+  greetTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginTop: 2,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+
+  // Wallet Card
+  walletCard: {
+    backgroundColor: '#1E3A5F',
+    marginTop: 12,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  walletLabel: {
+    fontSize: 12,
+    color: '#9CC2E7',
+    marginBottom: 6,
+    letterSpacing: 0.5,
+  },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  walletAmount: {
+    fontSize: 32,
+    color: '#fff',
+    fontWeight: '700',
+  },
+  eyeBtn: { marginLeft: 12, padding: 6 }
+  ,
+  walletActionsRow: {
+    flexDirection: 'row',
+    marginTop: 14,
+  },
+  primaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginRight: 10,
+  },
+  primaryActionText: {
+    color: '#fff',
+    marginLeft: 8,
+    fontWeight: '700',
+  },
+  secondaryAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#C9D6E5',
+  },
+  secondaryActionText: {
+    color: '#1E3A5F',
+    marginLeft: 8,
+    fontWeight: '700',
+  },
+
+  // Quick Actions Row
+  quickActionsRow: {
+    paddingVertical: 12,
+    paddingHorizontal: 2,
+  },
+  quickAction: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    marginRight: 10,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+  },
+  quickActionText: {
+    marginTop: 6,
+    fontSize: 12,
+    color: '#1E3A5F',
+    fontWeight: '600',
+  },
+
+  // Services
+  sectionHeader: {
+    marginTop: 16,
+    marginBottom: 6,
+    paddingHorizontal: 2,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  serviceGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  serviceCard: {
+    alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: '#1E3A5F',
+    shadowColor: '#000',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    width: '48%',
+    borderWidth: 0,
+  },
+  serviceText: {
+    marginTop: 8,
+    textAlign: 'center',
+    color: '#fff',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+
+  // Activity List
+  activityCard: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: 12,
+  },
+  activityItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  activityDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#1E3A5F',
+    marginRight: 10,
+  },
+  activityText: {
+    color: '#334155',
+  },
+
+  // Service icon circle
+  serviceIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyStateText: {
+    color: '#64748B',
+  },
+
+  // Legacy styles kept for compatibility (not used in new layout but safe to keep)
   topContainer: {
-    backgroundColor: '#2D5783',
-    paddingVertical: 5,
+    backgroundColor: '#1E3A5F',
+    paddingVertical: 16,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     paddingTop: 55,
-    paddingLeft: 50,
-    paddingRight: 50,
-    marginRight: -20,
-    marginLeft: -20,
+    marginHorizontal: -20,
     marginTop: -20,
   },
   bottomContainer: {
-    backgroundColor: 'white',
-    padding: 15,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: 'transparent',
+    padding: 16,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 16,
   },
   iconButton: {
-    marginRight: 10,
+    marginRight: 12,
     backgroundColor: 'white',
     borderRadius: 50,
     overflow: 'hidden',
   },
   welcomeText: {
-    fontSize: 25,
-    fontWeight: 'bold',
+    fontSize: 22,
+    fontWeight: '700',
     color: 'white',
   },
   balanceWrapper: {
     alignItems: 'center',
-    marginBottom: 10,
-    paddingVertical: 15,
-    paddingHorizontal: 30,
-    borderRadius: 5,
-    backgroundColor: '#f1f1f1',
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 10,
-    elevation: 4,
+    marginBottom: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
     width: '100%',
   },
   balanceLabel: {
-    fontSize: 18,
-    color: 'green',
+    fontSize: 12,
+    color: '#BEE3F8',
+    letterSpacing: 1,
   },
   balanceAmount: {
-    fontSize: 36,
-    color: 'black',
+    fontSize: 32,
+    color: 'white',
+    fontWeight: '700',
   },
   marqueeContainer: {
     height: 20,
     marginTop: 5,
   },
   reviewText: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#E2E8F0',
     width: 600,
   },
   iconGrid: {
@@ -539,23 +831,29 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    padding: 13,
-    marginTop: 15,
-    borderRadius: 15,
-    backgroundColor: '#F1F1F1',
+    paddingVertical: 16,
+    paddingHorizontal: 12,
+    marginTop: 12,
+    borderRadius: 12,
+    backgroundColor: 'white',
     shadowColor: '#000',
-    shadowOpacity: 2,
-    shadowRadius: 5,
-    elevation: 5,
-    width: '45%',
-    marginBottom: 15,
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
+    width: '47%',
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   iconText: {
-    marginTop: 5,
+    marginTop: 6,
     textAlign: 'center',
-    color: 'black',
-    fontSize: 14,
+    color: '#0F172A',
+    fontSize: 13,
+    fontWeight: '600',
   },
+
+  // Modals
   modalContainer: {
     position: 'absolute',
     top: 0,
@@ -581,7 +879,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   modalButton: {
-    backgroundColor: '#2D5783',
+    backgroundColor: '#1E3A5F',
     paddingVertical: 10,
     borderRadius: 5,
     marginTop: 10,
@@ -590,5 +888,33 @@ const styles = StyleSheet.create({
     color: 'white',
     textAlign: 'center',
     fontSize: 16,
+  },
+
+  // Floating center AI tab styles
+  centerTabButton: {
+    position: 'absolute',
+    left: '50%',
+    // Shift left by half of button width (58/2 = 29) to center precisely
+    transform: [{ translateX: -29 }],
+    zIndex: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  centerTabButtonInner: {
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 4,
+    borderColor: '#1E3A5F',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 6,
+  },
+  centerTabButtonInnerActive: {
+    backgroundColor: '#FFFFFF',
   },
 });

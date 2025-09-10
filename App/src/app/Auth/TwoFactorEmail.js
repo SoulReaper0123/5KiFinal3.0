@@ -42,30 +42,35 @@ export default function TwoFactorEmail({ route, navigation }) {
         onPress={() => navigation.goBack()}
         activeOpacity={0.7}
       >
-        <MaterialIcons name="arrow-back" size={30} color="white" />
+        <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
       </TouchableOpacity>
 
-      <View style={styles.contentContainer}>
-        <Text style={styles.title}>Two-Factor Authentication</Text>
-        
-        <View style={styles.emailContainer}>
-          <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
-            {email}
-          </Text>
-          <MaterialIcons name="lock" size={20} color="#666" />
+      <View style={styles.contentWrapper}>
+        <View style={{ marginBottom: 16 }}>
+          <Text style={styles.title}>Two-Factor Authentication</Text>
+          <Text style={styles.subLabel}>We'll send a 6-digit code to your email</Text>
         </View>
 
-        <Text style={styles.instructions}>
-          For your security, we'll send a 6-digit verification code to this email address.
-        </Text>
-        
-        <TouchableOpacity 
-          style={styles.button} 
-          onPress={handleSendCode}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>Send Code</Text>
-        </TouchableOpacity>
+        <View style={styles.card}>
+          <View style={styles.emailContainer}>
+            <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
+              {email}
+            </Text>
+            <MaterialIcons name="lock" size={20} color="#666" />
+          </View>
+
+          <Text style={styles.instructions}>
+            For your security, we'll send a 6-digit verification code to this email address.
+          </Text>
+          
+          <TouchableOpacity 
+            style={styles.primaryButton} 
+            onPress={handleSendCode}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.primaryButtonText}>Send Code</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -74,28 +79,35 @@ export default function TwoFactorEmail({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#2D5783',
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
   backButton: {
-    position: 'absolute',
-    top: 60,
-    left: 25,
-    zIndex: 1,
-    padding: 10,
+     alignSelf: 'flex-start',
+    marginBottom: 10,
+    marginTop: 20,
   },
-  contentContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 30,
+  card: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: 'white',
-    marginBottom: 50,
-    textAlign: 'center',
-    lineHeight: 40,
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
+    textAlign: 'left',
+  },
+  subLabel: {
+    fontSize: 13,
+    marginTop: 2,
+    color: '#475569',
   },
   emailContainer: {
     width: '100%',
@@ -122,29 +134,27 @@ const styles = StyleSheet.create({
     marginRight: 10,
   },
   instructions: {
-    color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: 16,
-    marginBottom: 40,
-    textAlign: 'center',
-    lineHeight: 24,
+    color: '#475569',
+    fontSize: 14,
+    marginBottom: 16,
+    textAlign: 'left',
+    lineHeight: 20,
     width: '100%',
   },
-  button: {
-    backgroundColor: '#A8D5BA',
-    paddingVertical: 16,
-    paddingHorizontal: 30,
+  primaryButton: {
+    backgroundColor: '#1E3A5F',
+    paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 3,
   },
-  buttonText: {
-    color: '#1A1A1A',
-    fontSize: 18,
-    fontWeight: '600',
+  primaryButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  contentWrapper: {
+    flex: 1,
+    justifyContent: 'center',
   },
 });

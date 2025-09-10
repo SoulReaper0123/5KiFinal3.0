@@ -675,10 +675,14 @@ const WithdrawApplications = ({
         throw new Error('Member has insufficient balance for this withdrawal');
       }
 
+      // Generate a new transaction ID for approved/transactions records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
       // Database references
-      const withdrawRef = database.ref(`Withdrawals/WithdrawalApplications/${id}/${transactionId}`);
-      const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Withdrawals/${id}/${transactionId}`);
+      const withdrawRef = database.ref(`Withdrawals/WithdrawalApplications/${id}/${originalTransactionId}`);
+      const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Withdrawals/${id}/${newTransactionId}`);
       const fundsRef = database.ref('Settings/Funds');
       
       // Fetch data
@@ -711,6 +715,8 @@ const WithdrawApplications = ({
       // Create withdrawal record
       const approvedData = {
         ...withdrawData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         dateApproved: formatDate(now),
         timeApproved: formatTime(now),
         timestamp: now.getTime(),
@@ -721,6 +727,8 @@ const WithdrawApplications = ({
       await approvedRef.set(approvedData);
       await transactionRef.set(approvedData);
       await withdrawRef.remove();
+
+      return newTransactionId;
 
     } catch (err) {
       console.error('Approval DB error:', err);
@@ -735,9 +743,13 @@ const WithdrawApplications = ({
       const rejectionDate = formatDate(now);
       const rejectionTime = formatTime(now);
 
-      const withdrawRef = database.ref(`Withdrawals/WithdrawalApplications/${id}/${transactionId}`);
-      const rejectedRef = database.ref(`Withdrawals/RejectedWithdrawals/${id}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Withdrawals/${id}/${transactionId}`);
+      // Generate a new transaction ID for rejected/transactions records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const withdrawRef = database.ref(`Withdrawals/WithdrawalApplications/${id}/${originalTransactionId}`);
+      const rejectedRef = database.ref(`Withdrawals/RejectedWithdrawals/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Withdrawals/${id}/${newTransactionId}`);
 
       const withdrawSnap = await withdrawRef.once('value');
       if (!withdrawSnap.exists()) {
@@ -746,6 +758,8 @@ const WithdrawApplications = ({
 
       const rejectedWithdraw = { 
         ...withdrawSnap.val(), 
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
         dateRejected: rejectionDate,
         timeRejected: rejectionTime,
         timestamp: now.getTime(),
@@ -756,6 +770,8 @@ const WithdrawApplications = ({
       await rejectedRef.set(rejectedWithdraw);
       await transactionRef.set(rejectedWithdraw);
       await withdrawRef.remove();
+
+      return newTransactionId;
 
     } catch (err) {
       console.error('Rejection DB error:', err);

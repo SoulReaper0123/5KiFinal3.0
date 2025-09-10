@@ -1095,6 +1095,47 @@ const SystemSettings = () => {
               </div>
             </div>
 
+            {/* Privacy Policy */}
+            <div style={styles.contentCard}>
+              <h3 style={styles.accountTitle}>Privacy Policy</h3>
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Title</label>
+                {editMode ? (
+                  <input
+                    style={styles.input}
+                    value={settings.PrivacyPolicy.title}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      PrivacyPolicy: {
+                        ...settings.PrivacyPolicy,
+                        title: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={styles.staticText}>{settings.PrivacyPolicy.title}</div>
+                )}
+              </div>
+              <div style={styles.inputRow}>
+                <label style={styles.label}>Content</label>
+                {editMode ? (
+                  <textarea
+                    style={styles.textarea}
+                    value={settings.PrivacyPolicy.content}
+                    onChange={(e) => setSettings({
+                      ...settings,
+                      PrivacyPolicy: {
+                        ...settings.PrivacyPolicy,
+                        content: e.target.value
+                      }
+                    })}
+                  />
+                ) : (
+                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.PrivacyPolicy.content}</div>
+                )}
+              </div>
+            </div>
+
             {/* About Us */}
             <div style={styles.contentCard}>
               <h3 style={styles.accountTitle}>About Us</h3>
