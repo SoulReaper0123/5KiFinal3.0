@@ -1,179 +1,23 @@
-// Enhanced Firebase AI Service with Complete Codebase Knowledge
+// Enhanced Firebase AI Service with Display Data Only (Gemini only)
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { database } from '../firebaseConfig';
-import { ref as dbRef, get } from 'firebase/database';
 
-// Google AI configuration
-const GOOGLE_API_KEY = 'AIzaSyDPV6y1cgQMpOyJYKXIHeHXX0m6qIMrMZA';
-const googleAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
-const googleModel = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+// Google AI configuration (Gemini only)
+// Use env-only key; no hardcoded fallback
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 
-console.log('Enhanced Firebase AI Service initialized with complete codebase knowledge');
+let googleModel = null;
+if (GOOGLE_API_KEY) {
+  const googleAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+  googleModel = googleAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+}
 
-// Enhanced user data loader with comprehensive context
-export const loadEnhancedUserData = async (email) => {
-  try {
-    console.log('Loading enhanced user data for:', email);
-    
-    const userData = {
-      loans: [],
-      currentLoans: [],
-      deposits: [],
-      payments: [],
-      withdrawals: [],
-      memberInfo: null,
-      totalBalance: 0,
-      statistics: {
-        totalLoans: 0,
-        totalDeposits: 0,
-        totalPayments: 0,
-        totalWithdrawals: 0,
-        pendingApplications: 0,
-        approvedApplications: 0,
-        rejectedApplications: 0
-      }
-    };
+console.log('Enhanced Firebase AI Service initialized (Gemini only, display data only)');
 
-    // Get member info and balance
-    const membersRef = dbRef(database, 'Members');
-    const membersSnapshot = await get(membersRef);
-    if (membersSnapshot.exists()) {
-      const membersData = membersSnapshot.val();
-      Object.keys(membersData).forEach(memberId => {
-        const member = membersData[memberId];
-        if (member && member.email === email) {
-          userData.memberInfo = { id: memberId, ...member };
-          userData.totalBalance = parseFloat(member.balance) || 0;
-        }
-      });
-    }
-
-    // Get user loan applications
-    const loansRef = dbRef(database, 'Loans/LoanApplications');
-    const loansSnapshot = await get(loansRef);
-    if (loansSnapshot.exists()) {
-      const loansData = loansSnapshot.val();
-      Object.keys(loansData).forEach(memberId => {
-        const memberLoans = loansData[memberId];
-        if (memberLoans) {
-          Object.keys(memberLoans).forEach(loanId => {
-            const loan = memberLoans[loanId];
-            if (loan && loan.email === email) {
-              userData.loans.push({ id: loanId, memberId, ...loan });
-              userData.statistics.totalLoans++;
-              if (loan.status === 'pending') userData.statistics.pendingApplications++;
-              else if (loan.status === 'approved') userData.statistics.approvedApplications++;
-              else if (loan.status === 'rejected') userData.statistics.rejectedApplications++;
-            }
-          });
-        }
-      });
-    }
-
-    // Get user current loans
-    const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
-    const currentLoansSnapshot = await get(currentLoansRef);
-    if (currentLoansSnapshot.exists()) {
-      const currentLoansData = currentLoansSnapshot.val();
-      Object.keys(currentLoansData).forEach(memberId => {
-        const memberCurrentLoans = currentLoansData[memberId];
-        if (memberCurrentLoans && userData.memberInfo && userData.memberInfo.id === memberId) {
-          Object.keys(memberCurrentLoans).forEach(loanId => {
-            const currentLoan = memberCurrentLoans[loanId];
-            if (currentLoan) {
-              userData.currentLoans.push({ id: loanId, memberId, ...currentLoan });
-            }
-          });
-        }
-      });
-    }
-
-    // Get user deposits
-    const depositsRef = dbRef(database, 'Deposits/DepositApplications');
-    const depositsSnapshot = await get(depositsRef);
-    if (depositsSnapshot.exists()) {
-      const depositsData = depositsSnapshot.val();
-      Object.keys(depositsData).forEach(memberId => {
-        const memberDeposits = depositsData[memberId];
-        if (memberDeposits) {
-          Object.keys(memberDeposits).forEach(depositId => {
-            const deposit = memberDeposits[depositId];
-            if (deposit && deposit.email === email) {
-              userData.deposits.push({ id: depositId, ...deposit });
-              userData.statistics.totalDeposits++;
-            }
-          });
-        }
-      });
-    }
-
-    // Get user payments
-    const paymentsRef = dbRef(database, 'Payments/PaymentApplications');
-    const paymentsSnapshot = await get(paymentsRef);
-    if (paymentsSnapshot.exists()) {
-      const paymentsData = paymentsSnapshot.val();
-      Object.keys(paymentsData).forEach(memberId => {
-        const memberPayments = paymentsData[memberId];
-        if (memberPayments) {
-          Object.keys(memberPayments).forEach(paymentId => {
-            const payment = memberPayments[paymentId];
-            if (payment && payment.email === email) {
-              userData.payments.push({ id: paymentId, ...payment });
-              userData.statistics.totalPayments++;
-            }
-          });
-        }
-      });
-    }
-
-    // Get user withdrawals
-    const withdrawalsRef = dbRef(database, 'Withdraws/WithdrawApplications');
-    const withdrawalsSnapshot = await get(withdrawalsRef);
-    if (withdrawalsSnapshot.exists()) {
-      const withdrawalsData = withdrawalsSnapshot.val();
-      Object.keys(withdrawalsData).forEach(memberId => {
-        const memberWithdrawals = withdrawalsData[memberId];
-        if (memberWithdrawals) {
-          Object.keys(memberWithdrawals).forEach(withdrawalId => {
-            const withdrawal = memberWithdrawals[withdrawalId];
-            if (withdrawal && withdrawal.email === email) {
-              userData.withdrawals.push({ id: withdrawalId, ...withdrawal });
-              userData.statistics.totalWithdrawals++;
-            }
-          });
-        }
-      });
-    }
-
-    console.log('Enhanced user data loaded:', userData.statistics);
-    return userData;
-  } catch (error) {
-    console.log('Error loading enhanced user data:', error);
-    return null;
-  }
-};
-
-// Get comprehensive mobile app context
+// Get mobile app context without codebase knowledge
 const getMobileAppContext = () => {
   return `
-MOBILE APPLICATION STRUCTURE & RECENT UPDATES:
-==============================================
-
-MAIN FEATURES:
-- User authentication with biometric support
-- Personal financial dashboard
-- Loan applications and management
-- Deposit requests and tracking
-- Payment submissions with OCR verification
-- Withdrawal requests
-- Transaction history
-- AI assistant (Bot.js) for user support
-
-RECENT IMPROVEMENTS:
-- Enhanced AI assistant with complete database knowledge
-- Improved user data loading and context awareness
-- Better error handling and user feedback
-- Streamlined navigation and user experience
+MOBILE APPLICATION FEATURES:
+============================
 
 USER CAPABILITIES:
 - View account balance and transaction history
@@ -211,70 +55,33 @@ NAVIGATION STRUCTURE:
 `;
 };
 
-// Enhanced AI response generator for mobile users
-export const generateEnhancedAIResponse = async (prompt, userEmail, options = {}) => {
+// Enhanced AI response generator using only displayed data
+export const generateEnhancedAIResponse = async (prompt, userData = null, options = {}) => {
   try {
-    console.log('Generating enhanced AI response for user:', userEmail);
+    console.log('Generating enhanced AI response with display data only (Gemini)');
     
-    // Load user-specific data
-    const userData = await loadEnhancedUserData(userEmail);
     let userDataContext = '';
     
-    if (userData && userData.memberInfo) {
-      // Calculate totals
-      const approvedDeposits = userData.deposits.filter(d => d.status === 'approved');
-      const totalDeposited = approvedDeposits.reduce((sum, d) => sum + (parseFloat(d.depositAmount) || 0), 0);
-      
-      const approvedWithdrawals = userData.withdrawals.filter(w => w.status === 'approved');
-      const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + (parseFloat(w.withdrawAmount) || 0), 0);
-      
-      const currentLoanBalance = userData.currentLoans.reduce((sum, loan) => 
-        sum + (parseFloat(loan.remainingBalance) || parseFloat(loan.loanAmount) || 0), 0);
-
+    if (userData) {
       userDataContext = `
-PERSONAL ACCOUNT INFORMATION (CONFIDENTIAL - Only for ${userData.memberInfo.firstName}):
-=====================================================================================
+USER INFORMATION (Based on Displayed Data):
+==========================================
 
 Member Details:
-- Member ID: ${userData.memberInfo.id}
-- Full Name: ${userData.memberInfo.firstName} ${userData.memberInfo.middleName || ''} ${userData.memberInfo.lastName}
-- Email: ${userData.memberInfo.email}
-- Phone: ${userData.memberInfo.phoneNumber || 'Not provided'}
-- Current Savings Balance: ₱${userData.totalBalance.toFixed(2)}
-- Account Status: ${userData.memberInfo.status || 'Active'}
-
-Account Summary:
-- Total Loan Applications: ${userData.statistics.totalLoans}
-- Total Deposit Requests: ${userData.statistics.totalDeposits}
-- Total Payment Submissions: ${userData.statistics.totalPayments}
-- Total Withdrawal Requests: ${userData.statistics.totalWithdrawals}
-- Pending Applications: ${userData.statistics.pendingApplications}
-- Approved Applications: ${userData.statistics.approvedApplications}
-- Rejected Applications: ${userData.statistics.rejectedApplications}
-
-Financial Summary:
-- Total Amount Deposited (Approved): ₱${totalDeposited.toFixed(2)}
-- Total Amount Withdrawn (Approved): ₱${totalWithdrawn.toFixed(2)}
-- Current Outstanding Loan Balance: ₱${currentLoanBalance.toFixed(2)}
-- Active Loans: ${userData.currentLoans.length}
+- Full Name: ${userData.firstName || ''} ${userData.middleName || ''} ${userData.lastName || ''}
+- Email: ${userData.email || ''}
+- Phone: ${userData.phoneNumber || 'Not provided'}
+- Current Savings Balance: ₱${parseFloat(userData.balance || 0).toFixed(2)}
+- Account Status: ${userData.status || 'Active'}
 
 Recent Transactions:
-${userData.loans.slice(-3).map(loan => 
-  `- Loan Application: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
-).join('\n')}
-${userData.deposits.slice(-3).map(deposit => 
-  `- Deposit Request: ₱${deposit.depositAmount}, Status: ${deposit.status}, Date: ${deposit.dateApplied}`
-).join('\n')}
-${userData.payments.slice(-3).map(payment => 
-  `- Payment: ₱${payment.amountToBePaid}, Status: ${payment.status}, Date: ${payment.dateApplied}`
-).join('\n')}
-${userData.withdrawals.slice(-3).map(withdrawal => 
-  `- Withdrawal Request: ₱${withdrawal.withdrawAmount}, Status: ${withdrawal.status}, Date: ${withdrawal.dateApplied}`
-).join('\n')}
+${userData.recentTransactions ? userData.recentTransactions.map(t => 
+  `- ${t.type}: ₱${t.amount}, Status: ${t.status}, Date: ${t.date}`
+).join('\n') : 'No recent transactions'}
 `;
     }
 
-    const enhancedContext = `You are an AI assistant for 5KI Financial Services mobile application, specifically helping ${userEmail}.
+    const enhancedContext = `You are an AI assistant for 5KI Financial Services mobile application.
 
 ${getMobileAppContext()}
 
@@ -282,44 +89,38 @@ ${userDataContext}
 
 RESPONSE GUIDELINES:
 ===================
-- Provide personalized, helpful responses based on the user's actual data
+- Provide helpful responses based only on the user's displayed data
 - Use Philippine Peso (₱) formatting for all amounts
 - Be conversational and friendly while maintaining professionalism
-- Offer specific guidance based on the user's transaction history
-- Protect user privacy - only discuss this user's information
+- Offer specific guidance based on the user's displayed transaction history
+- Protect user privacy - only discuss information that would be visible to the user
 - Provide actionable advice and next steps
 - Reference specific transactions or applications when relevant
 - Help with navigation and feature explanations
 - Offer financial guidance and support
 
-CAPABILITIES:
-=============
-- Access to user's complete transaction history
-- Real-time account balance information
-- Application status tracking and updates
-- Loan payment calculations and schedules
-- Deposit and withdrawal guidance
-- Payment verification assistance
-- General financial advice and support
-- System navigation help`;
+IMPORTANT: You do not have access to the complete database or codebase. Only use the information provided above.`;
 
-    const fullPrompt = `${enhancedContext}\n\nUser Query: ${prompt}`;
-    
+    // No OpenRouter or other models. Gemini only.
+    const finalPrompt = typeof prompt === 'string' ? prompt : '';
+    const fullPrompt = `${enhancedContext}\n\nUser Query: ${finalPrompt}`;
+
+    if (!googleModel) throw new Error('AI model not initialized');
     const result = await googleModel.generateContent(fullPrompt);
     const response = await result.response;
     const text = response.text();
     
-    console.log('Enhanced AI response generated successfully');
+    console.log('Enhanced AI response generated successfully (Gemini)');
     return {
       success: true,
       text: text,
-      provider: 'Enhanced Google AI (Complete User Context)',
+      provider: 'Google Gemini (Display Data Only)',
       usage: null
     };
   } catch (error) {
     console.error('Enhanced AI error:', error);
     
-    if (error.message.includes('quota') || error.message.includes('QUOTA_EXCEEDED')) {
+    if (error.message?.toLowerCase().includes('quota')) {
       return {
         success: false,
         error: 'QUOTA_EXCEEDED',
@@ -338,24 +139,23 @@ CAPABILITIES:
 // Function to check enhanced AI service status
 export const checkEnhancedAIServiceStatus = async () => {
   try {
-    const testResult = await generateEnhancedAIResponse('Hello', 'test@example.com');
+    const testResult = await generateEnhancedAIResponse('Hello');
     return {
       available: testResult.success,
       model: 'gemini-1.5-flash',
-      provider: 'Enhanced Google AI (Complete User Context)'
+      provider: 'Google Gemini (Display Data Only)'
     };
   } catch (error) {
     return {
       available: false,
       error: error.message,
       model: 'gemini-1.5-flash',
-      provider: 'Enhanced Google AI (Complete User Context)'
+      provider: 'Google Gemini (Display Data Only)'
     };
   }
 };
 
 export default {
   generateEnhancedAIResponse,
-  checkEnhancedAIServiceStatus,
-  loadEnhancedUserData
+  checkEnhancedAIServiceStatus
 };

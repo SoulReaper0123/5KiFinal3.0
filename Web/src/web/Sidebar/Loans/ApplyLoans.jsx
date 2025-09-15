@@ -801,7 +801,10 @@ const ApplyLoans = ({
       savingsHistoryUpdate[dateKey] = newDaySavings;
       await savingsHistoryRef.update(savingsHistoryUpdate);
       
-      await memberRef.set(memberBalance - amount);
+      // Update member balance: deduct full loan amount as requested
+      const updatedMemberBalance = Math.max(0, Math.ceil((memberBalance - amount) * 100) / 100);
+      await memberRef.set(updatedMemberBalance);
+      console.log('Member balance deducted for loan approval');
 
       // Remove from pending loans AFTER all other operations succeed
       await loanRef.remove();

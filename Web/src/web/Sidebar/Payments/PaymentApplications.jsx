@@ -320,17 +320,17 @@ imageViewerModal: {
   },
   imageViewerContent: {
     position: 'relative',
-    width: '90%',
-    maxWidth: '800px',
-    height: '90vh',
+    width: '100%',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center'
   },
   largeImage: {
-    maxWidth: '100%',
-    maxHeight: '70vh',
+    width: '90%',
+    maxWidth: '1100px',
+    maxHeight: '82vh',
     objectFit: 'contain',
     borderRadius: '4px'
   },
@@ -341,19 +341,96 @@ imageViewerModal: {
     textAlign: 'center'
   },
   imageViewerClose: {
-    position: 'absolute',
-    top: '-40px',
-    right: '0',
+    position: 'fixed',
+    top: '20px',
+    right: '28px',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '28px',
     cursor: 'pointer',
     padding: '8px',
     backgroundColor: 'transparent',
     border: 'none',
     outline: 'none',
+    zIndex: 2200,
     '&:focus': {
       outline: 'none'
     }
+  },
+  imageViewerNav: {
+    position: 'fixed',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '28px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '50%',
+    border: 'none',
+    outline: 'none',
+    zIndex: 2200
+  },
+  prevButton: {
+    left: '28px'
+  },
+  nextButton: {
+    right: '28px'
+  },
+  // Compact info modal displayed inside the image viewer
+  infoModalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3000
+  },
+  infoModalCard: {
+    width: '340px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
+    textAlign: 'center'
+  },
+  infoTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: '12px'
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '6px 0'
+  },
+  infoLabel: {
+    fontWeight: '600',
+    color: '#555',
+    fontSize: '13px'
+  },
+  infoValue: {
+    color: '#333',
+    fontSize: '13px',
+    maxWidth: '60%',
+    wordBreak: 'break-word',
+    textAlign: 'right'
+  },
+  infoCloseButton: {
+    marginTop: '14px',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold'
   },
   rejectionModal: {
     position: 'fixed',
@@ -499,6 +576,9 @@ const PaymentApplications = ({
   const [actionInProgress, setActionInProgress] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
+  const showInfoModal = (title, fields) => setInfoModal({ visible: true, title, fields });
+  const closeInfoModal = () => setInfoModal({ visible: false, title: '', fields: [] });
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -884,9 +964,10 @@ const PaymentApplications = ({
       // STEP 2: UPDATE MEMBERS AND FUNDS AFTER CURRENTLOANS
       console.log('=== STEP 2: Updating Members and Funds ===');
       
-      // Update member balance first
-      await memberRef.update({ balance: Math.ceil(newMemberBalance * 100) / 100 });
-      console.log('Member balance updated');
+      // Update member savings balance: add only principalPaid + excessPayment
+      const memberBalanceToSet = Math.ceil((memberBalance + principalPaid + excessPayment) * 100) / 100;
+      await memberRef.update({ balance: memberBalanceToSet });
+      console.log('Member balance updated (principal + excess only)');
 
       // Update Savings: add penalty first, and interest paid (if any)
       const now = new Date();
@@ -1161,6 +1242,84 @@ const openImageViewer = (url, label) => {
     );
   };
 
+  // Copy of Registrations CORS-safe image loader for OCR
+  const loadImageWithCORS = async (imageUrl) => {
+    return new Promise((resolve, reject) => {
+      const createCanvasFromImage = (img) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width || img.naturalWidth;
+        canvas.height = img.height || img.naturalHeight;
+        try {
+          ctx.drawImage(img, 0, 0);
+          return canvas;
+        } catch (error) {
+          return img;
+        }
+      };
+      const tryLoadImage = (corsMode, attempt = 1) => {
+        const newImg = new Image();
+        if (corsMode) newImg.crossOrigin = corsMode;
+        newImg.onload = () => {
+          if (imageUrl.includes('firebasestorage.googleapis.com')) {
+            try { resolve(createCanvasFromImage(newImg)); } catch { resolve(newImg); }
+          } else {
+            resolve(newImg);
+          }
+        };
+        newImg.onerror = () => {
+          if (attempt === 1) {
+            tryLoadImage('use-credentials', 2);
+          } else if (attempt === 2) {
+            tryLoadImage(null, 3);
+          } else if (attempt === 3) {
+            try {
+              const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+              const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
+              const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+              const proxied = new Image();
+              proxied.crossOrigin = 'anonymous';
+              proxied.onload = () => resolve(proxied);
+              proxied.onerror = () => resolve(newImg);
+              proxied.src = proxyUrl;
+            } catch {
+              resolve(newImg);
+            }
+          }
+        };
+        newImg.src = imageUrl;
+      };
+      tryLoadImage('anonymous', 1);
+    });
+  };
+
+  // Simple preprocessing to improve OCR contrast/clarity
+  const preprocessForOCR = (img, scale = 2, binary = false) => {
+    try {
+      const srcW = img.width || img.naturalWidth || 0;
+      const srcH = img.height || img.naturalHeight || 0;
+      if (!srcW || !srcH) return img;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = Math.round(srcW * scale);
+      canvas.height = Math.round(srcH * scale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        let v = 0.299 * r + 0.587 * g + 0.114 * b;
+        v = Math.min(255, Math.max(0, (v - 128) * 1.15 + 128));
+        if (binary) v = v > 150 ? 255 : 0;
+        data[i] = data[i + 1] = data[i + 2] = v;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    } catch {
+      return img;
+    }
+  };
+
   const parsePaymentText = (raw) => {
     const text = (raw || '').replace(/\s+/g, ' ').replace(/[|]/g, ' ').trim();
 
@@ -1176,10 +1335,17 @@ const openImageViewer = (url, label) => {
       /\b(?:ref(?:erence)?\s*(?:no\.?|#)?)\s*([A-Z0-9\-]{6,})\b/i,
       /\b([A-Z0-9]{10,})\b/
     ];
+
+    // Date and time extraction similar to Registrations payment proof, with more variations
+    const month = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+    const timePart = '(?:\\d{1,2}[:.;\\s]\\d{2}(?:[:.;\\s]\\d{2})?\\s*(?:am|pm)?)';
     const datePatterns = [
-      /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},\s+\d{4}\b\s*(?:\d{1,2}:\d{2}\s*(?:am|pm))?/i,
-      /\b\d{4}-\d{2}-\d{2}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i,
-      /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i
+      new RegExp(`\\b${month}\\s+\\d{1,2},?\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{1,2}\\s+${month}\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b${month}\\s+\\d{1,2}\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{4}-\\d{2}-\\d{2}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{1,2}\/\\d{1,2}\/\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b(?:date\\s*&\\s*time|date\\s+and\\s+time|transaction\\s*date|date|time)\\s*[:\\-]?\\s*(${month}\\s+\\d{1,2},?\\s+\\d{2,4}(?:\\s+${timePart})?|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}(?:\\s+${timePart})?|\\d{4}-\\d{2}-\\d{2}(?:\\s+${timePart})?)`, 'i')
     ];
 
     let amount = null;
@@ -1223,7 +1389,12 @@ const openImageViewer = (url, label) => {
     let dateTime = null;
     for (const re of datePatterns) {
       const m = text.match(re);
-      if (m) { dateTime = m[0]; break; }
+      if (m) { dateTime = (m[1] || m[0]).trim(); break; }
+    }
+    if (!dateTime) {
+      const dateToken = text.match(new RegExp(`\\b(?:${month})\\s+\\d{1,2},?\\s+\\d{2,4}\\b|\\b\\d{1,2}\/\\d{1,2}\/\\d{2,4}\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b`, 'i'));
+      const timeToken = text.match(/\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\b/i);
+      if (dateToken && timeToken) dateTime = `${dateToken[0]} ${timeToken[0]}`.trim();
     }
 
     return { amount, refNo, dateTime };
@@ -1236,15 +1407,9 @@ const openImageViewer = (url, label) => {
     }));
 
     try {
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      await new Promise((resolve, reject) => {
-        img.onload = resolve;
-        img.onerror = reject;
-        img.src = imageUrl;
-      });
-
-      const { data: { text, confidence } } = await Tesseract.recognize(img, 'eng');
+      const baseImg = await loadImageWithCORS(imageUrl);
+      const preprocessed = preprocessForOCR(baseImg, 2, false);
+      const { data: { text, confidence } } = await Tesseract.recognize(preprocessed, 'eng');
       const parsed = parsePaymentText(text);
       const foundAny = parsed.amount || parsed.refNo;
 
@@ -1257,6 +1422,18 @@ const openImageViewer = (url, label) => {
             : 'Text detected but could not find Amount/Ref No'
         }
       }));
+
+      if (foundAny) {
+        showInfoModal('Verification Success', [
+          { label: 'Amount', value: parsed.amount || 'N/A' },
+          { label: 'Reference No', value: parsed.refNo || 'N/A' },
+          { label: 'Date/Time', value: parsed.dateTime || 'N/A' }
+        ]);
+      } else {
+        showInfoModal('Verification Failed', [
+          { label: 'Reason', value: 'Could not detect Amount and Reference No.' }
+        ]);
+      }
     } catch (e) {
       setValidationStatus(prev => ({
         ...prev,
@@ -1769,7 +1946,27 @@ const openImageViewer = (url, label) => {
                     'Verify Payment'
                   )}
                 </button>
-                {getValidationText('Payment Proof')}
+              </div>
+            )}
+
+            {infoModal.visible && (
+              <div style={styles.infoModalOverlay}>
+                <div style={styles.infoModalCard}>
+                  <div style={styles.infoTitle}>{infoModal.title}</div>
+                  {infoModal.fields.map((f, i) => (
+                    <div key={i} style={styles.infoRow}>
+                      <span style={styles.infoLabel}>{f.label}</span>
+                      <span style={styles.infoValue}>{f.value || 'N/A'}</span>
+                    </div>
+                  ))}
+                  <button
+                    style={styles.infoCloseButton}
+                    onClick={closeInfoModal}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    Close
+                  </button>
+                </div>
               </div>
             )}
           </div>

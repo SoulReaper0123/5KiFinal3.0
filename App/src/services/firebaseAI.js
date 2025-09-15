@@ -1,8 +1,8 @@
 // Use Google AI directly (free and no Firebase upgrade needed)
 import { GoogleGenerativeAI } from '@google/generative-ai';
 
-// Google AI configuration (completely free)
-const GOOGLE_API_KEY = 'AIzaSyDPV6y1cgQMpOyJYKXIHeHXX0m6qIMrMZA';
+// Google AI configuration (env-only)
+const GOOGLE_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY;
 const googleAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 const googleModel = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 

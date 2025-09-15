@@ -2,8 +2,8 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { database } from '../../../Database/firebaseConfig';
 
-// Google AI configuration
-const GOOGLE_API_KEY = 'AIzaSyDPV6y1cgQMpOyJYKXIHeHXX0m6qIMrMZA';
+// Google AI configuration (env-only)
+const GOOGLE_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const googleAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
 const googleModel = googleAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 

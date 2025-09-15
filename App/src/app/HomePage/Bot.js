@@ -438,7 +438,9 @@ ${userDataContext}`;
         const prompt = `${context}\n\nUser question: ${userQuery}`;
         
         console.log('Sending query to Google AI...');
-        const result = await generateEnhancedAIResponse(userQuery, userEmail, {
+        // Load display-only user data for context
+        const displayUserData = await loadUserData(userEmail);
+        const result = await generateEnhancedAIResponse(userQuery, displayUserData, {
           maxOutputTokens: 512,
           temperature: 0.7
         });

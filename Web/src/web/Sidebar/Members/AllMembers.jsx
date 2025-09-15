@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FaTimes, FaChevronLeft, FaChevronRight, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
 import { database } from '../../../../../Database/firebaseConfig';
 
@@ -394,6 +394,26 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
   const [successMessage, setSuccessMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [loansTotals, setLoansTotals] = useState({}); // memberId -> total current loans
+
+  useEffect(() => {
+    const fetchLoansTotals = async () => {
+      try {
+        const snap = await database.ref('Loans/CurrentLoans').once('value');
+        const all = snap.val() || {};
+        const totals = {};
+        Object.entries(all).forEach(([memberId, loansObj]) => {
+          const sum = Object.values(loansObj || {}).reduce((acc, l) => acc + (parseFloat(l.loanAmount) || 0), 0);
+          totals[memberId] = Math.ceil(sum * 100) / 100;
+        });
+        setLoansTotals(totals);
+      } catch (e) {
+        console.error('Failed to fetch members loans totals:', e);
+        setLoansTotals({});
+      }
+    };
+    fetchLoansTotals();
+  }, [members]);
 
   const formatNumber = (value) => {
     if (value === 0 || value === '0') return '0.00';
@@ -536,7 +556,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                   ...styles.tableCell,
                   ...styles.loansAmount
                 }}>
-                  ₱{formatNumber(member.loans)}
+                  ₱{formatNumber(loansTotals[member.id] || 0)}
                 </td>
                 <td style={{
                   ...styles.tableCell,

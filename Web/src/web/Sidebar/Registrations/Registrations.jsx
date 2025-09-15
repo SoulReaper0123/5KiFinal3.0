@@ -279,17 +279,17 @@ const styles = {
   },
   imageViewerContent: {
     position: 'relative',
-    width: '90%',
-    maxWidth: '800px',
-    height: '90vh',
+    width: '100%',
+    height: '100vh',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center'
   },
   largeImage: {
-    maxWidth: '100%',
-    maxHeight: '70vh',
+    width: '90%',
+    maxWidth: '1100px',
+    maxHeight: '82vh',
     objectFit: 'contain',
     borderRadius: '4px'
   },
@@ -300,34 +300,37 @@ const styles = {
     textAlign: 'center'
   },
   imageViewerClose: {
-    position: 'absolute',
-    top: '-40px',
-    right: '80px',
+    position: 'fixed',
+    top: '20px',
+    right: '28px',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '28px',
     cursor: 'pointer',
     padding: '8px',
     backgroundColor: 'transparent',
     border: 'none',
-    outline: 'none'
+    outline: 'none',
+    zIndex: 2200
   },
   imageViewerNav: {
-    position: 'absolute',
+    position: 'fixed',
     top: '50%',
     transform: 'translateY(-50%)',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '28px',
     cursor: 'pointer',
     padding: '16px',
-    backgroundColor: 'transparent',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '50%',
     border: 'none',
-    outline: 'none'
+    outline: 'none',
+    zIndex: 2200
   },
   prevButton: {
-    left: '50px'
+    left: '28px'
   },
   nextButton: { 
-    right: '50px'
+    right: '28px'
   },
   sectionTitle: {
     fontSize: '14px',
@@ -473,6 +476,62 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     marginBottom: '20px'
+  },
+  // Overlay modal used inside the image viewer for verification success
+  infoModalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3000
+  },
+  infoModalCard: {
+    width: '340px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
+    textAlign: 'center'
+  },
+  infoTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: '12px'
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '6px 0'
+  },
+  infoLabel: {
+    fontWeight: '600',
+    color: '#555',
+    fontSize: '13px'
+  },
+  infoValue: {
+    color: '#333',
+    fontSize: '13px',
+    maxWidth: '60%',
+    wordBreak: 'break-word',
+    textAlign: 'right'
+  },
+  infoCloseButton: {
+    marginTop: '14px',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold'
   }
 };
 
@@ -531,12 +590,15 @@ const Registrations = ({
   const [validationStatus, setValidationStatus] = useState({});
   const [modelsLoaded, setModelsLoaded] = useState(false);
   const [validationResults, setValidationResults] = useState(null);
-  const [isValidating, setIsValidating] = useState(false);
+  // Per-image verifying state keyed by label to avoid cross-image spinners
+  const [isVerifying, setIsVerifying] = useState({});
   const [tfModels, setTfModels] = useState({
     mobilenet: null,
     blazeface: null
   });
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  // Info modal state for per-image verification success inside the image viewer
+  const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
 
   useEffect(() => {
     const loadModels = async () => {
@@ -615,30 +677,44 @@ const Registrations = ({
     loadModels();
   }, []);
 
-  // Simplified image loading that bypasses CORS issues completely
+  // Image loader for TensorFlow: try CORS-friendly modes and proxy fallback so tf.browser.fromPixels can read pixels
   const loadImageForTensorFlow = async (imageUrl) => {
     return new Promise((resolve, reject) => {
-      console.log('Loading image for basic validation:', imageUrl);
-      
-      // Create a simple image element for basic validation
-      const img = new Image();
-      
-      img.onload = () => {
-        console.log('Image loaded successfully');
-        console.log('Image dimensions:', img.naturalWidth || img.width, 'x', img.naturalHeight || img.height);
-        
-        // Return image element for basic validation
-        // We'll do validation based on image properties rather than TensorFlow
-        resolve(img);
+      const tryLoad = (mode, attempt) => {
+        const img = new Image();
+        if (mode) img.crossOrigin = mode; // 'anonymous' or 'use-credentials'
+        img.onload = () => {
+          console.log(`TF image loaded with mode: ${mode || 'none'} (attempt ${attempt})`);
+          resolve(img);
+        };
+        img.onerror = () => {
+          console.warn(`TF image failed with mode: ${mode || 'none'} (attempt ${attempt})`);
+          if (attempt === 1) {
+            // Try with credentials
+            tryLoad('use-credentials', 2);
+          } else if (attempt === 2) {
+            // Try without CORS (may still work for same-origin)
+            tryLoad(null, 3);
+          } else if (attempt === 3) {
+            // Final: use proxy endpoint to serve with proper CORS
+            try {
+              const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+              const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
+              const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+              const proxied = new Image();
+              proxied.crossOrigin = 'anonymous';
+              proxied.onload = () => resolve(proxied);
+              proxied.onerror = () => reject(new Error('Failed to load image via proxy for TF'));
+              proxied.src = proxyUrl;
+            } catch (e) {
+              reject(e);
+            }
+          }
+        };
+        img.src = imageUrl;
       };
-      
-      img.onerror = (error) => {
-        console.warn('Image loading failed:', error);
-        reject(new Error('Failed to load image'));
-      };
-      
-      // Load image without CORS to avoid tainted canvas issues
-      img.src = imageUrl;
+      // Start with anonymous which is required for canvas pixel access
+      tryLoad('anonymous', 1);
     });
   };
 
@@ -696,37 +772,16 @@ const Registrations = ({
             // Try without CORS
             tryLoadImage(null, 3);
           } else if (attempt === 3) {
-            // Try with a modified Firebase URL (add token parameter)
-            if (imageUrl.includes('firebasestorage.googleapis.com') && !imageUrl.includes('alt=media')) {
-              const modifiedUrl = imageUrl.includes('?') 
-                ? `${imageUrl}&alt=media&token=` 
-                : `${imageUrl}?alt=media&token=`;
-              
-              const finalImg = new Image();
-              finalImg.crossOrigin = 'anonymous';
-              finalImg.onload = () => {
-                console.log('Image loaded with modified Firebase URL');
-                resolve(finalImg);
-              };
-              finalImg.onerror = () => {
-                console.warn('All image loading methods failed, using fallback');
-                // Create a small canvas as fallback
-                const canvas = document.createElement('canvas');
-                canvas.width = 300;
-                canvas.height = 200;
-                const ctx = canvas.getContext('2d');
-                ctx.fillStyle = '#f0f0f0';
-                ctx.fillRect(0, 0, 300, 200);
-                ctx.fillStyle = '#666';
-                ctx.font = '16px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText('Image Load Failed', 150, 100);
-                resolve(canvas);
-              };
-              finalImg.src = modifiedUrl;
-            } else {
-              // Final fallback
-              console.warn('All image loading methods failed, using fallback canvas');
+            // Try proxy endpoint to bypass CORS for Firebase Storage
+            const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+            const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
+            const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+            const proxied = new Image();
+            proxied.crossOrigin = 'anonymous';
+            proxied.onload = () => resolve(proxied);
+            proxied.onerror = () => {
+              // Final fallback canvas
+              console.warn('Proxy also failed, using fallback canvas');
               const canvas = document.createElement('canvas');
               canvas.width = 300;
               canvas.height = 200;
@@ -738,7 +793,8 @@ const Registrations = ({
               ctx.textAlign = 'center';
               ctx.fillText('Image Load Failed', 150, 100);
               resolve(canvas);
-            }
+            };
+            proxied.src = proxyUrl;
           }
         };
         
@@ -757,8 +813,8 @@ const Registrations = ({
       const srcH = img.height || img.naturalHeight || 0;
       if (!srcW || !srcH) return img; // fallback if dimensions missing
 
-      // Ensure minimum width for better OCR
-      const minTargetW = Math.max(1200, Math.floor(srcW * scale));
+      // Ensure minimum width for better OCR (reduced for performance)
+      const minTargetW = Math.max(800, Math.floor(srcW * scale));
       const factor = minTargetW / srcW;
       const targetW = Math.floor(srcW * factor);
       const targetH = Math.floor(srcH * factor);
@@ -799,7 +855,150 @@ const Registrations = ({
       return img;
     }
   };
-  
+
+  // --- Helpers to improve OCR for ID names ---
+  const cropPercent = (canvasOrImg, xPct, yPct, wPct, hPct) => {
+    try {
+      const baseW = canvasOrImg.width || canvasOrImg.naturalWidth;
+      const baseH = canvasOrImg.height || canvasOrImg.naturalHeight;
+      const x = Math.max(0, Math.floor(baseW * xPct));
+      const y = Math.max(0, Math.floor(baseH * yPct));
+      const w = Math.min(baseW - x, Math.floor(baseW * wPct));
+      const h = Math.min(baseH - y, Math.floor(baseH * hPct));
+      const c = document.createElement('canvas');
+      c.width = w; c.height = h;
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(canvasOrImg, x, y, w, h, 0, 0, w, h);
+      return c;
+    } catch (e) {
+      console.warn('cropPercent failed', e);
+      return canvasOrImg;
+    }
+  };
+
+  const upsampleIfSmall = (imgOrCanvas, minW = 600) => {
+    try {
+      const w = imgOrCanvas.width || imgOrCanvas.naturalWidth;
+      const h = imgOrCanvas.height || imgOrCanvas.naturalHeight;
+      if (!w || !h) return imgOrCanvas;
+      if (w >= minW) return imgOrCanvas;
+      const scale = minW / w;
+      const c = document.createElement('canvas');
+      c.width = Math.floor(w * scale);
+      c.height = Math.floor(h * scale);
+      const ctx = c.getContext('2d');
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(imgOrCanvas, 0, 0, c.width, c.height);
+      return c;
+    } catch {
+      return imgOrCanvas;
+    }
+  };
+
+  const recognizeText = async (imgOrCanvas, options = {}) => {
+    const defaultOpts = {
+      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,-'",
+      tessedit_pageseg_mode: 6,
+      preserve_interword_spaces: '1'
+    };
+    const opts = { ...defaultOpts, ...options };
+    // Ensure Tesseract never sees too tiny images
+    const big = upsampleIfSmall(imgOrCanvas, 800);
+    const { data: { text, confidence } } = await Tesseract.recognize(big, 'eng', opts);
+    return { text: (text || '').trim(), confidence: confidence ?? 0 };
+  };
+
+  const recognizeNameFromIDFront = async (img) => {
+    // Build candidate canvases: full preprocessed + likely name regions
+    const base = preprocessForOCR(img, 2.4, false);
+    const regions = [
+      base,
+      cropPercent(base, 0.18, 0.25, 0.75, 0.35), // wider band covering name area
+      cropPercent(base, 0.22, 0.28, 0.70, 0.28), // typical name band (right of photo)
+      cropPercent(base, 0.18, 0.35, 0.74, 0.25), // slightly lower/wider
+      cropPercent(base, 0.30, 0.30, 0.60, 0.25)  // tighter
+    ];
+    // Add binary versions to boost contrast
+    const binaries = regions.map(r => preprocessForOCR(r, 1.0, true));
+    const candidates = [...regions, ...binaries];
+
+    const configs = [
+      { tessedit_pageseg_mode: 7 }, // single line
+      { tessedit_pageseg_mode: 6 }, // uniform block
+      { tessedit_pageseg_mode: 7, preserve_interword_spaces: '1' }
+    ];
+
+    let best = { name: null, score: 0, details: '' };
+
+    for (const canvas of candidates) {
+      for (const cfg of configs) {
+        try {
+          const { text, confidence } = await recognizeText(canvas, cfg);
+          const extracted = extractNameFromIDText(text);
+          if (extracted) {
+            // Score by length and confidence
+            const score = (extracted.length) + (confidence || 0);
+            if (score > best.score) {
+              best = { name: extracted, score, details: `PSM:${cfg.tessedit_pageseg_mode}, conf:${confidence?.toFixed ? confidence.toFixed(1) : confidence}` };
+            }
+          }
+        } catch (e) {
+          // continue trying others
+        }
+      }
+    }
+    return best;
+  };
+
+  // Simple cache to avoid re-OCR on same image URL in one session
+  const __nameOcrCache = new Map();
+
+  const recognizeNameFromIDFrontFast = async (img, keyUrl = '') => {
+    if (keyUrl && __nameOcrCache.has(keyUrl)) return { name: __nameOcrCache.get(keyUrl), mode: 'cache' };
+
+    // Fast attempts on likely regions with tiny deskew to handle handheld photos
+    const tryAngles = [0, -2, 2, -3, 3];
+    const tryRegions = (base) => [
+      cropPercent(base, 0.15, 0.18, 0.78, 0.40),
+      cropPercent(base, 0.18, 0.22, 0.75, 0.35),
+      cropPercent(base, 0.22, 0.26, 0.70, 0.30)
+    ];
+    const rotateSmall = (imgIn, deg) => {
+      if (!deg) return imgIn;
+      try {
+        const w = imgIn.width || imgIn.naturalWidth;
+        const h = imgIn.height || imgIn.naturalHeight;
+        const rad = (deg * Math.PI) / 180;
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        const ctx = c.getContext('2d');
+        ctx.translate(w/2, h/2); ctx.rotate(rad);
+        ctx.drawImage(imgIn, -w/2, -h/2);
+        return c;
+      } catch { return imgIn; }
+    };
+
+    for (const ang of tryAngles) {
+      const rotated = rotateSmall(img, ang);
+      const base = preprocessForOCR(rotated, 1.6, false);
+      for (const region of tryRegions(base)) {
+        try {
+          let { text } = await recognizeText(region, { tessedit_pageseg_mode: 6 });
+          let name = extractNameFromIDText(text);
+          if (name) { if (keyUrl) __nameOcrCache.set(keyUrl, name); return { name, mode: 'fast-psm6' }; }
+          const bin = preprocessForOCR(region, 1.0, true);
+          ({ text } = await recognizeText(bin, { tessedit_pageseg_mode: 7 }));
+          name = extractNameFromIDText(text);
+          if (name) { if (keyUrl) __nameOcrCache.set(keyUrl, name); return { name, mode: 'fast-psm7-binary' }; }
+        } catch {}
+      }
+    }
+
+    return { name: null, mode: 'none' };
+  };
+
   // Function to extract name from ID text (robust for PH IDs like LTO Driver's License)
   const extractNameFromIDText = (rawText) => {
     if (!rawText) return null;
@@ -814,6 +1013,21 @@ const Registrations = ({
       .replace(/[^A-Z,'\-\s]/g, ' ') // keep letters, comma, hyphen, apostrophe
       .replace(/\s{2,}/g, ' ')
       .trim();
+
+    // Try to capture common PH ID pattern: LAST, FIRST MIDDLE
+    // Works even when OCR spaces/commas are noisy
+    for (const line of upperLines) {
+      const L = clean(line);
+      // e.g., "SARINO, LOUIS ANDRE DY" or with extra spaces
+      const m = L.match(/^([A-Z][A-Z'\-\s]{1,30}),\s*([A-Z][A-Z'\-]{1,20})(?:\s+([A-Z][A-Z'\-]{1,20}))?(?:\s+([A-Z][A-Z'\-]{1,10}))?$/);
+      if (m) {
+        const last = m[1].replace(/\s{2,}/g, ' ').trim();
+        const first = m[2];
+        const middle = [m[3], m[4]].filter(Boolean).join(' ');
+        const candidate = middle ? `${first} ${middle} ${last}` : `${first} ${last}`;
+        if (plausible(candidate)) return toTitleCase(candidate);
+      }
+    }
 
     const toTitleCase = (name) => {
       const keepUpper = new Set(['MC', 'MAC']);
@@ -930,7 +1144,6 @@ const Registrations = ({
   const manualVerifyID = async (imageUrl, label) => {
     // For Valid ID Front: run OCR and display only extracted text
     // For other labels, keep existing minimal status
-    setIsValidating(true);
     setValidationStatus(prev => ({
       ...prev,
       [label]: { status: 'verifying', message: 'Verifying...' }
@@ -957,20 +1170,85 @@ const Registrations = ({
             text = (ocrText2 || '').trim();
           }
           
-          // Extract name from the text
-          const extractedName = extractNameFromIDText(text);
+          // Fast path: minimal OCR on the name band
+          let extractedName = null;
+          try {
+            const fast = await recognizeNameFromIDFrontFast(loadedImg, imageUrl);
+            extractedName = fast?.name || null;
+          } catch {}
+
+          // Force-boost name accuracy for PhilID and LTO by scanning for known labels and avoiding 'NATIONALITY'
+          if (!extractedName) {
+            const up = (text || '').toUpperCase();
+            // Remove obvious non-name chunks before parsing (e.g., NATIONALITY values like 'PHL M')
+            const sanitized = up
+              .replace(/NATIONALITY[^\n]*\n?/g, ' ')
+              .replace(/SEX[^\n]*\n?/g, ' ')
+              .replace(/BIRTH[^\n]*\n?/g, ' ')
+              .replace(/ADDRESS[^\n]*\n?/g, ' ');
+            extractedName = extractNameFromIDText(sanitized);
+          }
+
+          // Detect ID type from OCR text
+          const detectIdType = (raw) => {
+            const t = (raw || '').toUpperCase();
+            // Detect PhilID with multiple cues in both EN and Filipino
+            if (/PHILIPPINE\s*IDENTIFICATION\s*CARD|PAMBANSANG\s*PAGKAKAKILANLAN|PHILSYS|PSN\s*ID|REPUBLIC\s*OF\s*THE\s*PHILIPPINES/.test(t)) return 'Philippine Identification Card';
+            if (/DRIVER'?S\s*LICENSE|LAND\s*TRANSPORTATION\s*OFFICE|\bLTO\b/.test(t)) return 'Driver\'s License';
+            if (/POSTAL\s*ID/.test(t)) return 'Postal ID';
+            if (/SSS|UMID/.test(t)) return 'SSS/UMID';
+            return 'Unknown';
+          };
+          const idType = detectIdType(text);
           
+          // If we got a name, auto-fill empty First/Middle/Last fields in the selected registration
+          if (extractedName) {
+            try {
+              const tokens = extractedName.split(/\s+/).filter(Boolean);
+              let firstName = tokens[0] || '';
+              let lastName = tokens[tokens.length - 1] || '';
+              let middleName = tokens.slice(1, -1).join(' ') || '';
+              // Handle common multi-word last-name particles (e.g., "De la Cruz")
+              const particles = new Set(['De','Del','Dei','Da','Di','La','Le','Von','Van','Dy','Du','Mac','Mc','San','Santa','Santo']);
+              if (tokens.length >= 3) {
+                const secondLast = tokens[tokens.length - 2];
+                if (particles.has(secondLast)) {
+                  lastName = tokens.slice(tokens.length - 2).join(' ');
+                  middleName = tokens.slice(1, -2).join(' ') || '';
+                }
+              }
+ 
+              setSelectedRegistration(prev => {
+                if (!prev) return prev;
+                const updated = { ...prev };
+                if (!updated.firstName && firstName) updated.firstName = firstName;
+                if (!updated.lastName && lastName) updated.lastName = lastName;
+                if (!updated.middleName && middleName) updated.middleName = middleName;
+                return updated;
+              });
+            } catch {}
+          }
+ 
           setValidationStatus(prev => ({
             ...prev,
             [label]: {
-              status: extractedName ? 'valid' : 'invalid',
-              message: extractedName ? `Name: ${extractedName}` : 'No name detected'
+              status: (text && text.trim()) ? 'valid' : 'invalid',
+              message: extractedName ? `Name: ${extractedName}` : (text && text.trim()) ? 'Text detected' : 'No text detected',
+              details: `Type of ID: ${idType}`
             }
           }));
+
+          // If we have a name, show success modal in viewer
+          if (extractedName) {
+            showInfoModal('Verification Success', [
+              { label: 'Type of ID', value: idType },
+              { label: 'Name', value: extractedName }
+            ]);
+          }
         } catch (ocrErr) {
           setValidationStatus(prev => ({
             ...prev,
-            [label]: { status: 'error', message: 'No name detected' }
+            [label]: { status: 'manual', message: 'Text extraction failed. Try a clearer, closer photo of the name line.' }
           }));
         }
       } else {
@@ -1004,7 +1282,8 @@ const Registrations = ({
     }));
 
     try {
-      const loadedImg = await loadImageWithCORS(imageUrl);
+      // Use TF-friendly loader to avoid tainted canvas
+      const loadedImg = await loadImageForTensorFlow(imageUrl);
       if (tfModels.blazeface) {
         try {
           const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
@@ -1019,20 +1298,20 @@ const Registrations = ({
         } catch (err) {
           setValidationStatus(prev => ({
             ...prev,
-            [label]: { status: 'invalid', message: 'No face detected' }
+            [label]: { status: 'manual', message: 'Automatic face detection failed' }
           }));
         }
       } else {
         // Model unavailable -> fallback to minimal message
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { status: 'manual', message: 'No face detected' }
+          [label]: { status: 'manual', message: 'Face model not loaded' }
         }));
       }
     } catch (error) {
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { status: 'error', message: 'No face detected' }
+        [label]: { status: 'error', message: 'Automatic face detection failed' }
       }));
     }
   };
@@ -1070,11 +1349,8 @@ const Registrations = ({
         for (const re of amountPatterns) {
           const m = normalized.match(re);
           if (m && m[1]) {
-            amount = m[1].replace(/,/g, '');
-            const dotCount = (amount.match(/\./g) || []).length;
-            const commaCount = (amount.match(/,/g) || []).length;
-            if (commaCount && !dotCount) amount = amount.replace(/,/g, '');
-            if (commaCount && dotCount) amount = amount.replace(/,/g, '');
+            // Normalize formats like 1,234.56 or 1 234.56 -> 1234.56
+            amount = m[1].replace(/[\s,]/g, '');
             break;
           }
         }
@@ -1111,18 +1387,33 @@ const Registrations = ({
       };
 
       const parsed = parsePaymentText(text || '');
-      const foundAny = parsed.amount || parsed.refNo;
+      const foundAll = Boolean(parsed.amount && parsed.refNo && parsed.dateTime);
+      const foundAny = parsed.amount || parsed.refNo || parsed.dateTime;
 
+      // Update inline status for fallback/debugging
       setValidationStatus(prev => ({
         ...prev,
         [label]: {
           status: foundAny ? 'valid' : (confidence > 30 ? 'partial' : 'manual'),
           message: foundAny
             ? `Amount: ${parsed.amount || 'N/A'}, Ref No: ${parsed.refNo || 'N/A'}${parsed.dateTime ? `, Date: ${parsed.dateTime}` : ''}`
-            : 'Text detected but could not find Amount/Ref No',
-          details: `OCR Confidence: ${confidence?.toFixed ? confidence.toFixed(1) : confidence}%`
+            : 'Text detected but could not find Amount/Ref No'
         }
       }));
+
+      // If all fields present, open compact success modal inside image viewer
+      if (foundAll) {
+        showInfoModal('Verification Success', [
+          { label: 'Amount', value: parsed.amount },
+          { label: 'Ref No.', value: parsed.refNo },
+          { label: 'Date', value: parsed.dateTime }
+        ]);
+      } else if (!parsed.amount && !parsed.refNo) {
+        // Show failure modal if neither key field is detected
+        showInfoModal('Verification Failed', [
+          { label: 'Reason', value: 'Could not detect Amount and Reference No.' }
+        ]);
+      }
     } catch (error) {
       console.error('Payment proof OCR failed:', error);
       setValidationStatus(prev => ({
@@ -1133,189 +1424,73 @@ const Registrations = ({
   };
 
   const verifyFace = async (imageUrl, label) => {
-    // Always use manual verification due to CORS issues with TensorFlow
-    console.log('Using manual face verification due to CORS restrictions');
-    return manualVerifyFace(imageUrl, label);
-
+    // TensorFlow face verification (BlazeFace)
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Verifying face with TensorFlow...' }
+      [label]: { status: 'verifying', message: 'Verifying face' }
     }));
 
     try {
-      console.log(`Starting TensorFlow face verification for: ${label}`);
-      console.log(`Image URL: ${imageUrl}`);
-
-      // Load image with simplified approach
       const loadedImg = await loadImageForTensorFlow(imageUrl);
-      console.log('Image loaded successfully for TensorFlow processing');
-      
-      // Get actual dimensions
       const width = loadedImg.width || 300;
       const height = loadedImg.height || 200;
-      console.log('Image dimensions:', width, 'x', height);
 
-      // Check if image is too small for face detection
-      if (width < 100 || height < 100) {
-        console.warn('Image too small for reliable face detection');
+      if (width < 64 || height < 64) {
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'Image too small for automatic detection',
-            details: 'Please verify manually that this shows a clear face'
-          }
+          [label]: { status: 'manual', message: 'Image too small for detection' }
         }));
         return;
       }
 
-      // Use TensorFlow BlazeFace for face detection
       let faceCount = 0;
       let confidence = 0;
       let detectionMethod = 'none';
-      
+
       if (tfModels.blazeface) {
         try {
-          console.log('Starting BlazeFace detection...');
-          console.log('Image type:', loadedImg.constructor.name);
-          console.log('Image dimensions:', width, 'x', height);
-          
-          // BlazeFace can work with both HTMLImageElement and HTMLCanvasElement
           const predictions = await tfModels.blazeface.estimateFaces(loadedImg, false);
           faceCount = predictions.length;
           detectionMethod = 'BlazeFace';
-          
-          if (predictions.length > 0) {
-            // BlazeFace returns probability scores
-            confidence = predictions[0].probability ? predictions[0].probability[0] : 0.8; // Default confidence
-            console.log('Face detection details:', predictions[0]);
-          }
-          
-          console.log(`BlazeFace detection: Found ${faceCount} faces with confidence ${confidence}`);
-        } catch (blazeError) {
-          console.error('BlazeFace detection failed:', blazeError);
-          
-          // Check if it's a tainted canvas error
-          if (blazeError.message.includes('tainted') || blazeError.message.includes('texImage2D')) {
-            console.log('Tainted canvas detected, falling back to image-based processing');
-            
-            // Try to create a clean image element for processing
-            try {
-              const cleanImg = new Image();
-              cleanImg.onload = async () => {
-                try {
-                  const cleanPredictions = await tfModels.blazeface.estimateFaces(cleanImg, false);
-                  faceCount = cleanPredictions.length;
-                  confidence = cleanPredictions.length > 0 ? 0.7 : 0;
-                  detectionMethod = 'BlazeFace (clean image)';
-                  
-                  console.log(`Clean image detection: Found ${faceCount} faces`);
-                  
-                  // Update status with clean results
-                  if (faceCount > 0) {
-                    setValidationStatus(prev => ({
-                      ...prev,
-                      [label]: { 
-                        status: 'valid', 
-                        message: `Face verification successful (${detectionMethod})`,
-                        details: `Detected ${faceCount} face(s) with ${(confidence * 100).toFixed(1)}% confidence`
-                      }
-                    }));
-                  } else {
-                    setValidationStatus(prev => ({
-                      ...prev,
-                      [label]: { 
-                        status: 'manual', 
-                        message: 'No faces detected automatically',
-                        details: 'Please verify manually that this shows a clear face.'
-                      }
-                    }));
-                  }
-                } catch (cleanError) {
-                  console.error('Clean image processing also failed:', cleanError);
-                  setValidationStatus(prev => ({
-                    ...prev,
-                    [label]: { 
-                      status: 'manual', 
-                      message: 'Automatic detection unavailable',
-                      details: 'Please verify manually that this shows a clear face.'
-                    }
-                  }));
-                }
-              };
-              
-              cleanImg.onerror = () => {
-                setValidationStatus(prev => ({
-                  ...prev,
-                  [label]: { 
-                    status: 'manual', 
-                    message: 'Image processing failed',
-                    details: 'Please verify manually that this shows a clear face.'
-                  }
-                }));
-              };
-              
-              cleanImg.src = imageUrl;
-              return; // Exit early, let the clean image handler continue
-            } catch (cleanImageError) {
-              console.error('Clean image creation failed:', cleanImageError);
-            }
-          }
-          
-          // Fallback to manual verification for other errors
+          confidence = predictions[0]?.probability?.[0] ?? (faceCount > 0 ? 0.8 : 0);
+        } catch (e) {
           setValidationStatus(prev => ({
             ...prev,
-            [label]: { 
-              status: 'manual', 
-              message: 'Automatic face detection failed',
-              details: 'TensorFlow face detection encountered an error. Please verify manually.'
-            }
+            [label]: { status: 'manual', message: 'Automatic face detection failed' }
           }));
           return;
         }
       } else {
-        console.warn('BlazeFace model not available');
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'Face detection model not loaded',
-            details: 'Please verify manually that this shows a clear face.'
-          }
+          [label]: { status: 'manual', message: 'Face model not loaded' }
         }));
         return;
       }
 
-      // Analyze results (only if we haven't already set status in error handling)
       if (faceCount > 0) {
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: 'valid', 
-            message: `Face verification successful (${detectionMethod})`,
-            details: `Detected ${faceCount} face(s) with ${(confidence * 100).toFixed(1)}% confidence`
-          }
+          [label]: { status: 'valid', message: 'Face detected'}
         }));
-      } else if (detectionMethod !== 'none') {
-        console.warn('No faces detected by TensorFlow BlazeFace');
+        // Show compact success modal for face detection
+        showInfoModal('Verification Success', [
+          { label: 'Face', value: 'Detected' }
+        ]);
+      } else {
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { 
-            status: 'manual', 
-            message: 'No faces detected automatically',
-            details: 'BlazeFace model did not detect any faces. Please verify manually that this shows a clear face.'
-          }
+          [label]: { status: 'invalid', message: 'No face detected' }
         }));
+        // Show modal when no face detected as requested
+        showInfoModal('Verification Result', [
+          { label: 'Face', value: 'No face detected' }
+        ]);
       }
     } catch (error) {
-      console.error('TensorFlow face verification failed:', error);
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { 
-          status: 'error', 
-          message: 'Face verification error',
-          details: `TensorFlow Error: ${error.message}`
-        }
+        [label]: { status: 'error', message: 'Face verification error' }
       }));
     } finally {
       setIsValidating(false);
@@ -1328,52 +1503,53 @@ const Registrations = ({
     setCurrentImage({ url, label });
     setImageViewerVisible(true);
  
-    if (modelsLoaded) {
-      if (label.includes('ID')) {
-        verifyID(url, label);
-      } else if (label.includes('Selfie')) {
-        verifyFace(url, label);
-      }
-    } else {
-      console.warn('Face-api.js models not loaded yet');
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Models not loaded yet' }
-      }));
-    }
-  
+    // Do not auto-verify on open; verification is manual per image to avoid cross-process interference
   };
 
   const handleManualVerification = () => {
     const { url, label } = currentImage;
+
+    // Set verifying state only for this specific label
+    setIsVerifying(prev => ({ ...prev, [label]: true }));
     
     console.log('Manual verification triggered for:', label);
     console.log('Image URL:', url);
 
-    if (label.includes('Payment') || label.includes('Proof')) {
-      verifyPaymentProof(url, label);
-    } else if (label.includes('ID')) {
-      if (!modelsLoaded) {
-        console.warn('AI models not loaded yet');
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'error', message: 'AI models not loaded yet' }
-        }));
-        return;
+    const labelLower = (label || '').toLowerCase();
+
+    const finish = () => setIsVerifying(prev => ({ ...prev, [label]: false }));
+
+    const run = async () => {
+      try {
+        if (labelLower.includes('payment') || labelLower.includes('proof') || labelLower.includes('receipt')) {
+          await verifyPaymentProof(url, label);
+        } else if (labelLower.includes('id') && !labelLower.includes('back')) {
+          await verifyID(url, label);
+        } else if (labelLower.includes('selfie')) {
+          if (!modelsLoaded) {
+            console.warn('AI models not loaded yet');
+            setValidationStatus(prev => ({
+              ...prev,
+              [label]: { status: 'error', message: 'AI models not loaded yet' }
+            }));
+            return;
+          }
+          await verifyFace(url, label);
+        }
+      } finally {
+        finish();
       }
-      verifyID(url, label);
-    } else if (label.includes('Selfie')) {
-      if (!modelsLoaded) {
-        console.warn('AI models not loaded yet');
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'error', message: 'AI models not loaded yet' }
-        }));
-        return;
-      }
-      verifyFace(url, label);
-    }
+    };
+
+    run();
   };
+
+  // Helper to show standardized info modal inside image viewer
+  const showInfoModal = (title, fields) => {
+    setInfoModal({ visible: true, title, fields });
+  };
+
+  const closeInfoModal = () => setInfoModal({ visible: false, title: '', fields: [] });
 
   const formatTime = (date) => {
     let hours = date.getHours();
@@ -1706,7 +1882,7 @@ const processDatabaseApprove = async (reg) => {
           lastName,
           email,
           memberId: parseInt(samePersonCheck.id),
-          status: 'completed',
+          status: 'approved',
           description: 'Registration approved for existing Admin'
         });
       }
@@ -1723,6 +1899,7 @@ const processDatabaseApprove = async (reg) => {
           ...rest,
           dateApproved: approvedDate,
           approvedTime: approvedTime,
+          investment: updateData.balance || parseFloat(registrationFee) || 0,
           balance: updateData.balance || parseFloat(registrationFee) || 0,
           status: isAdminLike ? (existingStatus || 'active') : 'active',
           role: isAdminLike ? (existingRole || 'admin') : (rest?.role || 'member')
@@ -1792,7 +1969,7 @@ const processDatabaseApprove = async (reg) => {
       dateApproved: approvedDate,
       approvedTime: approvedTime,
       timestamp: now.getTime(),
-      status: 'completed',
+      status: 'approved',
       memberId: newId,
       firstName,
       lastName,
@@ -1812,6 +1989,7 @@ const processDatabaseApprove = async (reg) => {
       dateApproved: approvedDate,
       approvedTime: approvedTime,
       balance: initialBalance,
+      investment: initialBalance,
       loans: 0.0,
       status: 'active'
     });
@@ -1832,7 +2010,7 @@ const processDatabaseApprove = async (reg) => {
         lastName,
         email,
         memberId: newId,
-        status: 'completed',
+        status: 'approved',
         description: 'Registration approved for Admin'
       });
     }
@@ -2541,10 +2719,10 @@ const processDatabaseApprove = async (reg) => {
                       padding: '10px 20px'
                     }}
                     onClick={handleManualVerification}
-                    disabled={(currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof')) ? isValidating : (!modelsLoaded || isValidating)}
+                    disabled={Boolean(isVerifying[currentImage.label])}
                     onFocus={(e) => e.target.style.outline = 'none'}
                   >
-                    {isValidating ? (
+                    {isVerifying[currentImage.label] ? (
                       <>
                         <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
                         Verifying...
@@ -2556,10 +2734,31 @@ const processDatabaseApprove = async (reg) => {
                       </>
                     )}
                   </button>
-                  {getValidationText(currentImage.label)}
                 </>
               )}
             </div>
+
+            {/* Info modal overlay inside image viewer */}
+            {infoModal.visible && (
+              <div style={styles.infoModalOverlay}>
+                <div style={styles.infoModalCard}>
+                  <div style={styles.infoTitle}>{infoModal.title}</div>
+                  {infoModal.fields.map((f, i) => (
+                    <div key={i} style={styles.infoRow}>
+                      <span style={styles.infoLabel}>{f.label}</span>
+                      <span style={styles.infoValue}>{f.value || 'N/A'}</span>
+                    </div>
+                  ))}
+                  <button
+                    style={styles.infoCloseButton}
+                    onClick={closeInfoModal}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

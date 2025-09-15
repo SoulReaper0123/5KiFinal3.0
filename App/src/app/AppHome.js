@@ -38,6 +38,8 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [selfie, setSelfie] = useState(null);
   const [biometricPromptShown, setBiometricPromptShown] = useState(false);
   const [amountHidden, setAmountHidden] = useState(false);
+  const [investment, setInvestment] = useState(0);
+  const [investmentHidden, setInvestmentHidden] = useState(false);
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -87,6 +89,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         if (foundUser) {
           setFirstName(foundUser.firstName || 'Guest');
           setBalance(foundUser.balance || 0);
+          setInvestment(foundUser.investment || foundUser.investments || 0);
           setEmail(foundUser.email || 'No email provided');
           setSelfie(foundUser.selfie || null);
         }
@@ -315,6 +318,17 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             >
               <Ionicons name="notifications-outline" size={26} color="#fff" />
             </TouchableOpacity>
+          </View>
+
+          {/* Investment Card (same UI as Savings) */}
+          <View style={styles.walletCard}>
+            <Text style={styles.walletLabel}>INVESTMENT</Text>
+            <View style={styles.balanceRow}>
+              <Text style={styles.walletAmount}>{investmentHidden ? '******' : formatBalance(investment)}</Text>
+              <TouchableOpacity onPress={() => setInvestmentHidden((v) => !v)} style={styles.eyeBtn}>
+                <MaterialIcons name={investmentHidden ? 'visibility' : 'visibility-off'} size={22} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Wallet Card */}

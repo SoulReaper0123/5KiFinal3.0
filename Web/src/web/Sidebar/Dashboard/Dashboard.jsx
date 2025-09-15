@@ -737,7 +737,7 @@ const Dashboard = () => {
     labels: ['Total Loans', 'Total Receivables'],
     datasets: [
       {
-        data: [fundsData.totalLoans, fundsData.totalReceivables - fundsData.totalLoans],
+        data: [fundsData.totalLoans, fundsData.totalReceivables],
         backgroundColor: ['#2D5783', '#3B82F6'],
         borderColor: ['#fff', '#fff'],
         borderWidth: 1,
@@ -751,16 +751,16 @@ const Dashboard = () => {
       {
         label: 'Available Funds',
         data: earningsData.map(item => item.funds),
-        backgroundColor: 'rgba(45, 87, 131, 0.1)',
+        backgroundColor: 'rgba(45, 87, 131, 0.08)',
         borderColor: '#2D5783',
-        borderWidth: 3,
+        borderWidth: 2,
         fill: true,
-        tension: 0.4,
-        pointRadius: 6,
-        pointHoverRadius: 8,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
         pointBackgroundColor: '#2D5783',
         pointBorderColor: '#fff',
-        pointBorderWidth: 2,
+        pointBorderWidth: 1,
       },
       {
         label: 'Savings',
@@ -771,16 +771,16 @@ const Dashboard = () => {
           });
           return monthSavings.reduce((sum, item) => sum + item.amount, 0);
         }),
-        backgroundColor: 'rgba(16, 185, 129, 0.1)',
+        backgroundColor: 'rgba(16, 185, 129, 0.08)',
         borderColor: '#10B981',
-        borderWidth: 3,
+        borderWidth: 2,
         fill: true,
-        tension: 0.4,
-        pointRadius: 6,
-        pointHoverRadius: 8,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
         pointBackgroundColor: '#10B981',
         pointBorderColor: '#fff',
-        pointBorderWidth: 2,
+        pointBorderWidth: 1,
       }
     ],
   };
@@ -792,10 +792,8 @@ const Dashboard = () => {
       legend: {
         position: 'bottom',
         labels: {
-          padding: 20,
-          font: {
-            size: 12
-          }
+          padding: 12,
+          font: { size: 12 }
         }
       },
       tooltip: {
@@ -804,7 +802,6 @@ const Dashboard = () => {
             const label = context.dataset.label || '';
             const value = context.raw || 0;
             const total = context.dataset.data.reduce((a, b) => a + b, 0);
-            
             if (context.datasetIndex === 0 && context.chart.data.labels) {
               const percentage = Math.round((value / total) * 100);
               return `${label}: ₱${formatCurrency(value)} (${percentage}%)`;
@@ -822,13 +819,26 @@ const Dashboard = () => {
             return `₱${formatCurrency(value)}`;
           },
           stepSize: 500,
-        }
-      }
+        },
+        grid: { color: 'rgba(0,0,0,0.06)' }
+      },
+      x: { grid: { display: false } }
     }
   };
 
   const loansChartOptions = {
     ...chartOptions,
+    plugins: {
+      ...chartOptions.plugins,
+      tooltip: {
+        callbacks: {
+          label: (context) => {
+            const value = context.raw || 0;
+            return `${context.dataset.label || 'Amount'}: ₱${formatCurrency(value)}`;
+          }
+        }
+      }
+    },
     scales: {
       y: {
         ...chartOptions.scales.y,
@@ -843,6 +853,11 @@ const Dashboard = () => {
 
   const fundsChartOptions = {
     ...chartOptions,
+    plugins: {
+      ...chartOptions.plugins,
+      legend: { ...chartOptions.plugins.legend, labels: { ...chartOptions.plugins.legend.labels, padding: 12 } },
+      tooltip: { ...chartOptions.plugins.tooltip }
+    },
     scales: {
       y: {
         ...chartOptions.scales.y,
@@ -850,8 +865,10 @@ const Dashboard = () => {
           ...chartOptions.scales.y.ticks,
           stepSize: 1000,
           suggestedMax: Math.ceil(fundsData.availableFunds / 1000) * 1000 || 10000
-        }
-      }
+        },
+        grid: { color: 'rgba(0,0,0,0.06)' }
+      },
+      x: { grid: { display: false } }
     }
   };
 
@@ -882,7 +899,7 @@ const Dashboard = () => {
     },
     metricsGrid: {
       display: 'grid',
-      gridTemplateColumns: '1fr 1fr',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
       gap: '20px',
       marginBottom: '20px',
       width: '100%',
@@ -890,18 +907,12 @@ const Dashboard = () => {
     },
     secondaryMetricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(4, 1fr)',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
       gap: '20px',
       marginBottom: '40px',
-      marginTop: '50px',
+      marginTop: '30px',
       width: '100%',
-      alignItems: 'stretch',
-      '@media (max-width: 768px)': {
-        gridTemplateColumns: 'repeat(2, 1fr)'
-      },
-      '@media (max-width: 480px)': {
-        gridTemplateColumns: '1fr'
-      }
+      alignItems: 'stretch'
     },
     primaryCard: {
       padding: '12px',
@@ -968,17 +979,18 @@ const Dashboard = () => {
     },
     chartSelector: {
       display: 'flex',
-      gap: '20px',
-      marginTop: '30px',
-      marginBottom: '15px'
+      gap: '10px',
+      flexWrap: 'wrap',
+      marginTop: '16px',
+      marginBottom: '12px'
     },
     chartButton: {
-      padding: '8px 16px',
+      padding: '8px 12px',
       backgroundColor: 'white',
       border: '1px solid #E5E7EB',
-      borderRadius: '6px',
+      borderRadius: '20px',
       cursor: 'pointer',
-      fontSize: '14px',
+      fontSize: '13px',
       transition: 'all 0.2s'
     },
     selectedChartButton: {
@@ -1010,7 +1022,7 @@ const Dashboard = () => {
       backgroundColor: 'white'
     },
     chartWrapper: {
-      height: '300px',
+      height: '260px',
       position: 'relative'
     },
     loansSection: {
@@ -1310,6 +1322,16 @@ const Dashboard = () => {
     }
   };
 
+  if (loading) {
+    return (
+      <div style={styles.container}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+          <div style={styles.spinner}></div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.container}>
       <div style={styles.header}>
@@ -1412,9 +1434,33 @@ const Dashboard = () => {
                 <h3 style={styles.chartTitle}>Loans Portfolio</h3>
               </div>
               <div style={styles.chartWrapper}>
-                <Pie 
-                  data={loansPieData} 
-                  options={loansChartOptions}
+                <Bar 
+                  data={{
+                    labels: ['Total Loans', 'Total Receivables'],
+                    datasets: [
+                      {
+                        label: 'Amount',
+                        data: [fundsData.totalLoans, fundsData.totalReceivables],
+                        backgroundColor: ['#2D5783', '#3B82F6'],
+                        borderColor: ['#1E3A5F', '#1F5FBF'],
+                        borderWidth: 1,
+                        borderRadius: 6,
+                        barThickness: 48,
+                        maxBarThickness: 56
+                      }
+                    ]
+                  }} 
+                  options={{
+                    ...loansChartOptions,
+                    indexAxis: 'x', // vertical bars
+                    scales: {
+                      ...loansChartOptions.scales,
+                      y: {
+                        ...loansChartOptions.scales.y,
+                        beginAtZero: true
+                      }
+                    }
+                  }}
                 />
               </div>
             </>
@@ -1434,11 +1480,13 @@ const Dashboard = () => {
                   ))}
                 </select>
               </div>
-              <div style={styles.chartWrapper}>
-                <Line 
-                  data={fundsLineData} 
-                  options={fundsChartOptions}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                <div style={styles.chartWrapper}>
+                  <Line 
+                    data={fundsLineData} 
+                    options={fundsChartOptions}
+                  />
+                </div>
               </div>
             </>
           )}
@@ -1458,23 +1506,222 @@ const Dashboard = () => {
                 </select>
               </div>
               {/* Centered summary labels directly under title */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '20px', marginBottom: '10px', marginTop: '4px', textAlign: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px', marginTop: '4px', textAlign: 'center', flexWrap: 'wrap' }}>
                 {(() => {
                   const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
                   const membersDividendValue = totalYields * (fundsData.membersDividendPercentage || 0);
                   const fiveKiEarningsValue = totalYields * (fundsData.fiveKiEarningsPercentage || 0);
+                  const chip = (bg, border, color, label) => (
+                    <div style={{ padding: '4px 8px', background: bg, color, border: `1px solid ${border}`, borderRadius: '9999px', fontWeight: 600, fontSize: '12px' }}>{label}</div>
+                  );
                   return (
                     <>
-                      <div style={{ padding: '6px 10px', background: '#ECFDF5', color: '#065F46', border: '1px solid #A7F3D0', borderRadius: '8px', fontWeight: 600 }}>
-                        Members Dividend: ₱{formatCurrency(membersDividendValue)} ({((fundsData.membersDividendPercentage || 0) * 100).toFixed(0)}%)
-                      </div>
-                      <div style={{ padding: '6px 10px', background: '#EFF6FF', color: '#1E3A8A', border: '1px solid #BFDBFE', borderRadius: '8px', fontWeight: 600 }}>
-                        5ki Earnings: ₱{formatCurrency(fiveKiEarningsValue)} ({((fundsData.fiveKiEarningsPercentage || 0) * 100).toFixed(0)}%)
-                      </div>
+                      {chip('#ECFDF5', '#A7F3D0', '#065F46', `Members Dividend: ₱${formatCurrency(membersDividendValue)} (${((fundsData.membersDividendPercentage || 0) * 100).toFixed(0)}%)`)}
+                      {chip('#EFF6FF', '#BFDBFE', '#1E3A8A', `5KI Earnings: ₱${formatCurrency(fiveKiEarningsValue)} (${((fundsData.fiveKiEarningsPercentage || 0) * 100).toFixed(0)}%)`)}
                     </>
                   );
                 })()}
               </div>
+
+              {/* Dividends Pie Charts */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+                <div style={{ ...styles.chartWrapper }}>
+                  <Pie
+                    data={{
+                      labels: ['Members Dividend', '5KI Earnings'],
+                      datasets: [
+                        {
+                          data: [
+                            ((fundsData.membersDividendPercentage || 0) * 100),
+                            ((fundsData.fiveKiEarningsPercentage || 0) * 100)
+                          ],
+                          backgroundColor: ['#10B981', '#3B82F6'],
+                          borderColor: ['#fff', '#fff'],
+                          borderWidth: 1
+                        }
+                      ]
+                    }}
+                    options={{
+                      plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(0)}%`
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                <div style={{ ...styles.chartWrapper, minWidth: '220px' }}>
+                  <Pie
+                    data={(() => {
+                      // Compute top members by Total % (table logic), shown as percentages
+                      const totalInvestments = dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
+                      const totalLoans = dividendsData.reduce((sum, m) => sum + (m.totalLoanAmount || 0), 0);
+                      const totalActiveMonths = dividendsData.reduce((sum, m) => sum + (m.activeMonthsCount ?? 0), 0);
+
+                      const calcPct = (m) => {
+                        const invShare = totalInvestments > 0 ? (m.investment || 0) / totalInvestments : 0;
+                        const patShare = totalLoans > 0 ? (m.totalLoanAmount || 0) / totalLoans : 0;
+                        const actShare = totalActiveMonths > 0 ? (m.activeMonthsCount ?? 0) / totalActiveMonths : 0;
+                        const pct =
+                          (invShare * (fundsData.investmentSharePercentage || 0)) +
+                          (patShare * (fundsData.patronageSharePercentage || 0)) +
+                          (actShare * (fundsData.activeMonthsPercentage || 0));
+                        return +(pct * 100).toFixed(2); // percent
+                      };
+
+                      const ranked = dividendsData
+                        .map(m => ({
+                          name: m.memberName || m.memberId,
+                          percent: calcPct(m)
+                        }))
+                        .sort((a, b) => b.percent - a.percent)
+                        .slice(0, 6);
+
+                      const labels = ranked.map(r => r.name.length > 14 ? r.name.slice(0, 13) + '…' : r.name);
+                      const values = ranked.map(r => r.percent);
+
+                      return {
+                        labels,
+                        datasets: [
+                          {
+                            data: values,
+                            backgroundColor: ['#F59E0B','#2D5783','#10B981','#3B82F6','#7C3AED','#DC2626'],
+                            borderColor: ['#fff','#fff','#fff','#fff','#fff','#fff'],
+                            borderWidth: 1
+                          }
+                        ]
+                      };
+                    })()}
+                    options={{
+                      plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(2)}%`
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+
+                <div style={{ ...styles.chartWrapper, minWidth: '220px' }}>
+                  <Pie
+                    data={{
+                      labels: ['Investment Share', 'Patronage Share', 'Active Months'],
+                      datasets: [
+                        {
+                          data: [
+                            ((fundsData.investmentSharePercentage || 0) * 100),
+                            ((fundsData.patronageSharePercentage || 0) * 100),
+                            ((fundsData.activeMonthsPercentage || 0) * 100)
+                          ],
+                          backgroundColor: ['#7C3AED', '#DC2626', '#059669'],
+                          borderColor: ['#fff', '#fff', '#fff'],
+                          borderWidth: 1
+                        }
+                      ]
+                    }}
+                    options={{
+                      plugins: {
+                        legend: { position: 'bottom' },
+                        tooltip: {
+                          callbacks: {
+                            label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(0)}%`
+                          }
+                        }
+                      }
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Dividends Total % Chart (Top 10) */}
+              <div style={{ ...styles.chartWrapper, minHeight: '260px', marginBottom: '12px' }}>
+                {(() => {
+                  const totalInvestments = dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
+                  const totalLoans = dividendsData.reduce((sum, m) => sum + (m.totalLoanAmount || 0), 0);
+                  const totalActiveMonths = dividendsData.reduce((sum, m) => sum + (m.activeMonthsCount ?? 0), 0);
+
+                  const toPct = (m) => {
+                    const invShare = totalInvestments > 0 ? (m.investment || 0) / totalInvestments : 0;
+                    const patShare = totalLoans > 0 ? (m.totalLoanAmount || 0) / totalLoans : 0;
+                    const actShare = totalActiveMonths > 0 ? (m.activeMonthsCount ?? 0) / totalActiveMonths : 0;
+
+                    const pct =
+                      (invShare * (fundsData.investmentSharePercentage || 0)) +
+                      (patShare * (fundsData.patronageSharePercentage || 0)) +
+                      (actShare * (fundsData.activeMonthsPercentage || 0));
+
+                    return +(pct * 100).toFixed(2);
+                  };
+
+                  const ranked = dividendsData
+                    .map(m => ({ name: m.memberName || m.memberId, value: toPct(m) }))
+                    .sort((a, b) => b.value - a.value)
+                    .slice(0, 8);
+
+                  const labels = ranked.map(r => r.name.length > 16 ? r.name.slice(0, 15) + '…' : r.name);
+                  const values = ranked.map(r => r.value);
+
+                  return (
+                    <Bar
+                      data={{
+                        labels,
+                        datasets: [
+                          {
+                            label: 'Total Share (₱)',
+                            data: ranked.map(r => {
+                              // Convert percentage to peso value using total yields and members dividend
+                              const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
+                              const membersDividendDecimal = fundsData.membersDividendPercentage || 0;
+                              return +(r.value / 100 * totalYields * membersDividendDecimal).toFixed(2);
+                            }),
+                            backgroundColor: '#2D5783',
+                            borderRadius: 4,
+                            barThickness: 14,
+                            maxBarThickness: 16,
+                          }
+                        ]
+                      }}
+                      options={{
+                        indexAxis: 'y',
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                          legend: { display: false },
+                          tooltip: {
+                            callbacks: {
+                              label: (ctx) => `₱${formatCurrency(ctx.parsed.x)}`
+                            }
+                          }
+                        },
+                        scales: {
+                          x: {
+                            beginAtZero: true,
+                            ticks: {
+                              callback: (v) => `₱${formatCurrency(v)}`
+                            },
+                            grid: { display: true, color: 'rgba(0,0,0,0.06)' }
+                          },
+                          y: {
+                            ticks: { autoSkip: false },
+                            grid: { display: false },
+                            afterFit: (scale) => { scale.width = Math.min(scale.width, 160); }
+                          }
+                        }
+                      }}
+                    />
+                  );
+                })()}
+              </div>
+
+
+
               <div style={styles.dividendsTableContainer}>
                 {(() => {
                   // Calculate totals for investment, patronage share and active months distribution
@@ -1698,73 +1945,75 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div style={styles.loansSection}>
-        <div style={styles.sectionHeader}>
-          <h2 style={styles.sectionTitle}>Active Loans Portfolio</h2>
-          <div style={styles.searchBox}>
-            <input
-              type="text"
-              placeholder="Search by Member ID or Transaction ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              style={styles.searchInput}
-            />
+      {selectedChart === 'loans' && (
+        <div style={styles.loansSection}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Active Loans Portfolio</h2>
+            <div style={styles.searchBox}>
+              <input
+                type="text"
+                placeholder="Search by Member ID or Transaction ID..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                style={styles.searchInput}
+              />
+            </div>
+          </div>
+          
+          <div style={styles.tableContainer}>
+            <table style={styles.loansTable}>
+              <thead>
+                <tr>
+                  <th style={styles.tableHeader}>Member ID</th>
+                  <th style={styles.tableHeader}>Transaction ID</th>
+                  <th style={styles.tableHeader}>Amount</th>
+                  <th style={styles.tableHeader}>Outstanding</th>
+                  <th style={styles.tableHeader}>Term</th>
+                  <th style={styles.tableHeader}>Interest</th>
+                  <th style={styles.tableHeader}>Monthly</th>
+                  <th style={styles.tableHeader}>Total Monthly</th>
+                  <th style={styles.tableHeader}>Due Date</th>
+                  <th style={styles.tableHeader}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredLoans.length > 0 ? (
+                  filteredLoans.map((loan, index) => (
+                    <tr key={`${loan.memberId}-${loan.transactionId}`}>
+                      <td style={styles.tableCell}>{loan.memberId}</td>
+                      <td style={styles.tableCell}>{loan.transactionId}</td>
+                      <td style={styles.tableCell}>₱{formatCurrency(loan.loanAmount)}</td>
+                      <td style={styles.tableCell}>₱{formatCurrency(loan.outstandingBalance)}</td>
+                      <td style={styles.tableCell}>{loan.term}</td>
+                      <td style={styles.tableCell}>{loan.interest}</td>
+                      <td style={styles.tableCell}>₱{formatCurrency(loan.monthlyPayment)}</td>
+                      <td style={styles.tableCell}>₱{formatCurrency(loan.totalMonthlyPayment)}</td>
+                      <td style={styles.tableCell}>
+                        <span style={loan.isOverdue ? styles.overdueDate : null}>
+                          {loan.dueDate}
+                        </span>
+                        {loan.isOverdue && <span style={styles.overdueBadge}>Overdue</span>}
+                      </td>
+                      <td style={styles.tableCell}>
+                        <button 
+                          onClick={() => handleResendClick(loan)}
+                          style={styles.resendButton}
+                        >
+                          Resend Reminder
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="10" style={styles.noResults}>No loans found matching your search criteria</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
-        
-        <div style={styles.tableContainer}>
-          <table style={styles.loansTable}>
-            <thead>
-              <tr>
-                <th style={styles.tableHeader}>Member ID</th>
-                <th style={styles.tableHeader}>Transaction ID</th>
-                <th style={styles.tableHeader}>Amount</th>
-                <th style={styles.tableHeader}>Outstanding</th>
-                <th style={styles.tableHeader}>Term</th>
-                <th style={styles.tableHeader}>Interest</th>
-                <th style={styles.tableHeader}>Monthly</th>
-                <th style={styles.tableHeader}>Total Monthly</th>
-                <th style={styles.tableHeader}>Due Date</th>
-                <th style={styles.tableHeader}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredLoans.length > 0 ? (
-                filteredLoans.map((loan, index) => (
-                  <tr key={`${loan.memberId}-${loan.transactionId}`}>
-                    <td style={styles.tableCell}>{loan.memberId}</td>
-                    <td style={styles.tableCell}>{loan.transactionId}</td>
-                    <td style={styles.tableCell}>₱{formatCurrency(loan.loanAmount)}</td>
-                    <td style={styles.tableCell}>₱{formatCurrency(loan.outstandingBalance)}</td>
-                    <td style={styles.tableCell}>{loan.term}</td>
-                    <td style={styles.tableCell}>{loan.interest}</td>
-                    <td style={styles.tableCell}>₱{formatCurrency(loan.monthlyPayment)}</td>
-                    <td style={styles.tableCell}>₱{formatCurrency(loan.totalMonthlyPayment)}</td>
-                    <td style={styles.tableCell}>
-                      <span style={loan.isOverdue ? styles.overdueDate : null}>
-                        {loan.dueDate}
-                      </span>
-                      {loan.isOverdue && <span style={styles.overdueBadge}>Overdue</span>}
-                    </td>
-                    <td style={styles.tableCell}>
-                      <button 
-                        onClick={() => handleResendClick(loan)}
-                        style={styles.resendButton}
-                      >
-                        Resend Reminder
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="10" style={styles.noResults}>No loans found matching your search criteria</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      )}
 
 {showResendConfirmation && (
   <div style={styles.centeredModal}>

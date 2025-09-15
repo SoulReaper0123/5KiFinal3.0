@@ -75,21 +75,10 @@ const getDaysUntilDue = (dueDate) => {
   return Math.ceil((due - now) / (1000 * 60 * 60 * 24));
 };
 
-// Prefer nextDueDate when it's later or more relevant than dueDate
+// Use only dueDate from database; do not use nextDueDate
 const pickDueTimestamp = (record) => {
-  const hasDue = !!record?.dueDate;
-  const hasNext = !!record?.nextDueDate;
-  if (!hasDue && !hasNext) return Date.now();
-
-  const dueTs = hasDue ? parseDateTime(record.dueDate) : null;
-  const nextTs = hasNext ? parseDateTime(record.nextDueDate) : null;
-
-  // If only one exists, return it
-  if (dueTs && !nextTs) return dueTs;
-  if (!dueTs && nextTs) return nextTs;
-
-  // If both exist, prefer the later/next one
-  return nextTs >= dueTs ? nextTs : dueTs;
+  if (!record?.dueDate) return null;
+  return parseDateTime(record.dueDate);
 };
 
 const MarqueeData = (callback) => {
@@ -187,7 +176,7 @@ const MarqueeData = (callback) => {
                   id: `reminder-${messageData.id}-${daysUntilDue}`,
                   type: 'Loan Payment',
                   status: 'reminder',
-                  message: `Your payment of ₱${messageData.monthlyPayment} is due on ${formatDueDate(messageData.dueDate)}`,
+                  message: `Your payment of ₱${messageData.monthlyPayment} is due on ${messageData.dueDate}`,
                   timestamp: messageData.dueDate,
                   amount: messageData.monthlyPayment,
                   daysUntilDue,

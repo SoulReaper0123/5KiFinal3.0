@@ -60,6 +60,7 @@ const AdminHome = () => {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  // Model selector removed; using Gemini only
   
   // Chat Management States
   const [chatSessions, setChatSessions] = useState([]);
@@ -506,8 +507,98 @@ const handleAIQuery = async (userMessage) => {
   try {
     console.log('Processing admin AI query:', userMessage);
     
-    // Use the enhanced admin AI service
-    const result = await generateEnhancedAdminAIResponse(userMessage);
+    // Build minimal, display-only UI context for AI (no DB access)
+    let visibleContext = `\nActive Section: ${activeSection}\nWindow: ${windowWidth}px\n`;
+
+    try {
+      // Preload summary counts and key totals (display-only snapshot)
+      const [
+        membersSnap,
+        loansAppsSnap,
+        approvedLoansSnap,
+        currentLoansSnap,
+        depositsSnap,
+        paymentsSnap,
+        withdrawAppsSnap,
+        fundsSnap,
+        savingsSnap
+      ] = await Promise.all([
+        database.ref('Members').once('value'),
+        database.ref('Loans/LoanApplications').once('value'),
+        database.ref('Loans/ApprovedLoans').once('value'),
+        database.ref('Loans/CurrentLoans').once('value'),
+        database.ref('Deposits/DepositApplications').once('value'),
+        database.ref('Payments/PaymentApplications').once('value'),
+        database.ref('Withdraws/WithdrawApplications').once('value'),
+        database.ref('Settings/Funds').once('value'),
+        database.ref('Settings/Savings').once('value')
+      ]);
+
+      const membersData = membersSnap.val() || {};
+      const totalMembers = Object.keys(membersData).length;
+
+      const countNested = (obj) => {
+        let count = 0;
+        Object.values(obj || {}).forEach(v => {
+          if (v && typeof v === 'object') count += Object.keys(v).length; else count += 1;
+        });
+        return count;
+      };
+
+      const loansApps = loansAppsSnap.val() || {};
+      const approvedLoans = approvedLoansSnap.val() || {};
+      const currentLoans = currentLoansSnap.val() || {};
+      const deposits = depositsSnap.val() || {};
+      const payments = paymentsSnap.val() || {};
+      const withdraws = withdrawAppsSnap.val() || {};
+
+      // Totals (best-effort from applications where amounts exist)
+      const sumAmounts = (root, amountKeys) => {
+        let total = 0;
+        Object.values(root || {}).forEach(member => {
+          Object.values(member || {}).forEach(item => {
+            for (const k of amountKeys) {
+              if (item && item[k] != null && !isNaN(parseFloat(item[k]))) {
+                total += parseFloat(item[k]);
+                break;
+              }
+            }
+          });
+        });
+        return total;
+      };
+
+      const totalLoanApplications = countNested(loansApps);
+      const totalApprovedLoans = countNested(approvedLoans);
+      const totalCurrentLoans = countNested(currentLoans);
+      const totalDepositApplications = countNested(deposits);
+      const totalPaymentApplications = countNested(payments);
+      const totalWithdrawApplications = countNested(withdraws);
+
+      const totalLoanAmount = sumAmounts(approvedLoans, ['loanAmount']);
+      const totalPaymentAmount = sumAmounts(payments, ['amountToBePaid', 'amount']);
+      const totalDepositAmount = sumAmounts(deposits, ['amountToBeDeposited', 'amount']);
+      const totalWithdrawAmount = sumAmounts(withdraws, ['withdrawAmount', 'amountWithdrawn', 'amount']);
+
+      const availableFunds = parseFloat(fundsSnap.val() || 0) || 0;
+      const fiveKISavings = parseFloat(savingsSnap.val() || 0) || 0;
+
+      visibleContext += `\nOVERVIEW (display-only):\n`;
+      visibleContext += `- Members: ${totalMembers}\n`;
+      visibleContext += `- Funds: ₱${availableFunds.toLocaleString()}\n`;
+      visibleContext += `- Savings: ₱${fiveKISavings.toLocaleString()}\n`;
+      visibleContext += `- Loan Applications: ${totalLoanApplications}\n`;
+      visibleContext += `- Approved Loans: ${totalApprovedLoans} | Current Loans: ${totalCurrentLoans}\n`;
+      visibleContext += `- Deposit Applications: ${totalDepositApplications}\n`;
+      visibleContext += `- Payment Applications: ${totalPaymentApplications}\n`;
+      visibleContext += `- Withdraw Applications: ${totalWithdrawApplications}\n`;
+      visibleContext += `- Totals — Loans: ₱${totalLoanAmount.toLocaleString()}, Payments: ₱${totalPaymentAmount.toLocaleString()}, Deposits: ₱${totalDepositAmount.toLocaleString()}, Withdrawals: ₱${totalWithdrawAmount.toLocaleString()}\n`;
+    } catch (e) {
+      console.warn('Visible context preload failed (non-blocking):', e?.message);
+    }
+
+    // Use the enhanced admin AI service with visible UI context only (Gemini only)
+    const result = await generateEnhancedAdminAIResponse(userMessage, visibleContext);
     
     if (!result.success) {
       throw new Error(result.message || 'AI service unavailable');
@@ -547,14 +638,15 @@ const handleAIQuery = async (userMessage) => {
     } else if (lowerMessage.includes('report') || lowerMessage.includes('statistic')) {
       fallbackResponse = 'I can generate various reports and statistics about members, loans, deposits, withdrawals, and overall system performance.';
     } else {
-      fallbackResponse = 'I\'m your admin AI assistant with access to all database information. I can help with member management, financial reports, transaction analysis, and system insights.';
+      fallbackResponse = 'I can assist using only what is currently visible on your admin UI (no database access).';
     }
     
     const errorMessage = {
       type: 'ai',
-      content: `I'm temporarily having trouble accessing the full database. Here's what I can help you with:\n\n${fallbackResponse}\n\nPlease try your question again, or contact support if the issue persists.`,
+      content: `${fallbackResponse}\n\nPlease try again once the dashboard has loaded relevant data.`,
       timestamp: new Date().toLocaleTimeString()
     };
+    
     
     const finalMessages = [...updatedMessages, errorMessage];
     setAiMessages(finalMessages);
@@ -2005,6 +2097,7 @@ content: {
 </div>
               
               <form onSubmit={handleAIInputSubmit} style={styles.aiInputContainer}>
+
                 <input
                   type="text"
                   value={aiInput}

@@ -44,7 +44,7 @@ export default {
     favicon: "./assets/favicon.png"
   },
   extra: {
-    // Environment variables
-    geminiApiKey: process.env.GEMINI_API_KEY || 'AIzaSyDPV6y1cgQMpOyJYKXIHeHXX0m6qIMrMZA',
+    // Environment variables (do not hardcode secrets)
+    geminiApiKey: process.env.GEMINI_API_KEY,
   },
 };

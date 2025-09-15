@@ -10,12 +10,15 @@ import {
   Modal,
   ActivityIndicator,
   BackHandler,
-  KeyboardAvoidingView, Platform
+  KeyboardAvoidingView, Platform,
+  Image
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import CustomConfirmModal from '../../components/CustomConfirmModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
+import ImagePickerModal from '../../components/ImagePickerModal';
 import { ref as dbRef, set, get } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
 
@@ -53,6 +56,8 @@ const ApplyLoan = () => {
   const [collateralValue, setCollateralValue] = useState('');
   const [collateralDescription, setCollateralDescription] = useState('');
   const [showCollateralModal, setShowCollateralModal] = useState(false);
+  const [proofOfCollateral, setProofOfCollateral] = useState(null);
+  const [showImageOptions, setShowImageOptions] = useState(false);
   
   // Modal states
   const [alertModalVisible, setAlertModalVisible] = useState(false);
@@ -123,7 +128,7 @@ const ApplyLoan = () => {
 
   // Check if all collateral fields are filled
   const isCollateralValid = () => {
-    return collateralType && collateralValue && collateralDescription;
+    return collateralType && collateralValue && collateralDescription && proofOfCollateral;
   };
 
   const handleLoanTypeChange = (option) => {
@@ -495,7 +500,8 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       ...(requiresCollateral && {
         collateralType,
         collateralValue,
-        collateralDescription
+        collateralDescription,
+        proofOfCollateralUrl: proofOfCollateral || '' // will be URL after upload if you choose to upload now
       })
     };
 
@@ -605,11 +611,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       // Show a clear confirm dialog requiring user action
       // Include the phrase 'Collateral Required' to drive the modal UI label/ icon
       setConfirmMessage(
-        `Collateral Required: Loan Amount exceeds the loanable amount (₱${maxLoanableAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}).\n` +
-        `This requires collateral. Do you want to continue?`
+        `Loan amount is more than the loanable amount, this requires collateral. Do you want to continue?`
       );
       setConfirmAction(() => () => {
-        // User chose Yes: proceed to fill collateral, but do NOT submit yet
         setRequiresCollateral(true);
         setShowCollateralModal(true);
       });
@@ -630,6 +634,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     setCollateralType('');
     setCollateralValue('');
     setCollateralDescription('');
+    setProofOfCollateral(null);
   };
 
   const formatCurrency = (amount) => {
@@ -642,6 +647,10 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       <Text style={{color: 'red'}}>*</Text>
     </Text>
   );
+
+  const handleSelectProofOfCollateral = () => {
+    setShowImageOptions(true);
+  };
 
   return (
     <KeyboardAvoidingView
@@ -748,82 +757,119 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           transparent={false}
           onRequestClose={() => setShowCollateralModal(false)}
         >
-          <ScrollView style={styles.modalContent}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Collateral Information</Text>
-              <TouchableOpacity onPress={() => setShowCollateralModal(false)}>
-                <MaterialIcons name="close" size={24} color="black" />
+          <ScrollView style={styles.collateralScreen}>
+            <View style={styles.headerRow}>
+              <TouchableOpacity style={styles.headerSide} onPress={() => setShowCollateralModal(false)}>
+                <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
               </TouchableOpacity>
+              <Text style={styles.headerTitle}>Collateral</Text>
+              <View style={styles.headerSide} />
             </View>
 
-            <Text style={styles.label}><RequiredField>Collateral Type</RequiredField></Text>
-            <ModalSelector
-              data={collateralOptions}
-              initValue="Select Collateral Type"
-              onChange={(option) => setCollateralType(option.key)}
-              style={styles.picker}
-            >
-              <TouchableOpacity style={styles.pickerContainer}>
-                <Text style={styles.pickerText}>
-                  {collateralType || 'Select Collateral Type'}
-                </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-              </TouchableOpacity>
-            </ModalSelector>
-
-            <Text style={styles.label}><RequiredField>Collateral Value (₱)</RequiredField></Text>
-            <TextInput
-              placeholder="Estimated value of collateral"
-              value={collateralValue}
-              onChangeText={setCollateralValue}
-              style={styles.input}
-              keyboardType="numeric"
-            />
-
-            <Text style={styles.label}><RequiredField>Collateral Description</RequiredField></Text>
-            <Text style={styles.descriptionHint}>
-              Please include the following details if applicable:
-            </Text>
-            <Text style={styles.descriptionBullet}>• Make, model, and serial number</Text>
-            <Text style={styles.descriptionBullet}>• Physical condition</Text>
-            <Text style={styles.descriptionBullet}>• Location</Text>
-            <Text style={styles.descriptionBullet}>• Ownership documents</Text>
-            <Text style={styles.descriptionBullet}>• Any identifying marks</Text>
-            <TextInput
-              placeholder="Describe your collateral in detail..."
-              value={collateralDescription}
-              onChangeText={setCollateralDescription}
-              style={[styles.input, { height: 100, textAlignVertical: 'top' }]}
-              multiline
-            />
-
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.continueButton, !isCollateralValid() && styles.disabledButton]}
-                onPress={() => {
-                  if (isCollateralValid()) {
-                    setRequiresCollateral(true);
-                    // Close the collateral modal and return to the main form
-                    // The final confirmation will show only when user taps Submit
-                    setShowCollateralModal(false);
-                  }
-                }}
-                disabled={!isCollateralValid()}
+            <View style={styles.content}>
+              <Text style={styles.label}><RequiredField>Collateral Type</RequiredField></Text>
+              <ModalSelector
+                data={collateralOptions}
+                initValue="Select Collateral Type"
+                onChange={(option) => setCollateralType(option.key)}
+                style={styles.picker}
+                modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                overlayStyle={{ justifyContent: 'flex-end' }}
               >
-                <Text style={styles.modalButtonText}>Continue</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]}
-                onPress={() => {
-                  setShowCollateralModal(false);
-                  setRequiresCollateral(false);
-                }}
-              >
-                <Text style={styles.modalButtonText}>Cancel</Text>
-              </TouchableOpacity>
+                <TouchableOpacity style={styles.pickerContainer}>
+                  <Text style={styles.pickerText}>
+                    {collateralType || 'Select Collateral Type'}
+                  </Text>
+                  <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                </TouchableOpacity>
+              </ModalSelector>
+
+              <Text style={styles.label}><RequiredField>Collateral Value (₱)</RequiredField></Text>
+              <TextInput
+                placeholder="Estimated value of collateral"
+                value={collateralValue}
+                onChangeText={setCollateralValue}
+                style={styles.input}
+                keyboardType="numeric"
+              />
+
+              <Text style={styles.label}><RequiredField>Collateral Description</RequiredField></Text>
+              <Text style={styles.descriptionHint}>
+                Please include the following details if applicable:
+              </Text>
+              <Text style={styles.descriptionBullet}>• Make, model, and serial number</Text>
+              <Text style={styles.descriptionBullet}>• Physical condition</Text>
+              <Text style={styles.descriptionBullet}>• Location</Text>
+              <Text style={styles.descriptionBullet}>• Ownership documents</Text>
+              <Text style={styles.descriptionBullet}>• Any identifying marks</Text>
+              <TextInput
+                placeholder="Describe your collateral in detail..."
+                value={collateralDescription}
+                onChangeText={setCollateralDescription}
+                style={[styles.input, { height: 120, textAlignVertical: 'top' }]}
+                multiline
+              />
+
+              {/* Proof of Collateral */}
+              <Text style={styles.label}><RequiredField>Proof of Collateral</RequiredField></Text>
+              {proofOfCollateral ? (
+                <TouchableOpacity onPress={() => setShowImageOptions(true)}>
+                  <Image source={{ uri: proofOfCollateral }} style={styles.proofPreview} />
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity style={styles.uploadButton} onPress={() => setShowImageOptions(true)}>
+                  <MaterialIcons name="photo-camera" size={24} color="#2D5783" />
+                  <Text style={styles.uploadButtonText}>Add Photo</Text>
+                </TouchableOpacity>
+              )}
+
+              <View style={{ height: 8 }} />
+
+              <View style={{ marginTop: 20 }}>
+                <TouchableOpacity 
+                  style={[styles.submitButton, !isCollateralValid() && styles.disabledButton]}
+                  onPress={() => {
+                    if (isCollateralValid()) {
+                      setRequiresCollateral(true);
+                      // Show loan confirmation directly like ApplyLoan Submit
+                      const loanAmountNum = parseFloat(loanAmount) || 0;
+                      const processingFeeNum = parseFloat(processingFee) || 0;
+                      const releaseAmount = loanAmountNum - processingFeeNum;
+                      let message = `Loan Type: ${loanType}\n` +
+                        `Loan Amount: ₱${loanAmountNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+                        `Processing Fee: ₱${processingFeeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+                        `Release Amount: ₱${releaseAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
+                        `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
+                        `Disbursement: ${disbursement}\n` +
+                        `Account Name: ${accountName}\n` +
+                        `Account Number: ${accountNumber}` +
+                        `\n\nCollateral Details\n` +
+                        `Type: ${collateralType}\n` +
+                        `Value: ₱${collateralValue}\n` +
+                        `Description: ${collateralDescription}`;
+                      setConfirmMessage(message);
+                      setConfirmAction(() => () => {
+                        submitLoanApplication();
+                      });
+                      setConfirmModalVisible(true);
+                    }
+                  }}
+                  disabled={!isCollateralValid()}
+                >
+                  <Text style={styles.submitButtonText}>Continue</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </ScrollView>
         </Modal>
+
+        {/* Image Picker for Proof of Collateral */}
+        <ImagePickerModal
+          visible={showImageOptions}
+          onClose={() => setShowImageOptions(false)}
+          onImageSelected={(uri) => setProofOfCollateral(uri)}
+          title="Select Proof of Collateral"
+        />
 
         <TouchableOpacity 
           style={[styles.submitButton, !isFormValid() && styles.disabledButton]} 
@@ -863,36 +909,39 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 
 
 
-      {/* Detailed Confirmation Modal */}
+      {/* Detailed Confirmation Modal - match PayLoan structure */}
       <Modal visible={confirmModalVisible} transparent animationType="fade">
         <View style={styles.centeredModal}>
           <View style={styles.modalCard}>
-            <MaterialIcons 
-              name={confirmMessage.includes('Collateral Required') ? 'warning' : 'help-outline'} 
-              size={40} 
-              color={confirmMessage.includes('Collateral Required') ? '#ff9800' : '#2C5282'} 
-              style={styles.modalIcon} 
-            />
+            <MaterialIcons name="info" size={40} color="#2C5282" style={styles.modalIcon} />
             <Text style={styles.modalTitle}>
-              {confirmMessage.includes('Collateral Required') ? 'Collateral Required' : 'Confirm Loan Application'}
+              {requiresCollateral || confirmMessage.toLowerCase().includes('requires collateral') ? 'Collateral Required' : 'Confirm Loan Application'}
             </Text>
             <View style={styles.modalContent}>
-              <Text style={styles.modalText}>Balance: ₱{balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-              <Text style={styles.modalText}>Loan Type: {loanType}</Text>
-              <Text style={styles.modalText}>Loan Amount: ₱{parseFloat(loanAmount || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-              <Text style={styles.modalText}>Processing Fee: ₱{parseFloat(processingFee || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-              <Text style={styles.modalText}>Release Amount: ₱{(parseFloat(loanAmount || 0) - parseFloat(processingFee || 0)).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-              <Text style={styles.modalText}>Term: {term} {term === '1' ? 'Month' : 'Months'}</Text>
-              <Text style={styles.modalText}>Interest Rate: {(interestRate * 100).toFixed(1)}%</Text>
-              <Text style={styles.modalText}>Disbursement: {disbursement}</Text>
-              <Text style={styles.modalText}>Account Name: {accountName}</Text>
-              <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
-              {requiresCollateral && (
+              {requiresCollateral || confirmMessage.toLowerCase().includes('requires collateral') ? (
+                <Text style={styles.modalText}>
+                  loan amount is more than the loanable amount, this requires collateral, do you want to continue?
+                </Text>
+              ) : (
                 <>
-                  <Text style={[styles.modalText, { fontWeight: 'bold', marginTop: 10 }]}>Collateral Details:</Text>
-                  <Text style={styles.modalText}>Type: {collateralType}</Text>
-                  <Text style={styles.modalText}>Value: ₱{parseFloat(collateralValue || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-                  <Text style={styles.modalText}>Description: {collateralDescription}</Text>
+                  <Text style={styles.modalText}>Balance: {formatCurrency(balance)}</Text>
+                  <Text style={styles.modalText}>Loan Type: {loanType}</Text>
+                  <Text style={styles.modalText}>Loan Amount: {formatCurrency(loanAmount || 0)}</Text>
+                  <Text style={styles.modalText}>Processing Fee: {formatCurrency(processingFee || 0)}</Text>
+                  <Text style={styles.modalText}>Release Amount: {formatCurrency((parseFloat(loanAmount || 0) - parseFloat(processingFee || 0)) || 0)}</Text>
+                  <Text style={styles.modalText}>Term: {term} {term === '1' ? 'Month' : 'Months'}</Text>
+                  <Text style={styles.modalText}>Interest Rate: {(Number(interestRate) * 100).toFixed(1)}%</Text>
+                  <Text style={styles.modalText}>Disbursement: {disbursement}</Text>
+                  <Text style={styles.modalText}>Account Name: {accountName}</Text>
+                  <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+                  {requiresCollateral && (
+                    <>
+                      <Text style={[styles.modalText, { marginTop: 8, fontWeight: '700', color: '#2C5282' }]}>Collateral Details</Text>
+                      <Text style={styles.modalText}>Type: {collateralType}</Text>
+                      <Text style={styles.modalText}>Value: {formatCurrency(collateralValue || 0)}</Text>
+                      <Text style={styles.modalText}>Description: {collateralDescription}</Text>
+                    </>
+                  )}
                 </>
               )}
             </View>
@@ -901,26 +950,19 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => {
                   setConfirmModalVisible(false);
-                  if (requiresCollateral) {
-                    setShowCollateralModal(true);
-                  }
+                  if (requiresCollateral) setShowCollateralModal(true);
                 }}
               >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
+                <Text style={styles.cancelButtonText}>{requiresCollateral ? 'No' : 'Cancel'}</Text>
               </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.modalButton, styles.confirmButton]} 
                 onPress={() => {
                   setConfirmModalVisible(false);
-                  if (confirmAction) {
-                    confirmAction();
-                    setConfirmAction(null);
-                  }
+                  if (confirmAction) { confirmAction(); setConfirmAction(null); }
                 }}
               >
-                <Text style={styles.confirmButtonText}>
-                  {confirmMessage.includes('Collateral Required') ? 'Continue' : 'Submit'}
-                </Text>
+                <Text style={styles.confirmButtonText}>{requiresCollateral ? 'Yes' : 'Submit'}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1049,22 +1091,36 @@ const styles = StyleSheet.create({
     color: '#ffffff',
     fontSize: 18,
   },
-  // Collateral Modal Styles
-  modalContent: {
-    flex: 1,
-    padding: 20,
-    backgroundColor: 'white',
+  proofPreview: {
+    width: '100%',
+    height: 180,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    marginBottom: 12,
   },
-  modalHeader: {
+  uploadButton: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#2D5783',
+    borderRadius: 10,
+    backgroundColor: '#EAF3FF',
   },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
+  uploadButtonText: {
     color: '#2D5783',
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginLeft: 8,
+  },
+  // Collateral screen container using same card layout as ApplyLoan form
+  collateralScreen: {
+    flex: 1,
+    backgroundColor: '#F8FAFC',
+    padding: 16,
   },
   descriptionHint: {
     fontSize: 14,
@@ -1084,20 +1140,23 @@ const styles = StyleSheet.create({
   },
   modalButton: {
     flex: 1,
-    padding: 15,
-    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
     alignItems: 'center',
     marginHorizontal: 5,
     minWidth: '48%',
   },
   cancelButton: {
-    backgroundColor: '#cccccc',
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
   continueButton: {
-    backgroundColor: '#2D5783',
+    backgroundColor: '#4FE7AF',
   },
   modalButtonText: {
-    color: 'white',
+    color: 'black',
     fontSize: 16,
     fontWeight: 'bold',
   },
