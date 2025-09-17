@@ -5,8 +5,10 @@ import {
   FaChevronLeft, 
   FaChevronRight,
   FaExclamationCircle,
-  FaCheckCircle
+  FaCheckCircle,
+  FaPlus
 } from 'react-icons/fa';
+import { AiOutlineClose } from 'react-icons/ai';
 import { FiAlertCircle } from 'react-icons/fi';
 import ExcelJS from 'exceljs';
 import WithdrawApplications from './WithdrawApplications';
@@ -28,6 +30,21 @@ const Withdraws = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  // Add modal states for Approved tab
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [showAddWithdrawConfirmation, setShowAddWithdrawConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [addForm, setAddForm] = useState({
+    memberId: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    withdrawOption: 'GCash',
+    accountName: '',
+    accountNumber: '',
+    amountWithdrawn: ''
+  });
   const pageSize = 10;
 
   useEffect(() => {
@@ -172,6 +189,36 @@ const Withdraws = () => {
         font-size: 16px;
         color: #666;
       }
+      .plus-button {
+        position: fixed;
+        right: 30px;
+        bottom: 30px;
+        background-color: #2D5783;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        border: none;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        color: white;
+        z-index: 100;
+      }
+      .plus-icon { font-size: 24px; }
+      .centered-add-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:1000; }
+      .add-modal-card { width: 40%; max-width: 800px; background:#fff; border-radius:8px; padding:20px; position:relative; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:90vh; height:auto; display:flex; flex-direction:column; }
+      .add-modal-header { border-bottom:1px solid #eee; padding-bottom:12px; margin-bottom:12px; }
+      .add-modal-title { font-size:18px; font-weight:bold; color:#2D5783; text-align:center; }
+      .add-form { display:grid; grid-template-columns:1fr 1fr; gap: 20px; }
+      .form-group { display:flex; flex-direction:column; margin-bottom:12px; }
+      .form-label { font-weight:600; margin-bottom:6px; font-size:14px; }
+      .form-input { padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px; }
+      .add-actions { display:flex; justify-content:center; gap:12px; padding-top:12px; border-top:1px solid #eee; }
+      .btn { padding:8px 16px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; }
+      .btn-primary { background:#4CAF50; color:#fff; }
+      .btn-secondary { background:#f44336; color:#fff; }
       .loading-container {
         display: flex;
         justify-content: center;
@@ -414,6 +461,104 @@ const Withdraws = () => {
     setNoMatch(false);
   };
 
+  const openAddModal = () => setAddModalVisible(true);
+  const closeAddModal = () => setAddModalVisible(false);
+  const updateForm = (field, value) => setAddForm(prev => ({ ...prev, [field]: value }));
+
+  const formatDate = (d) => d.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' });
+  const formatTime = (d) => `${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}`;
+
+  // Add an approved withdrawal directly (mirrors WithdrawApplications approve + App Withdraw.js)
+  const handleAddApprovedWithdraw = async () => {
+    try {
+      setIsProcessing(true);
+      const now = new Date();
+      const dateApproved = formatDate(now);
+      const timeApproved = formatTime(now);
+
+      const required = ['memberId','firstName','lastName','email','withdrawOption','amountWithdrawn'];
+      for (const f of required) { if (!addForm[f]) throw new Error('Please fill all required fields'); }
+
+      const memberRef = database.ref(`Members/${addForm.memberId}`);
+      const fundsRef = database.ref('Settings/Funds');
+
+      const [memberSnap, fundsSnap] = await Promise.all([
+        memberRef.once('value'),
+        fundsRef.once('value')
+      ]);
+
+      if (!memberSnap.exists()) throw new Error('Member not found');
+
+      const member = memberSnap.val();
+      const withdrawAmount = parseFloat(addForm.amountWithdrawn);
+      const currentBalance = parseFloat(member.balance || 0);
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+
+      if (withdrawAmount > currentBalance) throw new Error('Insufficient member balance');
+      if (withdrawAmount > currentFunds) throw new Error('Insufficient funds');
+
+      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+      const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${addForm.memberId}/${transactionId}`);
+      const txnRef = database.ref(`Transactions/Withdrawals/${addForm.memberId}/${transactionId}`);
+
+      const approvedData = {
+        id: addForm.memberId,
+        transactionId,
+        firstName: addForm.firstName,
+        lastName: addForm.lastName,
+        email: addForm.email,
+        withdrawOption: addForm.withdrawOption,
+        accountName: addForm.accountName,
+        accountNumber: addForm.accountNumber,
+        amountWithdrawn: withdrawAmount,
+        dateApproved,
+        timeApproved,
+        status: 'approved'
+      };
+
+      // Persist as in WithdrawApplications approve flow
+      await approvedRef.set(approvedData);
+      await txnRef.set(approvedData);
+
+      const newBalance = currentBalance - withdrawAmount;
+      const newFunds = currentFunds - withdrawAmount;
+      await memberRef.update({ balance: newBalance });
+      await fundsRef.set(newFunds);
+
+      // Log to FundsHistory (YYYY-MM-DD) like WithdrawApplications
+      const dateKey = now.toISOString().split('T')[0];
+      await database.ref(`Settings/FundsHistory/${dateKey}`).set(newFunds);
+
+      // Send email via ApproveWithdraws API
+      try {
+        const { ApproveWithdraws } = await import('../../../../../Server/api');
+        await ApproveWithdraws({
+          memberId: addForm.memberId,
+          transactionId,
+          amount: withdrawAmount,
+          dateApproved,
+          timeApproved,
+          email: addForm.email,
+          firstName: addForm.firstName,
+          lastName: addForm.lastName,
+          status: 'approved'
+        });
+      } catch (e) {
+        console.warn('ApproveWithdraws email send failed or not configured:', e?.message || e);
+      }
+
+      setSuccessMessage('Approved withdrawal added successfully!');
+      setSuccessModalVisible(true);
+      setAddModalVisible(false);
+    } catch (err) {
+      console.error('Add approved withdraw error:', err);
+      setErrorMessage(err.message || 'Failed to add approved withdrawal');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
@@ -529,6 +674,93 @@ const Withdraws = () => {
             </>
           )}
         </div>
+
+        {activeSection === 'approvedWithdraws' && (
+          <button className="plus-button" onClick={openAddModal}>
+            <FaPlus className="plus-icon" />
+          </button>
+        )}
+
+        {addModalVisible && (
+          <div className="centered-add-modal">
+            <div className="add-modal-card">
+              <button onClick={closeAddModal} style={{ position:'absolute', top:10, right:10, border:'none', background:'transparent', cursor:'pointer' }}>
+                <AiOutlineClose />
+              </button>
+              <div className="add-modal-header">
+                <h3 className="add-modal-title">Add Approved Withdrawal</h3>
+              </div>
+              <div className="add-form">
+                <div className="form-group">
+                  <label className="form-label">Member ID</label>
+                  <input className="form-input" value={addForm.memberId} onChange={(e)=>updateForm('memberId', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Email</label>
+                  <input className="form-input" type="email" value={addForm.email} onChange={(e)=>updateForm('email', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">First Name</label>
+                  <input className="form-input" value={addForm.firstName} onChange={(e)=>updateForm('firstName', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Last Name</label>
+                  <input className="form-input" value={addForm.lastName} onChange={(e)=>updateForm('lastName', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Withdraw Option</label>
+                  <select className="form-input" value={addForm.withdrawOption} onChange={(e)=>updateForm('withdrawOption', e.target.value)}>
+                    <option value="GCash">GCash</option>
+                    <option value="Bank">Bank</option>
+                    <option value="Cash">Cash</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Account Name</label>
+                  <input className="form-input" value={addForm.accountName} onChange={(e)=>updateForm('accountName', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Account Number</label>
+                  <input className="form-input" value={addForm.accountNumber} onChange={(e)=>updateForm('accountNumber', e.target.value)} />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Amount</label>
+                  <input className="form-input" type="number" value={addForm.amountWithdrawn} onChange={(e)=>updateForm('amountWithdrawn', e.target.value)} />
+                </div>
+              </div>
+              <div className="add-actions">
+                <button className="btn btn-secondary" onClick={closeAddModal} disabled={isProcessing}>Cancel</button>
+                <button className="btn btn-primary" onClick={() => setShowAddWithdrawConfirmation(true)} disabled={isProcessing}>{isProcessing ? 'Processing...' : 'Add Approved Withdrawal'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Approve (Add Approved Withdrawal) Confirmation Modal */}
+        {showAddWithdrawConfirmation && (
+          <div className="centered-modal">
+            <div className="small-modal-card">
+              <FaExclamationCircle className="confirm-icon" style={{ color: '#2D5783' }} />
+              <p className="modal-text">Are you sure you want to add this approved withdrawal?</p>
+              <div style={{ display:'flex', gap: '10px' }}>
+                <button 
+                  className="confirm-btn"
+                  onClick={async () => { setActionInProgress(true); setShowAddWithdrawConfirmation(false); await handleAddApprovedWithdraw(); setActionInProgress(false); }}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  className="cancel-btn"
+                  onClick={() => setShowAddWithdrawConfirmation(false)}
+                  disabled={actionInProgress}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Success Modal */}
         {successModalVisible && (

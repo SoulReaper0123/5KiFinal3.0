@@ -5,8 +5,10 @@ import {
   FaChevronLeft, 
   FaChevronRight,
   FaExclamationCircle,
-  FaCheckCircle
+  FaCheckCircle,
+  FaPlus
 } from 'react-icons/fa';
+import { AiOutlineClose } from 'react-icons/ai';
 import { FiAlertCircle } from 'react-icons/fi';
 import ExcelJS from 'exceljs';
 import ApplyLoans from './ApplyLoans';
@@ -28,6 +30,23 @@ const Loans = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  // Add modal states
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  // Confirmation modals for Add Approved Loan
+  const [showAddLoanConfirmation, setShowAddLoanConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [addForm, setAddForm] = useState({
+    memberId: '',
+    firstName: '',
+    lastName: '',
+    email: '',
+    loanAmount: '',
+    term: '',
+    disbursement: 'GCash',
+    accountName: '',
+    accountNumber: ''
+  });
   const pageSize = 10;
 
   useEffect(() => {
@@ -172,6 +191,36 @@ const Loans = () => {
         font-size: 16px;
         color: #666;
       }
+      .plus-button {
+        position: fixed;
+        right: 30px;
+        bottom: 30px;
+        background-color: #2D5783;
+        border-radius: 50%;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        border: none;
+        width: 60px;
+        height: 60px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        cursor: pointer;
+        color: white;
+        z-index: 100;
+      }
+      .plus-icon { font-size: 24px; }
+      .centered-add-modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display:flex; justify-content:center; align-items:center; z-index:1000; }
+      .add-modal-card { width: 40%; max-width: 800px; background:#fff; border-radius:8px; padding:20px; position:relative; box-shadow:0 4px 12px rgba(0,0,0,0.15); max-height:90vh; height:auto; display:flex; flex-direction:column; }
+      .add-modal-header { border-bottom:1px solid #eee; padding-bottom:12px; margin-bottom:12px; }
+      .add-modal-title { font-size:18px; font-weight:bold; color:#2D5783; text-align:center; }
+      .add-form { display:grid; grid-template-columns:1fr 1fr; gap: 20px; }
+      .form-group { display:flex; flex-direction:column; margin-bottom:12px; }
+      .form-label { font-weight:600; margin-bottom:6px; font-size:14px; }
+      .form-input { padding:10px; border:1px solid #ccc; border-radius:5px; font-size:14px; }
+      .add-actions { display:flex; justify-content:center; gap:12px; padding-top:12px; border-top:1px solid #eee; }
+      .btn { padding:8px 16px; border:none; border-radius:4px; cursor:pointer; font-weight:bold; }
+      .btn-primary { background:#4CAF50; color:#fff; }
+      .btn-secondary { background:#f44336; color:#fff; }
       .loading-container {
         display: flex;
         justify-content: center;
@@ -388,6 +437,180 @@ const Loans = () => {
     setNoMatch(false);
   };
 
+  const openAddModal = () => setAddModalVisible(true);
+  const closeAddModal = () => setAddModalVisible(false);
+  const updateForm = (field, value) => setAddForm(prev => ({ ...prev, [field]: value }));
+
+  const formatDate = (date) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+  const formatTime = (date) => {
+    const h = date.getHours().toString().padStart(2, '0');
+    const m = date.getMinutes().toString().padStart(2, '0');
+    return `${h}:${m}`;
+  };
+
+  // Add approved loan directly (Admin-created) by mirroring ApplyLoan.js + ApplyLoans.jsx approve flow
+  const handleAddApprovedLoan = async () => {
+    try {
+      setIsProcessing(true);
+      const now = new Date();
+      const dateApproved = formatDate(now);
+      const timeApproved = formatTime(now);
+
+      // Validate
+      const required = ['memberId','firstName','lastName','email','loanAmount','term','disbursement'];
+      for (const f of required) {
+        if (!addForm[f]) throw new Error('Please fill all required fields');
+      }
+
+      // Fetch settings and member balance
+      const memberBalanceRef = database.ref(`Members/${addForm.memberId}/balance`);
+      const fundsRef = database.ref('Settings/Funds');
+      const interestRateRef = database.ref(`Settings/InterestRate/${addForm.term}`);
+      const processingFeeRef = database.ref('Settings/ProcessingFee');
+      const loanPercentageRef = database.ref('Settings/LoanPercentage');
+
+      const [balanceSnap, fundsSnap, irSnap, feeSnap, percSnap] = await Promise.all([
+        memberBalanceRef.once('value'),
+        fundsRef.once('value'),
+        interestRateRef.once('value'),
+        processingFeeRef.once('value'),
+        loanPercentageRef.once('value')
+      ]);
+
+      const memberBalance = parseFloat(balanceSnap.val()) || 0;
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+      const interestRate = (parseFloat(irSnap.val()) || 0) / 100;
+      const processingFee = parseFloat(feeSnap.val()) || 0;
+      const loanPercentage = parseFloat(percSnap.val());
+
+      const amount = parseFloat(addForm.loanAmount);
+      const termMonths = parseInt(addForm.term);
+
+      // Percentage check as in ApplyLoans.jsx
+      const maxLoanAmount = loanPercentage === 0 ? memberBalance : memberBalance * ((loanPercentage || 80) / 100);
+      if (amount > maxLoanAmount) {
+        const pct = loanPercentage === 0 ? 100 : (loanPercentage || 80);
+        throw new Error(`Loan amount exceeds ${pct}% of member's balance.`);
+      }
+
+      if (amount > currentFunds) {
+        throw new Error('Insufficient funds to approve this loan.');
+      }
+
+      // Compute loan figures like ApplyLoans.jsx
+      const monthlyPayment = amount / termMonths;
+      const interest = amount * interestRate;
+      const totalMonthlyPayment = monthlyPayment + interest;
+      const totalTermPayment = totalMonthlyPayment * termMonths;
+      const releaseAmount = amount - processingFee;
+
+      const dueDate = new Date(now); dueDate.setDate(now.getDate() + 30);
+
+      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+      const approvedRef = database.ref(`Loans/ApprovedLoans/${addForm.memberId}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Loans/${addForm.memberId}/${transactionId}`);
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${addForm.memberId}/${transactionId}`);
+      const memberLoanRef = database.ref(`Members/${addForm.memberId}/loans/${transactionId}`);
+
+      const approvedData = {
+        id: addForm.memberId,
+        firstName: addForm.firstName,
+        lastName: addForm.lastName,
+        email: addForm.email,
+        transactionId,
+        loanAmount: amount,
+        term: termMonths,
+        disbursement: addForm.disbursement,
+        accountName: addForm.accountName,
+        accountNumber: addForm.accountNumber,
+        dateApproved,
+        timeApproved,
+        timestamp: now.getTime(),
+        status: 'approved',
+        interestRate: interestRate * 100,
+        interest,
+        monthlyPayment,
+        totalMonthlyPayment,
+        totalTermPayment,
+        processingFee,
+        releaseAmount,
+        dueDate: `${dueDate.getFullYear()}-${(dueDate.getMonth()+1).toString().padStart(2,'0')}-${dueDate.getDate().toString().padStart(2,'0')}`,
+        paymentsMade: 0
+      };
+
+      // Write to DB similar to ApplyLoans.jsx approval
+      await approvedRef.set(approvedData);
+      await transactionRef.set(approvedData);
+      await currentLoanRef.set(approvedData);
+      await memberLoanRef.set(approvedData);
+
+      // Update Settings/Funds and FundsHistory
+      const newFundsAmount = currentFunds - amount;
+      await fundsRef.set(newFundsAmount);
+      const timestampKey = now.toISOString().replace(/[.#$\[\]]/g, '_');
+      await database.ref(`Settings/FundsHistory/${timestampKey}`).set(newFundsAmount);
+
+      // Update Savings and SavingsHistory with processing fee (same pattern)
+      const dateKey = now.toISOString().split('T')[0];
+      const savingsRef = database.ref('Settings/Savings');
+      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+      const [savingsSnap, daySavingsSnap] = await Promise.all([
+        savingsRef.once('value'),
+        savingsHistoryRef.child(dateKey).once('value')
+      ]);
+      const currentSavings = parseFloat(savingsSnap.val()) || 0;
+      const newSavings = Math.ceil((currentSavings + processingFee) * 100) / 100;
+      await savingsRef.set(newSavings);
+      const currentDaySavings = parseFloat(daySavingsSnap.val()) || 0;
+      const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
+      await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+
+      // Deduct member balance by full amount, as in ApplyLoans.jsx
+      const updatedMemberBalance = Math.max(0, Math.ceil((memberBalance - amount) * 100) / 100);
+      await memberBalanceRef.set(updatedMemberBalance);
+
+      // Send approval email using existing API ApproveLoans
+      try {
+        const { ApproveLoans } = await import('../../../../../Server/api');
+        await ApproveLoans({
+          memberId: addForm.memberId,
+          transactionId,
+          amount: amount.toFixed(2),
+          term: termMonths,
+          dateApproved,
+          timeApproved,
+          email: addForm.email,
+          firstName: addForm.firstName,
+          lastName: addForm.lastName,
+          status: 'approved',
+          interestRate: (interestRate * 100).toFixed(2) + '%',
+          interest: interest.toFixed(2),
+          monthlyPayment: monthlyPayment.toFixed(2),
+          totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
+          totalTermPayment: totalTermPayment.toFixed(2),
+          releaseAmount: releaseAmount.toFixed(2),
+          processingFee: processingFee.toFixed(2),
+          dueDate: approvedData.dueDate
+        });
+      } catch (e) {
+        console.warn('ApproveLoans email send failed or not configured:', e?.message || e);
+      }
+
+      setSuccessMessage('Approved loan added successfully!');
+      setSuccessModalVisible(true);
+      setAddModalVisible(false);
+    } catch (err) {
+      console.error('Add approved loan error:', err);
+      setErrorMessage(err.message || 'Failed to add approved loan');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
   const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
@@ -482,6 +705,98 @@ const Loans = () => {
             </>
           )}
         </div>
+
+        {activeSection === 'approvedLoans' && (
+          <button className="plus-button" onClick={openAddModal}>
+            <FaPlus className="plus-icon" />
+          </button>
+        )}
+
+        {addModalVisible && (
+          <div className="centered-add-modal">
+            <div className="add-modal-card">
+              <button onClick={closeAddModal} className="close-add-modal" style={{ position:'absolute', top:10, right:10, border:'none', background:'transparent', cursor:'pointer' }}>
+                <AiOutlineClose />
+              </button>
+              <div className="add-modal-header">
+                <h3 className="add-modal-title">Add Approved Loan</h3>
+              </div>
+              <div className="add-modal-body">
+                <div className="add-form">
+                  <div className="form-group">
+                    <label className="form-label">Member ID</label>
+                    <input className="form-input" value={addForm.memberId} onChange={(e)=>updateForm('memberId', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Email</label>
+                    <input className="form-input" type="email" value={addForm.email} onChange={(e)=>updateForm('email', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">First Name</label>
+                    <input className="form-input" value={addForm.firstName} onChange={(e)=>updateForm('firstName', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Last Name</label>
+                    <input className="form-input" value={addForm.lastName} onChange={(e)=>updateForm('lastName', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Loan Amount</label>
+                    <input className="form-input" type="number" value={addForm.loanAmount} onChange={(e)=>updateForm('loanAmount', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Term (months)</label>
+                    <input className="form-input" type="number" value={addForm.term} onChange={(e)=>updateForm('term', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Disbursement</label>
+                    <select className="form-input" value={addForm.disbursement} onChange={(e)=>updateForm('disbursement', e.target.value)}>
+                      <option value="GCash">GCash</option>
+                      <option value="Bank">Bank</option>
+                    </select>
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Name</label>
+                    <input className="form-input" value={addForm.accountName} onChange={(e)=>updateForm('accountName', e.target.value)} />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Account Number</label>
+                    <input className="form-input" value={addForm.accountNumber} onChange={(e)=>updateForm('accountNumber', e.target.value)} />
+                  </div>
+                </div>
+              </div>
+              <div className="add-actions">
+                <button className="btn btn-secondary" onClick={closeAddModal} disabled={isProcessing}>Cancel</button>
+                <button className="btn btn-primary" onClick={() => setShowAddLoanConfirmation(true)} disabled={isProcessing}>{isProcessing ? 'Processing...' : 'Add Approved Loan'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Approve (Add Approved Loan) Confirmation Modal */}
+        {showAddLoanConfirmation && (
+          <div className="centered-modal">
+            <div className="small-modal-card">
+              <FaExclamationCircle className="confirm-icon" style={{ color: '#2D5783' }} />
+              <p className="modal-text">Are you sure you want to add this approved loan?</p>
+              <div style={{ display:'flex', gap: '10px' }}>
+                <button 
+                  className="confirm-btn"
+                  onClick={async () => { setActionInProgress(true); setShowAddLoanConfirmation(false); await handleAddApprovedLoan(); setActionInProgress(false); }}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  className="cancel-btn"
+                  onClick={() => setShowAddLoanConfirmation(false)}
+                  disabled={actionInProgress}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Success Modal */}
         {successModalVisible && (

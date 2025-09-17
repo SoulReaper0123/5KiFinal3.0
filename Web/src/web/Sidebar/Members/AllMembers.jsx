@@ -533,6 +533,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>First Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Last Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Investment</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Savings</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
@@ -546,6 +547,12 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                 <td style={styles.tableCell}>{member.id || 'N/A'}</td>
                 <td style={styles.tableCell}>{member.firstName || 'N/A'}</td>
                 <td style={styles.tableCell}>{member.lastName || 'N/A'}</td>
+                <td style={{
+                  ...styles.tableCell,
+                  ...styles.savingsAmount
+                }}>
+                  ₱{formatNumber(member.investment)}
+                </td>
                 <td style={{
                   ...styles.tableCell,
                   ...styles.savingsAmount

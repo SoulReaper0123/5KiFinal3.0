@@ -134,6 +134,16 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
   },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    margin: '12px 0 8px 0',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #eee',
+    textAlign: 'left',
+    width: '100%'
+  },
   modalTitle: {
     fontSize: '18px',
     fontWeight: 'bold',
@@ -1078,7 +1088,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
       {modalVisible && selectedLoan && (
         <div style={styles.centeredModal}>
-          <div style={hasDocuments(selectedLoan) ? styles.modalCard : styles.modalCardSingleColumn}>
+          <div style={styles.modalCard}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -1150,12 +1160,41 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
 
                   </div>
-                  
+                  <div style={styles.rightColumn}>
+                    <div style={styles.sectionTitle}>Proof of Documents</div>
+                    <div style={styles.imageGrid}>
+                      {selectedLoan.proofOfIncomeUrl && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Proof of Income</p>
+                          <img
+                            src={selectedLoan.proofOfIncomeUrl}
+                            alt="Proof of Income"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
+                            onFocus={(e) => e.target.style.outline = 'none'}
+                          />
+                        </div>
+                      )}
+                      {selectedLoan.proofOfIdentityUrl && (
+                        <div style={styles.imageBlock}>
+                          <p style={styles.imageLabel}>Proof of Identity</p>
+                          <img
+                            src={selectedLoan.proofOfIdentityUrl}
+                            alt="Proof of Identity"
+                            style={styles.imageThumbnail}
+                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
+                            onFocus={(e) => e.target.style.outline = 'none'}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ) : (
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Member Information</div>
-                  <div style={styles.compactField}>
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+ <div style={styles.sectionTitle}>Member Information</div>
+                    <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Member ID:</span>
                     <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
                   </div>
@@ -1177,7 +1216,9 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                       {existingLoanInfo.hasExisting ? `Yes — Outstanding: ${formatCurrency(existingLoanInfo.outstanding)}` : 'No'}
                     </span>
                   </div>
-
+                  
+                  </div>
+                  <div style={styles.rightColumn}>
                   <div style={styles.sectionTitle}>Loan Details</div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Transaction ID:</span>
@@ -1209,6 +1250,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                   </div>
 
 
+                </div>
                 </div>
               )}
             </div>

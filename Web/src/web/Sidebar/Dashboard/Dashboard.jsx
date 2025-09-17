@@ -24,6 +24,7 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [fundsData, setFundsData] = useState({
     availableFunds: 0,
+    totalYields: 0,
     totalLoans: 0,
     totalReceivables: 0,
     fiveKISavings: 0,
@@ -50,6 +51,13 @@ const Dashboard = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
+  const [dividendsLoading, setDividendsLoading] = useState(false);
+  // Dividends distribution modal and flow
+  const [showDividendsModal, setShowDividendsModal] = useState(false);
+  const [distributionMembers, setDistributionMembers] = useState([]); // { memberId, name, investment, savings, dividend }
+  const [distributionProcessing, setDistributionProcessing] = useState(false);
+  const [distributionConfirmVisible, setDistributionConfirmVisible] = useState(false);
+  const [distributionSuccessVisible, setDistributionSuccessVisible] = useState(false);
 
   const checkDueDates = async () => {
     try {
@@ -239,7 +247,9 @@ const Dashboard = () => {
   // Refresh dividends data when year changes
   useEffect(() => {
     if (selectedChart === 'dividends') {
-      fetchDashboardData();
+      setDividendsLoading(true);
+      fetchDashboardData({ lightweight: true })
+        .finally(() => setDividendsLoading(false));
     }
   }, [selectedYear, selectedChart]);
 
@@ -307,13 +317,61 @@ const Dashboard = () => {
     }
   };
 
-  const fetchDashboardData = async () => {
+  // Helpers to match PayLoan.js display and calculations
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+
+  const formatDisplayDate = (dateInput) => {
     try {
-      setLoading(true);
+      if (!dateInput) return 'N/A';
+      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+        const date = new Date(dateInput.seconds * 1000);
+        return date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      }
+      if (typeof dateInput === 'string') {
+        const parsedDate = new Date(dateInput);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+        }
+        return dateInput;
+      }
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+        return dateInput.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      }
+      return 'N/A';
+    } catch (e) {
+      return 'N/A';
+    }
+  };
+
+  const getOverdueDays = (dueDate) => {
+    if (!dueDate) return 0;
+    let due = typeof dueDate === 'string' ? new Date(dueDate) : new Date(dueDate);
+    if (isNaN(due.getTime())) return 0;
+    const today = startOfDay(new Date());
+    const dueStart = startOfDay(due);
+    if (today <= dueStart) return 0;
+    const ms = today.getTime() - dueStart.getTime();
+    return Math.ceil(ms / (1000 * 60 * 60 * 24));
+  };
+
+  const computePenaltyAndNewTotal = (loan) => {
+    const overdueDays = getOverdueDays(loan.dueDate || loan.nextDueDate);
+    const interest = parseFloat(loan.interest) || 0;
+    const penalty = overdueDays > 0 ? (interest * (overdueDays / 30)) : 0; // match PayLoan.js logic
+    const monthly = parseFloat(loan.totalMonthlyPayment) || 0;
+    const newTotalMonthly = monthly + penalty;
+    return { overdueDays, penalty, newTotalMonthly };
+  };
+
+  const fetchDashboardData = async (options = {}) => {
+    const { lightweight = false } = options;
+    try {
+      if (!lightweight) setLoading(true);
       
       const [
         fundsSnapshot,
-        fiveKISnapshot,
+        savingsSnapshot,
+        yieldsSnapshot,
         savingsHistorySnapshot,
         fundsHistorySnapshot,
         membersSnapshot,
@@ -324,6 +382,7 @@ const Dashboard = () => {
       ] = await Promise.all([
         database.ref('Settings/Funds').once('value'),
         database.ref('Settings/Savings').once('value'),
+        database.ref('Settings/Yields').once('value'),
         database.ref('Settings/SavingsHistory').once('value'),
         database.ref('Settings/FundsHistory').once('value'),
         database.ref('Members').once('value'),
@@ -334,7 +393,8 @@ const Dashboard = () => {
       ]);
 
       const availableFunds = fundsSnapshot.val() || 0;
-      const fiveKISavings = fiveKISnapshot.val() || 0;
+      const fiveKISavings = savingsSnapshot.val() || 0;
+      const totalYields = yieldsSnapshot.val() || 0;
       const savingsHistory = Object.entries(savingsHistorySnapshot.val() || {}).map(([date, amount]) => ({
         date,
         amount: parseFloat(amount) || 0
@@ -356,6 +416,8 @@ const Dashboard = () => {
       const activeMonthsPercentage = parseFloat(settingsData.ActiveMonthsPercentage || 0) / 100;
       const membersDividendPercentage = parseFloat(settingsData.MembersDividendPercentage || 0) / 100;
       const fiveKiEarningsPercentage = parseFloat(settingsData.FiveKiEarningsPercentage || 0) / 100;
+      // Save dividend date for due indicator
+      window.__dividendSettingsDate = settingsData.DividendDate || '';
       
       let totalLoans = 0;
       let totalReceivables = 0;
@@ -434,6 +496,7 @@ const Dashboard = () => {
 
       setFundsData({
         availableFunds,
+        totalYields,
         totalLoans,
         totalReceivables,
         fiveKISavings,
@@ -447,6 +510,17 @@ const Dashboard = () => {
         membersDividendPercentage,
         fiveKiEarningsPercentage
       });
+
+      // Preserve settings snapshot for distribution
+      window.__dividendSettings = {
+        investmentSharePercentage,
+        patronageSharePercentage,
+        activeMonthsPercentage,
+        membersDividendPercentage,
+        fiveKiEarningsPercentage,
+        availableFunds,
+        fiveKISavings
+      };
       
       setLoanData(loanItems);
       setEarningsData(formattedFunds);
@@ -679,10 +753,115 @@ const Dashboard = () => {
       });
       
       setDividendsData(dividendsItems);
-      setLoading(false);
+      if (!lightweight) setLoading(false);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setLoading(false);
+      if (!lightweight) setLoading(false);
+    }
+  };
+
+  // Compute per-member dividends for the modal based on current table logic
+  const computeMemberDividendShare = (member) => {
+    const totalYields = fundsData.totalYields || 0;
+    const totalInvestments = window.totalAllMembersInvestment || dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
+    const totalLoans = window.totalAllMembersLoanAmount || dividendsData.reduce((sum, m) => sum + (m.totalLoanAmount || 0), 0);
+    const totalActiveMonths = window.totalActiveMonths || dividendsData.reduce((sum, m) => sum + (m.activeMonthsCount ?? 0), 0);
+
+    const investmentShareDecimal = totalInvestments > 0 ? (member.investment / totalInvestments) : 0;
+    const patronageShareDecimal = totalLoans > 0 ? ((member.totalLoanAmount || 0) / totalLoans) : 0;
+    const activeMonthShareDecimal = totalActiveMonths > 0 ? ((member.activeMonthsCount ?? 0) / totalActiveMonths) : 0;
+
+    const totalPercentageDecimal =
+      (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
+      (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
+      (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
+
+    const membersDividendDecimal = fundsData.membersDividendPercentage || 0; // settings already /100
+    const totalShare = totalYields * totalPercentageDecimal * membersDividendDecimal;
+    return totalShare;
+  };
+
+  const openDividendsModal = async () => {
+    try {
+      setDistributionProcessing(true);
+      // Gather members with investment info already prepared in dividendsData
+      // Also fetch current savings from Members table for display
+      const membersSnap = await database.ref('Members').once('value');
+      const membersRaw = membersSnap.val() || {};
+
+      const rows = dividendsData.map(m => {
+        const memberRecord = membersRaw[m.memberId] || {};
+        const savings = parseFloat(memberRecord.balance) || 0;
+        const currentInvestment = parseFloat(memberRecord.investment) || 0; // display and increment source
+        const dividend = computeMemberDividendShare(m);
+        return {
+          memberId: m.memberId,
+          name: m.memberName,
+          // show current members investment like AllMembers
+          investment: currentInvestment,
+          savings,
+          dividend,
+          _calcContext: m // keep context for potential recalcs
+        };
+      });
+
+      setDistributionMembers(rows);
+      setShowDividendsModal(true);
+    } catch (e) {
+      console.error('Open dividends modal error:', e);
+      setErrorMessage('Failed to prepare dividends list');
+      setErrorModalVisible(true);
+    } finally {
+      setDistributionProcessing(false);
+    }
+  };
+
+  const confirmDistributeDividends = async () => {
+    setDistributionConfirmVisible(true);
+  };
+
+  const performDistributeDividends = async () => {
+    setDistributionConfirmVisible(false);
+    setDistributionProcessing(true);
+    try {
+      const updates = {};
+      const now = new Date();
+      const approvedDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+      const approvedTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const year = now.getFullYear();
+
+      // For each member, add dividend to savings and log a transaction entry
+      distributionMembers.forEach(row => {
+        // Savings increment (balance)
+        const newBalPath = `Members/${row.memberId}/balance`;
+        const newBalance = (parseFloat(row.savings) || 0) + (parseFloat(row.dividend) || 0);
+        updates[newBalPath] = parseFloat(newBalance.toFixed(2));
+
+        // Investment increment (align with Registrations approval behavior)
+        const newInvPath = `Members/${row.memberId}/investment`;
+        const newInvestment = (parseFloat(row.investment) || 0) + (parseFloat(row.dividend) || 0);
+        updates[newInvPath] = parseFloat(newInvestment.toFixed(2));
+
+        // Log dividend transaction like other Transactions sections
+        const txnId = `DIV-${Date.now()}-${row.memberId}`;
+        const txnPath = `Transactions/Dividends/${row.memberId}/${txnId}`;
+        updates[`${txnPath}/type`] = 'DividendDistribution';
+        updates[`${txnPath}/amount`] = parseFloat(row.dividend.toFixed(2));
+        updates[`${txnPath}/dateApproved`] = approvedDate;
+        updates[`${txnPath}/approvedTime`] = approvedTime;
+        updates[`${txnPath}/year`] = year;
+        updates[`${txnPath}/status`] = 'distributed';
+      });
+
+      await database.ref().update(updates);
+
+      setDistributionSuccessVisible(true);
+    } catch (e) {
+      console.error('Distribution error:', e);
+      setErrorMessage('Failed to distribute dividends');
+      setErrorModalVisible(true);
+    } finally {
+      setDistributionProcessing(false);
     }
   };
 
@@ -910,7 +1089,7 @@ const Dashboard = () => {
       gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
       gap: '20px',
       marginBottom: '40px',
-      marginTop: '30px',
+      marginTop: '40px',
       width: '100%',
       alignItems: 'stretch'
     },
@@ -1110,6 +1289,31 @@ const Dashboard = () => {
       cursor: 'pointer',
       fontSize: '12px',
       transition: 'background-color 0.2s'
+    },
+
+    // Dividends modal table
+    dividendsModalTable: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      minWidth: '700px'
+    },
+    dividendsModalTh: {
+      textAlign: 'left',
+      padding: '10px 8px',
+      borderBottom: '1px solid #eee',
+      fontWeight: 600,
+      fontSize: '14px'
+    },
+    dividendsModalTd: {
+      padding: '8px 8px',
+      borderBottom: '1px solid #f1f1f1',
+      fontSize: '13px'
+    },
+    modalFooterRow: {
+      display: 'flex',
+      justifyContent: 'flex-end',
+      gap: '10px',
+      marginTop: '12px'
     },
   modalCardSmall: {
     width: '250px',
@@ -1353,8 +1557,8 @@ const Dashboard = () => {
         <div style={{...styles.metricCard, ...styles.primaryCard}}>
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Yields</h3>
-            <div style={styles.metricValue}>₱{formatCurrency(fundsData.availableFunds + fundsData.fiveKISavings)}</div>
-            <div style={styles.metricDescription}>Funds plus savings</div>
+            <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalYields)}</div>
+            <div style={styles.metricDescription}>From Settings/Yields</div>
           </div>
           <div style={{...styles.healthIndicator, backgroundColor: '#10B981', opacity: 0}}>
             Placeholder
@@ -1389,7 +1593,7 @@ const Dashboard = () => {
 
         <div style={{...styles.metricCard, ...styles.secondaryCard}}>
           <div style={styles.metricContent}>
-            <h3 style={styles.metricTitle}>5KI Savings</h3>
+            <h3 style={styles.metricTitle}>5KI Earnings</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.fiveKISavings)}</div>
             <div style={styles.metricDescription}>Organization savings</div>
           </div>
@@ -1505,10 +1709,10 @@ const Dashboard = () => {
                   ))}
                 </select>
               </div>
-              {/* Centered summary labels directly under title */}
+              {/* Centered summary labels directly under title + action row */}
               <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px', marginTop: '4px', textAlign: 'center', flexWrap: 'wrap' }}>
                 {(() => {
-                  const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
+                  const totalYields = fundsData.totalYields || 0;
                   const membersDividendValue = totalYields * (fundsData.membersDividendPercentage || 0);
                   const fiveKiEarningsValue = totalYields * (fundsData.fiveKiEarningsPercentage || 0);
                   const chip = (bg, border, color, label) => (
@@ -1522,6 +1726,151 @@ const Dashboard = () => {
                   );
                 })()}
               </div>
+
+              {/* Action row: Due badge and distribution button */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                <div>
+                  {(() => {
+                    // Show due/overdue indicator like Overdue Loans when DividendDate is today or past
+                    const settingsDate = (window.__dividendSettingsDate || '').toString();
+                    const isDue = (() => {
+                      if (!settingsDate) return false;
+                      const d = new Date(settingsDate);
+                      if (isNaN(d.getTime())) return false;
+                      const today = new Date();
+                      const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                      const tt = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                      return dd.getTime() <= tt.getTime();
+                    })();
+                    return isDue ? (
+                      <span style={{ ...styles.overdueBadge, backgroundColor: '#FEF3C7', color: '#B45309', borderRadius: 6 }}>Dividends Action Needed</span>
+                    ) : null;
+                  })()}
+                </div>
+                <div>
+                  <button onClick={openDividendsModal} style={styles.resendButton}>Distribute Dividends</button>
+                </div>
+              </div>
+
+
+              {showDividendsModal && (
+                <div style={styles.centeredModal}>
+                  <div style={styles.modalCard}>
+                    <button 
+                      style={styles.closeButton} 
+                      onClick={() => setShowDividendsModal(false)}
+                      aria-label="Close modal"
+                      onFocus={(e) => e.target.style.outline = 'none'}
+                    >
+                      <FaTimes />
+                    </button>
+                    <h3 style={styles.modalTitle}>Distribute Dividends</h3>
+                    <div style={styles.modalContent}>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={styles.dividendsModalTable}>
+                          <thead>
+                            <tr>
+                              <th style={styles.dividendsModalTh}>Member ID</th>
+                              <th style={styles.dividendsModalTh}>Member</th>
+                              <th style={styles.dividendsModalTh}>Investments</th>
+                              <th style={styles.dividendsModalTh}>Savings</th>
+                              <th style={styles.dividendsModalTh}>Dividends</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {distributionMembers.map(r => (
+                              <tr key={r.memberId}>
+                                <td style={styles.dividendsModalTd}>{r.memberId}</td>
+                                <td style={styles.dividendsModalTd}>{r.name}</td>
+                                <td style={styles.dividendsModalTd}>₱{formatCurrency(r.investment)}</td>
+                                <td style={styles.dividendsModalTd}>₱{formatCurrency(r.savings)}</td>
+                                <td style={styles.dividendsModalTd}><strong>₱{formatCurrency(r.dividend)}</strong></td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                    <div style={styles.modalFooterRow}>
+                      <button 
+                        style={{ ...styles.actionButton, backgroundColor: '#f1f5f9', color: '#111' }}
+                        onClick={() => setShowDividendsModal(false)}
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
+                        onClick={confirmDistributeDividends}
+                        disabled={distributionProcessing || distributionMembers.length === 0}
+                      >
+                        {distributionProcessing ? 'Processing...' : 'Distribute'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirm Modal */}
+              {distributionConfirmVisible && (
+                <div style={styles.centeredModal}>
+                  <div style={styles.modalCardSmall}>
+                    <button 
+                      style={styles.closeButton} 
+                      onClick={() => setDistributionConfirmVisible(false)}
+                      aria-label="Close modal"
+                      onFocus={(e) => e.target.style.outline = 'none'}
+                    >
+                      <FaTimes />
+                    </button>
+                    <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+                    <p style={styles.modalText}>Are you sure you want to distribute dividends to all listed members?</p>
+                    <div style={{ display: 'flex', gap: '10px' }}>
+                      <button 
+                        style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
+                        onClick={performDistributeDividends}
+                        disabled={distributionProcessing}
+                      >
+                        {distributionProcessing ? 'Processing...' : 'Yes'}
+                      </button>
+                      <button 
+                        style={{ ...styles.actionButton, backgroundColor: '#f1f5f9', color: '#111' }}
+                        onClick={() => setDistributionConfirmVisible(false)}
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Success Modal */}
+              {distributionSuccessVisible && (
+                <div style={styles.centeredModal}>
+                  <div style={styles.modalCardSmall}>
+                    <button 
+                      style={styles.closeButton} 
+                      onClick={() => setDistributionSuccessVisible(false)}
+                      aria-label="Close modal"
+                      onFocus={(e) => e.target.style.outline = 'none'}
+                    >
+                      <FaTimes />
+                    </button>
+                    <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+                    <p style={styles.modalText}>Dividends distributed successfully!</p>
+                    <button 
+                      style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
+                      onClick={() => {
+                        setDistributionSuccessVisible(false);
+                        setShowDividendsModal(false);
+                        fetchDashboardData({ lightweight: true });
+                      }}
+                      onFocus={(e) => e.target.style.outline = 'none'}
+                    >
+                      OK
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Dividends Pie Charts */}
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
@@ -1555,6 +1904,7 @@ const Dashboard = () => {
                 </div>
 
                 <div style={{ ...styles.chartWrapper, minWidth: '220px' }}>
+              
                   <Pie
                     data={(() => {
                       // Compute top members by Total % (table logic), shown as percentages
@@ -1641,6 +1991,7 @@ const Dashboard = () => {
               </div>
 
               {/* Dividends Total % Chart (Top 10) */}
+                <h3 style={styles.chartTitle}>Total Share ({selectedYear})</h3>
               <div style={{ ...styles.chartWrapper, minHeight: '260px', marginBottom: '12px' }}>
                 {(() => {
                   const totalInvestments = dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
@@ -1677,7 +2028,7 @@ const Dashboard = () => {
                             label: 'Total Share (₱)',
                             data: ranked.map(r => {
                               // Convert percentage to peso value using total yields and members dividend
-                              const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
+                              const totalYields = fundsData.totalYields || 0;
                               const membersDividendDecimal = fundsData.membersDividendPercentage || 0;
                               return +(r.value / 100 * totalYields * membersDividendDecimal).toFixed(2);
                             }),
@@ -1908,7 +2259,7 @@ const Dashboard = () => {
                           <strong style={{color: '#111827'}}>
                             {(() => {
                               // Total Share = Total Yields * Total% * MembersDividendPercentage (all decimals)
-                              const totalYields = (fundsData.availableFunds || 0) + (fundsData.fiveKISavings || 0);
+                              const totalYields = fundsData.totalYields || 0;
 
                               // Use totals-based shares (consistent with Total % cell)
                               const totalInvestments = window.totalAllMembersInvestment || 0;
@@ -1972,6 +2323,8 @@ const Dashboard = () => {
                   <th style={styles.tableHeader}>Interest</th>
                   <th style={styles.tableHeader}>Monthly</th>
                   <th style={styles.tableHeader}>Total Monthly</th>
+                  <th style={styles.tableHeader}>Penalty</th>
+                  <th style={styles.tableHeader}>New Total Monthly</th>
                   <th style={styles.tableHeader}>Due Date</th>
                   <th style={styles.tableHeader}>Actions</th>
                 </tr>
@@ -1988,9 +2341,18 @@ const Dashboard = () => {
                       <td style={styles.tableCell}>{loan.interest}</td>
                       <td style={styles.tableCell}>₱{formatCurrency(loan.monthlyPayment)}</td>
                       <td style={styles.tableCell}>₱{formatCurrency(loan.totalMonthlyPayment)}</td>
+                      {(() => {
+                        const { penalty, newTotalMonthly } = computePenaltyAndNewTotal(loan);
+                        return (
+                          <>
+                            <td style={styles.tableCell}>₱{formatCurrency(penalty)}</td>
+                            <td style={styles.tableCell}>₱{formatCurrency(newTotalMonthly)}</td>
+                          </>
+                        );
+                      })()}
                       <td style={styles.tableCell}>
                         <span style={loan.isOverdue ? styles.overdueDate : null}>
-                          {loan.dueDate}
+                          {formatDisplayDate(loan.dueDate)}
                         </span>
                         {loan.isOverdue && <span style={styles.overdueBadge}>Overdue</span>}
                       </td>

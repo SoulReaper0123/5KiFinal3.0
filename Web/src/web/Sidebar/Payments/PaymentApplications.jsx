@@ -750,10 +750,11 @@ const PaymentApplications = ({
         throw new Error('Member details do not match our records');
       }
 
-      // 2. Load Settings (Funds, Savings, Penalty)
+      // 2. Load Settings (Funds, Yields, Savings, Penalty)
       const fundsRef = database.ref('Settings/Funds');
+      const yieldsRef = database.ref('Settings/Yields');
+      const yieldsHistoryRef = database.ref('Settings/YieldsHistory');
       const savingsRef = database.ref('Settings/Savings');
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
       const penaltyValueRef = database.ref('Settings/PenaltyValue');
 
       // 3. Find current loan (if any)
@@ -969,25 +970,33 @@ const PaymentApplications = ({
       await memberRef.update({ balance: memberBalanceToSet });
       console.log('Member balance updated (principal + excess only)');
 
-      // Update Savings: add penalty first, and interest paid (if any)
+      // Update Savings with penalty only, and Yields with interest
       const now = new Date();
       const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const savingsIncrement = penaltyPaid + (interestPaid > 0 ? interestPaid : 0);
 
-      if (savingsIncrement > 0) {
-        const newSavingsAmount = Math.ceil((currentSavings + savingsIncrement) * 100) / 100;
+      // 2a) Add penalties to Savings
+      if (penaltyPaid > 0) {
+        const newSavingsAmount = Math.ceil((currentSavings + penaltyPaid) * 100) / 100;
         await savingsRef.set(newSavingsAmount);
-        console.log('Savings updated');
-        
-        // Get current day's savings history to add to it (not overwrite)
-        const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
-        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-        const newDaySavings = Math.ceil((currentDaySavings + savingsIncrement) * 100) / 100;
-        
-        const savingsHistoryUpdate = {};
-        savingsHistoryUpdate[dateKey] = newDaySavings;
-        await savingsHistoryRef.update(savingsHistoryUpdate);
-        console.log('Savings history updated');
+        console.log('Savings (penalties) updated');
+      }
+
+      // 2b) Add interest to Yields and YieldsHistory
+      if (interestPaid > 0) {
+        const currentYieldsSnap = await yieldsRef.once('value');
+        const currentYields = parseFloat(currentYieldsSnap.val()) || 0;
+        const newYieldsAmount = Math.ceil((currentYields + interestPaid) * 100) / 100;
+        await yieldsRef.set(newYieldsAmount);
+        console.log('Yields (interest) updated');
+
+        // Update daily YieldsHistory by adding to the existing value for the date
+        const currentDayYieldsSnap = await yieldsHistoryRef.child(dateKey).once('value');
+        const currentDayYields = parseFloat(currentDayYieldsSnap.val()) || 0;
+        const newDayYields = Math.ceil((currentDayYields + interestPaid) * 100) / 100;
+        const yieldsHistoryUpdate = {};
+        yieldsHistoryUpdate[dateKey] = newDayYields;
+        await yieldsHistoryRef.update(yieldsHistoryUpdate);
+        console.log('Yields history updated');
       }
 
       // Update Funds with principal only
