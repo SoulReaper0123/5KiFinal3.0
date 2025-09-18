@@ -631,6 +631,8 @@ const PayLoan = () => {
         accountName,
         accountNumber,
         amountToBePaid: parseFloat(amountToBePaid),
+        // Include penalty only when applicable
+        ...(penaltyAmount > 0 ? { penalty: roundToCents(penaltyAmount), overdueDays } : {}),
         proofOfPaymentUrl,
         dateApplied: formattedDate,
         timestamp: currentDate.getTime(),
@@ -674,15 +676,18 @@ const PayLoan = () => {
     }
 
     // Validate payment amount against total amount due
-    const paymentAmount = parseFloat(amountToBePaid);
-    if (totalAmountDue > 0 && paymentAmount < totalAmountDue) {
-      let message = `Payment amount must be at least ₱${totalAmountDue.toFixed(2)}`;
+    const paymentAmount = roundToCents(amountToBePaid);
+    const totalDueRounded = roundToCents(totalAmountDue);
+
+    // If overdue, require payment >= total due (allow equality). If not overdue, allow any positive amount
+    if (overdueDays > 0 && paymentAmount < totalDueRounded) {
+      let message = `Payment amount must be at least ₱${totalDueRounded.toFixed(2)}`;
       
       if (penaltyAmount > 0) {
         message += `\n\nBreakdown:
-• Monthly Payment: ₱${(currentLoan?.totalMonthlyPayment || 0).toFixed(2)}
-• Late Fee (${overdueDays} days overdue): ₱${penaltyAmount.toFixed(2)}
-• Total Amount Due: ₱${totalAmountDue.toFixed(2)}`;
+• Monthly Payment: ₱${roundToCents(currentLoan?.totalMonthlyPayment || 0).toFixed(2)}
+• Late Fee (${overdueDays} days overdue): ₱${roundToCents(penaltyAmount).toFixed(2)}
+• Total Amount Due: ₱${totalDueRounded.toFixed(2)}`;
       }
       
       setAlertMessage(message);
@@ -750,6 +755,12 @@ const PayLoan = () => {
 
   const formatCurrency = (amount) => {
     return `₱${parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+  };
+
+  // Round any value to 2 decimal places to avoid floating precision issues
+  const roundToCents = (value) => {
+    const num = parseFloat(value) || 0;
+    return Math.round((num + Number.EPSILON) * 100) / 100;
   };
 
   return (
@@ -1016,7 +1027,9 @@ const PayLoan = () => {
           <View style={styles.modalCard}>
             <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
             <Text style={styles.modalTitle}>Error</Text>
-            <Text style={styles.modalText}>{errorMessage}</Text>
+            <View style={styles.modalContent}>
+              <Text style={[styles.modalText]}>{errorMessage}</Text>
+            </View>
             <TouchableOpacity 
               style={[styles.modalButton, styles.confirmButton]} 
               onPress={() => setErrorModalVisible(false)}
@@ -1229,6 +1242,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 8,
     color: '#333',
+    textAlign: 'left',
   },
   modalButtonContainer: {
     flexDirection: 'row',

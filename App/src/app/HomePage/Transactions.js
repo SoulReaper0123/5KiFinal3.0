@@ -162,11 +162,15 @@ const Transactions = () => {
 
   const handleTransactionPress = (transaction) => {
     // Navigate to GCASH-like details screen
+    const approvedAt = transaction.dateApproved || transaction.dateApplied || null;
+    const timeApproved = transaction.timeApproved || (typeof transaction.timestamp === 'number' ? new Date(transaction.timestamp).toISOString() : null);
     navigation.navigate('TransactionDetails', { item: {
       ...transaction,
       label: transaction.label,
       type: transaction.label,
-      approvedAt: transaction.dateApproved || transaction.dateApplied,
+      approvedAt,
+      timeApproved,
+      timestamp: transaction.timestamp,
     }});
   };
 
@@ -195,37 +199,69 @@ const Transactions = () => {
     }
   };
 
-  const renderTransaction = (transaction) => (
-    <TouchableOpacity 
-      key={transaction.transactionId} 
-      style={styles.compactCard}
-      onPress={() => handleTransactionPress(transaction)}
-    >
-      <View style={styles.iconContainer}>
-        <MaterialIcons 
-          name={getTransactionIcon(transaction.type)} 
-          size={24} 
-          color={transaction.amount >= 0 ? '#4CAF50' : '#E53935'} 
-        />
+  // Helpers for grouping and time display
+  const toStartOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const getSectionLabel = (tsMs) => {
+    if (!tsMs) return '';
+    const now = new Date();
+    const todayStart = toStartOfDay(now).getTime();
+    const yesterdayStart = todayStart - 24 * 60 * 60 * 1000;
+    const d = new Date(tsMs);
+    const dayStart = toStartOfDay(d).getTime();
+    if (dayStart === todayStart) return 'Today';
+    if (dayStart === yesterdayStart) return 'Yesterday';
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+  const getTimeStr = (transaction) => {
+    const base = typeof transaction.timestamp === 'number' ? new Date(transaction.timestamp)
+      : (transaction.dateApproved || transaction.dateApplied ? new Date(transaction.dateApproved || transaction.dateApplied) : null);
+    if (!base || isNaN(base)) return '';
+    return base.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const renderTransaction = (transaction, idx, arr) => {
+    const tsMs = typeof transaction.timestamp === 'number' ? transaction.timestamp
+      : (transaction.dateApproved || transaction.dateApplied ? new Date(transaction.dateApproved || transaction.dateApplied).getTime() : null);
+    const section = tsMs ? getSectionLabel(tsMs) : '';
+
+    const prev = idx > 0 ? arr[idx - 1] : null;
+    const prevTs = prev && (typeof prev.timestamp === 'number' ? prev.timestamp : (prev.dateApproved || prev.dateApplied ? new Date(prev.dateApproved || prev.dateApplied).getTime() : null));
+    const prevSection = prevTs ? getSectionLabel(prevTs) : '';
+
+    const showHeader = section && section !== prevSection;
+
+    return (
+      <View key={transaction.transactionId}>
+        {showHeader && (
+          <Text style={styles.sectionHeader}>{section}</Text>
+        )}
+        <TouchableOpacity 
+          style={styles.compactCard}
+          onPress={() => handleTransactionPress(transaction)}
+        >
+          <View style={styles.iconContainer}>
+            <MaterialIcons 
+              name={getTransactionIcon(transaction.type)} 
+              size={24} 
+              color={transaction.amount >= 0 ? '#4CAF50' : '#E53935'} 
+            />
+          </View>
+          <View style={styles.transactionInfo}>
+            <Text style={styles.transactionTitle}>{transaction.label}</Text>
+            <Text style={styles.transactionDate}>{getTimeStr(transaction)}</Text>
+          </View>
+          <Text style={[
+            styles.transactionAmount,
+            { color: transaction.amount >= 0 ? '#4CAF50' : '#E53935' }
+          ]}>
+            {transaction.amount >= 0
+              ? `+₱${parseFloat(transaction.amount).toFixed(2)}`
+              : `-₱${Math.abs(parseFloat(transaction.amount)).toFixed(2)}`}
+          </Text>
+        </TouchableOpacity>
       </View>
-      <View style={styles.transactionInfo}>
-        <Text style={styles.transactionTitle}>{transaction.label}</Text>
-        <Text style={styles.transactionDate}>
-          {(transaction.status && transaction.status.toLowerCase() === 'pending')
-            ? `Applied: ${formatDate(transaction.dateApplied)}`
-            : `Approved: ${formatDate(transaction.dateApproved || transaction.dateApplied)}`}
-        </Text>
-      </View>
-      <Text style={[
-        styles.transactionAmount,
-        { color: transaction.amount >= 0 ? '#4CAF50' : '#E53935' }
-      ]}>
-        {transaction.amount >= 0
-          ? `+₱${parseFloat(transaction.amount).toFixed(2)}`
-          : `-₱${Math.abs(parseFloat(transaction.amount)).toFixed(2)}`}
-      </Text>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   // Modal no longer needed; we navigate to details screen.
   const renderTransactionModal = () => null;
@@ -248,7 +284,7 @@ const Transactions = () => {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {transactions.length > 0 ? (
-            transactions.map(renderTransaction)
+            transactions.map((t, i) => renderTransaction(t, i, transactions))
           ) : (
             <Text style={styles.noTransactionsText}>No transactions found</Text>
           )}
@@ -294,6 +330,14 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: 15,
     paddingBottom: 20,
+  },
+  sectionHeader: {
+    marginTop: 12,
+    marginBottom: 6,
+    marginLeft: 4,
+    color: '#64748B',
+    fontSize: 13,
+    fontWeight: '700'
   },
   compactCard: {
     backgroundColor: 'white',

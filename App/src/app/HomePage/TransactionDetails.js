@@ -61,7 +61,10 @@ export default function TransactionDetails() {
   const amount = item?.amount ?? 0;
   const txnId = item?.transactionId || item?.id || 'N/A';
   const approvedRaw = item?.dateApproved || item?.approvedAt || item?.dateApplied || null;
-  const { date, time } = splitDateTime(approvedRaw);
+  // Prefer reliable numeric timestamp for time display (matches Inbox sorting)
+  const ts = typeof item?.timestamp === 'number' ? new Date(item.timestamp) : (approvedRaw ? new Date(approvedRaw) : null);
+  const date = ts ? ts.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : 'N/A';
+  const time = ts ? ts.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }) : 'N/A';
 
   const icon = iconByType(type);
   const IconComp = icon.lib === 'Ionicons' ? Ionicons : (icon.lib === 'FontAwesome' ? FontAwesome : MaterialIcons);

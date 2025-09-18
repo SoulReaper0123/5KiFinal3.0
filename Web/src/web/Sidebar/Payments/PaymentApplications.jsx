@@ -838,17 +838,23 @@ const PaymentApplications = ({
         return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
       };
 
+      // Prefer penalty provided in payment application; fallback to computed by overdue days
+      const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
+
       let overdueDays = 0;
-      if (isLoanPayment && dueDateStr) {
+      let penaltyDue = 0;
+      if (penaltyFromApp > 0) {
+        penaltyDue = Math.round((penaltyFromApp + Number.EPSILON) * 100) / 100;
+      } else if (isLoanPayment && dueDateStr) {
         const todayStart = parseToStartOfDay(new Date());
         const dueDateParsed = parseToStartOfDay(new Date(dueDateStr));
         if (!isNaN(dueDateParsed.getTime()) && todayStart > dueDateParsed) {
           const ms = todayStart.getTime() - dueDateParsed.getTime();
           overdueDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
         }
+        penaltyDue = Math.max(0, overdueDays * penaltyPerDay);
       }
 
-      const penaltyDue = Math.max(0, overdueDays * penaltyPerDay);
       const penaltyPaid = Math.min(paymentAmount, penaltyDue);
 
       // Amount left for interest/principal after penalty
@@ -877,8 +883,8 @@ const PaymentApplications = ({
         excessPayment = Math.max(0, remainingAfterPrincipal);
 
         // Update or clear the loan
-        const remainingLoan = loanAmount - principalPaid;
-        console.log('remainingLoan after payment:', remainingLoan);
+        const remainingLoan = loanAmount - (principalPaid + excessPayment);
+        console.log('remainingLoan after payment (after applying principal + excess):', remainingLoan);
         
         if (remainingLoan <= 0) {
           // Fully paid: remove from CurrentLoans and any ApprovedLoans entries
@@ -948,7 +954,7 @@ const PaymentApplications = ({
           
           // Update CurrentLoans in the specific order: loanAmount, dueDate, monthlyPayment, totalMonthlyPayment
           const loanUpdates = {};
-          loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100;
+          loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100; // remaining after applying principal + excess
           loanUpdates['dueDate'] = newDueDate;
           loanUpdates['monthlyPayment'] = Math.ceil(newMonthlyPayment * 100) / 100;
           loanUpdates['totalMonthlyPayment'] = Math.ceil(newTotalMonthlyPayment * 100) / 100;
@@ -965,20 +971,28 @@ const PaymentApplications = ({
       // STEP 2: UPDATE MEMBERS AND FUNDS AFTER CURRENTLOANS
       console.log('=== STEP 2: Updating Members and Funds ===');
       
-      // Update member savings balance: add only principalPaid + excessPayment
+      // Update member savings balance: add principalPaid + excessPayment
       const memberBalanceToSet = Math.ceil((memberBalance + principalPaid + excessPayment) * 100) / 100;
       await memberRef.update({ balance: memberBalanceToSet });
-      console.log('Member balance updated (principal + excess only)');
+      console.log('Member balance updated (principal + excess)');
 
       // Update Savings with penalty only, and Yields with interest
       const now = new Date();
       const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
 
-      // 2a) Add penalties to Savings
+      // 2a) Add penalties to Savings and SavingsHistory (daily aggregate)
       if (penaltyPaid > 0) {
         const newSavingsAmount = Math.ceil((currentSavings + penaltyPaid) * 100) / 100;
         await savingsRef.set(newSavingsAmount);
         console.log('Savings (penalties) updated');
+
+        // Update daily SavingsHistory by adding to the existing value for the date
+        const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+        const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const newDaySavings = Math.ceil((currentDaySavings + penaltyPaid) * 100) / 100;
+        await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+        console.log('Savings history updated');
       }
 
       // 2b) Add interest to Yields and YieldsHistory
@@ -999,11 +1013,12 @@ const PaymentApplications = ({
         console.log('Yields history updated');
       }
 
-      // Update Funds with principal only
-      if (principalPaid > 0) {
-        const newFundsAmount = Math.ceil((currentFunds + principalPaid) * 100) / 100;
+      // Update Funds with principal + excess
+      const principalPlusExcess = principalPaid + excessPayment;
+      if (principalPlusExcess > 0) {
+        const newFundsAmount = Math.ceil((currentFunds + principalPlusExcess) * 100) / 100;
         await fundsRef.set(newFundsAmount);
-        console.log('Funds updated');
+        console.log('Funds updated (principal + excess)');
         
         // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD to match SavingsHistory)
         const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -1551,6 +1566,10 @@ const openImageViewer = (url, label) => {
                       <span style={styles.fieldValue}>{formatCurrency(selectedPayment.amountToBePaid)}</span>
                     </div>
                     <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Penalty:</span>
+                      <span style={styles.fieldValue}>{formatCurrency((selectedPayment.penaltyPaid != null ? selectedPayment.penaltyPaid : (selectedPayment.penalty != null ? selectedPayment.penalty : 0)))}</span>
+                    </div>
+                    <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Payment Method:</span>
                       <span style={styles.fieldValue}>{selectedPayment.paymentOption || 'N/A'}</span>
                     </div>
@@ -1569,6 +1588,10 @@ const openImageViewer = (url, label) => {
                         <div style={styles.compactField}>
                           <span style={styles.fieldLabel}>Time Approved:</span>
                           <span style={styles.fieldValue}>{selectedPayment.timeApproved}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Penalty Paid:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedPayment.penaltyPaid || selectedPayment.penalty || 0)}</span>
                         </div>
                         <div style={styles.compactField}>
                           <span style={styles.fieldLabel}>Interest Paid:</span>

@@ -409,30 +409,42 @@ const ExistingLoan = () => {
 
  const fetchTransactionHistory = async (memberId) => {
   try {
-    const transactionsRef = dbRef(database, `Transactions/Payments/${memberId}`);
+    // Fetch only approved payments for this member
+    const transactionsRef = dbRef(database, `Transactions/Payments/ApprovedPayments/${memberId}`);
     const snapshot = await get(transactionsRef);
 
     if (snapshot.exists()) {
       const transactionsData = snapshot.val();
       const transactions = Object.entries(transactionsData)
-        .map(([id, t]) => ({
-          transactionId: id,
-          type: t.type || 'Payment',
-          amountToBePaid: parseFloat(t.amountToBePaid || 0),
-          dateApproved: t.dateApproved,
-          description: t.description || '',
-          status: t.status || 'Pending',
-          paymentOption: t.paymentOption || 'Not specified'
-        }))
-        // Only include "Completed" or "Paid" transactions
+        .map(([id, t]) => {
+          // Prefer numeric timestamp if present
+          const ts = typeof t.timestamp === 'number'
+            ? t.timestamp
+            : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+          const normalizedStatus = (t.status || 'approved');
+          return {
+            transactionId: id,
+            type: t.type || 'Payment',
+            amountToBePaid: parseFloat(t.amountToBePaid || 0),
+            dateApproved: t.dateApproved,
+            timestamp: ts,
+            description: t.description || '',
+            status: normalizedStatus,
+            paymentOption: t.paymentOption || 'Not specified'
+          };
+        })
+        // Include approved/paid/completed entries
         .filter(t => {
-          const status = t.status.toLowerCase();
-          return status === 'completed' || status === 'paid';
+          const status = String(t.status).toLowerCase();
+          return status === 'approved' || status === 'paid' || status === 'completed';
         });
 
-      transactions.sort((a, b) => 
-        parseDateTime(b.dateApproved).getTime() - parseDateTime(a.dateApproved).getTime()
-      );
+      // Sort newest first using timestamp fallback to dateApproved
+      transactions.sort((a, b) => {
+        const at = typeof a.timestamp === 'number' ? a.timestamp : parseDateTime(a.dateApproved).getTime();
+        const bt = typeof b.timestamp === 'number' ? b.timestamp : parseDateTime(b.dateApproved).getTime();
+        return bt - at;
+      });
       
       setTransactionHistory(transactions);
     } else {

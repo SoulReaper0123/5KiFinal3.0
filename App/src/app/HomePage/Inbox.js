@@ -352,7 +352,7 @@ export default function Inbox() {
 
   const renderItem = ({ item }) => {
     const ts = typeof item.timestamp === 'number' ? new Date(item.timestamp) : new Date();
-    const timeStr = ts.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    const timeStr = ts.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
     const peso = (n) => `₱${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
@@ -376,14 +376,17 @@ export default function Inbox() {
 
     return (
       <TouchableOpacity 
-        style={[styles.compactCard, { borderLeftWidth: 4, borderLeftColor: item.color }]}
+        style={styles.compactCard}
         onPress={() => handleMessagePress(item)}
       >
-        <View style={styles.centeredIconWrap}>
-          <MaterialIcons name={item.icon} size={28} color={item.color} />
-          <Text style={styles.smallTimeCenter}>{timeStr}</Text>
+        <View style={styles.iconContainer}>
+          <MaterialIcons name={item.icon} size={24} color={item.color} />
         </View>
-        <Text style={styles.centeredTitle}>{title}</Text>
+        <View style={styles.messageInfo}>
+          <Text style={styles.messageTitle}>{title}</Text>
+          <Text numberOfLines={1} style={styles.messagePreview}>{item.message}</Text>
+        </View>
+        <Text style={styles.messageTime}>{timeStr}</Text>
       </TouchableOpacity>
     );
   };
@@ -500,6 +503,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 16,
     marginBottom: 8,
+    flexDirection: 'row',
     alignItems: 'center',
     elevation: 1,
     shadowColor: '#000',
@@ -539,6 +543,7 @@ const styles = StyleSheet.create({
   messageTime: {
     fontSize: 12,
     color: '#999',
+    marginLeft: 8,
   },
   statusIndicator: {
     marginLeft: 8,

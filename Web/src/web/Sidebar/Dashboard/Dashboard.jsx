@@ -609,14 +609,15 @@ const Dashboard = () => {
             const month = transactionDate.getMonth();
             
             // Extract amount using correct field name for each transaction type
+            // Exclude Deposits from monthly table (Jan-Dec)
+            if (transaction.type === 'Deposits') {
+              return; // skip counting deposits in monthly breakdown
+            }
             let amount = 0;
             switch (transaction.type) {
               case 'Registrations':
                 // Registrations don't have monetary amounts, skip them
                 return;
-              case 'Deposits':
-                amount = parseFloat(transaction.amountToBeDeposited) || 0;
-                break;
               case 'Loans':
                 amount = parseFloat(transaction.loanAmount) || 0;
                 break;
@@ -1558,7 +1559,7 @@ const Dashboard = () => {
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Yields</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalYields)}</div>
-            <div style={styles.metricDescription}>From Settings/Yields</div>
+            <div style={styles.metricDescription}>Total Interest for payments</div>
           </div>
           <div style={{...styles.healthIndicator, backgroundColor: '#10B981', opacity: 0}}>
             Placeholder
@@ -2505,10 +2506,9 @@ const Dashboard = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', tableLayout: 'fixed', margin: 0 }}>
           <thead>
             <tr style={styles.dividendsHeaderRow}>
-              <th style={{...styles.dividendsHeaderCell, width: '110px'}}>Date</th>
-              <th style={{...styles.dividendsHeaderCell, width: '100px'}}>Type</th>
-              <th style={{...styles.dividendsHeaderCell, width: 'auto'}}>Description</th>
-              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Amount</th>
+              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
+              <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
+              <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
               <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Status</th>
             </tr>
           </thead>
@@ -2529,10 +2529,6 @@ const Dashboard = () => {
                   }}>
                     {transaction.type}
                   </span>
-                </td>
-                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis'}}>
-                  {transaction.description || transaction.remarks || 
-                   transaction.purpose || transaction.loanPurpose || 'No description'}
                 </td>
                 <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
                   <div>
