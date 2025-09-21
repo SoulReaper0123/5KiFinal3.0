@@ -5,9 +5,10 @@ import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@rea
 import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
 import { getDatabase, ref, get, child } from 'firebase/database';
 import { MaterialIcons } from '@expo/vector-icons';
-import { auth } from '../../App/src/firebaseConfig';
+import { auth } from '../src/firebaseConfig';
 import * as SecureStore from 'expo-secure-store';
 
+// Import all your screens
 import Splashscreen from '../src/app/Splashscreen';
 import AppLoginPage from '../src/app/Auth/AppLoginPage';
 import ForgotPassword from '../src/app/Auth/ForgotPassword';
@@ -50,17 +51,11 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
     setShowLogoutModal(false);
     setGlobalLogoutLoading(true);
     try {
-      // Add a small delay to show the loading animation
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      // Clear any stored user data
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
-      
-      // Sign out from Firebase
       await auth.signOut();
       
-      // Navigate to login
       props.navigation.reset({
         index: 0,
         routes: [{ name: 'Login' }],
@@ -113,8 +108,6 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
         </View>
       </DrawerContentScrollView>
 
-
-      {/* Logout Confirmation Modal */}
       <Modal
         visible={showLogoutModal}
         transparent={true}
@@ -188,46 +181,45 @@ const DrawerNavigator = ({ route }) => {
   return (
     <View style={{ flex: 1 }}>
       <Drawer.Navigator
-        drawerContent={(props) => <CustomDrawerContent 
-          user={user} 
-          loading={loading} 
-          setGlobalLogoutLoading={setGlobalLogoutLoading}
-          {...props} 
-        />}
+        drawerContent={(props) => (
+          <CustomDrawerContent 
+            user={user} 
+            loading={loading} 
+            setGlobalLogoutLoading={setGlobalLogoutLoading}
+            {...props} 
+          />
+        )}
         screenOptions={{
           drawerStyle: { backgroundColor: 'black' },
+          // Add these options to ensure compatibility
+          drawerType: 'front',
+          overlayColor: 'transparent',
         }}
       >
-      <Drawer.Screen 
-        name="Home" 
-        component={AppHome} 
-        initialParams={{ 
-          user, 
-          email, 
-          password, 
-          shouldPromptBiometric 
-        }} 
-        options={{ headerShown: false }} 
-      />
-      <Drawer.Screen name="Account Management" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
-      <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
-      <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
-      <Drawer.Screen name="About Us" component={AboutUs} options={{ headerShown: false }} />
-      <Drawer.Screen name="Contact Us" component={ContactUs} options={{ headerShown: false }} />
-      <Drawer.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
-    </Drawer.Navigator>
+        <Drawer.Screen 
+          name="Home" 
+          component={AppHome} 
+          initialParams={{ user, email, password, shouldPromptBiometric }} 
+          options={{ headerShown: false }} 
+        />
+        <Drawer.Screen name="Account Management" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
+        <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
+        <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
+        <Drawer.Screen name="About Us" component={AboutUs} options={{ headerShown: false }} />
+        <Drawer.Screen name="Contact Us" component={ContactUs} options={{ headerShown: false }} />
+        <Drawer.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
+      </Drawer.Navigator>
     
-    {/* Global Logout Loading Overlay */}
-    {globalLogoutLoading && (
-      <View style={styles.globalLoadingOverlay}>
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#3A7F0D" />
-          <Text style={styles.loadingText}>Logging out...</Text>
-          <Text style={styles.loadingSubText}>Please wait</Text>
+      {globalLogoutLoading && (
+        <View style={styles.globalLoadingOverlay}>
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#3A7F0D" />
+            <Text style={styles.loadingText}>Logging out...</Text>
+            <Text style={styles.loadingSubText}>Please wait</Text>
+          </View>
         </View>
-      </View>
-    )}
-  </View>
+      )}
+    </View>
   );
 };
 
@@ -241,6 +233,7 @@ const AppNav = () => (
       <Stack.Screen name="Register2" component={RegisterPage2} options={{ headerShown: false }} />
       <Stack.Screen name="CreatePassword" component={CreatePasswordPage} options={{ headerShown: false }} />
       <Stack.Screen name="DrawerNav" component={DrawerNavigator} options={{ headerShown: false }} />
+      <Stack.Screen name="AppHomeStandalone" component={AppHome} options={{ headerShown: false }} />
       <Stack.Screen name="ApplyLoan" component={ApplyLoan} options={{ headerShown: false }} />
       <Stack.Screen name="PayLoan" component={PayLoan} options={{ headerShown: false }} />
       <Stack.Screen name="ExistingLoan" component={ExistingLoan} options={{ headerShown: false }} />
@@ -264,10 +257,7 @@ const AppNav = () => (
       <Stack.Screen 
         name="BiometricSetup" 
         component={BiometricSetupScreen} 
-        options={{ 
-          headerShown: false,
-          gestureEnabled: false 
-        }} 
+        options={{ headerShown: false, gestureEnabled: false }} 
       />
     </Stack.Navigator>
   </NavigationContainer>

@@ -11,7 +11,8 @@ export default {
     "expo-font",
     "expo-secure-store"
   ],
-  newArchEnabled: true,
+  // Disable New Architecture to avoid Reanimated native crashes on some devices/dev builds
+  newArchEnabled: false,
   version: "1.0.0",
   orientation: "portrait",
   icon: "./assets/logo.png",

@@ -221,8 +221,11 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   useEffect(() => {
     const backAction = () => {
-      navigation.dispatch(DrawerActions.openDrawer());
-      return true;
+      const parent = navigation.getParent?.();
+      if (parent?.openDrawer) {
+        parent.openDrawer();
+      }
+      return true; // prevent default back action
     };
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
     return () => backHandler.remove();
@@ -282,6 +285,29 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     }
   };
 
+  // Fallback drawer state and handlers when Drawer navigator isn't available
+  const [fallbackDrawerVisible, setFallbackDrawerVisible] = useState(false);
+
+  const handleOpenMenu = () => {
+    const parent = navigation.getParent?.();
+    if (parent?.openDrawer) {
+      parent.openDrawer();
+    } else {
+      setFallbackDrawerVisible(true);
+    }
+  };
+
+  const handleLogoutFallback = async () => {
+    try {
+      await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
+      await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
+      await auth.signOut();
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+    } catch (e) {
+      Alert.alert('Logout Error', 'There was an error during logout. Please try again.');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       {loading ? (
@@ -298,7 +324,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
           <View style={styles.headerBar}>
             <TouchableOpacity
               style={styles.avatarButton}
-              onPress={() => navigation.dispatch(DrawerActions.openDrawer())}
+              onPress={handleOpenMenu}
             >
               {selfie ? (
                 <Image source={{ uri: selfie }} style={{ width: 46, height: 46, borderRadius: 23 }} />
@@ -437,6 +463,51 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
           </View>
         </ScrollView>
       )}
+
+      {/* Fallback Drawer Modal when Drawer navigator is unavailable */}
+      {fallbackDrawerVisible && (
+        <View style={styles.fallbackOverlay}>
+          <View style={styles.fallbackDrawer}>
+            <View style={{ alignItems: 'center', marginBottom: 16 }}>
+              {selfie ? (
+                <Image source={{ uri: selfie }} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 8 }} />
+              ) : (
+                <MaterialIcons name="person" size={64} color="#1E3A5F" />
+              )}
+              <Text style={{ color: '#1E3A5F', fontWeight: '700', fontSize: 16 }}>{firstName}</Text>
+              <Text style={{ color: '#475569', fontSize: 12 }}>{email}</Text>
+            </View>
+
+            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Account Management', { email }); }}>
+              <MaterialIcons name="account-circle" size={20} color="#1E3A5F" />
+              <Text style={styles.fallbackItemText}>Account Management</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Settings'); }}>
+              <MaterialIcons name="settings" size={20} color="#1E3A5F" />
+              <Text style={styles.fallbackItemText}>Settings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('AboutUs'); }}>
+              <MaterialIcons name="info" size={20} color="#1E3A5F" />
+              <Text style={styles.fallbackItemText}>About Us</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('ContactUs'); }}>
+              <MaterialIcons name="contact-mail" size={20} color="#1E3A5F" />
+              <Text style={styles.fallbackItemText}>Contact Us</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 12 }} />
+
+            <TouchableOpacity style={[styles.fallbackItem, { justifyContent: 'center', backgroundColor: '#8E0B16', borderRadius: 8 }]} onPress={handleLogoutFallback}>
+              <Text style={{ color: 'white', fontWeight: '700' }}>Logout</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={{ alignSelf: 'center', marginTop: 12 }} onPress={() => setFallbackDrawerVisible(false)}>
+              <Text style={{ color: '#1E3A5F', fontWeight: '600' }}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+
       {withdrawModalVisible && (
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
@@ -882,6 +953,42 @@ const styles = StyleSheet.create({
   modalBox: {
     width: '80%',
     backgroundColor: 'white',
+  },
+
+  // Fallback drawer styles
+  fallbackOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    zIndex: 1000,
+  },
+  fallbackDrawer: {
+    width: '75%',
+    backgroundColor: 'white',
+    padding: 16,
+    paddingTop: 48,
+    height: '100%',
+    borderTopRightRadius: 12,
+    borderBottomRightRadius: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  fallbackItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 12,
+  },
+  fallbackItemText: {
+    color: '#1E3A5F',
+    fontWeight: '600',
     borderRadius: 10,
     padding: 20,
     elevation: 10,

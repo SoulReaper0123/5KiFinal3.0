@@ -946,7 +946,7 @@ const WithdrawApplications = ({
 
       {modalVisible && selectedWithdraw && (
         <div style={styles.centeredModal}>
-          <div style={hasDocuments(selectedWithdraw) ? styles.modalCard : styles.modalCardSingleColumn}>
+          <div style={styles.modalCard}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -984,10 +984,6 @@ const WithdrawApplications = ({
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Amount:</span>
                       <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Bank Name:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.bankName || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Account Name:</span>

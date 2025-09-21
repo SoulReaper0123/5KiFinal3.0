@@ -1,6 +1,8 @@
 module.exports = {
   presets: ['babel-preset-expo'],
   plugins: [
-    // Add any necessary plugins
+    ['module:react-native-dotenv'],
+    // Reanimated plugin must be last
+    'react-native-reanimated/plugin',
   ],
 };

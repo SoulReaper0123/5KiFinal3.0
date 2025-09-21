@@ -14,11 +14,14 @@ import { MaterialIcons } from '@expo/vector-icons';
 import * as Keychain from 'react-native-keychain';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { sendVerificationCode } from '../../api';
 
 export default function VerifyCode({ route, navigation }) {
   const { email, password, verificationCode, fromBiometric } = route.params;
   const [digits, setDigits] = useState(['', '', '', '', '', '']);
+  const [expectedCode, setExpectedCode] = useState(verificationCode);
+  const [secondsLeft, setSecondsLeft] = useState(60);
   const inputRefs = useRef([]);
   const nav = useNavigation();
 
@@ -27,21 +30,12 @@ export default function VerifyCode({ route, navigation }) {
     inputRefs.current[0]?.focus();
   }, []);
 
-  // We don't need this function anymore since we're handling biometric setup in AppHome
-  const promptBiometricSetup = () => {
-    // Navigate to DrawerNav with parameters for biometric setup
-    nav.reset({
-      index: 0,
-      routes: [{ 
-        name: 'DrawerNav', 
-        params: { 
-          email, 
-          password, 
-          shouldPromptBiometric: true 
-        } 
-      }],
-    });
-  };
+  // countdown timer
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const t = setInterval(() => setSecondsLeft((s) => s - 1), 1000);
+    return () => clearInterval(t);
+  }, [secondsLeft]);
 
   const handleChange = (text, index) => {
     if (!/^\d?$/.test(text)) return;
@@ -72,35 +66,19 @@ export default function VerifyCode({ route, navigation }) {
     const code = digits.join('');
     if (code.length < 6) return;
 
-    if (code === verificationCode) {
-      if (fromBiometric) {
-        // When using biometric login, ensure we pass the email to DrawerNav
-        // We need to pass the same parameters as the regular login to ensure data is loaded
-        console.log('Navigating to DrawerNav from biometric login with email:', email);
+    if (code === expectedCode) {
+      // Prefer DrawerNav; if it fails, fallback to AppHomeStandalone
+      try {
+        if (fromBiometric) {
+          nav.reset({ index: 0, routes: [{ name: 'DrawerNav', params: { email } }] });
+        } else {
+          nav.reset({ index: 0, routes: [{ name: 'DrawerNav', params: { email, password, shouldPromptBiometric: true } }] });
+        }
+      } catch (e) {
+        console.warn('DrawerNav navigation failed, falling back to AppHomeStandalone:', e);
         nav.reset({
           index: 0,
-          routes: [{ 
-            name: 'DrawerNav', 
-            params: { 
-              email,
-              // Don't pass shouldPromptBiometric since user already has biometrics set up
-            } 
-          }],
-        });
-      } else {
-        // Navigate to DrawerNav with parameters for biometric setup
-        // Make sure we're passing the shouldPromptBiometric flag
-        console.log('Navigating to DrawerNav with shouldPromptBiometric=true');
-        nav.reset({
-          index: 0,
-          routes: [{ 
-            name: 'DrawerNav', 
-            params: { 
-              email, 
-              password, 
-              shouldPromptBiometric: true 
-            } 
-          }],
+          routes: [{ name: 'AppHomeStandalone', params: { email, password, shouldPromptBiometric: !fromBiometric } }],
         });
       }
     } else {
@@ -110,17 +88,38 @@ export default function VerifyCode({ route, navigation }) {
     }
   };
 
+  const handleResend = async () => {
+    try {
+      const newCode = Math.floor(100000 + Math.random() * 900000).toString();
+      setExpectedCode(newCode);
+      setSecondsLeft(60);
+      setDigits(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+
+      await sendVerificationCode({ email, verificationCode: newCode });
+      Alert.alert('Code sent', 'A new verification code has been emailed to you.');
+    } catch (e) {
+      console.error('Resend code error:', e);
+      Alert.alert('Error', 'Failed to resend code. Please try again.');
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
     >
-      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
+          <MaterialIcons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
+        <Text style={styles.headerTitle}>Verification</Text>
+        <View style={{ width: 24 }} />
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.contentWrapper}>
           <View style={{ marginBottom: 16 }}>
             <Text style={styles.title}>Enter Verification Code</Text>
@@ -145,12 +144,27 @@ export default function VerifyCode({ route, navigation }) {
               ))}
             </View>
 
+            {/* Countdown */}
+            <Text style={styles.countdownText}>
+              {secondsLeft > 0 ? `Resend code in ${secondsLeft}s` : 'You can resend a new code now.'}
+            </Text>
+
+            {/* Continue */}
             <TouchableOpacity
               style={[styles.primaryButton, digits.join('').length < 6 && styles.disabledButton]}
               onPress={handleVerify}
               disabled={digits.join('').length < 6}
             >
               <Text style={styles.primaryButtonText}>Continue</Text>
+            </TouchableOpacity>
+
+            {/* Resend */}
+            <TouchableOpacity
+              style={[styles.resendButton, secondsLeft > 0 && styles.disabledButton]}
+              onPress={handleResend}
+              disabled={secondsLeft > 0}
+            >
+              <Text style={styles.resendButtonText}>Resend Code</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -164,15 +178,28 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
+  header: {
+    height: 54,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 12,
+    backgroundColor: '#FFFFFF',
+    borderBottomColor: '#E2E8F0',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  headerBack: {
+    padding: 8,
+  },
+  headerTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
   scrollContent: {
     flexGrow: 1,
     padding: 16,
     paddingBottom: 24,
-  },
-  backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-    marginTop: 20,
   },
   title: {
     fontSize: 22,
@@ -200,11 +227,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: 8,
     width: '100%',
-    marginBottom: 16,
+    marginBottom: 12,
     gap: 8,
   },
   codeInput: {
-    flex: 1, // allow boxes to shrink to fit small screens
+    flex: 1,
     minWidth: 40,
     maxWidth: 56,
     height: 56,
@@ -216,12 +243,25 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#0F172A',
   },
+  countdownText: {
+    textAlign: 'center',
+    color: '#475569',
+    marginBottom: 12,
+  },
   primaryButton: {
     backgroundColor: '#1E3A5F',
     paddingVertical: 14,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
+  },
+  resendButton: {
+    marginTop: 12,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    width: '100%',
+    backgroundColor: '#0F172A',
   },
   disabledButton: {
     opacity: 0.6,
@@ -230,6 +270,11 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: '700',
+  },
+  resendButtonText: {
+    color: 'white',
+    fontSize: 15,
+    fontWeight: '600',
   },
   contentWrapper: {
     flex: 1,

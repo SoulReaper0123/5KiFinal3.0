@@ -128,8 +128,10 @@ const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
 useEffect(() => {
   const hasEmptyFields = !withdrawOption || !accountName || !accountNumber || !withdrawAmount;
-  const insufficientBalance = parseFloat(withdrawAmount) > balance;
-  setIsSubmitDisabled(hasEmptyFields || insufficientBalance);
+  const amount = parseFloat(withdrawAmount);
+  const insufficientBalance = amount > balance;
+  const belowMinimum = !isNaN(amount) && amount < 5000;
+  setIsSubmitDisabled(hasEmptyFields || insufficientBalance || belowMinimum);
 }, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
 
  const handleSubmit = async () => {
@@ -140,14 +142,22 @@ useEffect(() => {
     return;
   }
 
-  if (isNaN(withdrawAmount) || parseFloat(withdrawAmount) <= 0) {
+  const amount = parseFloat(withdrawAmount);
+  if (isNaN(amount) || amount <= 0) {
     setAlertMessage('Please enter a valid amount');
     setAlertType('error');
     setAlertModalVisible(true);
     return;
   }
 
-  if (parseFloat(withdrawAmount) > balance) {
+  if (amount < 5000) {
+    setAlertMessage('Minimum withdrawal amount is ₱5,000');
+    setAlertType('error');
+    setAlertModalVisible(true);
+    return;
+  }
+
+  if (amount > balance) {
     setAlertMessage('Insufficient balance');
     setAlertType('error');
     setAlertModalVisible(true);

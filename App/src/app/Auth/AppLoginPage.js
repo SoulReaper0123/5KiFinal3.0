@@ -23,6 +23,7 @@ import { signInWithEmailAndPassword } from 'firebase/auth';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import CustomModal from '../../components/CustomModal';
+import CustomConfirmModal from '../../components/CustomConfirmModal';
 
 const { width, height } = Dimensions.get('window');
 
@@ -41,6 +42,10 @@ export default function AppLoginPage() {
   const [modalButtonText, setModalButtonText] = useState('OK');
   const [modalAction, setModalAction] = useState(null);
   const [showExitModal, setShowExitModal] = useState(false);
+
+  // Invalid password confirm modal
+  const [invalidPwdVisible, setInvalidPwdVisible] = useState(false);
+  const [invalidPwdMessage, setInvalidPwdMessage] = useState('');
   
   const navigation = useNavigation();
   const isFocused = useIsFocused();
@@ -359,8 +364,12 @@ export default function AppLoginPage() {
           case 'auth/user-token-expired':
             title = 'Invalid Password';
             message = 'The password you entered is incorrect. Please try again.';
-            buttonText = 'Reset Password';
-            action = () => navigation.navigate('ForgotPassword', { email });
+            // Show two-button confirm modal for invalid password
+            setInvalidPwdMessage('The password you entered is incorrect. Please try again.');
+            setInvalidPwdVisible(true);
+            // Prevent the single-button modal for this case
+            buttonText = null;
+            action = null;
             break;
 
           case 'auth/user-not-found':
@@ -546,19 +555,34 @@ export default function AppLoginPage() {
         title={modalTitle}
         message={modalMessage}
         type={modalType}
-        buttonText={modalButtonText}
+        buttonText={modalButtonText || 'OK'}
         onButtonPress={handleModalButtonPress}
       />
 
+      {/* Invalid Password Confirm Modal (Close + Reset Password) */}
+      <CustomConfirmModal
+        visible={invalidPwdVisible}
+        onClose={() => setInvalidPwdVisible(false)}
+        title="Invalid Password"
+        message={invalidPwdMessage}
+        type="error"
+        cancelText="Close"
+        confirmText="Reset Password"
+        onCancel={() => setInvalidPwdVisible(false)}
+        onConfirm={() => { setInvalidPwdVisible(false); navigation.navigate('ForgotPassword', { email }); }}
+      />
+
       {/* Exit Confirmation Modal */}
-      <CustomModal
+      <CustomConfirmModal
         visible={showExitModal}
         onClose={() => setShowExitModal(false)}
         title="Exit Application?"
         message="Are you sure you want to exit?"
         type="warning"
-        buttonText="Exit"
-        onButtonPress={() => BackHandler.exitApp()}
+        cancelText="No"
+        confirmText="Yes"
+        onCancel={() => setShowExitModal(false)}
+        onConfirm={() => BackHandler.exitApp()}
       />
     </KeyboardAvoidingView>
   );
