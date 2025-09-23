@@ -177,7 +177,61 @@ const SystemSettings = () => {
   const [actionAmount, setActionAmount] = useState('');
   const [messageModal, setMessageModal] = useState({ visible: false, title: '', message: '', isError: false });
 
+  const [selectedLoanType, setSelectedLoanType] = useState('');
+  const [minTerm, setMinTerm] = useState(0);
+  const [maxTerm, setMaxTerm] = useState(0);
   const db = getDatabase();
+
+  // Initialize selected loan type when LoanTypes load
+  useEffect(() => {
+    const defaultType = settings.LoanTypes?.[0] || '';
+    setSelectedLoanType((prev) => prev || defaultType);
+  }, [settings.LoanTypes]);
+
+  // Sync min/max when selection or settings change
+  useEffect(() => {
+    const allTerms = Object.keys(settings.InterestRate || {})
+      .map((t) => Number(t))
+      .sort((a, b) => a - b);
+
+    if (!selectedLoanType) {
+      setMinTerm(allTerms[0] || 0);
+      setMaxTerm(allTerms[allTerms.length - 1] || 0);
+      return;
+    }
+
+    const sel = (settings.LoanTermsMapping?.[selectedLoanType] || [])
+      .map((t) => Number(t))
+      .sort((a, b) => a - b);
+
+    const newMin = sel.length ? sel[0] : (allTerms[0] || 0);
+    const newMax = sel.length ? sel[sel.length - 1] : (allTerms[allTerms.length - 1] || 0);
+    setMinTerm(newMin || 0);
+    setMaxTerm(newMax || 0);
+  }, [selectedLoanType, settings.InterestRate, settings.LoanTermsMapping]);
+
+  // Apply selected range to mapping
+  const applyLoanTermRange = () => {
+    if (!editMode) return;
+    const allTerms = Object.keys(settings.InterestRate || {})
+      .map((t) => Number(t))
+      .sort((a, b) => a - b);
+    if (!allTerms.length || !selectedLoanType) return;
+
+    const validMin = allTerms.find((t) => t >= minTerm) ?? allTerms[0];
+    const validMax = [...allTerms].reverse().find((t) => t <= maxTerm) ?? allTerms[allTerms.length - 1];
+    if (validMin > validMax) return;
+
+    const selectedRange = allTerms.filter((t) => t >= validMin && t <= validMax).map(String);
+
+    setSettings((prev) => ({
+      ...prev,
+      LoanTermsMapping: {
+        ...(prev.LoanTermsMapping || {}),
+        [selectedLoanType]: selectedRange,
+      },
+    }));
+  };
 
   // Helper function to format peso amounts with at least 2 decimal places
   const formatPesoAmount = (amount) => {
@@ -839,56 +893,91 @@ const SystemSettings = () => {
               {/* Loan Term Assignment */}
               <div style={{ ...styles.interestRatesSection, marginTop: '20px' }}>
                 <h3 style={styles.subSectionTitle}>Assign Terms to Loan Types</h3>
-                {settings.LoanTypes.map((lt) => {
-                  const allTerms = Object.keys(settings.InterestRate).sort((a,b)=>Number(a)-Number(b));
-                  const selected = settings.LoanTermsMapping?.[lt] || [];
-                  const toggle = (term) => {
-                    setSettings(prev => {
-                      const prevMap = prev.LoanTermsMapping || {};
-                      const prevSel = new Set(prevMap[lt] || []);
-                      if (prevSel.has(term)) prevSel.delete(term); else prevSel.add(term);
-                      return {
-                        ...prev,
-                        LoanTermsMapping: {
-                          ...prevMap,
-                          [lt]: Array.from(prevSel).sort((a,b)=>Number(a)-Number(b))
-                        }
-                      };
-                    });
-                  };
-                  return (
-                    <div key={lt} style={{ marginBottom: '12px', padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                      <div style={{ fontWeight: 600, marginBottom: '8px', color: '#2D5783' }}>{lt}</div>
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                        {allTerms.length === 0 ? (
-                          <span style={{ color: '#64748b' }}>No terms available. Add interest terms first.</span>
-                        ) : (
-                          allTerms.map((t) => {
-                            const isSel = selected.includes(t);
-                            return (
-                              <button
-                                key={t}
-                                type="button"
-                                onClick={() => toggle(t)}
-                                disabled={!editMode}
-                                style={{
-                                  padding: '6px 10px',
-                                  borderRadius: '16px',
-                                  border: isSel ? '1px solid #2D5783' : '1px solid #cbd5e1',
-                                  background: isSel ? '#e0f2fe' : '#fff',
-                                  color: isSel ? '#2D5783' : '#334155',
-                                  cursor: editMode ? 'pointer' : 'default'
-                                }}
-                              >
-                                {t} mo
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
+
+                {/* Single-panel range selector */}
+                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
+                  {/* Loan Type */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
+                    <label style={{ fontWeight: 600, width: 140 }}>Type of Loan</label>
+                    <select
+                      disabled={!editMode}
+                      value={selectedLoanType}
+                      onChange={(e) => setSelectedLoanType(e.target.value)}
+                      style={{ padding: '8px', borderRadius: 6, border: '1px solid #cbd5e1', minWidth: 220 }}
+                    >
+                      {settings.LoanTypes?.map((lt) => (
+                        <option key={lt} value={lt}>{lt}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Min/Max Terms */}
+                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontWeight: 600, width: 140 }}>Minimum terms</label>
+                      <select
+                        disabled={!editMode || Object.keys(settings.InterestRate || {}).length === 0}
+                        value={minTerm}
+                        onChange={(e) => setMinTerm(Number(e.target.value))}
+                        style={{ padding: '8px', borderRadius: 6, border: '1px solid #cbd5e1', minWidth: 120 }}
+                      >
+                        {Object.keys(settings.InterestRate || {}).map((t) => (
+                          <option key={`min-${t}`} value={Number(t)}>{t} months</option>
+                        ))}
+                      </select>
                     </div>
-                  );
-                })}
+
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <label style={{ fontWeight: 600, width: 140 }}>Maximum terms</label>
+                      <select
+                        disabled={!editMode || Object.keys(settings.InterestRate || {}).length === 0}
+                        value={maxTerm}
+                        onChange={(e) => setMaxTerm(Number(e.target.value))}
+                        style={{ padding: '8px', borderRadius: 6, border: '1px solid #cbd5e1', minWidth: 120 }}
+                      >
+                        {Object.keys(settings.InterestRate || {}).map((t) => (
+                          <option key={`max-${t}`} value={Number(t)}>{t} months</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={applyLoanTermRange}
+                      disabled={!editMode}
+                      style={{
+                        padding: '8px 14px',
+                        background: editMode ? '#2D5783' : '#94a3b8',
+                        color: '#fff',
+                        borderRadius: 6,
+                        border: 'none',
+                        cursor: editMode ? 'pointer' : 'not-allowed'
+                      }}
+                    >
+                      Apply range
+                    </button>
+                  </div>
+
+                  {/* Display current selection for the chosen loan type */}
+                  <div style={{ marginTop: 12, color: '#334155' }}>
+                    <strong>Selected terms:</strong>{' '}
+                    {(settings.LoanTermsMapping?.[selectedLoanType] || []).length
+                      ? (settings.LoanTermsMapping[selectedLoanType]).join(', ') + ' months'
+                      : 'None'}
+                  </div>
+                </div>
+
+                {/* Read-only display of all mappings */}
+                <div style={{ marginTop: 12 }}>
+                  {settings.LoanTypes.map((lt) => (
+                    <div key={`view-${lt}`} style={{ marginBottom: 8 }}>
+                      <span style={{ fontWeight: 600, color: '#2D5783' }}>{lt}:</span>{' '}
+                      {(settings.LoanTermsMapping?.[lt] || []).length
+                        ? settings.LoanTermsMapping[lt].join(', ') + ' months'
+                        : 'No terms assigned'}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

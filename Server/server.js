@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 3000;
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
-const FACEBOOK_LINK = 'https://www.facebook.com/5KiFS';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
 // Middleware
@@ -131,7 +130,7 @@ app.get('/', (req, res) => {
 
 app.post('/send-admin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating admin creation emails', req.body);
-    const { email, firstName, middleName = '', lastName, password, websiteLink, facebookLink } = req.body;
+    const { email, firstName, middleName = '', lastName, password, websiteLink } = req.body;
 
     // Validate required fields
     if (!email || !firstName || !lastName || !password) {
@@ -194,7 +193,6 @@ app.post('/send-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -293,7 +291,7 @@ app.post('/send-admin-email', async (req, res) => {
 
 app.post('/send-delete-admin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating admin deletion emails', req.body);
-    const { email, firstName, middleName = '', lastName, websiteLink, facebookLink } = req.body;
+    const { email, firstName, middleName = '', lastName, websiteLink } = req.body;
 
     // Validate required fields
     if (!email || !firstName || !lastName) {
@@ -1527,15 +1525,15 @@ app.post('/approveLoans', async (req, res) => {
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Release Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${releaseAmount} (after processing fee)</td>
-                        </tr>
-                        <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Processing Fee</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${processingFee}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Repayment Term</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Release Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${releaseAmount}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Terms</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${term} months</td>
                         </tr>
                         <tr>
@@ -1543,23 +1541,19 @@ app.post('/approveLoans', async (req, res) => {
                             <td style="padding: 8px; border: 1px solid #ddd;">${interestRate}</td>
                         </tr>
                         <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${monthlyPayment}</td>
+                        </tr>
+                        <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Interest</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${interest}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal Payment</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${monthlyPayment}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Monthly Payment</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Amortization</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${totalMonthlyPayment}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Term Payment</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${totalTermPayment}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Due Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Maturity</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${dueDate}</td>
                         </tr>
                     </table>
@@ -2595,7 +2589,7 @@ app.post('/send-coadmin-email', async (req, res) => {
 
 app.post('/send-delete-coadmin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating co-admin deletion emails', req.body);
-    const { email, firstName, middleName = '', lastName, websiteLink, facebookLink } = req.body;
+    const { email, firstName, middleName = '', lastName, websiteLink } = req.body;
 
     if (!email || !firstName || !lastName) {
         console.log('[NOTIFICATION ERROR] Missing required fields for co-admin deletion');
@@ -2605,6 +2599,7 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
         });
     }
 
+    // Validate email format
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
         return res.status(400).json({
             success: false,
@@ -2653,7 +2648,6 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -2663,7 +2657,7 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
         };
 
         // Email to deleted co-admin
-        console.log('[NOTIFICATION] Sending co-admin deletion notification to deleted user');
+        console.log('[NOTIFICATION] Sending co-admin deletion notification to deleted co-admin');
         const coAdminMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
@@ -2674,12 +2668,35 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
                         Account Access Update
                     </h2>
                     <p>Dear ${firstName},</p>
-                    <p>We're writing to inform you that your co-admin access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
-                    <p>If you believe this is a mistake, please contact the system administrator immediately.</p>
+                    <p>We're writing to inform you that your co-administrator access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Effective Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Information:</h3>
+                    <ul style="margin-bottom: 20px;">
+                        <li>You will no longer have access to the admin dashboard</li>
+                        <li>All admin privileges have been revoked</li>
+                        <li>This action is permanent and cannot be undone</li>
+                    </ul>
+                    <p style="font-weight: bold;">
+                        If this action was taken in error or you have any questions, please contact the system administrator immediately at 
+                        <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
+                    </p>
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -2688,6 +2705,7 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
             `
         };
 
+        // Send both emails
         await transporter.sendMail(ownerMailOptions);
         await transporter.sendMail(coAdminMailOptions);
 
@@ -2709,12 +2727,4 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
         });
     }
-});
-
-// ==============================================
-// SERVER INITIALIZATION
-// ==============================================
-
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
 });

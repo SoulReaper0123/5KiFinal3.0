@@ -143,13 +143,19 @@ const Deposit = () => {
   const depositOptions = [
     { key: 'Bank', label: 'Bank' },
     { key: 'GCash', label: 'GCash' },
+    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
   ];
 
   const handleDepositOptionChange = (option) => {
     setDepositOption(option.key);
+    if (option.key === 'Cash-on-Hand') {
+      setAccountNumber('');
+      setAccountName('');
+      return;
+    }
     const selectedAccount = depositAccounts[option.key];
-    setAccountNumber(selectedAccount.accountNumber || '');
-    setAccountName(selectedAccount.accountName || '');
+    setAccountNumber(selectedAccount?.accountNumber || '');
+    setAccountName(selectedAccount?.accountName || '');
   };
 
   const handleSelectProofOfDeposit = () => {
@@ -387,6 +393,7 @@ const Deposit = () => {
         <Text style={styles.label}>Account Name</Text>
         <TextInput 
           value={accountName} 
+          placeholder={depositOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
           style={[styles.input, styles.fixedInput]} 
           editable={false} 
         />
@@ -394,6 +401,7 @@ const Deposit = () => {
         <Text style={styles.label}>Account Number</Text>
         <TextInput 
           value={accountNumber} 
+          placeholder={depositOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
           style={[styles.input, styles.fixedInput]} 
           editable={false} 
         />

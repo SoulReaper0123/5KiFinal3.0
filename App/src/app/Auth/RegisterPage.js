@@ -48,11 +48,19 @@ const RegisterPage = () => {
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateText, setDateText] = useState('Select Date of Birth');
   const [governmentId, setGovernmentId] = useState('');
+  const [isOtherGovernmentId, setIsOtherGovernmentId] = useState(false);
+  const [otherGovernmentId, setOtherGovernmentId] = useState('');
   const [attendedOrientation, setAttendedOrientation] = useState(false);
   const [orientationCode, setOrientationCode] = useState('');
   const [validOrientationCode, setValidOrientationCode] = useState('');
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  
+  // Optional Employment fields
+  const [occupation, setOccupation] = useState('');
+  const [employer, setEmployer] = useState('');
+  const [employmentAddress, setEmploymentAddress] = useState('');
+  const [employmentContactNo, setEmploymentContactNo] = useState('');
   
   // Error states
   const [firstNameError, setFirstNameError] = useState('');
@@ -76,6 +84,11 @@ const RegisterPage = () => {
   const addressInput = useRef(null);
   const placeOfBirthInput = useRef(null);
   const orientationCodeInput = useRef(null);
+  // Optional Employment refs
+  const occupationInput = useRef(null);
+  const employerInput = useRef(null);
+  const employmentAddressInput = useRef(null);
+  const employmentContactInput = useRef(null);
 
   useEffect(() => {
     const handleBackPress = () => {
@@ -206,6 +219,21 @@ const RegisterPage = () => {
   };
 
   const validateGovernmentId = (value) => {
+    // If "Other" is selected, ensure the custom text is provided
+    if (isOtherGovernmentId) {
+      if (!otherGovernmentId || !otherGovernmentId.trim()) {
+        setGovernmentIdError('Please specify your government ID');
+        return false;
+      }
+      setGovernmentIdError('');
+      return true;
+    }
+
+    // Otherwise validate the selected option
+    if (!value || !String(value).trim()) {
+      setGovernmentIdError('Government ID is required');
+      return false;
+    }
     setGovernmentIdError('');
     return true;
   };
@@ -283,9 +311,10 @@ const RegisterPage = () => {
                        !placeOfBirthError && !addressError && !governmentIdError && 
                        !ageError && !orientationError;
     
+    // Optional employment fields are NOT required for completeness
     const basicInfoComplete = firstName && lastName && email && phoneNumber && 
                              gender && civilStatus && placeOfBirth && address && 
-                             governmentId && age >= 21;
+                             (isOtherGovernmentId ? otherGovernmentId : governmentId) && age >= 21;
     
     const orientationComplete = attendedOrientation ? 
       (orientationCode && orientationCode === validOrientationCode) : true;
@@ -342,9 +371,14 @@ const RegisterPage = () => {
       address,
       age,
       dateOfBirth: dateOfBirthISO,
-      governmentId,
+      governmentId: isOtherGovernmentId ? otherGovernmentId : governmentId,
       attendedOrientation,
       orientationCode,
+      // Optional employment fields
+      occupation: occupation || null,
+      employer: employer || null,
+      employmentAddress: employmentAddress || null,
+      employmentContactNo: employmentContactNo || null,
     });
   };
 
@@ -397,6 +431,7 @@ const RegisterPage = () => {
   const genderOptions = [
     { key: 'Male', label: 'Male' },
     { key: 'Female', label: 'Female' },
+    { key: 'Prefer not to say', label: 'Prefer not to say' },
   ];
 
   const civilStatusOptions = [
@@ -411,6 +446,7 @@ const RegisterPage = () => {
     { key: 'sss', label: 'SSS ID' },
     { key: 'philhealth', label: 'PhilHealth ID' },
     { key: 'drivers_license', label: 'Drivers License' },
+    { key: 'other', label: 'Other' },
   ];
 
   return (
@@ -429,9 +465,9 @@ const RegisterPage = () => {
 
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.title}>Basic Information</Text>
-          <Text style={styles.subLabel}>Step 1 of 4 • Tell us about you</Text>
+          <Text style={styles.subLabel}>Step 1 of 5 • Tell us about you</Text>
           <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
-            <View style={{ width: '25%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+            <View style={{ width: '20%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
           </View>
         </View>
 
@@ -625,9 +661,70 @@ const RegisterPage = () => {
               returnKeyType="next"
               blurOnSubmit={false}
               ref={phoneNumberInput}
-              onSubmitEditing={() => Keyboard.dismiss()}
+              onSubmitEditing={() => occupationInput.current?.focus()}
             />
             {phoneNumberError ? <Text style={styles.errorText}>{phoneNumberError}</Text> : null}
+          </View>
+
+          {/* Optional Employment Section */}
+          <View style={{ marginTop: 10, marginBottom: 6 }}>
+            <Text style={[styles.subLabel, { fontWeight: '600', color: '#334155' }]}>Employment (Optional)</Text>
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Occupation</Text>
+            <TextInput
+              placeholder="Enter Occupation"
+              value={occupation}
+              onChangeText={setOccupation}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={occupationInput}
+              onSubmitEditing={() => employerInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Employer</Text>
+            <TextInput
+              placeholder="Enter Employer"
+              value={employer}
+              onChangeText={setEmployer}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={employerInput}
+              onSubmitEditing={() => employmentAddressInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Address</Text>
+            <TextInput
+              placeholder="Enter Employer Address"
+              value={employmentAddress}
+              onChangeText={setEmploymentAddress}
+              style={styles.input}
+              returnKeyType="next"
+              blurOnSubmit={false}
+              ref={employmentAddressInput}
+              onSubmitEditing={() => employmentContactInput.current?.focus()}
+            />
+          </View>
+
+          <View style={styles.inputContainer}>
+            <Text style={styles.label}>Contact No.</Text>
+            <TextInput
+              placeholder="Enter Employer Contact No."
+              value={employmentContactNo}
+              onChangeText={setEmploymentContactNo}
+              style={styles.input}
+              keyboardType="phone-pad"
+              returnKeyType="done"
+              ref={employmentContactInput}
+              onSubmitEditing={() => Keyboard.dismiss()}
+            />
           </View>
 
           <View style={styles.inputContainer}>
@@ -637,8 +734,16 @@ const RegisterPage = () => {
               initValue="Select Government ID"
               cancelText="Cancel"
               onChange={(option) => {
-                setGovernmentId(option.label);
-                validateGovernmentId(option.label);
+                const isOther = option.key === 'other';
+                setIsOtherGovernmentId(isOther);
+                if (isOther) {
+                  setGovernmentId('Other');
+                  setOtherGovernmentId('');
+                } else {
+                  setGovernmentId(option.label);
+                  setOtherGovernmentId('');
+                }
+                validateGovernmentId(isOther ? otherGovernmentId : option.label);
               }}
               style={styles.picker}
               modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
@@ -646,12 +751,27 @@ const RegisterPage = () => {
             >
               <TouchableOpacity style={styles.pickerContainer}>
                 <Text style={styles.pickerText}>
-                  {governmentId || 'Select Government ID'}
+                  {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
                 </Text>
                 <MaterialIcons name="arrow-drop-down" size={24} color="black" />
               </TouchableOpacity>
             </ModalSelector>
-
+            {isOtherGovernmentId && (
+              <View style={{ marginTop: 8 }}>
+                <TextInput
+                  placeholder="Please specify your Government ID"
+                  value={otherGovernmentId}
+                  onChangeText={(text) => {
+                    setOtherGovernmentId(text);
+                    // Keep the main field in sync for form completeness checks
+                    setGovernmentId(text);
+                    validateGovernmentId(text);
+                  }}
+                  style={styles.input}
+                />
+              </View>
+            )}
+            {governmentIdError ? <Text style={styles.errorText}>{governmentIdError}</Text> : null}
           </View>
 
           <View style={styles.radioContainer}>

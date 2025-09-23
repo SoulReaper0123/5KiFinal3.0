@@ -170,7 +170,11 @@ const CreatePasswordPage = () => {
         timeCreated: formatTime(now),
         status: 'pending',
         registrationFee: registrationData.registrationFee || 0,
-        paymentStatus: registrationData.proofOfPayment ? 'paid' : 'unpaid'
+        paymentStatus: registrationData.proofOfPayment ? 'paid' : 'unpaid',
+        bankAccName: registrationData.bankAccName || '',
+        bankAccNum: registrationData.bankAccNum || '',
+        gcashAccName: registrationData.gcashAccName || '',
+        gcashAccNum: registrationData.gcashAccNum || ''
       };
 
       // Add payment details if available
@@ -264,13 +268,20 @@ const CreatePasswordPage = () => {
         
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.title}>Create Password</Text>
-          <Text style={styles.subLabel}>Step 4 of 4 • Secure your account</Text>
+          <Text style={styles.subLabel}>Step 5 of 5 • Secure your account</Text>
           <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
             <View style={{ width: '100%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
           </View>
         </View>
         
         <View style={styles.card}>
+          <View style={{ marginBottom: 12 }}>
+            <Text style={styles.sectionTitle}>Account Credentials</Text>
+            <Text style={[styles.label, { marginTop: 8 }]}>Username</Text>
+            <View style={styles.readonlyBox}>
+              <Text style={styles.readonlyText}>{registrationData?.email || '-'}</Text>
+            </View>
+          </View>
           <View style={styles.inputContainer}>
             <Text style={styles.label}>
               Password <Text style={styles.required}>*</Text>
@@ -434,6 +445,23 @@ const CreatePasswordPage = () => {
 };
 
 const styles = StyleSheet.create({
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  readonlyBox: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#F3F4F6',
+  },
+  readonlyText: {
+    fontSize: 16,
+    color: '#111827',
+  },
   container: {
     flexGrow: 1,
     backgroundColor: '#F8FAFC',

@@ -15,6 +15,11 @@ const Withdraw = () => {
   const [withdrawOption, setWithdrawOption] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  // Saved accounts from Members
+  const [bankAccName, setBankAccName] = useState('');
+  const [bankAccNum, setBankAccNum] = useState('');
+  const [gcashAccName, setGcashAccName] = useState('');
+  const [gcashAccNum, setGcashAccNum] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
   const [balance, setBalance] = useState(0);
   const [memberId, setMemberId] = useState('');
@@ -49,6 +54,11 @@ const Withdraw = () => {
           setEmail(foundUser.email);
           setFirstName(foundUser.firstName || ''); // Fetch firstName
           setLastName(foundUser.lastName || '');   // Fetch lastName
+          // Capture saved disbursement accounts
+          setBankAccName(foundUser.bankAccName || '');
+          setBankAccNum(foundUser.bankAccNum || '');
+          setGcashAccName(foundUser.gcashAccName || '');
+          setGcashAccNum(foundUser.gcashAccNum || '');
         } else {
           setAlertMessage('User not found');
           setAlertType('error');
@@ -108,7 +118,7 @@ const Withdraw = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.navigate('Home');
+      navigation.reset({ index: 0, routes: [{ name: 'AppHomeStandalone' }] });
       return true;
     };
 
@@ -118,10 +128,19 @@ const Withdraw = () => {
   }, [navigation]);
 
   const handleWithdrawOptionChange = (option) => {
-    setWithdrawOption(option.key);
-    // Reset account fields when withdraw option changes
-    setAccountName('');
-    setAccountNumber('');
+    const key = option.key;
+    setWithdrawOption(key);
+    // Auto-fill from saved accounts
+    if (key === 'Bank') {
+      setAccountName(bankAccName || '');
+      setAccountNumber((bankAccNum || '').toString());
+    } else if (key === 'GCash') {
+      setAccountName(gcashAccName || '');
+      setAccountNumber((gcashAccNum || '').toString());
+    } else {
+      setAccountName('');
+      setAccountNumber('');
+    }
   };
 
 const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
@@ -286,19 +305,19 @@ useEffect(() => {
 
         <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
         <TextInput
-          placeholder="Enter Account Name"
           value={accountName}
-          onChangeText={setAccountName}
-          style={styles.input}
+          editable={false}
+          style={[styles.input, { backgroundColor: '#F3F4F6' }]}
+          placeholder="Auto-filled from your profile"
         />
 
         <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
         <TextInput
-          placeholder="Enter Account Number"
           value={accountNumber}
-          onChangeText={setAccountNumber}
-          style={styles.input}
+          editable={false}
+          style={[styles.input, { backgroundColor: '#F3F4F6' }]}
           keyboardType="numeric"
+          placeholder="Auto-filled from your profile"
         />
 
         <Text style={styles.label}>Withdraw Amount<Text style={styles.required}>*</Text></Text>

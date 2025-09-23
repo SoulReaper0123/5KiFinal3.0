@@ -125,8 +125,8 @@ const RegistrationFeePage = () => {
 
     setLoading(true);
     
-    // Navigate to CreatePassword page with all registration data including payment proof
-    navigation.navigate('CreatePassword', {
+    // Navigate to AccountDetails step with accumulated registration data
+    navigation.navigate('AccountDetails', {
       ...registrationData,
       paymentOption,
       accountNumber,
@@ -150,9 +150,9 @@ const RegistrationFeePage = () => {
 
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.title}>Registration Fee</Text>
-          <Text style={styles.subLabel}>Step 3 of 4 • Deposit and provide proof</Text>
+          <Text style={styles.subLabel}>Step 3 of 5 • Deposit and provide proof</Text>
           <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
-            <View style={{ width: '75%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+            <View style={{ width: '60%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
           </View>
         </View>
 

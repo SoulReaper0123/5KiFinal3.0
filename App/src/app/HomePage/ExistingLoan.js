@@ -18,6 +18,7 @@ const ExistingLoan = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loanStatus, setLoanStatus] = useState('Active');
   const [statusColor, setStatusColor] = useState('#3A7F0D');
+  const [activeLoans, setActiveLoans] = useState([]);
 
   // Robust date formatter
   const formatDisplayDate = (dateInput) => {
@@ -290,31 +291,36 @@ const ExistingLoan = () => {
 
       if (currentSnapshot.exists()) {
         const allCurrentLoans = currentSnapshot.val();
+        const foundLoans = [];
         for (const memberId in allCurrentLoans) {
           const loans = allCurrentLoans[memberId];
           for (const loanId in loans) {
             const currentLoan = loans[loanId];
             if (currentLoan?.email === userEmail) {
-              console.log('Found loan for user:', userEmail);
-              console.log('Current loan data:', currentLoan);
-              console.log('Due date from database:', currentLoan.dueDate);
-              console.log('Next due date from database:', currentLoan.nextDueDate);
-              
               const loanData = {
                 ...currentLoan,
                 ...approvedData,
+                _memberId: memberId,
+                _loanId: loanId,
                 outstandingBalance: currentLoan.loanAmount,
                 dateApplied: currentLoan.dateApplied,
                 dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
               };
-              
-              console.log('Final loan data:', loanData);
-              setLoanDetails(loanData);
-              checkLoanStatus(loanData);
-              fetchTransactionHistory(memberId);
-              return;
+              foundLoans.push(loanData);
             }
           }
+        }
+        if (foundLoans.length > 0) {
+          // Sort newest approved first if possible
+          foundLoans.sort((a, b) => {
+            const at = a.dateApproved ? new Date(a.dateApproved).getTime() : 0;
+            const bt = b.dateApproved ? new Date(b.dateApproved).getTime() : 0;
+            return bt - at;
+          });
+          setActiveLoans(foundLoans);
+          // Do not auto-select a loan; wait for user tap on Active Loans
+          setLoanDetails(null);
+          return;
         }
       }
       setLoanDetails(null);
@@ -409,47 +415,70 @@ const ExistingLoan = () => {
 
  const fetchTransactionHistory = async (memberId) => {
   try {
-    // Fetch only approved payments for this member
-    const transactionsRef = dbRef(database, `Transactions/Payments/ApprovedPayments/${memberId}`);
-    const snapshot = await get(transactionsRef);
+    // Read from both actual write paths and merge
+    const approvedRef = dbRef(database, `Payments/ApprovedPayments/${memberId}`);
+    const txRef = dbRef(database, `Transactions/Payments/${memberId}`);
 
-    if (snapshot.exists()) {
-      const transactionsData = snapshot.val();
-      const transactions = Object.entries(transactionsData)
-        .map(([id, t]) => {
-          // Prefer numeric timestamp if present
-          const ts = typeof t.timestamp === 'number'
-            ? t.timestamp
-            : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
-          const normalizedStatus = (t.status || 'approved');
-          return {
-            transactionId: id,
-            type: t.type || 'Payment',
-            amountToBePaid: parseFloat(t.amountToBePaid || 0),
-            dateApproved: t.dateApproved,
-            timestamp: ts,
-            description: t.description || '',
-            status: normalizedStatus,
-            paymentOption: t.paymentOption || 'Not specified'
-          };
-        })
-        // Include approved/paid/completed entries
-        .filter(t => {
-          const status = String(t.status).toLowerCase();
-          return status === 'approved' || status === 'paid' || status === 'completed';
+    const [approvedSnap, txSnap] = await Promise.all([get(approvedRef), get(txRef)]);
+
+    const merged = [];
+
+    if (approvedSnap.exists()) {
+      const data = approvedSnap.val();
+      Object.entries(data).forEach(([id, t]) => {
+        const ts = typeof t.timestamp === 'number'
+          ? t.timestamp
+          : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+        merged.push({
+          transactionId: id,
+          type: t.type || 'Payment',
+          amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
+          dateApproved: t.dateApproved,
+          timestamp: ts,
+          description: t.description || '',
+          status: t.status || 'approved',
+          paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified'
         });
-
-      // Sort newest first using timestamp fallback to dateApproved
-      transactions.sort((a, b) => {
-        const at = typeof a.timestamp === 'number' ? a.timestamp : parseDateTime(a.dateApproved).getTime();
-        const bt = typeof b.timestamp === 'number' ? b.timestamp : parseDateTime(b.dateApproved).getTime();
-        return bt - at;
       });
-      
-      setTransactionHistory(transactions);
-    } else {
-      setTransactionHistory([]);
     }
+
+    if (txSnap.exists()) {
+      const data = txSnap.val();
+      Object.entries(data).forEach(([id, t]) => {
+        const ts = typeof t.timestamp === 'number'
+          ? t.timestamp
+          : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+        merged.push({
+          transactionId: id,
+          type: t.type || 'Payment',
+          amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
+          dateApproved: t.dateApproved,
+          timestamp: ts,
+          description: t.description || '',
+          status: t.status || 'approved',
+          paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified'
+        });
+      });
+    }
+
+    // Deduplicate by transactionId
+    const dedupedMap = new Map();
+    merged.forEach(item => {
+      dedupedMap.set(item.transactionId, item);
+    });
+    const deduped = Array.from(dedupedMap.values())
+      .filter(t => {
+        const status = String(t.status || '').toLowerCase();
+        return status === 'approved' || status === 'paid' || status === 'completed';
+      });
+
+    deduped.sort((a, b) => {
+      const at = typeof a.timestamp === 'number' ? a.timestamp : parseDateTime(a.dateApproved).getTime();
+      const bt = typeof b.timestamp === 'number' ? b.timestamp : parseDateTime(b.dateApproved).getTime();
+      return bt - at;
+    });
+
+    setTransactionHistory(deduped);
   } catch (error) {
     console.error('Error fetching transactions:', error);
     setTransactionHistory([]);
@@ -481,13 +510,6 @@ const ExistingLoan = () => {
     );
   }
 
-  if (!loanDetails) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.noLoansText}>No active loan found</Text>
-      </View>
-    );
-  }
 
   return (
     <View style={styles.container}>
@@ -496,7 +518,7 @@ const ExistingLoan = () => {
         <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitleText}>Loan Details</Text>
+        <Text style={styles.headerTitleText}>Existing Loans</Text>
         <View style={styles.headerSide} />
       </View>
 
@@ -512,83 +534,61 @@ const ExistingLoan = () => {
           />
         }
       >
-        <View style={getCardStyle()}>
-          <View style={styles.summaryHeader}>
-            <Text style={styles.summaryTitle}>Current Loan</Text>
-            <Text style={[styles.loanStatus, { color: statusColor }]}>
-              {loanStatus.toUpperCase()}
-            </Text>
-          </View>
-          
-          {(() => {
-            // Check if due date is overdue outside of the array
-            const currentDueDate = loanDetails.dueDate || loanDetails.nextDueDate;
-            const isCurrentDueDateOverdue = isSimplyOverdue(currentDueDate);
-            
-            console.log('=== FINAL OVERDUE CHECK FOR UI ===');
-            console.log('Current due date:', currentDueDate);
-            console.log('Is overdue for UI:', isCurrentDueDateOverdue);
-            console.log('Today:', new Date().toDateString());
-            console.log('================================');
+        {/* Loan Details summary moved to dedicated LoanDetails screen */}
 
-            return [
-              { label: 'Loan ID', value: loanDetails.transactionId || 'N/A' },
-              { label: 'Loan Type', value: loanDetails.loanType || 'N/A' },
-              { label: 'Approved Amount', value: `₱${(loanDetails.loanAmount || 0).toFixed(2)}` },
-              { label: 'Outstanding Balance', value: `₱${(loanDetails.outstandingBalance || 0).toFixed(2)}` },
-              { label: 'Date Applied', value: formatDisplayDate(loanDetails.dateApplied) },
-              { label: 'Date Approved', value: formatDisplayDate(loanDetails.dateApproved) },
-              { label: 'Interest Rate', value: `${(loanDetails.interestRate || 0).toFixed(2)}%` },
-              { label: 'Total Interest', value: `₱${(loanDetails.interest || 0).toFixed(2)}` },
-              { label: 'Terms', value: loanDetails.term ? `${loanDetails.term} months` : 'N/A' },
-              { label: 'Monthly Payment', value: `₱${(loanDetails.monthlyPayment || 0).toFixed(2)}` },
-              { 
-                label: 'Due Date', 
-                value: formatDisplayDate(currentDueDate),
-                isOverdue: isCurrentDueDateOverdue
-              }
-            ];
-          })().map((item, index) => (
-            <View key={index} style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{item.label}</Text>
-              <View style={styles.summaryValueContainer}>
-                <Text style={item.isOverdue ? {
-                  fontSize: 14,
-                  fontWeight: '700',
-                  color: '#FF0000',
-                  backgroundColor: '#FFE6E6',
-                  paddingHorizontal: 4,
-                  paddingVertical: 2,
-                  borderRadius: 4,
-                } : styles.summaryValue}>
-                  {item.value}
-                  {console.log(`Rendering ${item.label}: isOverdue=${item.isOverdue}, value=${item.value}`)}
-                </Text>
-                {item.isOverdue && (
-                  <Text style={styles.overdueBadge}>OVERDUE</Text>
-                )}
+        <Text style={styles.sectionTitle}>Active Loans</Text>
+        {activeLoans && activeLoans.length > 0 ? (
+          activeLoans.map((loan) => (
+            <TouchableOpacity
+              key={loan.transactionId || loan._loanId}
+              style={styles.transactionCard}
+              onPress={() => {
+                navigation.navigate('LoanDetails', {
+                  item: {
+                    ...loan,
+                    outstandingBalance: parseFloat(loan.loanAmount || 0),
+                  }
+                });
+              }}
+            >
+              <View style={styles.transactionHeader}>
+                <Text style={styles.transactionType}>{loan.loanType || 'Loan'}</Text>
+                <Text style={styles.transactionStatus}>{formatDisplayDate(loan.dueDate || loan.nextDueDate)}</Text>
               </View>
-            </View>
-          ))}
-        </View>
+              {[
+                { label: 'Outstanding Balance:', value: `₱${(parseFloat(loan.loanAmount || 0)).toFixed(2)}` },
+                { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
+                { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved || loan.dateApplied) },
+              ].map((item, index) => (
+                <View key={index} style={styles.transactionRow}>
+                  <Text style={styles.transactionLabel}>{item.label}</Text>
+                  <Text style={styles.transactionValue}>{item.value}</Text>
+                </View>
+              ))}
+            </TouchableOpacity>
+          ))
+        ) : (
+          <View style={styles.emptyState}>
+            <MaterialIcons name="account-balance" size={48} color="#D3D3D3" />
+            <Text style={styles.emptyText}>No active loans</Text>
+          </View>
+        )}
 
-        <Text style={styles.sectionTitle}>Payment History</Text>
-        
+        <Text style={styles.sectionTitle}>Payment History (Paid Loans)</Text>
         {transactionHistory.length > 0 ? (
           transactionHistory.map((transaction) => (
             <View key={transaction.transactionId} style={styles.transactionCard}>
               <View style={styles.transactionHeader}>
                 <Text style={styles.transactionType}>{transaction.type}</Text>
                 <Text style={[
-                  styles.transactionStatus, 
+                  styles.transactionStatus,
                   { color: getStatusColor(transaction.status) }
                 ]}>
-                  {transaction.status.toUpperCase()}
+                  {String(transaction.status || '').toUpperCase()}
                 </Text>
               </View>
-              
               {[
-                { label: 'Amount:', value: `₱${transaction.amountToBePaid.toFixed(2)}` },
+                { label: 'Amount:', value: `₱${Number(transaction.amountToBePaid || 0).toFixed(2)}` },
                 { label: 'Transaction ID:', value: transaction.transactionId },
                 { label: 'Payment Date:', value: formatDisplayDate(transaction.dateApproved) },
                 { label: 'Mode of Payment:', value: transaction.paymentOption }
@@ -598,12 +598,9 @@ const ExistingLoan = () => {
                   <Text style={styles.transactionValue}>{item.value}</Text>
                 </View>
               ))}
-              
-              {transaction.description && (
-                <Text style={styles.transactionDescription}>
-                  Notes: {transaction.description}
-                </Text>
-              )}
+              {transaction.description ? (
+                <Text style={styles.transactionDescription}>Notes: {transaction.description}</Text>
+              ) : null}
             </View>
           ))
         ) : (

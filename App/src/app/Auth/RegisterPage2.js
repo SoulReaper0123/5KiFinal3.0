@@ -262,9 +262,9 @@ const RegisterPage2 = () => {
 
                 <View style={{ marginBottom: 16 }}>
                     <Text style={styles.title}>Identity Verification</Text>
-                    <Text style={styles.subLabel}>Step 2 of 4 • Provide ID and selfie</Text>
+                    <Text style={styles.subLabel}>Step 2 of 5 • Provide ID and selfie</Text>
                     <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
-                        <View style={{ width: '50%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
+                        <View style={{ width: '40%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
                     </View>
                 </View>
 

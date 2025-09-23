@@ -48,6 +48,8 @@ const PayLoan = () => {
   
   // Loan and penalty states
   const [currentLoan, setCurrentLoan] = useState(null);
+  const [activeLoans, setActiveLoans] = useState([]); // list of active loans for member
+  const [selectedLoanId, setSelectedLoanId] = useState(null); // which loan is selected for payment
   const [penaltyAmount, setPenaltyAmount] = useState(0);
   const [penaltyPerDay, setPenaltyPerDay] = useState(100); // Default penalty
   const [totalAmountDue, setTotalAmountDue] = useState(0);
@@ -57,6 +59,7 @@ const PayLoan = () => {
   const paymentOptions = [
     { key: 'Bank', label: 'Bank' },
     { key: 'GCash', label: 'GCash' },
+    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
   ];
 
   useEffect(() => {
@@ -116,7 +119,7 @@ const PayLoan = () => {
 
   useEffect(() => {
     if (email) {
-      fetchCurrentLoan(email);
+      fetchCurrentLoans(email);
     }
   }, [email]);
 
@@ -215,34 +218,39 @@ const PayLoan = () => {
     }
   };
 
-  const fetchCurrentLoan = async (userEmail) => {
+  // Fetch all current loans for the member and support multiple selections
+  const fetchCurrentLoans = async (userEmail) => {
     try {
       const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
       const snapshot = await get(currentLoansRef);
       
+      const found = [];
       if (snapshot.exists()) {
         const allCurrentLoans = snapshot.val();
-        for (const memberId in allCurrentLoans) {
-          const loans = allCurrentLoans[memberId];
+        for (const mId in allCurrentLoans) {
+          const loans = allCurrentLoans[mId];
           for (const loanId in loans) {
             const loan = loans[loanId];
             if (loan?.email === userEmail) {
-              console.log('PayLoan - Found loan for user:', userEmail);
-              console.log('PayLoan - Loan data:', loan);
-              console.log('PayLoan - Due date from database:', loan.dueDate);
-              console.log('PayLoan - Next due date from database:', loan.nextDueDate);
-              
-              setCurrentLoan(loan);
-              // Don't calculate penalty here, let useEffect handle it
-              return;
+              found.push({ ...loan, _loanId: loanId, _memberId: mId });
             }
           }
         }
       }
-      console.log('PayLoan - No loan found for user:', userEmail);
-      setCurrentLoan(null);
+
+      if (found.length > 0) {
+        setActiveLoans(found);
+        // default to first loan if none selected
+        const first = found[0];
+        setSelectedLoanId(first._loanId);
+        setCurrentLoan(first);
+      } else {
+        setActiveLoans([]);
+        setSelectedLoanId(null);
+        setCurrentLoan(null);
+      }
     } catch (error) {
-      console.error('PayLoan - Error fetching current loan:', error);
+      console.error('PayLoan - Error fetching current loans:', error);
     }
   };
 
@@ -573,9 +581,14 @@ const PayLoan = () => {
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option.key);
+    if (option.key === 'Cash-on-Hand') {
+      setAccountNumber('');
+      setAccountName('');
+      return;
+    }
     const selectedAccount = paymentAccounts[option.key];
-    setAccountNumber(selectedAccount.accountNumber || '');
-    setAccountName(selectedAccount.accountName || '');
+    setAccountNumber(selectedAccount?.accountNumber || '');
+    setAccountName(selectedAccount?.accountName || '');
   };
 
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
@@ -791,97 +804,53 @@ const PayLoan = () => {
           <Text style={styles.label}>Balance</Text>
           <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-          {/* Loan Information */}
-          {currentLoan && (
+          {/* Loans list and details */}
+          {activeLoans.length > 0 && (
             <View style={styles.loanInfoContainer}>
-              <Text style={styles.sectionTitle}>Current Loan Information</Text>
-              
-              {/* Overdue Warning */}
-              {overdueDays > 0 && (
-                <View style={styles.overdueWarning}>
-                  <MaterialIcons name="warning" size={20} color="#FF0000" />
-                  <Text style={styles.overdueWarningText}>
-                    Your loan is {overdueDays} day{overdueDays > 1 ? 's' : ''} overdue!
-                  </Text>
+              <Text style={styles.sectionTitle}>Select Loan</Text>
+              {activeLoans.map((ln) => (
+                <View
+                  key={ln._loanId}
+                  style={[styles.loanSelectItem, selectedLoanId === ln._loanId ? styles.loanSelectItemActive : null]}
+                >
+                  {/* Left: tap whole loan row to navigate to details */}
+                  <TouchableOpacity
+                    style={{ flex: 1 }}
+                    onPress={() => {
+                      setSelectedLoanId(ln._loanId);
+                      setCurrentLoan(ln);
+                      navigation.navigate('PayLoanDetails', {
+                        item: {
+                          ...ln,
+                          outstandingBalance: parseFloat(ln.loanAmount || ln.outstandingBalance || 0),
+                        }
+                      });
+                    }}
+                  >
+                    <Text style={styles.loanSelectTitle}>{ln.loanType || 'Loan'}</Text>
+                    <Text style={styles.loanSelectSub}>{`Amount: ${formatCurrency(ln.loanAmount || ln.outstandingBalance || 0)}`}</Text>
+                    <Text style={styles.loanSelectSub}>{`Due: ${formatDisplayDate(ln.dueDate || ln.nextDueDate)}`}</Text>
+                  </TouchableOpacity>
+
+                  {/* Right: checkbox only toggles selection (no navigation) */}
+                  <TouchableOpacity
+                    style={styles.checkboxArea}
+                    onPress={() => {
+                      setSelectedLoanId(ln._loanId);
+                      setCurrentLoan(ln);
+                    }}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                  >
+                    {selectedLoanId === ln._loanId ? (
+                      <MaterialIcons name="check-box" size={22} color="#2D5783" />
+                    ) : (
+                      <MaterialIcons name="check-box-outline-blank" size={22} color="#94A3B8" />
+                    )}
+                  </TouchableOpacity>
                 </View>
-              )}
-              
-              <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Loan Amount:</Text>
-                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.loanAmount || currentLoan.outstandingBalance || 0)}</Text>
-              </View>
-              
-              <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Principal:</Text>
-                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.monthlyPayment || 0)}</Text>
-              </View>
-              
-              <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Interest:</Text>
-                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.interest || interest || 0)}</Text>
-              </View>
-              
-              <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Total Monthly Payment:</Text>
-                <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.totalMonthlyPayment || 0)}</Text>
-              </View>
-              
-              <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Due Date:</Text>
-                <View style={styles.loanInfoValueContainer}>
-                  <Text style={(() => {
-                    const dueDate = currentLoan.dueDate || currentLoan.nextDueDate;
-                    const isOverdue = isSimplyOverdue(dueDate);
-                    console.log(`PayLoan - RENDERING DUE DATE: ${dueDate}, isOverdue: ${isOverdue}`);
-                    return isOverdue ? {
-                      fontSize: 14,
-                      fontWeight: '700',
-                      color: '#FF0000',
-                      backgroundColor: '#FFE6E6',
-                      paddingHorizontal: 4,
-                      paddingVertical: 2,
-                      borderRadius: 4,
-                    } : styles.loanInfoValue;
-                  })()}>
-                    {formatDisplayDate(currentLoan.dueDate || currentLoan.nextDueDate)}
-                  </Text>
-                  {isSimplyOverdue(currentLoan.dueDate || currentLoan.nextDueDate) && (
-                    <Text style={styles.overdueBadge}>OVERDUE</Text>
-                  )}
-                </View>
-              </View>
-              
-              {/* Always show penalty row, even if zero */}
-              <View style={styles.loanInfoRow}>
-                <Text style={styles.loanInfoLabel}>Penalty:</Text>
-                <Text style={[
-                  styles.loanInfoValue,
-                  penaltyAmount > 0 ? styles.overdueText : styles.normalText
-                ]}>
-                  {penaltyAmount > 0 ? 
-                    `${formatCurrency(penaltyAmount)} (₱${(currentLoan?.interest || interest || 0).toFixed(2)} × ${overdueDays}/30 days)` : 
-                    formatCurrency(0)
-                  }
-                </Text>
-              </View>
-              
-              {/* Separator line */}
-              <View style={styles.separatorLine} />
-              
-              <View style={[
-                styles.loanInfoRow, 
-                styles.totalRow,
-                overdueDays > 0 ? styles.overdueTotal : null
-              ]}>
-                <Text style={[
-                  styles.totalLabel,
-                  overdueDays > 0 ? styles.overdueTotalLabel : null
-                ]}>Total Amount Due:</Text>
-                <Text style={[
-                  styles.totalValue,
-                  overdueDays > 0 ? styles.overdueTotalValue : null
-                ]}>{formatCurrency(totalAmountDue)}</Text>
-              </View>
+              ))}
+
+              {/* Current Loan Information moved to PayLoanDetails screen */}
             </View>
           )}
 
@@ -903,6 +872,7 @@ const PayLoan = () => {
           <Text style={styles.label}>Account Name</Text>
           <TextInput 
             value={accountName} 
+            placeholder={paymentOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
             style={[styles.input, styles.fixedInput]} 
             editable={false} 
           />
@@ -910,6 +880,7 @@ const PayLoan = () => {
           <Text style={styles.label}>Account Number</Text>
           <TextInput 
             value={accountNumber} 
+            placeholder={paymentOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
             style={[styles.input, styles.fixedInput]} 
             editable={false} 
           />
@@ -1329,6 +1300,37 @@ const styles = StyleSheet.create({
     color: '#2D5783',
     marginBottom: 10,
     textAlign: 'center',
+  },
+  // Loan select row (each item)
+  loanSelectItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 10,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 8,
+  },
+  loanSelectItemActive: {
+    borderColor: '#2D5783',
+    backgroundColor: '#F1F5F9',
+  },
+  loanSelectTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  loanSelectSub: {
+    fontSize: 12,
+    color: '#475569',
+  },
+  checkboxArea: {
+    paddingLeft: 12,
+    paddingVertical: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loanInfoRow: {
     flexDirection: 'row',

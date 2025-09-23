@@ -44,6 +44,11 @@ const ApplyLoan = () => {
   const [disbursement, setDisbursement] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  // Saved accounts from Members
+  const [bankAccName, setBankAccName] = useState('');
+  const [bankAccNum, setBankAccNum] = useState('');
+  const [gcashAccName, setGcashAccName] = useState('');
+  const [gcashAccNum, setGcashAccNum] = useState('');
   const [balance, setBalance] = useState(0);
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
@@ -78,6 +83,9 @@ const ApplyLoan = () => {
     { key: 'Quick Cash', label: 'Quick Cash' },
   ]);
 
+  // Track member investment only (pending applications not shown)
+  const [investment, setInvestment] = useState(0);
+
   const accountNumberInput = useRef(null);
 
   // Dynamic terms and rates from System Settings
@@ -107,7 +115,7 @@ const ApplyLoan = () => {
       term && 
       disbursement && 
       accountName && 
-      accountNumber;
+      accountNumber; // account fields are auto-filled from profile
     
     if (requiresCollateral) {
       return basicFieldsValid && 
@@ -271,17 +279,26 @@ const ApplyLoan = () => {
         const foundUser = Object.values(members).find(member => member.email === userEmail);
         if (foundUser) {
           const userBalance = foundUser.balance || 0;
+          const userInvestment = foundUser.investment || foundUser.investments || 0;
           setBalance(userBalance);
+          setInvestment(Number(userInvestment) || 0);
           setMemberId(foundUser.id || '');
           setUserId(foundUser.id || '');
           setFirstName(foundUser.firstName || '');
           setLastName(foundUser.lastName || '');
+
+          // Capture saved disbursement accounts
+          setBankAccName(foundUser.bankAccName || '');
+          setBankAccNum(foundUser.bankAccNum || '');
+          setGcashAccName(foundUser.gcashAccName || '');
+          setGcashAccNum(foundUser.gcashAccNum || '');
           
-          // Calculate max loanable amount
+          // Calculate max loanable amount (legacy, but not used for gating anymore)
           calculateMaxLoanableAmount(userBalance, loanableAmountPercentage);
           
-          // Check for existing loans after setting user data
+          // Check for existing loans and pending applications
           await checkExistingLoans(userEmail);
+          // no need to compute total amount anymore
         } else {
           setAlertMessage('User not found');
           setAlertType('error');
@@ -321,28 +338,30 @@ const ApplyLoan = () => {
       }
       setHasExistingLoan(false);
 
-      // Check LoanApplications table for pending applications
-      const applicationsRef = dbRef(database, 'Loans/LoanApplications');
-      const applicationsSnapshot = await get(applicationsRef);
-
-      if (applicationsSnapshot.exists()) {
-        const allApplications = applicationsSnapshot.val();
-        for (const memberId in allApplications) {
-          const applications = allApplications[memberId];
-          for (const applicationId in applications) {
-            const application = applications[applicationId];
-            if (application?.email === userEmail && application?.status === 'pending') {
-              setHasPendingApplication(true);
-              return;
-            }
-          }
-        }
-      }
+      // No longer block for "any" pending application; we'll compute total amount instead
       setHasPendingApplication(false);
     } catch (error) {
       console.error('Error checking existing loans and applications:', error);
       setHasExistingLoan(false);
       setHasPendingApplication(false);
+    }
+  };
+
+  // Check if user has any existing pending application in LoanApplications
+  const hasAnyPendingApplication = async (memberId) => {
+    try {
+      const applicationsRef = dbRef(database, `Loans/LoanApplications/${memberId}`);
+      const snapshot = await get(applicationsRef);
+      if (!snapshot.exists()) return false;
+      const apps = snapshot.val();
+      for (const id in apps) {
+        const a = apps[id];
+        if ((a?.status || 'pending') === 'pending') return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Error checking pending applications:', e);
+      return false;
     }
   };
 
@@ -395,12 +414,12 @@ const ApplyLoan = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.navigate('Home');
-      return true;
+      navigation.reset({ index: 0, routes: [{ name: 'AppHomeStandalone' }] });
+      return true; // prevent default pop
     };
 
-    const backHandler = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-    return () => backHandler.remove();
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    return () => subscription.remove();
   }, [navigation]);
 
   const generateTransactionId = () => Math.floor(100000 + Math.random() * 900000).toString();
@@ -534,8 +553,8 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     setAlertMessage('Loan application submitted successfully. You will receive a confirmation email shortly.');
     setAlertType('success');
     setSuccessAction(() => () => {
-      resetForm();
-      navigation.navigate('Home');
+      // Reset to Home to avoid stacking ApplyLoan on back stack
+      navigation.reset({ index: 0, routes: [{ name: 'AppHomeStandalone' }] });
       // Run API operations in background after navigation
       if (loanData) {
         runApiOperationsInBackground(loanData);
@@ -588,36 +607,52 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       return;
     }
 
-    // Check for existing loans first
-    if (hasExistingLoan) {
-      setAlertMessage('You already have an active loan. Please complete your current loan before applying for a new one.');
+    // Allow multiple active loans as long as member's investment won't go down to 0
+
+    // 1) Optional: still prevent duplicate pending applications for same member
+    if (memberId) {
+      const exists = await hasAnyPendingApplication(memberId);
+      if (exists) {
+        setAlertMessage('You already have a pending loan application. Please wait for it to be processed before submitting another.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+        return;
+      }
+    }
+
+    // 2) Ensure the member's BALANCE will remain above 0 after considering all active loans + this request
+    let currentLoansTotal = 0;
+    try {
+      const currSnap = await get(dbRef(database, `Loans/CurrentLoans/${memberId}`));
+      if (currSnap.exists()) {
+        const loans = currSnap.val();
+        for (const k in loans) {
+          const l = loans[k];
+          const amt = Number(l?.loanAmount) || 0;
+          currentLoansTotal += amt;
+        }
+      }
+    } catch (e) {
+      // fail open to avoid blocking due to read error
+    }
+
+    const loanAmountNum = Number(loanAmount) || 0;
+    const projectedTotal = currentLoansTotal + loanAmountNum;
+
+    const userBalance = Number(balance) || 0;
+    if (userBalance <= 0) {
+      setAlertMessage('You have no available balance to support a new loan.');
       setAlertType('error');
       setAlertModalVisible(true);
       return;
     }
 
-    // Check for pending applications
-    if (hasPendingApplication) {
-      setAlertMessage('You already have a pending loan application. Please wait for approval or rejection before submitting a new application.');
+    // Require that remaining BALANCE stays above 0 (not equal)
+    const remaining = userBalance - projectedTotal;
+    if (remaining <= 0) {
+      setAlertMessage('Your requested amount would use up all your balance. Please lower the amount so your remaining balance stays above ₱0.00.');
       setAlertType('error');
       setAlertModalVisible(true);
-      return;
-    }
-
-    const loanAmountNum = parseFloat(loanAmount);
-    
-    // Check if loan amount exceeds loanable amount (based on percentage)
-    if (loanAmountNum > maxLoanableAmount) {
-      // Show a clear confirm dialog requiring user action
-      // Include the phrase 'Collateral Required' to drive the modal UI label/ icon
-      setConfirmMessage(
-        `Loan amount is more than the loanable amount, this requires collateral. Do you want to continue?`
-      );
-      setConfirmAction(() => () => {
-        setRequiresCollateral(true);
-        setShowCollateralModal(true);
-      });
-      setConfirmModalVisible(true);
       return;
     }
 
@@ -668,11 +703,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.label}>Balance</Text>
-        <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
-        
-        <Text style={styles.label}>Maximum Loanable Amount ({loanableAmountPercentage}%)</Text>
-        <Text style={styles.balanceText}>{formatCurrency(maxLoanableAmount)}</Text>
+        {/* Investment only */}
+        <Text style={styles.label}>Investment Limit</Text>
+        <Text style={styles.balanceText}>{formatCurrency(investment)}</Text>
 
         <Text style={styles.label}><RequiredField>Loan Type</RequiredField></Text>
         <ModalSelector
@@ -719,7 +752,21 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         <ModalSelector
           data={disbursementOptions}
           initValue="Select Disbursement Method"
-          onChange={(option) => setDisbursement(option.key)}
+          onChange={(option) => {
+            const key = option.key;
+            setDisbursement(key);
+            // Auto-fill from saved accounts
+            if (key === 'Bank') {
+              setAccountName(bankAccName || '');
+              setAccountNumber((bankAccNum || '').toString());
+            } else if (key === 'GCash') {
+              setAccountName(gcashAccName || '');
+              setAccountNumber((gcashAccNum || '').toString());
+            } else {
+              setAccountName('');
+              setAccountNumber('');
+            }
+          }}
           style={styles.picker}
           modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
           overlayStyle={{ justifyContent: 'flex-end' }}
@@ -735,19 +782,19 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
         <TextInput 
           value={accountName} 
-          onChangeText={setAccountName} 
-          style={styles.input} 
-          placeholder="Enter account name"
+          editable={false}
+          style={[styles.input, { backgroundColor: '#F3F4F6' }]} 
+          placeholder="Auto-filled from your profile"
         />
 
         <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
         <TextInput
           value={accountNumber}
-          onChangeText={handleAccountNumberChange}
-          style={styles.input}
+          editable={false}
+          style={[styles.input, { backgroundColor: '#F3F4F6' }]}
           keyboardType="numeric"
           ref={accountNumberInput}
-          placeholder="Enter account number"
+          placeholder="Auto-filled from your profile"
         />
 
         {/* Collateral Modal */}

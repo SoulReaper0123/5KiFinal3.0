@@ -12,7 +12,7 @@ const PORT = process.env.PORT || 3000;
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
-const FACEBOOK_LINK = 'https://www.facebook.com/5KiFS';
+
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
 // Middleware
@@ -131,7 +131,7 @@ app.get('/', (req, res) => {
 
 app.post('/send-admin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating admin creation emails', req.body);
-    const { email, firstName, middleName = '', lastName, password, websiteLink, facebookLink } = req.body;
+    const { email, firstName, middleName = '', lastName, password, websiteLink } = req.body;
 
     // Validate required fields
     if (!email || !firstName || !lastName || !password) {
@@ -194,7 +194,6 @@ app.post('/send-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -257,7 +256,6 @@ app.post('/send-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -293,7 +291,7 @@ app.post('/send-admin-email', async (req, res) => {
 
 app.post('/send-delete-admin-email', async (req, res) => {
     console.log('[NOTIFICATION] Initiating admin deletion emails', req.body);
-    const { email, firstName, middleName = '', lastName, websiteLink, facebookLink } = req.body;
+    const { email, firstName, middleName = '', lastName, websiteLink } = req.body;
 
     // Validate required fields
     if (!email || !firstName || !lastName) {
@@ -357,7 +355,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -603,14 +600,6 @@ app.post('/approveRegistrations', async (req, res) => {
                            style="display: inline-block; background-color: #3498db; color: white; 
                                   padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
                             Login to Your Account
-                        </a>
-                    </p>
-                    
-                    <p>
-                        <a href="${FACEBOOK_LINK}" 
-                           style="display: inline-block; background-color: #3b5998; color: white; 
-                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
-                            Connect With Us on Facebook
                         </a>
                     </p>
                     

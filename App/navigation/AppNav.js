@@ -2,11 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
-import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal } from 'react-native';
+import { Alert, View, Text, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, Pressable } from 'react-native';
 import { getDatabase, ref, get, child } from 'firebase/database';
 import { MaterialIcons } from '@expo/vector-icons';
 import { auth } from '../src/firebaseConfig';
 import * as SecureStore from 'expo-secure-store';
+import CustomConfirmModal from '../src/components/CustomConfirmModal';
 
 // Import all your screens
 import Splashscreen from '../src/app/Splashscreen';
@@ -51,7 +52,7 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
     setShowLogoutModal(false);
     setGlobalLogoutLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise(resolve => setTimeout(resolve, 800));
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
       await auth.signOut();
@@ -73,10 +74,10 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
       <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
         <View style={styles.profileContainer}>
           <TouchableOpacity
-            style={styles.backArrow}
-            onPress={() => props.navigation.navigate('HomeTab')}
+            style={{ position: 'absolute', top: 16, right: 16, padding: 8 }}
+            onPress={() => props.navigation.closeDrawer()}
           >
-            <MaterialIcons name="arrow-forward" size={28} color="white" />
+            <MaterialIcons name="close" size={28} color="white" />
           </TouchableOpacity>
 
           {user?.selfie && (
@@ -90,54 +91,53 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
         {loading ? (
           <ActivityIndicator size="large" color="white" style={styles.loadingIndicator} />
         ) : (
-          props.state.routes.map((route, index) => (
+          <>
+            {props.state.routes.map((route, index) => (
+              <DrawerItem
+                key={index}
+                label={route.name}
+                onPress={() => {
+                  props.navigation.navigate(route.name);
+                }}
+                labelStyle={styles.drawerItemLabel}
+              />
+            ))}
             <DrawerItem
-              key={index}
-              label={route.name}
-              onPress={() => {
-                props.navigation.navigate(route.name);
-              }}
+              label="Privacy"
+              onPress={() => props.navigation.navigate('Privacy Policy')}
               labelStyle={styles.drawerItemLabel}
             />
-          ))
+          </>
         )}
         <View style={styles.logoutContainer}>
-          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
+          <TouchableOpacity onPress={() => setLogoutConfirmVisible(true)} style={styles.logoutButton}>
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
       </DrawerContentScrollView>
 
-      <Modal
-        visible={showLogoutModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowLogoutModal(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <MaterialIcons name="logout" size={40} color="#2D5783" style={styles.modalIcon} />
-            <Text style={styles.modalTitle}>Confirm Logout</Text>
-            <Text style={styles.modalMessage}>Are you sure you want to logout?</Text>
-            
-            <View style={styles.modalButtons}>
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.cancelButton]} 
-                onPress={() => setShowLogoutModal(false)}
-              >
-                <Text style={styles.cancelButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.modalButton, styles.confirmButton]} 
-                onPress={confirmLogout}
-              >
-                <Text style={styles.confirmButtonText}>Logout</Text>
-              </TouchableOpacity>
-            </View>
+      {/* Full-screen confirmation modal using shared component */}
+      <CustomConfirmModal
+        visible={logoutConfirmVisible}
+        onClose={() => setLogoutConfirmVisible(false)}
+        title="Confirm Logout"
+        message="Are you sure you want to logout?"
+        type="warning"
+        cancelText="No"
+        confirmText="Yes"
+        onCancel={() => setLogoutConfirmVisible(false)}
+        onConfirm={() => { setLogoutConfirmVisible(false); confirmLogout(); }}
+      />
+
+      {/* Login-style loading overlay during logout */}
+      {globalLogoutLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
           </View>
         </View>
-      </Modal>
+      )}
     </View>
   );
 };
@@ -146,6 +146,7 @@ const DrawerNavigator = ({ route }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [globalLogoutLoading, setGlobalLogoutLoading] = useState(false);
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
   const { email, password, shouldPromptBiometric } = route.params;
 
   useEffect(() => {
@@ -191,9 +192,9 @@ const DrawerNavigator = ({ route }) => {
         )}
         screenOptions={{
           drawerStyle: { backgroundColor: 'black' },
-          // Add these options to ensure compatibility
           drawerType: 'front',
-          overlayColor: 'transparent',
+          overlayColor: 'rgba(0,0,0,0.3)',
+          swipeEnabled: true,
         }}
       >
         <Drawer.Screen 
@@ -202,7 +203,7 @@ const DrawerNavigator = ({ route }) => {
           initialParams={{ user, email, password, shouldPromptBiometric }} 
           options={{ headerShown: false }} 
         />
-        <Drawer.Screen name="Account Management" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
+        <Drawer.Screen name="Profile" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
         <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
         <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
         <Drawer.Screen name="About Us" component={AboutUs} options={{ headerShown: false }} />
@@ -232,11 +233,14 @@ const AppNav = () => (
       <Stack.Screen name="Register" component={RegisterPage} options={{ headerShown: false }} />
       <Stack.Screen name="Register2" component={RegisterPage2} options={{ headerShown: false }} />
       <Stack.Screen name="CreatePassword" component={CreatePasswordPage} options={{ headerShown: false }} />
-      <Stack.Screen name="DrawerNav" component={DrawerNavigator} options={{ headerShown: false }} />
+      <Stack.Screen name="AccountDetails" component={require('../src/app/Auth/AccountDetailsPage').default} options={{ headerShown: false }} />
+      <Stack.Screen name="DrawerNav" component={AppHome} options={{ headerShown: false }} />
       <Stack.Screen name="AppHomeStandalone" component={AppHome} options={{ headerShown: false }} />
       <Stack.Screen name="ApplyLoan" component={ApplyLoan} options={{ headerShown: false }} />
       <Stack.Screen name="PayLoan" component={PayLoan} options={{ headerShown: false }} />
+      <Stack.Screen name="PayLoanDetails" component={require('../src/app/HomePage/PayLoanDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="ExistingLoan" component={ExistingLoan} options={{ headerShown: false }} />
+      <Stack.Screen name="LoanDetails" component={require('../src/app/HomePage/LoanDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="Deposit" component={Deposit} options={{ headerShown: false }} />
       <Stack.Screen name="Withdraw" component={Withdraw} options={{ headerShown: false }} />
       <Stack.Screen name="Terms" component={Terms} options={{ headerShown: false }} />
@@ -338,12 +342,31 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingBox: {
+    backgroundColor: '#1E3A5F',
+    paddingVertical: 24,
+    paddingHorizontal: 28,
+    borderRadius: 12,
+    alignItems: 'center',
+    width: 220,
+  },
   loadingText: {
-    marginTop: 15,
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#2D5783',
+    marginTop: 10,
+    fontSize: 16,
+    color: 'white',
     textAlign: 'center',
+    fontWeight: '600',
   },
   loadingSubText: {
     marginTop: 5,

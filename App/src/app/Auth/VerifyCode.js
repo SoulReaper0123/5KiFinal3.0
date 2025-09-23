@@ -11,7 +11,6 @@ import {
   ScrollView,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as Keychain from 'react-native-keychain';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useNavigation } from '@react-navigation/native';
@@ -69,14 +68,18 @@ export default function VerifyCode({ route, navigation }) {
     if (code === expectedCode) {
       // Prefer DrawerNav; if it fails, fallback to AppHomeStandalone
       try {
-        if (fromBiometric) {
-          nav.reset({ index: 0, routes: [{ name: 'DrawerNav', params: { email } }] });
-        } else {
-          nav.reset({ index: 0, routes: [{ name: 'DrawerNav', params: { email, password, shouldPromptBiometric: true } }] });
-        }
+        navigation.reset({
+          index: 0,
+          routes: [{
+            name: 'DrawerNav',
+            params: fromBiometric
+              ? { email }
+              : { email, password, shouldPromptBiometric: true },
+          }],
+        });
       } catch (e) {
         console.warn('DrawerNav navigation failed, falling back to AppHomeStandalone:', e);
-        nav.reset({
+        navigation.reset({
           index: 0,
           routes: [{ name: 'AppHomeStandalone', params: { email, password, shouldPromptBiometric: !fromBiometric } }],
         });
