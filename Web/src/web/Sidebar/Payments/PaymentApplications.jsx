@@ -759,8 +759,7 @@ const PaymentApplications = ({
 
       // 3. Find current loan (if any)
       const memberLoansRef = database.ref(`Loans/CurrentLoans/${id}`);
-      const memberLoansSnap = await memberLoansRef.once('value');
-      
+
       let currentLoanData = null;
       let currentLoanKey = null;
       let isLoanPayment = false;
@@ -768,42 +767,55 @@ const PaymentApplications = ({
       let loanAmount = 0;
       let dueDateStr = '';
       let approvedLoanData = null;
-      
-      if (memberLoansSnap.exists()) {
-        console.log('Found member loans, processing...');
-        memberLoansSnap.forEach((loanSnap) => {
-          if (!currentLoanData) {
-            currentLoanData = loanSnap.val();
-            currentLoanKey = loanSnap.key;
-            isLoanPayment = true;
-            loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
-            dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
-            
-            console.log('Current loan found:', {
-              key: currentLoanKey,
-              loanAmount,
-              currentDueDate: dueDateStr
-            });
-          }
-        });
-        
-        // 4. Fetch the original interest and term from ApprovedLoans (not from CurrentLoans)
-        if (currentLoanKey) {
-          const approvedLoanRef = database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`);
-          const approvedLoanSnap = await approvedLoanRef.once('value');
-          
-          if (approvedLoanSnap.exists()) {
-            approvedLoanData = approvedLoanSnap.val();
-            interestAmount = parseFloat(approvedLoanData.interest) || 0;
-            console.log('Original interest from ApprovedLoans:', interestAmount);
-            console.log('Original term from ApprovedLoans:', approvedLoanData.term);
-          } else {
-            console.log('Warning: ApprovedLoan data not found, using 0 interest');
-            interestAmount = 0;
-          }
+
+      // Prefer the loan explicitly selected in the application
+      const preferredLoanKey = payment.selectedLoanId;
+      if (preferredLoanKey) {
+        const specificLoanSnap = await database.ref(`Loans/CurrentLoans/${id}/${preferredLoanKey}`).once('value');
+        if (specificLoanSnap.exists()) {
+          currentLoanData = specificLoanSnap.val();
+          currentLoanKey = preferredLoanKey;
+          isLoanPayment = true;
+          loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+          dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+          console.log('Current loan (selected by member) found:', { key: currentLoanKey, loanAmount, currentDueDate: dueDateStr });
         }
-      } else {
-        console.log('No current loans found for member:', id);
+      }
+
+      // Fallback: pick the first loan if none explicitly selected or not found
+      if (!currentLoanData) {
+        const memberLoansSnap = await memberLoansRef.once('value');
+        if (memberLoansSnap.exists()) {
+          console.log('Found member loans, processing...');
+          memberLoansSnap.forEach((loanSnap) => {
+            if (!currentLoanData) {
+              currentLoanData = loanSnap.val();
+              currentLoanKey = loanSnap.key;
+              isLoanPayment = true;
+              loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+              dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+              console.log('Current loan found:', { key: currentLoanKey, loanAmount, currentDueDate: dueDateStr });
+            }
+          });
+        } else {
+          console.log('No current loans found for member:', id);
+        }
+      }
+
+      // 4. Fetch the original interest and term from ApprovedLoans (not from CurrentLoans)
+      if (currentLoanKey) {
+        const approvedLoanRef = database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`);
+        const approvedLoanSnap = await approvedLoanRef.once('value');
+        
+        if (approvedLoanSnap.exists()) {
+          approvedLoanData = approvedLoanSnap.val();
+          interestAmount = parseFloat(approvedLoanData.interest) || 0;
+          console.log('Original interest from ApprovedLoans:', interestAmount);
+          console.log('Original term from ApprovedLoans:', approvedLoanData.term);
+        } else {
+          console.log('Warning: ApprovedLoan data not found, using 0 interest');
+          interestAmount = 0;
+        }
       }
 
       // Generate a new transaction ID for approved/transactions records
@@ -1114,8 +1126,8 @@ const PaymentApplications = ({
       let excessPayment = 0;
       let isLoanPayment = false;
 
-      // Check if this is a loan payment
-      const loanRef = database.ref(`Loans/CurrentLoans/${payment.id}/${payment.transactionId}`);
+      // Check if this is a loan payment (use selectedLoanId if provided)
+      const loanRef = database.ref(`Loans/CurrentLoans/${payment.id}/${payment.selectedLoanId || payment.transactionId}`);
       const loanSnap = await loanRef.once('value');
       
       if (loanSnap.exists()) {

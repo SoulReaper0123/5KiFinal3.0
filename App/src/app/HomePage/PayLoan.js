@@ -102,7 +102,7 @@ const PayLoan = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.navigate('Home');
+      navigation.navigate('AppHome');
       return true;
     };
 
@@ -650,6 +650,8 @@ const PayLoan = () => {
         dateApplied: formattedDate,
         timestamp: currentDate.getTime(),
         status: 'pending',
+        // Persist the selected loan so admin approves against the correct CurrentLoans entry
+        selectedLoanId: selectedLoanId || (currentLoan ? currentLoan._loanId : null),
       };
 
       // Save application record

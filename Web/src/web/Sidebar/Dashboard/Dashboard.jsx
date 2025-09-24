@@ -63,13 +63,18 @@ const Dashboard = () => {
     try {
       console.log('Checking due dates for loan reminders...');
       const now = new Date();
-      const oneWeekFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+      
+      // Fetch reminder window (days) from Settings
+      const settingsSnap = await database.ref('Settings/LoanReminderDays').once('value');
+      const reminderDays = parseInt(settingsSnap.val() ?? 7, 10);
+      const windowMs = Math.max(0, reminderDays) * 24 * 60 * 60 * 1000;
+      const reminderWindowDate = new Date(now.getTime() + windowMs);
       
       // Format dates for logging
       const formattedNow = now.toISOString();
-      const formattedOneWeekFromNow = oneWeekFromNow.toISOString();
+      const formattedWindow = reminderWindowDate.toISOString();
       console.log(`Current date: ${formattedNow}`);
-      console.log(`One week from now: ${formattedOneWeekFromNow}`);
+      console.log(`Reminder window end (+${reminderDays}d): ${formattedWindow}`);
       
       const loansRef = database.ref('Loans/CurrentLoans');
       const loansSnapshot = await loansRef.once('value');
@@ -107,11 +112,11 @@ const Dashboard = () => {
           // Log the due date for debugging
           console.log(`Loan ${transactionId} for member ${memberId} has due date: ${dueDate.toISOString()}`);
           
-          // Check if the due date is within the next week
-          const isWithinOneWeek = dueDate <= oneWeekFromNow && dueDate > now;
-          console.log(`Is within one week: ${isWithinOneWeek}`);
+          // Check if the due date is within the configured reminder window
+          const isWithinWindow = dueDate <= reminderWindowDate && dueDate > now;
+          console.log(`Is within reminder window: ${isWithinWindow}`);
           
-          if (isWithinOneWeek) {
+          if (isWithinWindow) {
             const notificationKey = `${memberId}_${transactionId}`;
             const hasBeenNotified = notificationsData && notificationsData[notificationKey];
             

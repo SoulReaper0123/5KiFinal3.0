@@ -101,7 +101,9 @@ export default function InboxDetails() {
     // Amount
     const amount = item?.amount || 0;
 
-    const base = `Your ${type} application of Ref No. ${originalRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
+    // If originalRef and newRef are the same, omit originalRef from the first sentence
+    const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
+    const base = `Your ${type} application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
     const ref2 = `\nRef No. ${newRef}`;
     return `${base}${ref2}`;
   }, [item, title]);

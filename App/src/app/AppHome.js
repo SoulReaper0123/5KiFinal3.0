@@ -355,6 +355,19 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
                 <MaterialIcons name={investmentHidden ? 'visibility' : 'visibility-off'} size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
+            <View style={styles.walletActionsRow}>
+              <TouchableOpacity
+                style={styles.secondaryAction}
+                onPress={() =>
+                  navigation.navigate('Deposit', {
+                    user: { email, memberId, firstName, balance },
+                  })
+                }
+              >
+                <Entypo name="download" size={18} color="#1E3A5F" />
+                <Text style={styles.secondaryActionText}>Deposit</Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Wallet Card */}
@@ -368,17 +381,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             </View>
 
             <View style={styles.walletActionsRow}>
-              <TouchableOpacity
-                style={styles.primaryAction}
-                onPress={() =>
-                  navigation.navigate('Deposit', {
-                    user: { email, memberId, firstName, balance },
-                  })
-                }
-              >
-                <Entypo name="download" size={18} color="#fff" />
-                <Text style={styles.primaryActionText}>Deposit</Text>
-              </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.secondaryAction}

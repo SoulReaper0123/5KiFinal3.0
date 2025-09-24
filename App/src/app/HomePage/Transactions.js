@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   RefreshControl,
   TouchableOpacity,
+  BackHandler,
   Modal,
 } from 'react-native';
 import { ref, get } from 'firebase/database';
@@ -58,6 +59,17 @@ const Transactions = () => {
       setRefreshing(false);
     }
   };
+
+    useEffect(() => {
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          navigation.navigate('AppHome');
+          return true;
+        }
+      );
+      return () => backHandler.remove();
+    }, [navigation]);
 
   const onRefresh = () => {
     setRefreshing(true);

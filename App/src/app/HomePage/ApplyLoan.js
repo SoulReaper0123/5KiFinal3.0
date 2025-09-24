@@ -98,6 +98,7 @@ const ApplyLoan = () => {
   const disbursementOptions = [
     { key: 'GCash', label: 'GCash' },
     { key: 'Bank', label: 'Bank' },
+    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
   ];
 
   const collateralOptions = [
@@ -110,20 +111,21 @@ const ApplyLoan = () => {
 
   // Check if all required fields are filled
   const isFormValid = () => {
-    const basicFieldsValid = 
-      loanAmount && 
-      term && 
-      disbursement && 
-      accountName && 
-      accountNumber; // account fields are auto-filled from profile
-    
+    const disb = disbursement;
+    const accountsOk = disb === 'Cash-on-Hand' || (accountName && accountNumber);
+    const basicFieldsValid =
+      loanAmount &&
+      term &&
+      disbursement &&
+      accountsOk;
+
     if (requiresCollateral) {
-      return basicFieldsValid && 
-        collateralType && 
-        collateralValue && 
+      return basicFieldsValid &&
+        collateralType &&
+        collateralValue &&
         collateralDescription;
     }
-    
+
     return basicFieldsValid;
   };
 
@@ -414,7 +416,7 @@ const ApplyLoan = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.reset({ index: 0, routes: [{ name: 'AppHomeStandalone' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
       return true; // prevent default pop
     };
 
@@ -554,7 +556,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     setAlertType('success');
     setSuccessAction(() => () => {
       // Reset to Home to avoid stacking ApplyLoan on back stack
-      navigation.reset({ index: 0, routes: [{ name: 'AppHomeStandalone' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
       // Run API operations in background after navigation
       if (loanData) {
         runApiOperationsInBackground(loanData);
@@ -580,9 +582,8 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       `Processing Fee: ₱${processingFeeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `Release Amount: ₱${releaseAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
-      `Disbursement: ${disbursement}\n` +
-      `Account Name: ${accountName}\n` +
-      `Account Number: ${accountNumber}`;
+      `Disbursement: ${disbursement}` +
+      (disbursement === 'Cash-on-Hand' ? '' : `\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}`);
 
     // Include collateral details if required
     if (requiresCollateral) {
@@ -755,13 +756,16 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           onChange={(option) => {
             const key = option.key;
             setDisbursement(key);
-            // Auto-fill from saved accounts
+            // Auto-fill from saved accounts, clear for Cash-on-Hand
             if (key === 'Bank') {
               setAccountName(bankAccName || '');
               setAccountNumber((bankAccNum || '').toString());
             } else if (key === 'GCash') {
               setAccountName(gcashAccName || '');
               setAccountNumber((gcashAccNum || '').toString());
+            } else if (key === 'Cash-on-Hand') {
+              setAccountName('');
+              setAccountNumber('');
             } else {
               setAccountName('');
               setAccountNumber('');
@@ -784,7 +788,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           value={accountName} 
           editable={false}
           style={[styles.input, { backgroundColor: '#F3F4F6' }]} 
-          placeholder="Auto-filled from your profile"
+          placeholder={disbursement === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : 'Auto-filled from your profile'}
         />
 
         <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
@@ -794,7 +798,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           style={[styles.input, { backgroundColor: '#F3F4F6' }]}
           keyboardType="numeric"
           ref={accountNumberInput}
-          placeholder="Auto-filled from your profile"
+          placeholder={disbursement === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : 'Auto-filled from your profile'}
         />
 
         {/* Collateral Modal */}

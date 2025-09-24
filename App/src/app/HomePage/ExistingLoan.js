@@ -157,7 +157,7 @@ const ExistingLoan = () => {
       const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
       const dueDateStart = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
       
-      const isOverdue = todayStart > dueDateStart;
+      const isOverdue = todayStart >= dueDateStart;
       
       console.log('=== DUE DATE CHECK ===');
       console.log('Raw due date:', dueDate);
@@ -242,7 +242,7 @@ const ExistingLoan = () => {
     const backHandler = BackHandler.addEventListener(
       'hardwareBackPress',
       () => {
-        navigation.navigate('Home');
+        navigation.navigate('AppHome');
         return true;
       }
     );
@@ -386,6 +386,8 @@ const ExistingLoan = () => {
     try {
       const dueDate = parseDateTime(loan.dueDate || loan.nextDueDate);
       const today = new Date();
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const dueStart = new Date(dueDate.getFullYear(), dueDate.getMonth(), dueDate.getDate());
       
       const hasPaymentThisMonth = transactionHistory.some(t => {
         const paymentDate = parseDateTime(t.dateApproved);
@@ -399,7 +401,7 @@ const ExistingLoan = () => {
       if (hasPaymentThisMonth) {
         setLoanStatus('Paid');
         setStatusColor('#4CAF50');
-      } else if (today > dueDate) {
+      } else if (todayStart >= dueStart) {
         setLoanStatus('Overdue');
         setStatusColor('#F44336');
       } else {
@@ -551,20 +553,30 @@ const ExistingLoan = () => {
                 });
               }}
             >
-              <View style={styles.transactionHeader}>
-                <Text style={styles.transactionType}>{loan.loanType || 'Loan'}</Text>
-                <Text style={styles.transactionStatus}>{formatDisplayDate(loan.dueDate || loan.nextDueDate)}</Text>
+              {/* Display fields in requested order */}
+              <View style={styles.transactionRow}>
+                <Text style={styles.transactionLabel}>Loan Type:</Text>
+                <Text style={styles.transactionValue}>{loan.loanType || 'Loan'}</Text>
               </View>
-              {[
-                { label: 'Outstanding Balance:', value: `₱${(parseFloat(loan.loanAmount || 0)).toFixed(2)}` },
-                { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
-                { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved || loan.dateApplied) },
-              ].map((item, index) => (
-                <View key={index} style={styles.transactionRow}>
-                  <Text style={styles.transactionLabel}>{item.label}</Text>
-                  <Text style={styles.transactionValue}>{item.value}</Text>
+              <View style={styles.transactionRow}>
+                <Text style={styles.transactionLabel}>Loan ID:</Text>
+                <Text style={styles.transactionValue}>{loan.transactionId || loan._loanId || 'N/A'}</Text>
+              </View>
+              <View style={styles.transactionRow}>
+                <Text style={styles.transactionLabel}>Outstanding Balance:</Text>
+                <Text style={styles.transactionValue}>{`₱${(parseFloat(loan.loanAmount || 0)).toFixed(2)}`}</Text>
+              </View>
+              <View style={styles.transactionRow}>
+                <Text style={styles.transactionLabel}>DueDate:</Text>
+                <View style={{ alignItems: 'flex-end' }}>
+                  <Text style={[styles.transactionValue, isDueDateOverdue(loan.dueDate || loan.nextDueDate) && { color: '#D32F2F' }]}>
+                    {formatDisplayDate(loan.dueDate || loan.nextDueDate)}
+                  </Text>
+                  {isDueDateOverdue(loan.dueDate || loan.nextDueDate) && (
+                    <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: '700', marginTop: 2 }}>Overdue</Text>
+                  )}
                 </View>
-              ))}
+              </View>
             </TouchableOpacity>
           ))
         ) : (

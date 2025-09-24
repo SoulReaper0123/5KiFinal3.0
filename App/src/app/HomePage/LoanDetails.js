@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity} from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
 
@@ -18,24 +18,78 @@ const formatDate = (raw) => {
   }
 };
 
+
 export default function LoanDetails() {
   const navigation = useNavigation();
   const route = useRoute();
   const { item } = route.params || {};
   const loan = item || {};
 
+  // Robust date parser (handles Firebase Timestamp and strings like "August 20, 2025 at 00:00")
+  const parseDateTime = (dateInput) => {
+    try {
+      if (!dateInput) return null;
+      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+        return new Date(dateInput.seconds * 1000);
+      }
+      if (typeof dateInput === 'string') {
+        // Handle "mm/dd/yyyy at HH:MM" and "Month DD, YYYY at HH:MM"
+        if (dateInput.includes(' at ')) {
+          const [datePart, timePart] = dateInput.split(' at ');
+          // Try mm/dd/yyyy first
+          if (datePart.includes('/')) {
+            const [month, day, year] = datePart.split('/');
+            const [hours, minutes] = timePart.split(':');
+            return new Date(year, month - 1, day, hours, minutes);
+          } else {
+            const parsed = new Date(dateInput.replace(' at ', ' '));
+            if (!isNaN(parsed.getTime())) return parsed;
+          }
+        }
+        // Handle "Month DD, YYYY"
+        if (/^[A-Za-z]+ \d{1,2}, \d{4}$/.test(dateInput)) {
+          const parsed = new Date(dateInput + ' 00:00:00');
+          if (!isNaN(parsed.getTime())) return parsed;
+        }
+        // Handle YYYY-MM-DD
+        if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+          return new Date(dateInput + 'T00:00:00');
+        }
+        // Fallback: native parsing
+        const parsed = new Date(dateInput);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
+      return null;
+    } catch {
+      return null;
+    }
+  };
+
+  const isOverdue = (raw) => {
+    const d = parseDateTime(raw);
+    if (!d) return false;
+    const today = new Date();
+    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const startDue = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    return startToday >= startDue; // red when due today or overdue
+  };
+
+  const dueRaw = loan.dueDate || loan.nextDueDate;
+  const dueOverdue = isOverdue(dueRaw);
+
   const details = [
-    { label: 'Loan ID', value: loan.transactionId || loan._loanId || 'N/A' },
     { label: 'Loan Type', value: loan.loanType || 'N/A' },
-    { label: 'Approved Amount', value: formatPeso(loan.loanAmount) },
+    { label: 'Loan ID', value: loan.transactionId || loan._loanId || 'N/A' },
+    { label: 'ApprovedAmount', value: formatPeso(loan.loanAmount) },
     { label: 'Outstanding Balance', value: formatPeso(loan.outstandingBalance ?? loan.loanAmount) },
     { label: 'Date Applied', value: formatDate(loan.dateApplied) },
     { label: 'Date Approved', value: formatDate(loan.dateApproved) },
+    { label: 'Term', value: loan.term ? `${loan.term} months` : 'N/A' },
     { label: 'Interest Rate', value: `${Number(loan.interestRate || 0).toFixed(2)}%` },
-    { label: 'Total Interest', value: formatPeso(loan.interest) },
-    { label: 'Terms', value: loan.term ? `${loan.term} months` : 'N/A' },
-    { label: 'Monthly Payment', value: formatPeso(loan.monthlyPayment) },
-    { label: 'Due Date', value: formatDate(loan.dueDate || loan.nextDueDate) },
+    { label: 'Interest', value: formatPeso(loan.interest) },
+    { label: 'Principal Amount', value: formatPeso(loan.monthlyPayment) },
+    { label: 'Total Amount', value: formatPeso(loan.totalMonthlyPayment) },
   ];
 
   return (
@@ -50,11 +104,20 @@ export default function LoanDetails() {
 
       <View style={styles.card}>
         {details.map((row, idx) => (
-          <View key={idx} style={[styles.row, idx === details.length - 1 && { borderBottomWidth: 0 }]}> 
+          <View key={idx} style={[styles.row, { borderBottomWidth: 1, borderBottomColor: '#E2E8F0' }]}> 
             <Text style={styles.label}>{row.label}</Text>
             <Text style={styles.value}>{row.value}</Text>
           </View>
         ))}
+        <View style={[styles.row, { borderBottomWidth: 0 }]}> 
+          <Text style={styles.label}>DueDate</Text>
+          <View style={{ maxWidth: '100%', alignItems: 'flex-end' }}>
+            <Text style={[styles.value, dueOverdue && { color: '#D32F2F' }]}>
+              {formatDate(dueRaw)}
+            </Text>
+            {dueOverdue && <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: '700', marginTop: 4 }}>Overdue</Text>}
+          </View>
+        </View>
       </View>
     </View>
   );

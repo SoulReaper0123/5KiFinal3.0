@@ -698,7 +698,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     fontWeight: '500',
-    color: '#2D5783',
+    color: '#2C5282',
   },
   modalContent: {
     backgroundColor: 'white',

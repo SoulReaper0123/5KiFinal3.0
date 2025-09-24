@@ -119,7 +119,7 @@ const SystemSettings = () => {
     Funds: '',
     Savings: '',
     InterestRate: {},
-    AdvancedPayments: false,
+    LoanReminderDays: '7',
     DividendDate: '',
     // Dividend Distribution Percentages
     MembersDividendPercentage: '60',
@@ -250,7 +250,7 @@ const SystemSettings = () => {
           InterestRate: Object.fromEntries(
             Object.entries(data.InterestRate || {}).map(([key, val]) => [key, val.toString()])
           ),
-          AdvancedPayments: data.AdvancedPayments || false,
+          LoanReminderDays: (data.LoanReminderDays ?? 7).toString(),
           DividendDate: data.DividendDate || '',
           // Dividend Distribution Percentages
           MembersDividendPercentage: data.MembersDividendPercentage?.toString() || '60',
@@ -474,7 +474,7 @@ const SystemSettings = () => {
         Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
         Savings: parseFloat(parseFloat(settings.Savings || 0).toFixed(2)),
         InterestRate: parsedInterest,
-        AdvancedPayments: settings.AdvancedPayments,
+        LoanReminderDays: parseInt(settings.LoanReminderDays || 7, 10),
         DividendDate: settings.DividendDate,
         // Dividend Distribution Percentages
         MembersDividendPercentage: safeParseFloat(settings.MembersDividendPercentage, 60),
@@ -768,25 +768,18 @@ const SystemSettings = () => {
         {activeSection === 'loan' && (
           <div style={styles.section}>
             <div style={styles.inputRow}>
-              <label style={styles.label}>Advanced Payments</label>
-              <label style={styles.switch}>
+              <label style={styles.label}>Loan Reminder (days)</label>
+              {editMode ? (
                 <input
-                  type="checkbox"
-                  checked={settings.AdvancedPayments}
-                  onChange={(e) => setSettings({ ...settings, AdvancedPayments: e.target.checked })}
-                  disabled={!editMode}
-                  style={styles.switchInput}
+                  type="number"
+                  min="0"
+                  style={styles.input}
+                  value={settings.LoanReminderDays}
+                  onChange={(e) => setSettings({ ...settings, LoanReminderDays: e.target.value.replace(/[^0-9]/g, '') })}
                 />
-                <span style={{
-                  ...styles.slider,
-                  ...(settings.AdvancedPayments ? styles.sliderChecked : {})
-                }}>
-                  <span style={{
-                    ...styles.sliderBefore,
-                    ...(settings.AdvancedPayments ? styles.sliderBeforeChecked : {})
-                  }}></span>
-                </span>
-              </label>
+              ) : (
+                <span style={styles.staticText}>{settings.LoanReminderDays} days</span>
+              )}
             </div>
             
 

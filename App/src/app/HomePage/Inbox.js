@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Modal,
   ScrollView,
+  BackHandler,
   RefreshControl,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,6 +28,16 @@ export default function Inbox() {
   
   // State for email
   const [userEmail, setUserEmail] = useState(null);
+
+    useEffect(() => {
+      const handleBackPress = () => {
+        navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
+        return true; // prevent default pop
+      };
+  
+      const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+      return () => subscription.remove();
+    }, [navigation]);
   
   // Get email from all possible sources
   useEffect(() => {

@@ -2728,3 +2728,7 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
         });
     }
 });
+
+app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
