@@ -69,48 +69,127 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
     }
   };
 
+  // Get icon for each route
+  const getRouteIcon = (routeName) => {
+    switch (routeName) {
+      case 'Profile': return 'account-circle';
+      case 'Terms and Conditions': return 'description';
+      case 'Privacy Policy': return 'privacy-tip';
+      case 'About Us': return 'info';
+      case 'Contact Us': return 'contact-mail';
+      case 'Settings': return 'settings';
+      default: return 'chevron-right';
+    }
+  };
+
   return (
     <View style={{ flex: 1 }}>
       <DrawerContentScrollView {...props} contentContainerStyle={styles.drawerContent}>
+        {/* Enhanced Profile Header */}
         <View style={styles.profileContainer}>
           <TouchableOpacity
-            style={{ position: 'absolute', top: 16, right: 16, padding: 8 }}
+            style={styles.closeButton}
             onPress={() => props.navigation.closeDrawer()}
           >
-            <MaterialIcons name="close" size={28} color="white" />
+            <MaterialIcons name="close" size={24} color="white" />
           </TouchableOpacity>
 
-          {user?.selfie && (
-            <Image source={{ uri: user.selfie }} style={styles.profileImage} />
-          )}
+          <View style={styles.profileImageContainer}>
+            {user?.selfie ? (
+              <Image source={{ uri: user.selfie }} style={styles.profileImage} />
+            ) : (
+              <View style={styles.defaultProfileImage}>
+                <MaterialIcons name="person" size={50} color="#2D5783" />
+              </View>
+            )}
+            <View style={styles.onlineIndicator} />
+          </View>
+          
           <Text style={styles.profileName}>{user?.fullName || 'User'}</Text>
           <Text style={styles.profileEmail}>{user?.email}</Text>
+          
+          {/* Welcome message */}
+          <View style={styles.welcomeContainer}>
+            <Text style={styles.welcomeText}>Welcome back!</Text>
+          </View>
         </View>
 
-        <View style={styles.separator} />
-        {loading ? (
-          <ActivityIndicator size="large" color="white" style={styles.loadingIndicator} />
-        ) : (
-          <>
-            {props.state.routes.map((route, index) => (
-              <DrawerItem
-                key={index}
-                label={route.name}
-                onPress={() => {
-                  props.navigation.navigate(route.name);
-                }}
-                labelStyle={styles.drawerItemLabel}
-              />
-            ))}
-            <DrawerItem
-              label="Privacy"
-              onPress={() => props.navigation.navigate('Privacy Policy')}
-              labelStyle={styles.drawerItemLabel}
-            />
-          </>
-        )}
+        {/* Navigation Items */}
+        <View style={styles.navigationContainer}>
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2D5783" style={styles.loadingIndicator} />
+              <Text style={styles.loadingText}>Loading menu...</Text>
+            </View>
+          ) : (
+            <>
+              {props.state.routes.map((route, index) => {
+                // Skip the Home route as it's the current screen
+                if (route.name === 'Home') return null;
+                
+                // Custom label mapping
+                const getLabel = (routeName) => {
+                  switch (routeName) {
+                    case 'Profile': return 'Account Management';
+                    case 'Terms and Conditions': return 'Terms & Conditions';
+                    case 'Privacy Policy': return 'Privacy Policy';
+                    case 'About Us': return 'About Us';
+                    case 'Contact Us': return 'Contact Us';
+                    case 'Settings': return 'Settings';
+                    default: return routeName;
+                  }
+                };
+                
+                const isActive = props.state.index === index;
+                
+                return (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.drawerItem, isActive && styles.drawerItemActive]}
+                    onPress={() => {
+                      props.navigation.navigate(route.name);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.drawerItemIcon}>
+                      <MaterialIcons 
+                        name={getRouteIcon(route.name)} 
+                        size={22} 
+                        color={isActive ? '#2D5783' : '#666'} 
+                      />
+                    </View>
+                    <Text style={[styles.drawerItemLabel, isActive && styles.drawerItemLabelActive]}>
+                      {getLabel(route.name)}
+                    </Text>
+                    <MaterialIcons 
+                      name="chevron-right" 
+                      size={20} 
+                      color={isActive ? '#2D5783' : '#ccc'} 
+                    />
+                  </TouchableOpacity>
+                );
+              })}
+              
+              {/* Additional Privacy item */}
+              <TouchableOpacity
+                style={styles.drawerItem}
+                onPress={() => props.navigation.navigate('Privacy Policy')}
+                activeOpacity={0.7}
+              >
+                <View style={styles.drawerItemIcon}>
+                  <MaterialIcons name="privacy-tip" size={22} color="#666" />
+                </View>
+                <Text style={styles.drawerItemLabel}>Privacy</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* Enhanced Logout Section */}
         <View style={styles.logoutContainer}>
-          <TouchableOpacity onPress={() => setLogoutConfirmVisible(true)} style={styles.logoutButton}>
+          <TouchableOpacity onPress={handleLogout} style={styles.logoutButton} activeOpacity={0.8}>
+            <MaterialIcons name="logout" size={20} color="white" />
             <Text style={styles.logoutText}>Logout</Text>
           </TouchableOpacity>
         </View>
@@ -118,15 +197,15 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
 
       {/* Full-screen confirmation modal using shared component */}
       <CustomConfirmModal
-        visible={logoutConfirmVisible}
-        onClose={() => setLogoutConfirmVisible(false)}
+        visible={showLogoutModal}
+        onClose={() => setShowLogoutModal(false)}
         title="Confirm Logout"
         message="Are you sure you want to logout?"
         type="warning"
         cancelText="No"
         confirmText="Yes"
-        onCancel={() => setLogoutConfirmVisible(false)}
-        onConfirm={() => { setLogoutConfirmVisible(false); confirmLogout(); }}
+        onCancel={() => setShowLogoutModal(false)}
+        onConfirm={() => { setShowLogoutModal(false); confirmLogout(); }}
       />
 
       {/* Login-style loading overlay during logout */}
@@ -240,6 +319,7 @@ const AppNav = () => (
       <Stack.Screen name="PayLoan" component={PayLoan} options={{ headerShown: false }} />
       <Stack.Screen name="PayLoanDetails" component={require('../src/app/HomePage/PayLoanDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="ExistingLoan" component={ExistingLoan} options={{ headerShown: false }} />
+      <Stack.Screen name="LoanPaymentHistory" component={require('../src/app/HomePage/LoanPaymentHistory').default} options={{ headerShown: false }} />
       <Stack.Screen name="LoanDetails" component={require('../src/app/HomePage/LoanDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="Deposit" component={Deposit} options={{ headerShown: false }} />
       <Stack.Screen name="Withdraw" component={Withdraw} options={{ headerShown: false }} />
@@ -258,6 +338,7 @@ const AppNav = () => (
       <Stack.Screen name="ContactUs" component={ContactUs} options={{ headerShown: false }} />
       <Stack.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
       <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} options={{ headerShown: false }} />
+      <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen 
         name="BiometricSetup" 
         component={BiometricSetupScreen} 
@@ -270,55 +351,173 @@ const AppNav = () => (
 const styles = StyleSheet.create({
   drawerContent: {
     flexGrow: 1,
-    backgroundColor: 'white',
+    backgroundColor: '#f8fafc',
   },
   profileContainer: {
     padding: 30,
     paddingTop: 70,
     alignItems: 'center',
     backgroundColor: '#2D5783',
-    height: '35%',
+    minHeight: 280,
     marginTop: -60,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eaeaea',
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  profileImageContainer: {
+    position: 'relative',
+    marginBottom: 15,
   },
   profileImage: {
-    width: 120,
-    height: 120,
-    borderRadius: 80,
-    marginBottom: 10,
-    borderWidth: 2,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  defaultProfileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 5,
+    right: 5,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: '#4ade80',
+    borderWidth: 3,
     borderColor: '#ffffff',
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: '#ffffff',
+    marginBottom: 4,
+    textAlign: 'center',
   },
   profileEmail: {
     fontSize: 14,
-    color: '#e0e0e0',
+    color: '#e2e8f0',
+    marginBottom: 10,
+    textAlign: 'center',
   },
-  separator: {
-    height: 1,
-    backgroundColor: 'white',
+  welcomeContainer: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    borderRadius: 15,
+    marginTop: 8,
   },
-  logoutContainer: {
-    marginTop: 20,
+  welcomeText: {
+    fontSize: 12,
+    color: '#ffffff',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  navigationContainer: {
+    flex: 1,
+    paddingTop: 20,
     paddingHorizontal: 16,
   },
-  logoutButton: {
-    padding: 10,
-    backgroundColor: '#8E0B16',
-    borderRadius: 5,
+  drawerItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    marginVertical: 2,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  drawerItemActive: {
+    backgroundColor: '#e0f2fe',
+    borderLeftWidth: 4,
+    borderLeftColor: '#2D5783',
+  },
+  drawerItemIcon: {
+    width: 30,
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  drawerItemLabel: {
+    flex: 1,
+    fontSize: 16,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  drawerItemLabelActive: {
+    color: '#2D5783',
+    fontWeight: '600',
+  },
+  logoutContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
   },
   logoutText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: 16,
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
   },
   loadingIndicator: {
-    marginTop: 20,
+    marginBottom: 10,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: '#6b7280',
+    fontWeight: '500',
   },
   globalLoadingOverlay: {
     position: 'absolute',
@@ -330,17 +529,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: 'rgba(0, 0, 0, 0.7)',
     zIndex: 10000,
-  },
-  loadingContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 30,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -360,23 +548,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     width: 220,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: 'white',
-    textAlign: 'center',
-    fontWeight: '600',
-  },
-  loadingSubText: {
-    marginTop: 5,
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  drawerItemLabel: {
-    fontSize: 15,
-    color: 'black',
   },
   backArrow: {
     position: 'absolute',

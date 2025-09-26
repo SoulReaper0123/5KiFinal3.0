@@ -531,8 +531,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>First Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Last Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Investment</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Savings</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
@@ -545,8 +544,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
             {members.map((member, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{member.id || 'N/A'}</td>
-                <td style={styles.tableCell}>{member.firstName || 'N/A'}</td>
-                <td style={styles.tableCell}>{member.lastName || 'N/A'}</td>
+                <td style={styles.tableCell}>{member.firstName + " "+ member.lastName || 'N/A'}</td>
                 <td style={{
                   ...styles.tableCell,
                   ...styles.savingsAmount
@@ -635,7 +633,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.contactNumber || 'N/A'}</span>
+                    <span style={styles.fieldValue}>{selectedMember?.phoneNumber || 'N/A'}</span>
                   </div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Gender:</span>

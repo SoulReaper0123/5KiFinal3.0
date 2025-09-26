@@ -428,7 +428,7 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
 
       {modalVisible && selectedLoan && (
         <div style={styles.centeredModal}>
-          <div style={hasDocuments(selectedLoan) ? styles.modalCard : styles.modalCardSingleColumn}>
+          <div style={styles.modalCard}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -441,108 +441,7 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
               <h2 style={styles.modalTitle}>Loan Application Details</h2>
             </div>
             <div style={styles.modalContent}>
-              {hasDocuments(selectedLoan) ? (
-                <div style={styles.columns}>
-                  <div style={styles.leftColumn}>
-                    <div style={styles.sectionTitle}>Member Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Member ID:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Name:</span>
-                      <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Email:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Contact:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.phoneNumber || 'N/A'}</span>
-                    </div>
-
-                    <div style={styles.sectionTitle}>Loan Details</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Transaction ID:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Loan Amount:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Term:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.term} months</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Disbursement:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date Applied:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
-                    </div>
-
-                    <div style={styles.sectionTitle}>Rejection Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date Rejected:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Time Rejected:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.timeRejected}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Rejection Reason:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
-                    </div>
-                  </div>
-                  <div style={styles.rightColumn}>
-                    <div style={styles.sectionTitle}>Bank Details</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Account Name:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Account Number:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Bank Name:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.bankName || 'N/A'}</span>
-                    </div>
-
-                    <div style={styles.sectionTitle}>Supporting Documents</div>
-                    <div style={styles.imageGrid}>
-                      {selectedLoan.proofOfIncomeUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Income</p>
-                          <img
-                            src={selectedLoan.proofOfIncomeUrl}
-                            alt="Proof of Income"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                      {selectedLoan.proofOfIdentityUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Identity</p>
-                          <img
-                            src={selectedLoan.proofOfIdentityUrl}
-                            alt="Proof of Identity"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              <div style={styles.columns}>
                 <div style={styles.leftColumn}>
                   <div style={styles.sectionTitle}>Member Information</div>
                   <div style={styles.compactField}>
@@ -584,7 +483,18 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
                   </div>
 
-                  <div style={styles.sectionTitle}>Rejection Information</div>
+                </div>
+                <div style={styles.rightColumn}>
+                  <div style={styles.sectionTitle}>Bank Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Account Name:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Account Number:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
+                  </div>
+                                  <div style={styles.sectionTitle}>Rejection Information</div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Date Rejected:</span>
                     <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
@@ -598,21 +508,8 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     <span style={styles.fieldValue}>{selectedLoan.rejectionReason || 'N/A'}</span>
                   </div>
 
-                  <div style={styles.sectionTitle}>Bank Details</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Bank Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.bankName || 'N/A'}</span>
-                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>

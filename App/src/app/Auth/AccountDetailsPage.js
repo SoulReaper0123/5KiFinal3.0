@@ -86,7 +86,7 @@ const AccountDetailsPage = () => {
             keyboardType="numeric"
             placeholder="e.g., 09XXXXXXXXX"
             style={styles.input}
-            maxLength={20}
+            maxLength={11}
           />
 
           <TouchableOpacity

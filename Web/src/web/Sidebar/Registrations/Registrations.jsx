@@ -2245,11 +2245,9 @@ const processDatabaseApprove = async (reg) => {
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
+               <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '22%' }}>Email</th>
               <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Contact</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>First Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Last Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -2257,11 +2255,9 @@ const processDatabaseApprove = async (reg) => {
           <tbody>
             {registrations.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
+                <td style={styles.tableCell}>{item.firstName + ' ' + item.lastName || ''}</td>
                 <td style={styles.tableCell}>{item.email || ''}</td>
-                <td style={styles.tableCell}>{item.phoneNumber || ''}</td>
-                <td style={styles.tableCell}>{item.firstName || ''}</td>
-                <td style={styles.tableCell}>{item.lastName || ''}</td>
-                <td style={styles.tableCell}>{item.dateCreated || ''}</td>
+              <td style={styles.tableCell}>{item.phoneNumber || ''}</td>
                 <td style={{
                   ...styles.tableCell,
                   ...(item.status === 'approved' ? styles.statusApproved : {}),

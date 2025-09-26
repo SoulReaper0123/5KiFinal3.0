@@ -1500,7 +1500,6 @@ const openImageViewer = (url, label) => {
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Payment Method</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -1513,7 +1512,6 @@ const openImageViewer = (url, label) => {
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid)}</td>
                 <td style={styles.tableCell}>{item.paymentOption}</td>
-                <td style={styles.tableCell}>{item.dateApplied}</td>
                 <td style={{
                   ...styles.tableCell,
                   ...(item.status === 'approved' ? styles.statusApproved : {}),

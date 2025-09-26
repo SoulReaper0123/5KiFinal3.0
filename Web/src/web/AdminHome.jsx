@@ -54,6 +54,14 @@ const AdminHome = () => {
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
   const [sidebarWidth, setSidebarWidth] = useState(280);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
+  const [sectionReloadCounter, setSectionReloadCounter] = useState(0);
+  const [pendingCounts, setPendingCounts] = useState({
+    registrations: 0,
+    deposits: 0,
+    loans: 0,
+    payments: 0,
+    withdraws: 0,
+  });
   
   // AI Assistant States
   const [isAIAssistantVisible, setIsAIAssistantVisible] = useState(false);
@@ -151,9 +159,60 @@ try {
     };
     loadSection();
     loadChatSessions();
+
+    // Subscribe to pending counts (registrations, deposits, loans, payments, withdraws)
+    const refs = {
+      registrations: database.ref('Registrations/RegistrationApplications'),
+      deposits: database.ref('Deposits/DepositApplications'),
+      loans: database.ref('Loans/LoanApplications'),
+      payments: database.ref('Payments/PaymentApplications'),
+      withdraws: database.ref('Withdraws/WithdrawApplications'),
+    };
+
+    const computePending = (root) => {
+      // Handles both flat and nested-by-member structures
+      let count = 0;
+      if (!root) return 0;
+      Object.values(root).forEach(group => {
+        if (group && typeof group === 'object') {
+          Object.values(group).forEach(item => {
+            if (item && (item.status === 'pending' || item.status === 'Pending')) count += 1;
+          });
+        }
+      });
+      // Also check direct items (if stored flat)
+      Object.values(root).forEach(item => {
+        if (item && typeof item === 'object' && item.status && (item.status === 'pending' || item.status === 'Pending')) count += 0; // already counted above for nested
+      });
+      return count;
+    };
+
+    const handlers = {
+      registrations: (snap) => setPendingCounts(prev => ({ ...prev, registrations: computePending(snap.val()) })),
+      deposits: (snap) => setPendingCounts(prev => ({ ...prev, deposits: computePending(snap.val()) })),
+      loans: (snap) => setPendingCounts(prev => ({ ...prev, loans: computePending(snap.val()) })),
+      payments: (snap) => setPendingCounts(prev => ({ ...prev, payments: computePending(snap.val()) })),
+      withdraws: (snap) => setPendingCounts(prev => ({ ...prev, withdraws: computePending(snap.val()) })),
+    };
+
+    // Attach listeners
+    refs.registrations.on('value', handlers.registrations);
+    refs.deposits.on('value', handlers.deposits);
+    refs.loans.on('value', handlers.loans);
+    refs.payments.on('value', handlers.payments);
+    refs.withdraws.on('value', handlers.withdraws);
     
     // Test AI connection on component mount
     testAI();
+
+    // Cleanup
+    return () => {
+      refs.registrations.off('value', handlers.registrations);
+      refs.deposits.off('value', handlers.deposits);
+      refs.loans.off('value', handlers.loans);
+      refs.payments.off('value', handlers.payments);
+      refs.withdraws.off('value', handlers.withdraws);
+    };
   }, []);
 
   // Load chat sessions from localStorage
@@ -190,6 +249,8 @@ try {
     setActiveSection(section);
     await localStorage.setItem('activeSection', section);
     setIsDropdownVisible(false);
+    // Force re-render/re-mount of current section on every click to trigger fresh fetches
+    setSectionReloadCounter((c) => c + 1);
   };
 
   const toggleSidebar = () => {
@@ -199,18 +260,18 @@ try {
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'dashboard': return <Dashboard />;
-      case 'registrations': return <Register />;
-      case 'members': return <Members />;
-      case 'deposits': return <Deposits />;
-      case 'applyLoans': return <Loans />;
-      case 'payLoans': return <PayLoans />;
-      case 'withdraws': return <Withdraws />;
-      case 'transactions': return <Transactions />;
-      case 'coadmins': return <CoAdmins />;
-      case 'settings': return <Settings />;
-      case 'accountSettings': return <AccountSettings />;
-      default: return <Dashboard />;
+      case 'dashboard': return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
+      case 'registrations': return <Register key={`register-${sectionReloadCounter}`} />;
+      case 'members': return <Members key={`members-${sectionReloadCounter}`} />;
+      case 'deposits': return <Deposits key={`deposits-${sectionReloadCounter}`} />;
+      case 'applyLoans': return <Loans key={`loans-${sectionReloadCounter}`} />;
+      case 'payLoans': return <PayLoans key={`payloans-${sectionReloadCounter}`} />;
+      case 'withdraws': return <Withdraws key={`withdraws-${sectionReloadCounter}`} />;
+      case 'transactions': return <Transactions key={`transactions-${sectionReloadCounter}`} />;
+      case 'coadmins': return <CoAdmins key={`coadmins-${sectionReloadCounter}`} />;
+      case 'settings': return <Settings key={`settings-${sectionReloadCounter}`} />;
+      case 'accountSettings': return <AccountSettings key={`acctsettings-${sectionReloadCounter}`} />;
+      default: return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
     }
   };
 
@@ -1066,6 +1127,7 @@ const fetchRelevantData = async (userMessage) => {
       outline: 'none',
     },
     iconContainer: {
+      position: 'relative',
       width: '40px',
       height: '40px',
       marginRight: '16px',
@@ -1086,6 +1148,24 @@ const fetchRelevantData = async (userMessage) => {
       color: '#000',
       display: 'inline-block',
       fontStyle: 'normal',
+    },
+    badge: {
+      position: 'absolute',
+      top: '-6px',
+      right: '-6px',
+      minWidth: '18px',
+      height: '18px',
+      borderRadius: '9px',
+      backgroundColor: '#ff4d4f',
+      color: '#fff',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontSize: '11px',
+      padding: '0 5px',
+      lineHeight: 1,
+      border: '1px solid #fff',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
     },
     buttonText: {
       fontSize: '16px',
@@ -1541,6 +1621,7 @@ content: {
       background: 'none',
       border: 'none',
       cursor: 'pointer',
+      position: 'relative',
       borderRadius: '8px',
       transition: 'background-color 0.2s ease',
       ':hover': {
@@ -1610,6 +1691,9 @@ content: {
                   style={isActive('registrations') ? styles.activeIcon : styles.icon} 
                   size={28}
                 />
+                {pendingCounts.registrations > 0 && (
+                  <span style={styles.badge}>{pendingCounts.registrations}</span>
+                )}
               </div>
               <span style={isActive('registrations') ? styles.activeButtonText : styles.buttonText}>
                 Membership
@@ -1627,6 +1711,9 @@ content: {
                   style={isActive('deposits') ? styles.activeIcon : styles.icon} 
                   size={28}
                 />
+                {pendingCounts.deposits > 0 && (
+                  <span style={styles.badge}>{pendingCounts.deposits}</span>
+                )}
               </div>
               <span style={isActive('deposits') ? styles.activeButtonText : styles.buttonText}>
                 Deposits
@@ -1644,6 +1731,9 @@ content: {
                   style={isActive('applyLoans') ? styles.activeIcon : styles.icon} 
                   size={28}
                 />
+                {pendingCounts.loans > 0 && (
+                  <span style={styles.badge}>{pendingCounts.loans}</span>
+                )}
               </div>
               <span style={isActive('applyLoans') ? styles.activeButtonText : styles.buttonText}>
                 Loans
@@ -1661,6 +1751,9 @@ content: {
                   style={isActive('payLoans') ? styles.activeIcon : styles.icon} 
                   size={28}
                 />
+                {pendingCounts.payments > 0 && (
+                  <span style={styles.badge}>{pendingCounts.payments}</span>
+                )}
               </div>
               <span style={isActive('payLoans') ? styles.activeButtonText : styles.buttonText}>
                 Payments
@@ -1678,6 +1771,9 @@ content: {
                   style={isActive('withdraws') ? styles.activeIcon : styles.icon} 
                   size={28}
                 />
+                {pendingCounts.withdraws > 0 && (
+                  <span style={styles.badge}>{pendingCounts.withdraws}</span>
+                )}
               </div>
               <span style={isActive('withdraws') ? styles.activeButtonText : styles.buttonText}>
                 Withdrawals
@@ -1784,6 +1880,9 @@ content: {
                 style={isActive('registrations') ? styles.collapsedIconActive : styles.collapsedIcon} 
                 size={28} 
               />
+              {pendingCounts.registrations > 0 && (
+                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.registrations}</span>
+              )}
             </button>
 
             <button
@@ -1797,6 +1896,9 @@ content: {
                 style={isActive('deposits') ? styles.collapsedIconActive : styles.collapsedIcon} 
                 size={28} 
               />
+              {pendingCounts.deposits > 0 && (
+                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.deposits}</span>
+              )}
             </button>
 
             <button
@@ -1810,6 +1912,9 @@ content: {
                 style={isActive('applyLoans') ? styles.collapsedIconActive : styles.collapsedIcon} 
                 size={28} 
               />
+              {pendingCounts.loans > 0 && (
+                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.loans}</span>
+              )}
             </button>
 
             <button
@@ -1823,6 +1928,9 @@ content: {
                 style={isActive('payLoans') ? styles.collapsedIconActive : styles.collapsedIcon} 
                 size={28} 
               />
+              {pendingCounts.payments > 0 && (
+                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.payments}</span>
+              )}
             </button>
 
             <button
@@ -1836,6 +1944,9 @@ content: {
                 style={isActive('withdraws') ? styles.collapsedIconActive : styles.collapsedIcon} 
                 size={28} 
               />
+              {pendingCounts.withdraws > 0 && (
+                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.withdraws}</span>
+              )}
             </button>
 
             <button

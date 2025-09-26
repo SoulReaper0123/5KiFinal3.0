@@ -985,7 +985,7 @@ const PayLoan = () => {
               onPress={() => {
                 setSuccessModalVisible(false);
                 resetFormFields();
-                navigation.navigate('Home');
+                navigation.navigate('AppHome');
               }}
             >
               <Text style={styles.confirmButtonText}>OK</Text>

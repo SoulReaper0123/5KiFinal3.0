@@ -446,7 +446,7 @@ const RegisterPage = () => {
     { key: 'sss', label: 'SSS ID' },
     { key: 'philhealth', label: 'PhilHealth ID' },
     { key: 'drivers_license', label: 'Drivers License' },
-    { key: 'other', label: 'Other' },
+    { key: 'other', label: 'Others' },
   ];
 
   return (

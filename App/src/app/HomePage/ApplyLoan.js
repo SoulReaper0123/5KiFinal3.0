@@ -88,9 +88,9 @@ const ApplyLoan = () => {
 
   const accountNumberInput = useRef(null);
 
-  // Dynamic terms and rates from System Settings
-  const [interestRatesMap, setInterestRatesMap] = useState({}); // e.g., { '3': 1.5, '6': 2 }
-  const [loanTermsMapping, setLoanTermsMapping] = useState({}); // e.g., { 'Regular Loan': ['3','6'], 'Quick Cash': ['1'] }
+  // Per-loan-type interest rates from System Settings
+  // Structure: { [loanType]: { [termMonths]: ratePercent } }
+  const [interestRatesByType, setInterestRatesByType] = useState({});
   const [availableTerms, setAvailableTerms] = useState([]); // [{ key, label, interestRate }]
 
 
@@ -145,13 +145,14 @@ const ApplyLoan = () => {
     const selectedType = option.key;
     setLoanType(selectedType);
 
-    // Build available terms based on mapping from settings
-    const allowedTerms = (loanTermsMapping && loanTermsMapping[selectedType]) || [];
-    const sortedAllowed = [...allowedTerms].sort((a,b)=>Number(a)-Number(b));
-    const computed = sortedAllowed.map((t) => ({
+    // Build available terms from per-type interest map
+    const mapForType = (interestRatesByType && interestRatesByType[selectedType]) || {};
+    const sortedTerms = Object.keys(mapForType).sort((a, b) => Number(a) - Number(b));
+    const computed = sortedTerms.map((t) => ({
       key: t,
       label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
-      interestRate: (Number(interestRatesMap[t]) || 0) / 100 // Convert percent to decimal
+      // Convert percent stored in DB to decimal for calculations
+      interestRate: (Number(mapForType[t]) || 0) / 100,
     }));
     setAvailableTerms(computed);
 
@@ -170,16 +171,16 @@ const ApplyLoan = () => {
     setInterestRate(option.interestRate);
   };
 
-  // Update available terms when loanType changes externally (e.g., initial load)
+  // Update available terms when loanType or interest map changes (e.g., initial load)
   useEffect(() => {
     if (!loanType) return;
 
-    const allowed = (loanTermsMapping && loanTermsMapping[loanType]) || Object.keys(interestRatesMap || {});
-    const sorted = [...allowed].sort((a,b)=>Number(a)-Number(b));
+    const mapForType = (interestRatesByType && interestRatesByType[loanType]) || {};
+    const sorted = Object.keys(mapForType).sort((a,b)=>Number(a)-Number(b));
     const computed = sorted.map((t) => ({
       key: t,
       label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
-      interestRate: (Number(interestRatesMap[t]) || 0) / 100
+      interestRate: (Number(mapForType[t]) || 0) / 100
     }));
     setAvailableTerms(computed);
 
@@ -191,8 +192,11 @@ const ApplyLoan = () => {
         setTerm('');
         setInterestRate(0);
       }
+    } else {
+      const current = computed.find(o => o.key === term);
+      if (current) setInterestRate(current.interestRate);
     }
-  }, [loanType, loanTermsMapping, interestRatesMap]);
+  }, [loanType, interestRatesByType]);
 
   const validateAccountNumber = (value) => {
     const maxLength = disbursement === 'GCash' ? 11 : disbursement === 'Bank' ? 16 : 0;
@@ -227,21 +231,17 @@ const ApplyLoan = () => {
         const formattedLoanTypes = loanTypes.map(type => ({ key: type, label: type }));
         setLoanTypeOptions(formattedLoanTypes);
 
-        // Interest rates map from settings.InterestRate: store as { term: percentNumber }
-        const ir = settings.InterestRate || {};
-        setInterestRatesMap(ir);
+        // New: Per-loan-type interest rates map
+        const byType = settings.InterestRateByType || {};
+        setInterestRatesByType(byType);
 
-        // Loan terms mapping
-        const ltm = settings.LoanTermsMapping || {};
-        setLoanTermsMapping(ltm);
-
-        // Initialize available terms for current loanType
-        const allowed = (ltm && ltm[loanType]) ? ltm[loanType] : Object.keys(ir);
-        const sorted = [...allowed].sort((a,b)=>Number(a)-Number(b));
+        // Initialize available terms for current loanType from per-type map
+        const mapForType = (byType && byType[loanType]) || {};
+        const sorted = Object.keys(mapForType).sort((a,b)=>Number(a)-Number(b));
         const computed = sorted.map((t) => ({
           key: t,
           label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
-          interestRate: (Number(ir[t]) || 0) / 100
+          interestRate: (Number(mapForType[t]) || 0) / 100
         }));
         setAvailableTerms(computed);
 
@@ -511,7 +511,8 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       disbursement,
       accountName,
       accountNumber,
-      interestRate,
+      // Store percent value (e.g., 3 for 3%) as in SystemSettings
+      interestRate: Number(interestRatesByType?.[loanType]?.[term]) || (Number(interestRate) * 100) || 0,
       firstName,
       lastName,
       email,

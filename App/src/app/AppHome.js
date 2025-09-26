@@ -26,6 +26,7 @@ import * as SecureStore from 'expo-secure-store';
 
 import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
+import LoanHistory from './HomePage/LoanHistory';
 import MarqueeData from './HomePage/MarqueeData';
 
 const Tab = createBottomTabNavigator();
@@ -40,6 +41,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [amountHidden, setAmountHidden] = useState(false);
   const [investment, setInvestment] = useState(0);
   const [investmentHidden, setInvestmentHidden] = useState(false);
+  const [activeSection, setActiveSection] = useState('investment'); // 'savings' or 'investment'
 
   const navigation = useNavigation();
   const route = useRoute();
@@ -342,53 +344,97 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               style={styles.bellButton}
               onPress={() => navigation.navigate('InboxTab')}
             >
-              <Ionicons name="notifications-outline" size={26} color="#fff" />
+              <Ionicons name="notifications-outline" size={26} color="#1E3A5F" />
             </TouchableOpacity>
           </View>
 
-          {/* Investment Card (same UI as Savings) */}
+          {/* Combined Investment & Savings Card */}
           <View style={styles.walletCard}>
-            <Text style={styles.walletLabel}>INVESTMENT</Text>
-            <View style={styles.balanceRow}>
-              <Text style={styles.walletAmount}>{investmentHidden ? '******' : formatBalance(investment)}</Text>
-              <TouchableOpacity onPress={() => setInvestmentHidden((v) => !v)} style={styles.eyeBtn}>
-                <MaterialIcons name={investmentHidden ? 'visibility' : 'visibility-off'} size={22} color="#FFFFFF" />
+            {/* Toggle Buttons */}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  activeSection === 'investment' && styles.toggleButtonActive
+                ]}
+                onPress={() => setActiveSection('investment')}
+              >
+                <Text style={[
+                  styles.toggleButtonText,
+                  activeSection === 'investment' && styles.toggleButtonTextActive
+                ]}>
+                  INVESTMENT
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  activeSection === 'savings' && styles.toggleButtonActive
+                ]}
+                onPress={() => setActiveSection('savings')}
+              >
+                <Text style={[
+                  styles.toggleButtonText,
+                  activeSection === 'savings' && styles.toggleButtonTextActive
+                ]}>
+                  SAVINGS
+                </Text>
               </TouchableOpacity>
             </View>
-            <View style={styles.walletActionsRow}>
-              <TouchableOpacity
-                style={styles.secondaryAction}
-                onPress={() =>
-                  navigation.navigate('Deposit', {
-                    user: { email, memberId, firstName, balance },
-                  })
+
+            {/* Amount Display */}
+            <View style={styles.balanceRow}>
+              <Text style={styles.walletAmount}>
+                {activeSection === 'investment' 
+                  ? (investmentHidden ? '******' : formatBalance(investment))
+                  : (amountHidden ? '******' : formatBalance(balance))
                 }
+              </Text>
+              <TouchableOpacity 
+                onPress={() => {
+                  if (activeSection === 'investment') {
+                    setInvestmentHidden((v) => !v);
+                  } else {
+                    setAmountHidden((v) => !v);
+                  }
+                }} 
+                style={styles.eyeBtn}
               >
-                <Entypo name="download" size={18} color="#1E3A5F" />
-                <Text style={styles.secondaryActionText}>Deposit</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-          {/* Wallet Card */}
-          <View style={styles.walletCard}>
-            <Text style={styles.walletLabel}>SAVINGS</Text>
-            <View style={styles.balanceRow}>
-              <Text style={styles.walletAmount}>{amountHidden ? '******' : formatBalance(balance)}</Text>
-              <TouchableOpacity onPress={() => setAmountHidden((v) => !v)} style={styles.eyeBtn}>
-                <MaterialIcons name={amountHidden ? 'visibility' : 'visibility-off'} size={22} color="#FFFFFF" />
+                <MaterialIcons 
+                  name={
+                    activeSection === 'investment' 
+                      ? (investmentHidden ? 'visibility' : 'visibility-off')
+                      : (amountHidden ? 'visibility' : 'visibility-off')
+                  } 
+                  size={22} 
+                  color="#1E3A5F" 
+                />
               </TouchableOpacity>
             </View>
 
+            {/* Action Button */}
             <View style={styles.walletActionsRow}>
-
-              <TouchableOpacity
-                style={styles.secondaryAction}
-                onPress={() => setWithdrawModalVisible(true)}
-              >
-                <Entypo name="upload" size={18} color="#1E3A5F" />
-                <Text style={styles.secondaryActionText}>Withdraw</Text>
-              </TouchableOpacity>
+              {activeSection === 'investment' ? (
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={() =>
+                    navigation.navigate('Deposit', {
+                      user: { email, memberId, firstName, balance },
+                    })
+                  }
+                >
+                  <Entypo name="download" size={18} color="#1E3A5F" />
+                  <Text style={styles.secondaryActionText}>Deposit</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={() => setWithdrawModalVisible(true)}
+                >
+                  <Entypo name="upload" size={18} color="#1E3A5F" />
+                  <Text style={styles.secondaryActionText}>Withdraw</Text>
+                </TouchableOpacity>
+              )}
             </View>
           </View>
 
@@ -405,7 +451,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               }
             >
               <View style={styles.serviceIconCircle}>
-                <MaterialIcons name="edit-document" size={20} color="#fff" />
+                <MaterialIcons name="edit-document" size={20} color="#1E3A5F" />
               </View>
               <Text style={styles.serviceText}>Apply Loan</Text>
             </TouchableOpacity>
@@ -417,7 +463,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               }
             >
               <View style={styles.serviceIconCircle}>
-                <Ionicons name="cash" size={20} color="#fff" />
+                <Ionicons name="cash" size={20} color="#1E3A5F" />
               </View>
               <Text style={styles.serviceText}>Pay Loan</Text>
             </TouchableOpacity>
@@ -429,7 +475,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               }
             >
               <View style={styles.serviceIconCircle}>
-                <FontAwesome name="book" size={20} color="#fff" />
+                <FontAwesome name="book" size={20} color="#1E3A5F" />
               </View>
               <Text style={styles.serviceText}>Existing Loan</Text>
             </TouchableOpacity>
@@ -441,7 +487,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               }
             >
               <View style={styles.serviceIconCircle}>
-                <Ionicons name="swap-horizontal" size={20} color="#fff" />
+                <Ionicons name="swap-horizontal" size={20} color="#1E3A5F" />
               </View>
               <Text style={styles.serviceText}>Transactions</Text>
             </TouchableOpacity>
@@ -466,46 +512,98 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         </ScrollView>
       )}
 
-      {/* Fallback Drawer Modal when Drawer navigator is unavailable */}
+      {/* Enhanced Fallback Drawer Modal when Drawer navigator is unavailable */}
       {fallbackDrawerVisible && (
         <View style={styles.fallbackOverlay}>
           <View style={styles.fallbackDrawer}>
-            <View style={{ alignItems: 'center', marginBottom: 16 }}>
-              {selfie ? (
-                <Image source={{ uri: selfie }} style={{ width: 80, height: 80, borderRadius: 40, marginBottom: 8 }} />
-              ) : (
-                <MaterialIcons name="person" size={64} color="#1E3A5F" />
-              )}
-              <Text style={{ color: '#1E3A5F', fontWeight: '700', fontSize: 16 }}>{firstName}</Text>
-              <Text style={{ color: '#475569', fontSize: 12 }}>{email}</Text>
+            {/* Enhanced Profile Header */}
+            <View style={styles.fallbackProfileContainer}>
+              <TouchableOpacity 
+                style={styles.fallbackCloseButton}
+                onPress={() => setFallbackDrawerVisible(false)}
+              >
+                <MaterialIcons name="close" size={24} color="white" />
+              </TouchableOpacity>
+
+              <View style={styles.fallbackProfileImageContainer}>
+                {selfie ? (
+                  <Image source={{ uri: selfie }} style={styles.fallbackProfileImage} />
+                ) : (
+                  <View style={styles.fallbackDefaultProfileImage}>
+                    <MaterialIcons name="person" size={40} color="#2D5783" />
+                  </View>
+                )}
+                <View style={styles.fallbackOnlineIndicator} />
+              </View>
+              
+              <Text style={styles.fallbackProfileName}>{firstName}</Text>
+              <Text style={styles.fallbackProfileEmail}>{email}</Text>
+              
+
             </View>
 
-            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Account Management', { email }); }}>
-              <MaterialIcons name="account-circle" size={20} color="#1E3A5F" />
-              <Text style={styles.fallbackItemText}>Account Management</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Settings'); }}>
-              <MaterialIcons name="settings" size={20} color="#1E3A5F" />
-              <Text style={styles.fallbackItemText}>Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('AboutUs'); }}>
-              <MaterialIcons name="info" size={20} color="#1E3A5F" />
-              <Text style={styles.fallbackItemText}>About Us</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.fallbackItem} onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('ContactUs'); }}>
-              <MaterialIcons name="contact-mail" size={20} color="#1E3A5F" />
-              <Text style={styles.fallbackItemText}>Contact Us</Text>
-            </TouchableOpacity>
+            {/* Navigation Items */}
+            <View style={styles.fallbackNavigationContainer}>
+              <TouchableOpacity 
+                style={styles.fallbackMenuItem} 
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Profile', { email }); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fallbackMenuIcon}>
+                  <MaterialIcons name="account-circle" size={22} color="#2D5783" />
+                </View>
+                <Text style={styles.fallbackMenuText}>Account Management</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
 
-            <View style={{ height: 1, backgroundColor: '#E2E8F0', marginVertical: 12 }} />
+              <TouchableOpacity 
+                style={styles.fallbackMenuItem} 
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Settings'); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fallbackMenuIcon}>
+                  <MaterialIcons name="settings" size={22} color="#2D5783" />
+                </View>
+                <Text style={styles.fallbackMenuText}>Settings</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.fallbackItem, { justifyContent: 'center', backgroundColor: '#8E0B16', borderRadius: 8 }]} onPress={handleLogoutFallback}>
-              <Text style={{ color: 'white', fontWeight: '700' }}>Logout</Text>
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.fallbackMenuItem} 
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('AboutUs'); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fallbackMenuIcon}>
+                  <MaterialIcons name="info" size={22} color="#2D5783" />
+                </View>
+                <Text style={styles.fallbackMenuText}>About Us</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
 
-            <TouchableOpacity style={{ alignSelf: 'center', marginTop: 12 }} onPress={() => setFallbackDrawerVisible(false)}>
-              <Text style={{ color: '#1E3A5F', fontWeight: '600' }}>Close</Text>
-            </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.fallbackMenuItem} 
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('ContactUs'); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fallbackMenuIcon}>
+                  <MaterialIcons name="contact-mail" size={22} color="#2D5783" />
+                </View>
+                <Text style={styles.fallbackMenuText}>Contact Us</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Enhanced Logout Section */}
+            <View style={styles.fallbackLogoutContainer}>
+              <TouchableOpacity 
+                style={styles.fallbackLogoutButton} 
+                onPress={handleLogoutFallback}
+                activeOpacity={0.8}
+              >
+                <MaterialIcons name="logout" size={20} color="white" />
+                <Text style={styles.fallbackLogoutText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       )}
@@ -573,69 +671,79 @@ export default function AppHome() {
     }
   }, [route.params, email]);
 
-  const CenterTabButton = ({ onPress, accessibilityState }) => {
-    const focused = !!accessibilityState?.selected;
-    return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.9} style={[styles.centerTabButton, { bottom: Math.max(insets.bottom + 8, 20) }] }>
-        <View style={[styles.centerTabButtonInner, focused && styles.centerTabButtonInnerActive]}>
-          <MaterialIcons name="smart-toy" size={26} color={'#2D5783'} />
-        </View>
-      </TouchableOpacity>
-    );
+
+
+  const navigation = useNavigation();
+
+  const handleAIButtonPress = () => {
+    navigation.navigate('Bot', { email });
   };
 
   return (
-    <Tab.Navigator
-      screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
-          let iconName;
-          if (route.name === 'HomeTab') iconName = 'home';
-          else if (route.name === 'BotTab') iconName = 'smart-toy';
-          else if (route.name === 'InboxTab') iconName = 'email';
-          return <MaterialIcons name={iconName} size={size} color={color} />;
-        },
-        headerShown: false,
-        tabBarActiveTintColor: '#FFFFFF',
-        tabBarInactiveTintColor: 'rgba(255,255,255,0.7)',
-        tabBarStyle: {
-          backgroundColor: '#1E3A5F',
-          borderTopColor: 'transparent',
-          height: 84 + Math.max(insets.bottom, 0),
-          paddingBottom: Math.max(insets.bottom, 16),
-          paddingTop: 10,
-        },
-        tabBarLabelStyle: {
-          fontWeight: '600',
-        },
-      })}
-    >
-      <Tab.Screen
-        name="HomeTab"
-        options={{ tabBarLabel: 'Home' }}
-        children={() => (
-          <HomeTab
-            setMemberId={setMemberId}
-            setEmail={setEmail}
-            memberId={memberId}
-            email={email}
-          />
-        )}
-      />
-      <Tab.Screen 
-        name="BotTab" 
-        component={Bot} 
-        options={{ 
-          tabBarLabel: 'AI',
-          tabBarButton: (props) => <CenterTabButton {...props} />
-        }} 
-      />
-      <Tab.Screen
-        name="InboxTab"
-        options={{ tabBarLabel: 'Inbox' }}
+    <View style={{ flex: 1 }}>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ color, size }) => {
+            let iconName;
+            if (route.name === 'HomeTab') iconName = 'home';
+            else if (route.name === 'InboxTab') iconName = 'email';
+            else if (route.name === 'LoanHistoryTab') iconName = 'history';
+            return <MaterialIcons name={iconName} size={size} color={color} />;
+          },
+          headerShown: false,
+          tabBarActiveTintColor: '#FFFFFF',
+          tabBarInactiveTintColor: 'rgba(255,255,255,0.7)',
+          tabBarStyle: {
+            backgroundColor: '#1E3A5F',
+            borderTopColor: 'transparent',
+            height: 50 + Math.max(insets.bottom, 0),
+            paddingBottom: Math.max(insets.bottom, 16),
+            paddingTop: 10,
+          },
+          tabBarLabelStyle: {
+            fontWeight: '600',
+          },
+        })}
       >
-        {() => <Inbox memberId={memberId} email={email} />}
-      </Tab.Screen>
-    </Tab.Navigator>
+        <Tab.Screen
+          name="HomeTab"
+          options={{ tabBarLabel: 'Home' }}
+          children={() => (
+            <HomeTab
+              setMemberId={setMemberId}
+              setEmail={setEmail}
+              memberId={memberId}
+              email={email}
+            />
+          )}
+        />
+
+        <Tab.Screen
+          name="InboxTab"
+          options={{ tabBarLabel: 'Inbox' }}
+        >
+          {() => <Inbox memberId={memberId} email={email} />}
+        </Tab.Screen>
+
+        <Tab.Screen
+          name="LoanHistoryTab"
+          options={{ tabBarLabel: 'Loan History' }}
+        >
+          {() => <LoanHistory />}
+        </Tab.Screen>
+      </Tab.Navigator>
+      
+      {/* Floating AI Button */}
+      <TouchableOpacity 
+        style={[styles.floatingAIButton, { bottom: Math.max(insets.bottom + 70, 90) }]}
+        onPress={handleAIButtonPress}
+        activeOpacity={0.8}
+      >
+        <View style={styles.floatingAIButtonInner}>
+          <MaterialIcons name="smart-toy" size={28} color="#FFFFFF" />
+        </View>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -643,7 +751,7 @@ const styles = StyleSheet.create({
   // Layout
   container: {
     flex: 1,
-    backgroundColor: '#F8FAFC',
+    backgroundColor: '#fffff',
     marginTop: 30,
   },
   loaderContainer: {
@@ -658,13 +766,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#1E3A5F',
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 16,
   },
   avatarButton: {
-    backgroundColor: '#fff',
+    backgroundColor: '#1E3A5F',
     borderRadius: 24,
     padding: 2,
     overflow: 'hidden',
@@ -675,12 +782,12 @@ const styles = StyleSheet.create({
   },
   greetSubtitle: {
     fontSize: 12,
-    color: '#CFE1F7',
+    color: '#1E3A5F',
   },
   greetTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#fff',
+    color: '#1E3A5F',
     marginTop: 2,
   },
   bellButton: {
@@ -690,30 +797,30 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.3)',
+    borderColor: '#1E3A5F',
   },
 
   // Wallet Card
   walletCard: {
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#f2f4f7ff',
     marginTop: 12,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000',
+    shadowColor: '#00000091',
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 3,
   },
   walletLabel: {
     fontSize: 12,
-    color: '#9CC2E7',
+    color: '#1E3A5F',
     marginBottom: 6,
     letterSpacing: 0.5,
   },
   balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   walletAmount: {
     fontSize: 32,
-    color: '#fff',
+    color: '#1E3A5F',
     fontWeight: '700',
   },
   eyeBtn: { marginLeft: 12, padding: 6 }
@@ -750,6 +857,35 @@ const styles = StyleSheet.create({
     color: '#1E3A5F',
     marginLeft: 8,
     fontWeight: '700',
+  },
+
+  // Toggle Button Styles
+  toggleContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 4,
+    marginBottom: 16,
+  },
+  toggleButton: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toggleButtonActive: {
+    backgroundColor: '#1E3A5F',
+  },
+  toggleButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#64748B',
+    letterSpacing: 0.5,
+  },
+  toggleButtonTextActive: {
+    color: '#FFFFFF',
   },
 
   // Quick Actions Row
@@ -796,7 +932,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 12,
     borderRadius: 12,
-    backgroundColor: '#1E3A5F',
+    backgroundColor: '#f2f4f7ff',
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -807,7 +943,7 @@ const styles = StyleSheet.create({
   serviceText: {
     marginTop: 8,
     textAlign: 'center',
-    color: '#fff',
+    color: '#1E3A5F',
     fontSize: 13,
     fontWeight: '700',
   },
@@ -841,7 +977,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(199, 202, 238, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -957,43 +1093,173 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
 
-  // Fallback drawer styles
+  // Enhanced Fallback drawer styles
   fallbackOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-start',
     alignItems: 'flex-start',
     zIndex: 1000,
   },
   fallbackDrawer: {
-    width: '75%',
-    backgroundColor: 'white',
-    padding: 16,
-    paddingTop: 48,
+    width: '80%',
+    backgroundColor: '#f8fafc',
     height: '100%',
-    borderTopRightRadius: 12,
-    borderBottomRightRadius: 12,
+    borderTopRightRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: '#000',
-    shadowOpacity: 0.2,
+    shadowOffset: { width: 4, height: 0 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  fallbackProfileContainer: {
+    padding: 24,
+    paddingTop: 60,
+    alignItems: 'center',
+    backgroundColor: '#2D5783',
+    minHeight: 240,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
     shadowRadius: 8,
+    elevation: 8,
+  },
+  fallbackCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  fallbackProfileImageContainer: {
+    position: 'relative',
+    marginBottom: 12,
+  },
+  fallbackProfileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
     elevation: 5,
   },
-  fallbackItem: {
+  fallbackDefaultProfileImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fallbackOnlineIndicator: {
+    position: 'absolute',
+    bottom: 2,
+    right: 2,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#4ade80',
+    borderWidth: 2,
+    borderColor: '#ffffff',
+  },
+  fallbackProfileName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#ffffff',
+    marginBottom: 4,
+    textAlign: 'center',
+  },
+  fallbackProfileEmail: {
+    fontSize: 12,
+    color: '#e2e8f0',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  fallbackWelcomeContainer: {
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginTop: 6,
+  },
+  fallbackWelcomeText: {
+    fontSize: 11,
+    color: '#ffffff',
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  fallbackNavigationContainer: {
+    flex: 1,
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  fallbackMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 10,
-    paddingVertical: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    marginVertical: 2,
+    borderRadius: 12,
+    backgroundColor: '#ffffff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
-  fallbackItemText: {
-    color: '#1E3A5F',
+  fallbackMenuIcon: {
+    width: 28,
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  fallbackMenuText: {
+    flex: 1,
+    fontSize: 15,
+    color: '#374151',
+    fontWeight: '500',
+  },
+  fallbackLogoutContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 20,
+    paddingTop: 10,
+  },
+  fallbackLogoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 14,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    shadowColor: '#dc2626',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fallbackLogoutText: {
+    color: 'white',
     fontWeight: '600',
-    borderRadius: 10,
-    padding: 20,
-    elevation: 10,
+    fontSize: 15,
+    marginLeft: 6,
   },
   modalTitle: {
     fontSize: 18,
@@ -1013,31 +1279,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 
-  // Floating center AI tab styles
-  centerTabButton: {
+
+
+  // Floating AI Button styles
+  floatingAIButton: {
     position: 'absolute',
-    left: '50%',
-    // Shift left by half of button width (58/2 = 29) to center precisely
-    transform: [{ translateX: -29 }],
-    zIndex: 100,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  centerTabButtonInner: {
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 4,
-    borderColor: '#1E3A5F',
-    alignItems: 'center',
-    justifyContent: 'center',
+    right: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#2D5783',
     shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 12,
+    zIndex: 1000,
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
   },
-  centerTabButtonInnerActive: {
-    backgroundColor: '#FFFFFF',
+  floatingAIButtonInner: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 29,
+    backgroundColor: '#2D5783',
   },
 });

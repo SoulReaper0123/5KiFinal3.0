@@ -41,6 +41,7 @@ const Loans = () => {
     firstName: '',
     lastName: '',
     email: '',
+    loanType: '',
     loanAmount: '',
     term: '',
     disbursement: 'GCash',
@@ -48,6 +49,39 @@ const Loans = () => {
     accountNumber: ''
   });
   const pageSize = 10;
+
+  // Settings for loan types and terms
+  const [loanTypes, setLoanTypes] = useState([]);
+  const [interestByType, setInterestByType] = useState({});
+
+  // Load Settings for LoanTypes and InterestRateByType
+  useEffect(() => {
+    const settingsRef = database.ref('Settings');
+    const cb = (snap) => {
+      const s = snap.val() || {};
+      setLoanTypes(s.LoanTypes || ['Regular Loan', 'Quick Cash']);
+      setInterestByType(s.InterestRateByType || {});
+      if (!addForm.loanType && Array.isArray(s.LoanTypes) && s.LoanTypes.length > 0) {
+        const defaultType = s.LoanTypes[0];
+        setAddForm(prev => ({ ...prev, loanType: defaultType }));
+      }
+    };
+    settingsRef.on('value', cb);
+    return () => settingsRef.off('value', cb);
+  }, []);
+
+  // When loan type changes, ensure term is within allowed and has a defined rate
+  useEffect(() => {
+    const lt = addForm.loanType;
+    if (!lt) return;
+    const map = interestByType[lt] || {};
+    const allowed = Object.keys(map).filter((t) => map[t] !== undefined && map[t] !== null && map[t] !== '');
+    const sorted = allowed.sort((a,b)=>Number(a)-Number(b));
+    if (!sorted.includes(String(addForm.term))) {
+      const next = sorted[0] || '';
+      setAddForm(prev => ({ ...prev, term: next }));
+    }
+  }, [addForm.loanType, interestByType]);
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -308,49 +342,67 @@ const Loans = () => {
     };
   }, []);
 
+  // Centralized loan fetching; can be called on mount, tab switch, manual refresh, or polling
+  // Pass options: { silent: true } to avoid toggling the loading spinner (used by polling)
+  const fetchLoansDataForSection = async (sectionKey = activeSection, options = {}) => {
+    const { silent = false } = options;
+    if (!silent) setLoading(true);
+    try {
+      const [applySnap, approvedSnap, rejectedSnap] = await Promise.all([
+        database.ref('Loans/LoanApplications').once('value'),
+        database.ref('Loans/ApprovedLoans').once('value'),
+        database.ref('Loans/RejectedLoans').once('value'),
+      ]);
+
+      const flatten = (val) => {
+        const all = [];
+        Object.entries(val || {}).forEach(([uid, record]) => {
+          if (record && typeof record === 'object' && !record.hasOwnProperty('loanAmount')) {
+            Object.entries(record).forEach(([txId, inner]) => {
+              all.push({ id: uid, transactionId: txId, ...inner });
+            });
+          } else {
+            all.push({ id: uid, ...record });
+          }
+        });
+        return all;
+      };
+
+      const apply = flatten(applySnap.val());
+      const approved = flatten(approvedSnap.val());
+      const rejected = flatten(rejectedSnap.val());
+
+      setPendingLoans(apply);
+      setApprovedLoans(approved);
+      setRejectedLoans(rejected);
+
+      // Keep current tab view consistent after fetch
+      const base = sectionKey === 'applyLoans' ? apply : sectionKey === 'approvedLoans' ? approved : rejected;
+      setFilteredData(base);
+      setNoMatch(base.length === 0);
+    } catch (err) {
+      console.error('Loan fetch error:', err);
+      setErrorMessage('Failed to fetch loan data');
+      setErrorModalVisible(true);
+    } finally {
+      if (!silent) setLoading(false);
+    }
+  };
+
+  // Initial load
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        const [applySnap, approvedSnap, rejectedSnap] = await Promise.all([
-          database.ref('Loans/LoanApplications').once('value'),
-          database.ref('Loans/ApprovedLoans').once('value'),
-          database.ref('Loans/RejectedLoans').once('value'),
-        ]);
-
-        const flatten = (val) => {
-          const all = [];
-          Object.entries(val || {}).forEach(([uid, record]) => {
-            if (record && typeof record === 'object' && !record.hasOwnProperty('loanAmount')) {
-              Object.entries(record).forEach(([txId, inner]) => {
-                all.push({ id: uid, transactionId: txId, ...inner });
-              });
-            } else {
-              all.push({ id: uid, ...record });
-            }
-          });
-          return all;
-        };
-
-        const apply = flatten(applySnap.val());
-        const approved = flatten(approvedSnap.val());
-        const rejected = flatten(rejectedSnap.val());
-
-        setPendingLoans(apply);
-        setApprovedLoans(approved);
-        setRejectedLoans(rejected);
-        setFilteredData(apply);
-      } catch (err) {
-        console.error('Loan fetch error:', err);
-        setErrorMessage('Failed to fetch loan data');
-        setErrorModalVisible(true);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
+    fetchLoansDataForSection('applyLoans');
   }, []);
+
+  // Polling every 5 seconds to keep data fresh for the active tab
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      // Silent refresh to avoid flicker
+      fetchLoansDataForSection(activeSection, { silent: true });
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [activeSection]);
 
   const handleSearch = (text) => {
     setSearchQuery(text);
@@ -425,16 +477,11 @@ const Loans = () => {
     }
   };
 
-  const handleTabSwitch = (key) => {
+  const handleTabSwitch = async (key) => {
     setActiveSection(key);
     setSearchQuery('');
     setCurrentPage(0);
-    const data =
-      key === 'applyLoans' ? pendingLoans :
-      key === 'approvedLoans' ? approvedLoans :
-      rejectedLoans;
-    setFilteredData(data);
-    setNoMatch(false);
+    await fetchLoansDataForSection(key);
   };
 
   const openAddModal = () => setAddModalVisible(true);
@@ -468,7 +515,8 @@ const Loans = () => {
       // Fetch settings and member balance
       const memberBalanceRef = database.ref(`Members/${addForm.memberId}/balance`);
       const fundsRef = database.ref('Settings/Funds');
-      const interestRateRef = database.ref(`Settings/InterestRate/${addForm.term}`);
+      // Per-loan-type interest rate
+      const interestRateRef = database.ref(`Settings/InterestRateByType/${encodeURIComponent(addForm.loanType || '')}/${addForm.term}`);
       const processingFeeRef = database.ref('Settings/ProcessingFee');
       const loanPercentageRef = database.ref('Settings/LoanPercentage');
 
@@ -482,7 +530,11 @@ const Loans = () => {
 
       const memberBalance = parseFloat(balanceSnap.val()) || 0;
       const currentFunds = parseFloat(fundsSnap.val()) || 0;
-      const interestRate = (parseFloat(irSnap.val()) || 0) / 100;
+      const interestRateVal = irSnap.val();
+      if (interestRateVal === null || interestRateVal === undefined || interestRateVal === '') {
+        throw new Error(`Missing interest rate for type "${addForm.loanType}" and term ${addForm.term} months. Set it in Settings > System Settings.`);
+      }
+      const interestRate = (parseFloat(interestRateVal) || 0) / 100;
       const processingFee = parseFloat(feeSnap.val()) || 0;
       const loanPercentage = parseFloat(percSnap.val());
 
@@ -699,9 +751,33 @@ const Loans = () => {
             <span className="no-match-text">No Matches Found</span>
           ) : (
             <>
-              {activeSection === 'applyLoans' && <ApplyLoans loans={paginatedData} />}
-              {activeSection === 'approvedLoans' && <ApprovedLoans loans={paginatedData} />}
-              {activeSection === 'rejectedLoans' && <RejectedLoans loans={paginatedData} />}
+              {activeSection === 'applyLoans' && (
+                <ApplyLoans 
+                  loans={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={() => fetchLoansDataForSection('applyLoans')}
+                />
+              )}
+              {activeSection === 'approvedLoans' && (
+                <ApprovedLoans 
+                  loans={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={() => fetchLoansDataForSection('approvedLoans')}
+                />
+              )}
+              {activeSection === 'rejectedLoans' && (
+                <RejectedLoans 
+                  loans={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={() => fetchLoansDataForSection('rejectedLoans')}
+                />
+              )}
             </>
           )}
         </div>
@@ -744,8 +820,26 @@ const Loans = () => {
                     <input className="form-input" type="number" value={addForm.loanAmount} onChange={(e)=>updateForm('loanAmount', e.target.value)} />
                   </div>
                   <div className="form-group">
+                    <label className="form-label">Loan Type</label>
+                    <select className="form-input" value={addForm.loanType} onChange={(e)=>updateForm('loanType', e.target.value)}>
+                      {loanTypes.map((lt) => (
+                        <option key={`lt-${lt}`} value={lt}>{lt}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="form-group">
                     <label className="form-label">Term (months)</label>
-                    <input className="form-input" type="number" value={addForm.term} onChange={(e)=>updateForm('term', e.target.value)} />
+                    <select className="form-input" value={addForm.term} onChange={(e)=>updateForm('term', e.target.value)}>
+                      {Object.keys(interestByType[addForm.loanType] || {})
+                        .filter((t) => {
+                          const m = interestByType[addForm.loanType] || {};
+                          return m[String(t)] !== undefined && m[String(t)] !== null && m[String(t)] !== '';
+                        })
+                        .sort((a,b)=>Number(a)-Number(b))
+                        .map((t) => (
+                          <option key={`term-${t}`} value={t}>{t}</option>
+                        ))}
+                    </select>
                   </div>
                   <div className="form-group">
                     <label className="form-label">Disbursement</label>

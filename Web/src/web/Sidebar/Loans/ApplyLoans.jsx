@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApproveLoans, RejectLoans } from '../../../../../Server/api';
 import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
@@ -478,6 +478,7 @@ const ApplyLoans = ({
   const [actionInProgress, setActionInProgress] = useState(false);
   const [hoverStates, setHoverStates] = useState({});
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  const [justCompletedAction, setJustCompletedAction] = useState(false);
   // New: member financials for modal display
   const [memberBalance, setMemberBalance] = useState(null);
   const [existingLoanInfo, setExistingLoanInfo] = useState({ hasExisting: false, outstanding: 0 });
@@ -663,6 +664,7 @@ const ApplyLoans = ({
       }
       
       setSuccessMessageModalVisible(true);
+      setJustCompletedAction(true);
     } catch (error) {
       console.error('Error processing action:', error);
       setErrorMessage(error.message || 'An error occurred. Please try again.');
@@ -673,157 +675,182 @@ const ApplyLoans = ({
     }
   };
 
-  const processDatabaseApprove = async (loan) => {
-    try {
-      const { id, transactionId, term, loanAmount } = loan;
+const processDatabaseApprove = async (loan) => {
+  try {
+    const { id, transactionId, term, loanAmount } = loan;
 
-      const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
-      const memberRef = database.ref(`Members/${id}/balance`);
-      const settingsRef = database.ref('Settings/LoanPercentage');
-      
-      // First check if member has sufficient balance based on loan percentage
-      const [loanSnap, memberSnap, settingsSnap] = await Promise.all([
-        loanRef.once('value'),
-        memberRef.once('value'),
-        settingsRef.once('value')
-      ]);
+    const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
+    const memberRef = database.ref(`Members/${id}/balance`);
+    const settingsRef = database.ref('Settings/LoanPercentage');
+    
+    // First check if member has sufficient balance based on loan percentage
+    const [loanSnap, memberSnap, settingsSnap] = await Promise.all([
+      loanRef.once('value'),
+      memberRef.once('value'),
+      settingsRef.once('value')
+    ]);
 
-      if (!loanSnap.exists()) {
-        throw new Error('Loan data not found.');
-      }
-
-      const memberBalance = parseFloat(memberSnap.val()) || 0;
-      const loanPercentage = parseFloat(settingsSnap.val());
-      let maxLoanAmount;
-      
-      // If loan percentage is 0, allow 100% of balance
-      if (loanPercentage === 0) {
-        maxLoanAmount = memberBalance;
-      } else {
-        // Use the set percentage (default to 80% if not set)
-        const percentage = loanPercentage || 80;
-        maxLoanAmount = memberBalance * (percentage / 100);
-      }
-
-      const requestedAmount = parseFloat(loanAmount);
-
-      if (requestedAmount > maxLoanAmount) {
-        const percentageUsed = loanPercentage === 0 ? 100 : (loanPercentage || 80);
-        throw new Error(`Loan amount exceeds ${percentageUsed}% of member's balance. Maximum allowed: ${formatCurrency(maxLoanAmount)}`);
-      }
-
-      // Continue with approval process
-      // Generate a new transaction ID for approved/transactions/current loans records
-      const originalTransactionId = transactionId;
-      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
-      const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
-      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
-      const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      const interestRateRef = database.ref(`Settings/InterestRate/${term}`);
-      const processingFeeRef = database.ref('Settings/ProcessingFee');
-
-      const [fundsSnap, interestSnap, feeSnap] = await Promise.all([
-        fundsRef.once('value'),
-        interestRateRef.once('value'),
-        processingFeeRef.once('value'),
-      ]);
-
-      const loanData = loanSnap.val();
-      const interestRate = parseFloat(interestSnap.val()) / 100;
-      const amount = parseFloat(loanData.loanAmount);
-      const termMonths = parseInt(loanData.term);
-      const currentFunds = parseFloat(fundsSnap.val());
-      const processingFee = parseFloat(feeSnap.val());
-
-      if (amount > currentFunds) {
-        throw new Error('Insufficient funds to approve this loan.');
-      }
-
-      const monthlyPayment = amount / termMonths;
-      const interest = amount * interestRate;
-      const totalMonthlyPayment = monthlyPayment + interest;
-      const totalTermPayment = totalMonthlyPayment * termMonths;
-      const releaseAmount = amount - processingFee;
-
-      const now = new Date();
-      const dueDate = new Date(now);
-      dueDate.setDate(now.getDate() + 30);
-
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const formattedDueDate = formatDate(dueDate);
-
-      const approvedData = {
-        ...loanData,
-        transactionId: newTransactionId,
-        originalTransactionId: originalTransactionId,
-        interestRate: (interestRate * 100),
-        interest: interest,
-        monthlyPayment: monthlyPayment,
-        totalMonthlyPayment: totalMonthlyPayment,
-        totalTermPayment: totalTermPayment,
-        releaseAmount: releaseAmount,
-        processingFee: processingFee,
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        timestamp: now.getTime(),
-        dueDate: formattedDueDate,
-        status: 'approved',
-        paymentsMade: 0 
-      };
-
-      // Execute all database operations in sequence
-      await approvedRef.set(approvedData);
-      await transactionRef.set(approvedData);
-      await currentLoanRef.set(approvedData);
-      await memberLoanRef.set(approvedData);
-      
-      // Update funds and log to history
-      const newFundsAmount = currentFunds - amount;
-      await fundsRef.set(newFundsAmount);
-      
-      // Log to FundsHistory for dashboard chart
-      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-      await fundsHistoryRef.set(newFundsAmount);
-      
-      // Update Savings and SavingsHistory (daily aggregate) like PaymentApplications
-      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-
-      const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
-        savingsRef.once('value'),
-        savingsHistoryRef.child(dateKey).once('value')
-      ]);
-
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const newSavingsAmount = Math.ceil((currentSavings + processingFee) * 100) / 100;
-      await savingsRef.set(newSavingsAmount);
-
-      // Increment daily savings history by processing fee
-      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-      const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
-      const savingsHistoryUpdate = {};
-      savingsHistoryUpdate[dateKey] = newDaySavings;
-      await savingsHistoryRef.update(savingsHistoryUpdate);
-      
-      // Update member balance: deduct full loan amount as requested
-      const updatedMemberBalance = Math.max(0, Math.ceil((memberBalance - amount) * 100) / 100);
-      await memberRef.set(updatedMemberBalance);
-      console.log('Member balance deducted for loan approval');
-
-      // Remove from pending loans AFTER all other operations succeed
-      await loanRef.remove();
-
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve loan');
+    if (!loanSnap.exists()) {
+      throw new Error('Loan data not found.');
     }
-  };
+
+    const memberBalance = parseFloat(memberSnap.val()) || 0;
+    const loanPercentage = parseFloat(settingsSnap.val());
+    let maxLoanAmount;
+    
+    // If loan percentage is 0, allow 100% of balance
+    if (loanPercentage === 0) {
+      maxLoanAmount = memberBalance;
+    } else {
+      // Use the set percentage (default to 80% if not set)
+      const percentage = loanPercentage || 80;
+      maxLoanAmount = memberBalance * (percentage / 100);
+    }
+
+    const requestedAmount = parseFloat(loanAmount);
+
+    if (requestedAmount > maxLoanAmount) {
+      const percentageUsed = loanPercentage === 0 ? 100 : (loanPercentage || 80);
+      throw new Error(`Loan amount exceeds ${percentageUsed}% of member's balance. Maximum allowed: ${formatCurrency(maxLoanAmount)}`);
+    }
+
+    // Continue with approval process
+    const originalTransactionId = transactionId;
+    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
+    const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
+    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
+    const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
+    const fundsRef = database.ref('Settings/Funds');
+    const loanData = loanSnap.val();
+
+    // Fetch per-loan-type interest rate and processing fee
+    const interestRateRef = database.ref(`Settings/InterestRateByType/${encodeURIComponent(loanData.loanType || '')}/${term}`);
+    const processingFeeRef = database.ref('Settings/ProcessingFee');
+
+    const [fundsSnap, interestSnap, feeSnap] = await Promise.all([
+      fundsRef.once('value'),
+      interestRateRef.once('value'),
+      processingFeeRef.once('value'),
+    ]);
+
+    const interestRateRaw = interestSnap.val();
+    if (interestRateRaw === null || interestRateRaw === undefined || interestRateRaw === '') {
+      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${term} months. Please set it in Settings > System Settings.`);
+    }
+
+    const interestRatePercentage = parseFloat(interestRateRaw);
+    const interestRateDecimal = interestRatePercentage / 100; // Convert to decimal
+    const amount = parseFloat(loanData.loanAmount);
+    const termMonths = parseInt(loanData.term);
+    const currentFunds = parseFloat(fundsSnap.val());
+    const processingFee = parseFloat(feeSnap.val());
+
+    if (amount > currentFunds) {
+      throw new Error('Insufficient funds to approve this loan.');
+    }
+
+    // NEW CALCULATION METHOD:
+    // 1. Calculate interest per term: loanAmount * interestRateDecimal
+    const interestPerTerm = amount * interestRateDecimal;
+    
+    // 2. Calculate total interest: interestPerTerm * termMonths
+    const totalInterest = interestPerTerm * termMonths;
+    
+    // 3. Calculate total term payment: loanAmount + totalInterest
+    const totalTermPayment = amount + totalInterest;
+    
+    // 4. Calculate monthly payment: totalTermPayment / termMonths
+    const totalMonthlyPayment = totalTermPayment / termMonths;
+    
+    // 5. Monthly principal remains: amount / termMonths
+    const monthlyPrincipal = amount / termMonths;
+
+    // Release amount after deducting processing fee
+    const releaseAmount = amount - processingFee;
+
+    const now = new Date();
+    const dueDate = new Date(now);
+    dueDate.setDate(now.getDate() + 30);
+
+    const approvalDate = formatDate(now);
+    const approvalTime = formatTime(now);
+    const formattedDueDate = formatDate(dueDate);
+
+    const approvedData = {
+      ...loanData,
+      transactionId: newTransactionId,
+      originalTransactionId: originalTransactionId,
+      interestRate: interestRatePercentage, // Store as percentage (e.g., 1 for 1%)
+      interest: Math.round(interestPerTerm * 100) / 100, // Interest for each term period
+      totalInterest: Math.round(totalInterest * 100) / 100, // Total interest over entire loan
+      monthlyPayment: Math.round(monthlyPrincipal * 100) / 100, // Principal portion of monthly payment
+      totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100, // Total monthly payment (principal + interest)
+      totalTermPayment: Math.round(totalTermPayment * 100) / 100, // Total amount to be repaid
+      releaseAmount: Math.round(releaseAmount * 100) / 100,
+      processingFee: processingFee,
+      dateApproved: approvalDate,
+      timeApproved: approvalTime,
+      timestamp: now.getTime(),
+      dueDate: formattedDueDate,
+      status: 'approved',
+      paymentsMade: 0,
+      amountPaid: 0, // Track total amount paid
+      remainingBalance: Math.round(totalTermPayment * 100) / 100 // Start with full amount
+    };
+
+    // Execute all database operations in sequence
+    await approvedRef.set(approvedData);
+    await transactionRef.set(approvedData);
+    await currentLoanRef.set(approvedData);
+    await memberLoanRef.set(approvedData);
+    
+    // Update funds and log to history
+    const newFundsAmount = currentFunds - amount;
+    await fundsRef.set(newFundsAmount);
+    
+    // Log to FundsHistory for dashboard chart
+    const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+    await fundsHistoryRef.set(newFundsAmount);
+    
+    // Update Savings and SavingsHistory
+    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const savingsRef = database.ref('Settings/Savings');
+    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+
+    const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
+      savingsRef.once('value'),
+      savingsHistoryRef.child(dateKey).once('value')
+    ]);
+
+    const currentSavings = parseFloat(savingsSnap.val()) || 0;
+    const newSavingsAmount = Math.ceil((currentSavings + processingFee) * 100) / 100;
+    await savingsRef.set(newSavingsAmount);
+
+    // Increment daily savings history by processing fee
+    const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+    const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
+    const savingsHistoryUpdate = {};
+    savingsHistoryUpdate[dateKey] = newDaySavings;
+    await savingsHistoryRef.update(savingsHistoryUpdate);
+    
+    // Update member balance: deduct full loan amount as requested
+    const updatedMemberBalance = Math.max(0, Math.ceil((memberBalance - amount) * 100) / 100);
+    await memberRef.set(updatedMemberBalance);
+    console.log('Member balance deducted for loan approval');
+
+    // Remove from pending loans AFTER all other operations succeed
+    await loanRef.remove();
+
+
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve loan');
+  }
+};
+
 
   const processDatabaseReject = async (loan, rejectionReason) => {
     try {
@@ -988,9 +1015,22 @@ We recommend settling outstanding balances first before reapplying. Once cleared
       }
       setPendingApiCall(null);
     }
-    
-    refreshData();
+    // Do not call refreshData here directly; let useEffect handle it when modal closes
   };
+
+  // Auto-refresh when success modal closes (after approve/reject)
+  useEffect(() => {
+    if (!successMessageModalVisible && justCompletedAction) {
+      // Give the database a brief moment to settle writes
+      const t = setTimeout(() => {
+        if (typeof refreshData === 'function') {
+          refreshData();
+        }
+        setJustCompletedAction(false);
+      }, 250);
+      return () => clearTimeout(t);
+    }
+  }, [successMessageModalVisible, justCompletedAction, refreshData]);
 
   const openImageViewer = (url, label, index) => {
     const images = [];
@@ -1046,10 +1086,9 @@ We recommend settling outstanding balances first before reapplying. Once cleared
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
-               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
@@ -1059,8 +1098,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
             {loans.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
-                <td style={styles.tableCell}>{`${item.firstName}`}</td>
-                  <td style={styles.tableCell}>{`${item.lastName}`}</td>
+                <td style={styles.tableCell}>{`${item.firstName}` + " " + `${item.lastName}`}</td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.loanAmount)}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>

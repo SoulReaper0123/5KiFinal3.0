@@ -1750,18 +1750,18 @@ app.post('/payment', async (req, res) => {
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Payment Confirmed',
+            subject: 'Payment Application Confirmed',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                     <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
-                        Payment Confirmed
+                        Payment Application Confirmed
                     </h2>
                     
                     <p>Hi ${firstName},</p>
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            We have received your payment of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
+                            We have received your payment application for an amount of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
                         </p>
                     </div>
                     

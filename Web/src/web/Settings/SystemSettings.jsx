@@ -118,7 +118,8 @@ const SystemSettings = () => {
   const [settings, setSettings] = useState({
     Funds: '',
     Savings: '',
-    InterestRate: {},
+    InterestRate: {}, // Global (legacy) map term -> rate%
+    InterestRateByType: {}, // New: { [loanType]: { [term]: rate% } }
     LoanReminderDays: '7',
     DividendDate: '',
     // Dividend Distribution Percentages
@@ -151,8 +152,7 @@ const SystemSettings = () => {
       title: 'Contact Us',
       content: ''
     },
-    // Mapping of loan types to allowed terms (e.g., { "Regular Loan": ["3","6"], "Quick Cash": ["1"] })
-    LoanTermsMapping: {}
+    // Deprecated: LoanTermsMapping removed. Valid months are the keys of InterestRateByType[loanType].
   });
 
   const [newTerm, setNewTerm] = useState('');
@@ -163,6 +163,7 @@ const SystemSettings = () => {
   const [addLoanTypeModalVisible, setAddLoanTypeModalVisible] = useState(false);
   const [deleteLoanTypeModalVisible, setDeleteLoanTypeModalVisible] = useState(false);
   const [loanTypeToDelete, setLoanTypeToDelete] = useState('');
+  // Deprecated global content edit mode (replaced by per-card edit modes)
   const [editMode, setEditMode] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -176,62 +177,30 @@ const SystemSettings = () => {
   const [fundsActionModal, setFundsActionModal] = useState(null);
   const [actionAmount, setActionAmount] = useState('');
   const [messageModal, setMessageModal] = useState({ visible: false, title: '', message: '', isError: false });
+  // Snapshot of last saved settings (from DB) to support Cancel in per-section editing
+  const [savedSettingsSnapshot, setSavedSettingsSnapshot] = useState(null);
+  // Per-section edit flags
+  const [editAccounts, setEditAccounts] = useState(false);
+  const [editDividend, setEditDividend] = useState(false);
+  const [editLoanReminder, setEditLoanReminder] = useState(false);
+  const [editProcessingFee, setEditProcessingFee] = useState(false);
+  // Content Management per-card edit flags
+  const [editTerms, setEditTerms] = useState(false);
+  const [editPrivacy, setEditPrivacy] = useState(false);
+  const [editAbout, setEditAbout] = useState(false);
+  const [editContact, setEditContact] = useState(false);
+  // Loan & Dividend header-level edit for Loan Reminder + Processing Fee
+  const [editLoanAndFee, setEditLoanAndFee] = useState(false);
 
-  const [selectedLoanType, setSelectedLoanType] = useState('');
-  const [minTerm, setMinTerm] = useState(0);
-  const [maxTerm, setMaxTerm] = useState(0);
+  // Add Loan Type wizard state
+  const [addLoanTypeWizardVisible, setAddLoanTypeWizardVisible] = useState(false);
+  const [wizardLoanTypeName, setWizardLoanTypeName] = useState('');
+  const [wizardRows, setWizardRows] = useState([{ term: '', rate: '' }]);
+  const [wizardError, setWizardError] = useState('');
+  const [isEditingLoanType, setIsEditingLoanType] = useState(false);
+  const [editingOriginalLoanType, setEditingOriginalLoanType] = useState('');
+
   const db = getDatabase();
-
-  // Initialize selected loan type when LoanTypes load
-  useEffect(() => {
-    const defaultType = settings.LoanTypes?.[0] || '';
-    setSelectedLoanType((prev) => prev || defaultType);
-  }, [settings.LoanTypes]);
-
-  // Sync min/max when selection or settings change
-  useEffect(() => {
-    const allTerms = Object.keys(settings.InterestRate || {})
-      .map((t) => Number(t))
-      .sort((a, b) => a - b);
-
-    if (!selectedLoanType) {
-      setMinTerm(allTerms[0] || 0);
-      setMaxTerm(allTerms[allTerms.length - 1] || 0);
-      return;
-    }
-
-    const sel = (settings.LoanTermsMapping?.[selectedLoanType] || [])
-      .map((t) => Number(t))
-      .sort((a, b) => a - b);
-
-    const newMin = sel.length ? sel[0] : (allTerms[0] || 0);
-    const newMax = sel.length ? sel[sel.length - 1] : (allTerms[allTerms.length - 1] || 0);
-    setMinTerm(newMin || 0);
-    setMaxTerm(newMax || 0);
-  }, [selectedLoanType, settings.InterestRate, settings.LoanTermsMapping]);
-
-  // Apply selected range to mapping
-  const applyLoanTermRange = () => {
-    if (!editMode) return;
-    const allTerms = Object.keys(settings.InterestRate || {})
-      .map((t) => Number(t))
-      .sort((a, b) => a - b);
-    if (!allTerms.length || !selectedLoanType) return;
-
-    const validMin = allTerms.find((t) => t >= minTerm) ?? allTerms[0];
-    const validMax = [...allTerms].reverse().find((t) => t <= maxTerm) ?? allTerms[allTerms.length - 1];
-    if (validMin > validMax) return;
-
-    const selectedRange = allTerms.filter((t) => t >= validMin && t <= validMax).map(String);
-
-    setSettings((prev) => ({
-      ...prev,
-      LoanTermsMapping: {
-        ...(prev.LoanTermsMapping || {}),
-        [selectedLoanType]: selectedRange,
-      },
-    }));
-  };
 
   // Helper function to format peso amounts with at least 2 decimal places
   const formatPesoAmount = (amount) => {
@@ -244,11 +213,14 @@ const SystemSettings = () => {
     const unsubscribe = onValue(settingsRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        setSettings({
+        const loaded = {
           Funds: data.Funds?.toString() || '',
           Savings: data.Savings?.toString() || '',
           InterestRate: Object.fromEntries(
             Object.entries(data.InterestRate || {}).map(([key, val]) => [key, val.toString()])
+          ),
+          InterestRateByType: Object.fromEntries(
+            Object.entries(data.InterestRateByType || {}).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k,v]) => [k, String(v)]))])
           ),
           LoanReminderDays: (data.LoanReminderDays ?? 7).toString(),
           DividendDate: data.DividendDate || '',
@@ -263,7 +235,7 @@ const SystemSettings = () => {
           ProcessingFee: data.ProcessingFee?.toString() || '',
           RegistrationMinimumFee: data.RegistrationMinimumFee?.toString() || '5000',
           LoanTypes: data.LoanTypes || ['Regular Loan', 'Quick Cash'],
-          LoanTermsMapping: data.LoanTermsMapping || {},
+          // LoanTermsMapping deprecated; ignore DB value
           LoanPercentage: data.LoanPercentage?.toString() || '80',
           OrientationCode: data.OrientationCode || generateOrientationCode(),
           Accounts: data.Accounts || {
@@ -286,7 +258,10 @@ const SystemSettings = () => {
             title: 'Contact Us',
             content: 'No contact information available.'
           }
-        });
+        };
+        setSettings(loaded);
+        setSavedSettingsSnapshot(loaded);
+        
       }
       setLoading(false);
     });
@@ -332,12 +307,29 @@ const SystemSettings = () => {
     setSettings({ ...settings, [key]: clean });
   };
 
+  // Legacy global interest change (kept for backward compatibility if needed)
   const handleInterestChange = (term, value) => {
     const clean = value.replace(/[^0-9.]/g, '');
     if (clean.split('.').length > 2) return;
     setSettings((prev) => ({
       ...prev,
       InterestRate: { ...prev.InterestRate, [term]: clean },
+    }));
+  };
+
+  // New: change per-loan-type rate
+  const handleTypeInterestChange = (loanType, term, value) => {
+    const clean = String(value).replace(/[^0-9.]/g, '');
+    if (clean.split('.').length > 2) return;
+    setSettings((prev) => ({
+      ...prev,
+      InterestRateByType: {
+        ...(prev.InterestRateByType || {}),
+        [loanType]: {
+          ...((prev.InterestRateByType || {})[loanType] || {}),
+          [term]: clean,
+        }
+      }
     }));
   };
 
@@ -360,7 +352,7 @@ const SystemSettings = () => {
       return;
     }
     if (settings.InterestRate[newTerm]) {
-      showMessage('Error', 'This term already exists.', true);
+      showMessage('Error', 'This term already exists in the global map. Use per-type editor below instead.', true);
       return;
     }
 
@@ -371,7 +363,7 @@ const SystemSettings = () => {
     setNewTerm('');
     setNewRate('');
     setAddModalVisible(false);
-    showMessage('Success', 'Interest rate added successfully!');
+    showMessage('Success', 'Global term added. Assign per-type rates below.');
   };
 
   const requestAddTerm = () => {
@@ -388,14 +380,112 @@ const SystemSettings = () => {
   };
 
   const confirmDeleteTerm = () => {
-    const updatedRates = { ...settings.InterestRate };
-    delete updatedRates[termToDelete];
-    setSettings((prev) => ({ ...prev, InterestRate: updatedRates }));
+    const t = String(termToDelete);
+    const lt = editingOriginalLoanType || wizardLoanTypeName || '';
+    if (!lt) {
+      showMessage('Error', 'Please select a loan type first.', true);
+      return;
+    }
+
+    // Remove this term only for the selected loan type
+    const updatedByType = { ...(settings.InterestRateByType || {}) };
+    const typeMap = { ...(updatedByType[lt] || {}) };
+    delete typeMap[t];
+    updatedByType[lt] = typeMap;
+
+    setSettings((prev) => ({
+      ...prev,
+      InterestRateByType: updatedByType,
+    }));
     setDeleteModalVisible(false);
-    showMessage('Success', 'Interest rate deleted successfully!');
+    showMessage('Success', `Deleted ${t} month term for ${lt} only.`);
   };
 
   // Loan Types management functions
+  // Wizard helpers
+  const addWizardRow = () => setWizardRows((rows) => [...rows, { term: '', rate: '' }]);
+  const removeWizardRow = (idx) => setWizardRows((rows) => rows.filter((_, i) => i !== idx));
+  const updateWizardRow = (idx, key, value) => setWizardRows((rows) => rows.map((r, i) => i === idx ? { ...r, [key]: value } : r));
+  const resetWizard = () => {
+    setWizardLoanTypeName('');
+    setWizardRows([{ term: '', rate: '' }]);
+    setWizardError('');
+    setIsEditingLoanType(false);
+    setEditingOriginalLoanType('');
+  };
+  const openEditLoanType = (loanType) => {
+    // Pre-fill wizard with existing terms/rates for the type and open in edit mode
+    setWizardLoanTypeName(loanType);
+    const map = settings.InterestRateByType?.[loanType] || {};
+    const rows = Object.keys(map)
+      .sort((a,b)=>Number(a)-Number(b))
+      .map((t) => ({ term: t, rate: String(map[t] ?? '') }));
+    setWizardRows(rows.length ? rows : [{ term: '', rate: '' }]);
+    setWizardError('');
+    setAddLoanTypeWizardVisible(true);
+    setIsEditingLoanType(true);
+    setEditingOriginalLoanType(loanType);
+  };
+  const validateWizard = () => {
+    const name = wizardLoanTypeName.trim();
+    if (!name) return 'Please enter a loan type name.';
+    if (!isEditingLoanType && settings.LoanTypes.includes(name)) return 'This loan type already exists.';
+    if (!wizardRows.length) return 'Please add at least one term and rate.';
+    const seen = new Set();
+    for (const r of wizardRows) {
+      const t = String(r.term || '').trim();
+      const rate = String(r.rate || '').trim();
+      if (!t || isNaN(Number(t))) return 'Each row must have a valid numeric term in months.';
+      if (seen.has(t)) return 'Duplicate months are not allowed.';
+      seen.add(t);
+      if (!rate || isNaN(Number(rate))) return 'Each row must have a valid numeric interest rate.';
+    }
+    return '';
+  };
+  const confirmWizardAdd = () => {
+    const err = validateWizard();
+    if (err) { setWizardError(err); return; }
+    const name = wizardLoanTypeName.trim();
+
+    // Build per-type rates from rows
+    const newInterestByType = { ...(settings.InterestRateByType || {}) };
+    const typeMap = {};
+    for (const r of wizardRows) {
+      const t = String(r.term).trim();
+      typeMap[t] = String(r.rate);
+    }
+
+    let newLoanTypes = [...(settings.LoanTypes || [])];
+
+    if (isEditingLoanType) {
+      // If the name changed, rename the key and update LoanTypes list
+      const original = editingOriginalLoanType;
+      if (name !== original) {
+        // Rename key in InterestRateByType
+        delete newInterestByType[original];
+        newInterestByType[name] = typeMap;
+        // Update LoanTypes: replace original with name
+        newLoanTypes = newLoanTypes.map((lt) => (lt === original ? name : lt));
+      } else {
+        // Update existing map
+        newInterestByType[name] = typeMap;
+      }
+    } else {
+      // Adding new type
+      newLoanTypes = [...newLoanTypes, name];
+      newInterestByType[name] = typeMap;
+    }
+
+    setSettings(prev => ({
+      ...prev,
+      LoanTypes: newLoanTypes,
+      InterestRateByType: newInterestByType,
+    }));
+    setAddLoanTypeWizardVisible(false);
+    showMessage('Success', isEditingLoanType ? 'Loan type updated. Don’t forget to Save Settings.' : 'Loan type and per-term rates added. Don’t forget to Save Settings.');
+    resetWizard();
+  };
+
   const requestAddLoanType = () => {
     if (!newLoanType.trim()) {
       showMessage('Error', 'Please enter a loan type name.', true);
@@ -447,11 +537,23 @@ const SystemSettings = () => {
     setActionInProgress(true);
     try {
       const settingsRef = ref(db, 'Settings/');
+
+      // Normalize global interest (legacy)
       const parsedInterest = {};
       for (let key in settings.InterestRate) {
         const val = parseFloat(settings.InterestRate[key]);
         if (!isNaN(val)) parsedInterest[key] = val;
       }
+
+      // Normalize per-type interest
+      const parsedByType = {};
+      Object.entries(settings.InterestRateByType || {}).forEach(([lt, map]) => {
+        parsedByType[lt] = {};
+        Object.entries(map || {}).forEach(([term, rate]) => {
+          const v = parseFloat(rate);
+          if (!isNaN(v)) parsedByType[lt][term] = v;
+        });
+      });
 
       // Helper function to safely parse float values
       const safeParseFloat = (value, defaultValue = 0) => {
@@ -474,6 +576,7 @@ const SystemSettings = () => {
         Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
         Savings: parseFloat(parseFloat(settings.Savings || 0).toFixed(2)),
         InterestRate: parsedInterest,
+        InterestRateByType: parsedByType,
         LoanReminderDays: parseInt(settings.LoanReminderDays || 7, 10),
         DividendDate: settings.DividendDate,
         // Dividend Distribution Percentages
@@ -486,7 +589,7 @@ const SystemSettings = () => {
         ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
         RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 5000).toFixed(2)),
         LoanTypes: settings.LoanTypes,
-        LoanTermsMapping: settings.LoanTermsMapping || {},
+        // LoanTermsMapping removed per new design; valid months come from InterestRateByType keys
         OrientationCode: settings.OrientationCode,
         Accounts: settings.Accounts,
         TermsAndConditions: settings.TermsAndConditions,
@@ -638,20 +741,7 @@ const SystemSettings = () => {
             {/* Minimum Registration Fee */}
             <div style={styles.rateRow}>
               <span style={styles.termText}>Minimum Registration Fee</span>
-              {editMode ? (
-                <div style={styles.editRateRow}>
-                  <input
-                    style={styles.miniInput}
-                    value={settings.RegistrationMinimumFee}
-                    onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
-                    type="number"
-                    placeholder="5000"
-                  />
-                  <span>₱</span>
-                </div>
-              ) : (
-                <span style={styles.staticText}>₱{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
-              )}
+              <span style={styles.staticText}>₱{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
             </div>
             
             {/* Available Funds */}
@@ -666,35 +756,54 @@ const SystemSettings = () => {
               <span style={styles.staticText}>₱{formatPesoAmount(settings.Savings)}</span>
             </div>
 
-            {editMode && (
-              <div style={styles.fundsActions}>
-                <button 
-                  style={styles.actionBtnAddFunds}
-                  onClick={handleAddSavings}
-                >
-                  <FaPlus style={styles.buttonIcon} /> Add Savings
-                </button>
-                <button 
-                  style={styles.actionBtnAddFunds}
-                  onClick={() => handleFundsAction('add')}
-                  disabled={!settings.Savings || parseFloat(settings.Savings) <= 0}
-                >
-                  <FaExchangeAlt style={styles.buttonIcon} /> Add to Funds
-                </button>
-                <button 
-                  style={styles.actionBtnWithdrawFunds}
-                  onClick={() => handleFundsAction('withdraw')}
-                  disabled={!settings.Funds || parseFloat(settings.Funds) <= 0}
-                >
-                  <FaExchangeAlt style={styles.buttonIcon} /> Withdraw to Savings
-                </button>
-              </div>
-            )}
+
 
             <div style={styles.divider}></div>
 
             {/* Accounts Section */}
-            <h3 style={styles.contentTitle}>Accounts</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={styles.contentTitle}>Accounts</h3>
+              {!editAccounts ? (
+                <button style={styles.headerIconBtn} title="Edit Accounts" onClick={() => setEditAccounts(true)}>
+                  <FaEdit />
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                    title="Save Accounts"
+                    onClick={async () => {
+                      try {
+                        setActionInProgress(true);
+                        const settingsRef = ref(db, 'Settings/Accounts');
+                        await update(settingsRef, settings.Accounts);
+                        setSavedSettingsSnapshot(prev => ({ ...(prev || {}), Accounts: settings.Accounts }));
+                        setEditAccounts(false);
+                        showMessage('Success', 'Accounts updated successfully!');
+                      } catch (e) {
+                        showMessage('Error', e.message || 'Failed to save Accounts', true);
+                      } finally {
+                        setActionInProgress(false);
+                      }
+                    }}
+                  >
+                    <FaSave />
+                  </button>
+                  <button
+                    style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                    title="Cancel"
+                    onClick={() => {
+                      if (savedSettingsSnapshot?.Accounts) {
+                        setSettings(prev => ({ ...prev, Accounts: savedSettingsSnapshot.Accounts }));
+                      }
+                      setEditAccounts(false);
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={styles.accountRow}>
               <div style={styles.accountCard}>
                 <h3 style={styles.accountTitle}>Bank Account</h3>
@@ -702,13 +811,13 @@ const SystemSettings = () => {
                   label="Account Name"
                   value={settings.Accounts.Bank.accountName}
                   onChange={(text) => handleAccountChange('Bank', 'accountName', text)}
-                  editable={editMode}
+                  editable={editAccounts}
                 />
                 <InputRow
                   label="Account Number"
                   value={settings.Accounts.Bank.accountNumber}
                   onChange={(text) => handleAccountChange('Bank', 'accountNumber', text)}
-                  editable={editMode}
+                  editable={editAccounts}
                 />
               </div>
               
@@ -718,13 +827,13 @@ const SystemSettings = () => {
                   label="Account Name"
                   value={settings.Accounts.GCash.accountName}
                   onChange={(text) => handleAccountChange('GCash', 'accountName', text)}
-                  editable={editMode}
+                  editable={editAccounts}
                 />
                 <InputRow
                   label="Account Number"
                   value={settings.Accounts.GCash.accountNumber}
                   onChange={(text) => handleAccountChange('GCash', 'accountNumber', text)}
-                  editable={editMode}
+                  editable={editAccounts}
                 />
               </div>
             </div>
@@ -749,14 +858,6 @@ const SystemSettings = () => {
                 )}
                 {orientationCopied && <span style={styles.copiedText}>Copied!</span>}
               </div>
-              {editMode && (
-                <button 
-                  style={styles.generateBtn}
-                  onClick={handleGenerateOrientationCode}
-                >
-                  <FaRedo style={styles.buttonIcon} /> Generate New Code
-                </button>
-              )}
               <p style={styles.orientationCodeDescription}>
                 This code is used for registration when attending the orientation. Share this code with attendees.
               </p>
@@ -767,18 +868,68 @@ const SystemSettings = () => {
         {/* Loan & Dividend Section */}
         {activeSection === 'loan' && (
           <div style={styles.section}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={styles.subSectionTitle}>Loan Reminder and Processing Fee</h3>
+              {!editLoanAndFee ? (
+                <button style={styles.headerIconBtn} title="Edit Loan Reminder & Processing Fee" onClick={() => setEditLoanAndFee(true)}>
+                  <FaEdit />
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                    title="Save"
+                    onClick={async () => {
+                      try {
+                        setActionInProgress(true);
+                        await update(ref(db, 'Settings'), {
+                          LoanReminderDays: parseInt(settings.LoanReminderDays || 0, 10),
+                          ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2))
+                        });
+                        setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanReminderDays: settings.LoanReminderDays, ProcessingFee: settings.ProcessingFee }));
+                        setEditLoanAndFee(false);
+                        showMessage('Success', 'Loan Reminder and Processing Fee updated');
+                      } catch (e) {
+                        showMessage('Error', e.message || 'Failed to save', true);
+                      } finally {
+                        setActionInProgress(false);
+                      }
+                    }}
+                  >
+                    <FaSave />
+                  </button>
+                  <button
+                    style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                    title="Cancel"
+                    onClick={() => {
+                      setSettings(prev => ({
+                        ...prev,
+                        LoanReminderDays: savedSettingsSnapshot?.LoanReminderDays ?? prev.LoanReminderDays,
+                        ProcessingFee: savedSettingsSnapshot?.ProcessingFee ?? prev.ProcessingFee,
+                      }));
+                      setEditLoanAndFee(false);
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+              )}
+            </div>
             <div style={styles.inputRow}>
               <label style={styles.label}>Loan Reminder (days)</label>
-              {editMode ? (
-                <input
-                  type="number"
-                  min="0"
-                  style={styles.input}
-                  value={settings.LoanReminderDays}
-                  onChange={(e) => setSettings({ ...settings, LoanReminderDays: e.target.value.replace(/[^0-9]/g, '') })}
-                />
+              {!editLoanAndFee ? (
+                <>
+                  <span style={styles.staticText}>{settings.LoanReminderDays} days</span>
+                </>
               ) : (
-                <span style={styles.staticText}>{settings.LoanReminderDays} days</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <input
+                    style={styles.input}
+                    value={settings.LoanReminderDays}
+                    onChange={(e) => setSettings({ ...settings, LoanReminderDays: e.target.value.replace(/[^0-9]/g, '') })}
+                    type="number"
+                  />
+                </div>
               )}
             </div>
             
@@ -786,203 +937,160 @@ const SystemSettings = () => {
 
             <div style={styles.rateRow}>
               <span style={styles.termText}>Processing Fee</span>
-              {editMode ? (
-                <div style={styles.editRateRow}>
+              {!editLoanAndFee ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={styles.staticText}>₱{formatPesoAmount(settings.ProcessingFee)}</span>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <input
-                    style={styles.miniInput}
+                    style={styles.input}
                     value={settings.ProcessingFee}
                     onChange={(e) => handleInputChange('ProcessingFee', e.target.value)}
                     type="number"
-                    placeholder="0"
+                    min="0"
+                    step="0.01"
                   />
-                  <span>₱</span>
                 </div>
-              ) : (
-                <span style={styles.staticText}>₱{formatPesoAmount(settings.ProcessingFee)}</span>
               )}
             </div>
 
 
 
             <div style={styles.loanTypesSection}>
-              <h3 style={styles.subSectionTitle}>Types of Loans</h3>
+              <h3 style={{ ...styles.subSectionTitle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span>Types of Loans</span>
+                <button
+                  style={styles.headerIconBtn}
+                  title="Add Type of Loan"
+                  onClick={() => {
+                    setWizardLoanTypeName('');
+                    setWizardRows([{ term: '', rate: '' }]);
+                    setWizardError('');
+                    setIsEditingLoanType(false);
+                    setEditingOriginalLoanType('');
+                    setAddLoanTypeWizardVisible(true);
+                  }}
+                >
+                  <FaPlus />
+                </button>
+              </h3>
               {settings.LoanTypes.map((loanType, index) => (
                 <div key={index} style={styles.loanTypeRow}>
-                  <span style={styles.loanTypeText}>{loanType}</span>
-                  {editMode && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                    <span style={styles.loanTypeText}>{loanType}</span>
+                    <div style={{ fontSize: 13, color: '#555' }}>
+                      {(settings.InterestRateByType?.[loanType] && Object.keys(settings.InterestRateByType[loanType]).length > 0)
+                        ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                              {Object.keys(settings.InterestRateByType[loanType])
+                                .sort((a,b)=>Number(a)-Number(b))
+                                .map((m) => (
+                                  <span key={m} style={{
+                                    padding: '4px 8px',
+                                    border: '1px solid #ddd',
+                                    borderRadius: 6,
+                                    background: '#fafafa'
+                                  }}>
+                                    {m} mo — {String(settings.InterestRateByType[loanType][m])}%
+                                  </span>
+                                ))}
+                            </div>
+                          )
+                        : (<span style={{ color: '#888' }}>No terms set</span>)}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <button 
+                      style={styles.editLoanTypeBtn}
+                      title="Edit terms & rates"
+                      onClick={() => openEditLoanType(loanType)}
+                    >
+                      <FaEdit style={styles.buttonIcon} />
+                    </button>
                     <button 
                       style={styles.deleteLoanTypeBtn}
+                      title="Delete loan type"
                       onClick={() => requestDeleteLoanType(loanType)}
                     >
                       <FaTrashAlt style={styles.buttonIcon} />
                     </button>
-                  )}
+                  </div>
                 </div>
               ))}
-              {editMode && (
-                <div style={styles.inputRow}>
-                  <input
-                    style={styles.input}
-                    placeholder="New Loan Type (e.g. Emergency Loan)"
-                    value={newLoanType}
-                    onChange={(e) => setNewLoanType(e.target.value)}
-                    type="text"
-                  />
-                  <button style={styles.addLoanTypeBtn} onClick={requestAddLoanType}>
-                    <FaPlus style={styles.buttonIcon} /> Add
-                  </button>
-                </div>
-              )}
+
             </div>
 
             <div style={styles.interestRatesSection}>
-              <h3 style={styles.subSectionTitle}>Interest Rates</h3>
-              {Object.entries(settings.InterestRate).map(([term, rate]) => (
-                <div key={term} style={styles.rateRow}>
-                  <span style={styles.termText}>{term} months</span>
-                  {editMode ? (
-                    <div style={styles.editRateRow}>
-                      <input
-                        style={styles.miniInput}
-                        value={rate}
-                        onChange={(e) => handleInterestChange(term, e.target.value)}
-                        type="number"
-                      />
-                      <span>%</span>
-                      <button 
-                        style={styles.deleteTermBtn}
-                        onClick={() => requestDeleteTerm(term)}
-                      >
-                        <FaTrashAlt style={styles.buttonIcon} />
-                      </button>
-                    </div>
-                  ) : (
-                    <span style={styles.staticText}>{rate}%</span>
-                  )}
-                </div>
-              ))}
-              {editMode && (
-                <div style={styles.inputRow}>
-                  <input
-                    style={styles.input}
-                    placeholder="New Term (e.g. 6)"
-                    value={newTerm}
-                    onChange={(e) => setNewTerm(e.target.value)}
-                    type="number"
-                  />
-                  <input
-                    style={styles.input}
-                    placeholder="Interest Rate (%)"
-                    value={newRate}
-                    onChange={(e) => setNewRate(e.target.value)}
-                    type="number"
-                  />
-                  <button style={styles.addTermBtn} onClick={requestAddTerm}>
-                    <FaPlus style={styles.buttonIcon} /> Add
-                  </button>
-                </div>
-              )}
-
-              {/* Loan Term Assignment */}
-              <div style={{ ...styles.interestRatesSection, marginTop: '20px' }}>
-                <h3 style={styles.subSectionTitle}>Assign Terms to Loan Types</h3>
-
-                {/* Single-panel range selector */}
-                <div style={{ padding: '12px', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
-                  {/* Loan Type */}
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '12px' }}>
-                    <label style={{ fontWeight: 600, width: 140 }}>Type of Loan</label>
-                    <select
-                      disabled={!editMode}
-                      value={selectedLoanType}
-                      onChange={(e) => setSelectedLoanType(e.target.value)}
-                      style={{ padding: '8px', borderRadius: 6, border: '1px solid #cbd5e1', minWidth: 220 }}
-                    >
-                      {settings.LoanTypes?.map((lt) => (
-                        <option key={lt} value={lt}>{lt}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Min/Max Terms */}
-                  <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontWeight: 600, width: 140 }}>Minimum terms</label>
-                      <select
-                        disabled={!editMode || Object.keys(settings.InterestRate || {}).length === 0}
-                        value={minTerm}
-                        onChange={(e) => setMinTerm(Number(e.target.value))}
-                        style={{ padding: '8px', borderRadius: 6, border: '1px solid #cbd5e1', minWidth: 120 }}
-                      >
-                        {Object.keys(settings.InterestRate || {}).map((t) => (
-                          <option key={`min-${t}`} value={Number(t)}>{t} months</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <label style={{ fontWeight: 600, width: 140 }}>Maximum terms</label>
-                      <select
-                        disabled={!editMode || Object.keys(settings.InterestRate || {}).length === 0}
-                        value={maxTerm}
-                        onChange={(e) => setMaxTerm(Number(e.target.value))}
-                        style={{ padding: '8px', borderRadius: 6, border: '1px solid #cbd5e1', minWidth: 120 }}
-                      >
-                        {Object.keys(settings.InterestRate || {}).map((t) => (
-                          <option key={`max-${t}`} value={Number(t)}>{t} months</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={applyLoanTermRange}
-                      disabled={!editMode}
-                      style={{
-                        padding: '8px 14px',
-                        background: editMode ? '#2D5783' : '#94a3b8',
-                        color: '#fff',
-                        borderRadius: 6,
-                        border: 'none',
-                        cursor: editMode ? 'pointer' : 'not-allowed'
-                      }}
-                    >
-                      Apply range
-                    </button>
-                  </div>
-
-                  {/* Display current selection for the chosen loan type */}
-                  <div style={{ marginTop: 12, color: '#334155' }}>
-                    <strong>Selected terms:</strong>{' '}
-                    {(settings.LoanTermsMapping?.[selectedLoanType] || []).length
-                      ? (settings.LoanTermsMapping[selectedLoanType]).join(', ') + ' months'
-                      : 'None'}
-                  </div>
-                </div>
-
-                {/* Read-only display of all mappings */}
-                <div style={{ marginTop: 12 }}>
-                  {settings.LoanTypes.map((lt) => (
-                    <div key={`view-${lt}`} style={{ marginBottom: 8 }}>
-                      <span style={{ fontWeight: 600, color: '#2D5783' }}>{lt}:</span>{' '}
-                      {(settings.LoanTermsMapping?.[lt] || []).length
-                        ? settings.LoanTermsMapping[lt].join(', ') + ' months'
-                        : 'No terms assigned'}
-                    </div>
-                  ))}
-                </div>
-              </div>
+              {/* Removed: legacy per-loan-type editor and term assignment UI. Now handled via Edit modal in Types of Loans list. */}
             </div>
 
             <div style={styles.dividendSection}>
-              <h3 style={styles.subSectionTitle}>Dividend Settings</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={styles.subSectionTitle}>Dividend Settings</h3>
+                {!editDividend ? (
+                  <button style={styles.headerIconBtn} title="Edit Dividend Settings" onClick={() => setEditDividend(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          const payload = {
+                            MembersDividendPercentage: parseFloat(settings.MembersDividendPercentage || 0),
+                            FiveKiEarningsPercentage: parseFloat(settings.FiveKiEarningsPercentage || 0),
+                            InvestmentSharePercentage: parseFloat(settings.InvestmentSharePercentage || 0),
+                            PatronageSharePercentage: parseFloat(settings.PatronageSharePercentage || 0),
+                            ActiveMonthsPercentage: parseFloat(settings.ActiveMonthsPercentage || 0),
+                            DividendDate: settings.DividendDate || ''
+                          };
+                          await update(ref(db, 'Settings'), payload);
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ...payload }));
+                          setEditDividend(false);
+                          showMessage('Success', 'Dividend settings updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        if (savedSettingsSnapshot) {
+                          setSettings(prev => ({
+                            ...prev,
+                            MembersDividendPercentage: savedSettingsSnapshot.MembersDividendPercentage ?? prev.MembersDividendPercentage,
+                            FiveKiEarningsPercentage: savedSettingsSnapshot.FiveKiEarningsPercentage ?? prev.FiveKiEarningsPercentage,
+                            InvestmentSharePercentage: savedSettingsSnapshot.InvestmentSharePercentage ?? prev.InvestmentSharePercentage,
+                            PatronageSharePercentage: savedSettingsSnapshot.PatronageSharePercentage ?? prev.PatronageSharePercentage,
+                            ActiveMonthsPercentage: savedSettingsSnapshot.ActiveMonthsPercentage ?? prev.ActiveMonthsPercentage,
+                            DividendDate: savedSettingsSnapshot.DividendDate ?? prev.DividendDate,
+                          }));
+                        }
+                        setEditDividend(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
               
               {/* Dividend Distribution Percentages */}
               <div style={styles.dividendDistributionSection}>
                 <h4 style={styles.subSectionTitle}>Dividend Distribution</h4>
                 <div style={styles.rateRow}>
                   <span style={styles.termText}>Members Dividend</span>
-                  {editMode ? (
+                  {editDividend ? (
                     <div style={styles.editRateRow}>
                       <input
                         style={styles.miniInput}
@@ -999,7 +1107,7 @@ const SystemSettings = () => {
                 </div>
                 <div style={styles.rateRow}>
                   <span style={styles.termText}>5Ki Earnings</span>
-                  {editMode ? (
+                  {editDividend ? (
                     <div style={styles.editRateRow}>
                       <input
                         style={styles.miniInput}
@@ -1016,7 +1124,7 @@ const SystemSettings = () => {
                 </div>
                 
                 {/* Validation message for distribution percentages */}
-                {editMode && (
+                {editDividend && (
                   <div style={{
                     ...styles.validationMessage,
                     color: (parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? '#28a745' : '#dc3545'
@@ -1032,7 +1140,7 @@ const SystemSettings = () => {
                 <h4 style={styles.subSectionTitle}>Members Dividend Breakdown</h4>
                 <div style={styles.rateRow}>
                   <span style={styles.termText}>Investment Share</span>
-                  {editMode ? (
+                  {editDividend ? (
                     <div style={styles.editRateRow}>
                       <input
                         style={styles.miniInput}
@@ -1049,7 +1157,7 @@ const SystemSettings = () => {
                 </div>
                 <div style={styles.rateRow}>
                   <span style={styles.termText}>Patronage Share</span>
-                  {editMode ? (
+                  {editDividend ? (
                     <div style={styles.editRateRow}>
                       <input
                         style={styles.miniInput}
@@ -1066,7 +1174,7 @@ const SystemSettings = () => {
                 </div>
                 <div style={styles.rateRow}>
                   <span style={styles.termText}>Active Months</span>
-                  {editMode ? (
+                  {editDividend ? (
                     <div style={styles.editRateRow}>
                       <input
                         style={styles.miniInput}
@@ -1083,7 +1191,7 @@ const SystemSettings = () => {
                 </div>
                 
                 {/* Validation message for breakdown percentages */}
-                {editMode && (
+                {editDividend && (
                   <div style={{
                     ...styles.validationMessage,
                     color: (parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? '#28a745' : '#dc3545'
@@ -1095,7 +1203,7 @@ const SystemSettings = () => {
               </div>
 
               <label style={styles.label}>Dividend Date</label>
-              {editMode ? (
+              {editDividend ? (
                 <>
                   <button 
                     style={styles.dateButton}
@@ -1138,10 +1246,51 @@ const SystemSettings = () => {
           <div style={styles.section}>
             {/* Terms and Conditions */}
             <div style={styles.contentCard}>
-              <h3 style={styles.accountTitle}>Terms and Conditions</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={styles.accountTitle}>Terms and Conditions</h3>
+                {!editTerms ? (
+                  <button style={styles.headerIconBtn} title="Edit Terms and Conditions" onClick={() => setEditTerms(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          await update(ref(db, 'Settings/TermsAndConditions'), settings.TermsAndConditions);
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), TermsAndConditions: settings.TermsAndConditions }));
+                          setEditTerms(false);
+                          showMessage('Success', 'Terms and Conditions updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        if (savedSettingsSnapshot?.TermsAndConditions) {
+                          setSettings(prev => ({ ...prev, TermsAndConditions: savedSettingsSnapshot.TermsAndConditions }));
+                        }
+                        setEditTerms(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editMode ? (
+                {editTerms ? (
                   <input
                     style={styles.input}
                     value={settings.TermsAndConditions.title}
@@ -1159,7 +1308,7 @@ const SystemSettings = () => {
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editMode ? (
+                {editTerms ? (
                   <textarea
                     style={styles.textarea}
                     value={settings.TermsAndConditions.content}
@@ -1179,10 +1328,51 @@ const SystemSettings = () => {
 
             {/* Privacy Policy */}
             <div style={styles.contentCard}>
-              <h3 style={styles.accountTitle}>Privacy Policy</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={styles.accountTitle}>Privacy Policy</h3>
+                {!editPrivacy ? (
+                  <button style={styles.headerIconBtn} title="Edit Privacy Policy" onClick={() => setEditPrivacy(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          await update(ref(db, 'Settings/PrivacyPolicy'), settings.PrivacyPolicy);
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), PrivacyPolicy: settings.PrivacyPolicy }));
+                          setEditPrivacy(false);
+                          showMessage('Success', 'Privacy Policy updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        if (savedSettingsSnapshot?.PrivacyPolicy) {
+                          setSettings(prev => ({ ...prev, PrivacyPolicy: savedSettingsSnapshot.PrivacyPolicy }));
+                        }
+                        setEditPrivacy(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editMode ? (
+                {editPrivacy ? (
                   <input
                     style={styles.input}
                     value={settings.PrivacyPolicy.title}
@@ -1200,7 +1390,7 @@ const SystemSettings = () => {
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editMode ? (
+                {editPrivacy ? (
                   <textarea
                     style={styles.textarea}
                     value={settings.PrivacyPolicy.content}
@@ -1220,10 +1410,51 @@ const SystemSettings = () => {
 
             {/* About Us */}
             <div style={styles.contentCard}>
-              <h3 style={styles.accountTitle}>About Us</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={styles.accountTitle}>About Us</h3>
+                {!editAbout ? (
+                  <button style={styles.headerIconBtn} title="Edit About Us" onClick={() => setEditAbout(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          await update(ref(db, 'Settings/AboutUs'), settings.AboutUs);
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), AboutUs: settings.AboutUs }));
+                          setEditAbout(false);
+                          showMessage('Success', 'About Us updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        if (savedSettingsSnapshot?.AboutUs) {
+                          setSettings(prev => ({ ...prev, AboutUs: savedSettingsSnapshot.AboutUs }));
+                        }
+                        setEditAbout(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editMode ? (
+                {editAbout ? (
                   <input
                     style={styles.input}
                     value={settings.AboutUs.title}
@@ -1241,7 +1472,7 @@ const SystemSettings = () => {
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editMode ? (
+                {editAbout ? (
                   <textarea
                     style={styles.textarea}
                     value={settings.AboutUs.content}
@@ -1261,10 +1492,51 @@ const SystemSettings = () => {
 
             {/* Contact Us */}
             <div style={styles.contentCard}>
-              <h3 style={styles.accountTitle}>Contact Us</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <h3 style={styles.accountTitle}>Contact Us</h3>
+                {!editContact ? (
+                  <button style={styles.headerIconBtn} title="Edit Contact Us" onClick={() => setEditContact(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          await update(ref(db, 'Settings/ContactUs'), settings.ContactUs);
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ContactUs: settings.ContactUs }));
+                          setEditContact(false);
+                          showMessage('Success', 'Contact Us updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        if (savedSettingsSnapshot?.ContactUs) {
+                          setSettings(prev => ({ ...prev, ContactUs: savedSettingsSnapshot.ContactUs }));
+                        }
+                        setEditContact(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editMode ? (
+                {editContact ? (
                   <input
                     style={styles.input}
                     value={settings.ContactUs.title}
@@ -1282,7 +1554,7 @@ const SystemSettings = () => {
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editMode ? (
+                {editContact ? (
                   <textarea
                     style={styles.textarea}
                     value={settings.ContactUs.content}
@@ -1302,51 +1574,7 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* Save/Edit Button */}
-        <button 
-          style={{
-            ...styles.saveBtn,
-            ...(editMode ? styles.saveBtnSaveMode : {})
-          }}
-          onClick={editMode ? handleSave : () => setEditMode(true)}
-        >
-          {editMode ? <FaSave style={{ marginRight: '8px' }} /> : <FaEdit style={{ marginRight: '8px' }} />}
-          {editMode ? 'Save Settings' : 'Edit Settings'}
-        </button>
-
-        {/* Save Confirmation Modal */}
-        {confirmationModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-              <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#2D5783',
-                    color: '#fff'
-                  }} 
-                  onClick={confirmSave}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Saving...' : 'Yes'}
-                </button>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#f44336',
-                    color: '#fff'
-                  }} 
-                  onClick={() => setConfirmationModalVisible(false)}
-                  disabled={actionInProgress}
-                >
-                  No
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Removed global Save/Edit Button and confirmation modal in favor of per-section editing */}
 
         {/* Add Interest Term Modal */}
         {addModalVisible && (
@@ -1377,7 +1605,7 @@ const SystemSettings = () => {
           <div className="centered-modal">
             <div className="confirm-modal-card">
               <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Are you sure you want to delete the {termToDelete} month interest rate?</p>
+              <p className="modal-text">Delete the {termToDelete} month term for {(editingOriginalLoanType || wizardLoanTypeName)} only? Other loan types will keep this term.</p>
               <div className="bottom-buttons">
                 <button
                   className="confirm-btn"
@@ -1481,6 +1709,78 @@ const SystemSettings = () => {
                   onClick={() => setFundsActionModal(null)}
                 >
                   Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Loan Type Wizard Modal */}
+        {addLoanTypeWizardVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalContent}>
+              <h3 style={styles.modalTitle}>{isEditingLoanType ? 'Edit Loan Type' : 'Add Loan Type'}</h3>
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Loan Type Name</label>
+                <input
+                  style={styles.modalInput}
+                  placeholder="e.g., Emergency Loan"
+                  value={wizardLoanTypeName}
+                  onChange={(e) => setWizardLoanTypeName(e.target.value)}
+                />
+              </div>
+
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Terms and Interest Rates</label>
+                {wizardRows.map((row, idx) => (
+                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                    <input
+                      style={{ ...styles.modalInput, flex: 1 }}
+                      placeholder="Months (e.g., 6)"
+                      type="number"
+                      value={row.term}
+                      onChange={(e) => updateWizardRow(idx, 'term', e.target.value)}
+                    />
+                    <input
+                      style={{ ...styles.modalInput, flex: 1 }}
+                      placeholder="Interest Rate % (e.g., 3.5)"
+                      type="number"
+                      value={row.rate}
+                      onChange={(e) => updateWizardRow(idx, 'rate', e.target.value)}
+                    />
+                    <button
+                      style={{ ...styles.modalBtn, ...styles.modalBtnError, maxWidth: 100 }}
+                      onClick={() => removeWizardRow(idx)}
+                      disabled={wizardRows.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+                <button
+                  style={{ ...styles.modalBtn, ...styles.modalBtnConfirm, marginTop: 6 }}
+                  onClick={addWizardRow}
+                >
+                  + Add Row
+                </button>
+              </div>
+
+              {wizardError && (
+                <div style={{ color: '#f44336', marginBottom: 12, fontSize: 13 }}>{wizardError}</div>
+              )}
+
+              <div style={styles.modalButtons}>
+                <button
+                  style={{ ...styles.modalBtn, ...styles.modalBtnCancel }}
+                  onClick={() => { setAddLoanTypeWizardVisible(false); resetWizard(); }}
+                >
+                  Cancel
+                </button>
+                <button
+                  style={{ ...styles.modalBtn, ...styles.modalBtnSuccess }}
+                  onClick={confirmWizardAdd}
+                >
+                  {isEditingLoanType ? 'Save' : 'Add Loan Type'}
                 </button>
               </div>
             </div>

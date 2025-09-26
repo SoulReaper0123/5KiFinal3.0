@@ -372,11 +372,9 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Term</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Disbursement</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Approved</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
@@ -389,8 +387,6 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                 <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.loanAmount)}</td>
-                <td style={styles.tableCell}>{item.term} months</td>
-                <td style={styles.tableCell}>{item.disbursement}</td>
                 <td style={styles.tableCell}>{item.dateApproved}</td>
                 <td style={{
                   ...styles.tableCell,
@@ -415,7 +411,7 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
 
       {modalVisible && selectedLoan && (
         <div style={styles.centeredModal}>
-          <div style={hasDocuments(selectedLoan) ? styles.modalCard : { ...styles.modalCard, width: '50%' }}>
+          <div style={styles.modalCard}>
             <button 
               style={styles.closeButton} 
               onClick={closeModal}
@@ -428,128 +424,7 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
               <h2 style={styles.modalTitle}>Loan Application Details</h2>
             </div>
             <div style={styles.modalContent}>
-              {hasDocuments(selectedLoan) ? (
-                <div style={styles.columns}>
-                  <div style={styles.leftColumn}>
-                    <div style={styles.sectionTitle}>Member Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Member ID:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Name:</span>
-                      <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Email:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Contact:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.phoneNumber || 'N/A'}</span>
-                    </div>
-
-                    <div style={styles.sectionTitle}>Loan Details</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Transaction ID:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Loan Amount:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Term:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.term} months</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Disbursement:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date Applied:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
-                    </div>
-
-                    <div style={styles.sectionTitle}>Approval Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date Approved:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Time Approved:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.timeApproved}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Interest Rate:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.interestRate || 'N/A'}%</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Monthly Payment:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.monthlyPayment)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Total Term Payment:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.totalTermPayment)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Release Amount:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.releaseAmount)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Processing Fee:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedLoan.processingFee)}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Due Date:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.dueDate || 'N/A'}</span>
-                    </div>
-                  </div>
-                  <div style={styles.rightColumn}>
-                    <div style={styles.sectionTitle}>Bank Details</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Account Name:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Account Number:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Bank Name:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.bankName || 'N/A'}</span>
-                    </div>
-
-                    <div style={styles.sectionTitle}>Supporting Documents</div>
-                    <div style={styles.imageGrid}>
-                      {selectedLoan.proofOfIncomeUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Income</p>
-                          <img
-                            src={selectedLoan.proofOfIncomeUrl}
-                            alt="Proof of Income"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                      {selectedLoan.proofOfIdentityUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Identity</p>
-                          <img
-                            src={selectedLoan.proofOfIdentityUrl}
-                            alt="Proof of Identity"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
+              <div style={styles.columns}>
                 <div style={styles.leftColumn}>
                   <div style={styles.sectionTitle}>Member Information</div>
                   <div style={styles.compactField}>
@@ -563,10 +438,6 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Email:</span>
                     <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.phoneNumber || 'N/A'}</span>
                   </div>
 
                   <div style={styles.sectionTitle}>Loan Details</div>
@@ -590,7 +461,17 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     <span style={styles.fieldLabel}>Date Applied:</span>
                     <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
                   </div>
-
+                </div>
+                <div style={styles.rightColumn}>
+                  <div style={styles.sectionTitle}>Bank Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Account Name:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Account Number:</span>
+                    <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
+                  </div>
                   <div style={styles.sectionTitle}>Approval Information</div>
                   <div style={styles.compactField}>
                     <span style={styles.fieldLabel}>Date Approved:</span>
@@ -624,22 +505,8 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     <span style={styles.fieldLabel}>Due Date:</span>
                     <span style={styles.fieldValue}>{selectedLoan.dueDate || 'N/A'}</span>
                   </div>
-
-                  <div style={styles.sectionTitle}>Bank Details</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Bank Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.bankName || 'N/A'}</span>
-                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
