@@ -690,26 +690,10 @@ const PayLoan = () => {
       return;
     }
 
-    // Validate payment amount against total amount due
+    // Validate payment amount is a positive number; allow partial payments even when overdue
     const paymentAmount = roundToCents(amountToBePaid);
     const totalDueRounded = roundToCents(totalAmountDue);
-
-    // If overdue, require payment >= total due (allow equality). If not overdue, allow any positive amount
-    if (overdueDays > 0 && paymentAmount < totalDueRounded) {
-      let message = `Payment amount must be at least ₱${totalDueRounded.toFixed(2)}`;
-      
-      if (penaltyAmount > 0) {
-        message += `\n\nBreakdown:
-• Monthly Payment: ₱${roundToCents(currentLoan?.totalMonthlyPayment || 0).toFixed(2)}
-• Late Fee (${overdueDays} days overdue): ₱${roundToCents(penaltyAmount).toFixed(2)}
-• Total Amount Due: ₱${totalDueRounded.toFixed(2)}`;
-      }
-      
-      setAlertMessage(message);
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
-    }
+    // Note: We no longer block partial payments when overdue. Admin approval will allocate to penalty -> interest -> principal.
 
     // Show confirmation modal
     setConfirmModalVisible(true);

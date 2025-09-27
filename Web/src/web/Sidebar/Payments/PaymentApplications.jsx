@@ -898,9 +898,18 @@ const PaymentApplications = ({
         const remainingLoan = loanAmount - (principalPaid + excessPayment);
         console.log('remainingLoan after payment (after applying principal + excess):', remainingLoan);
         
-        if (remainingLoan <= 0) {
-          // Fully paid: remove from CurrentLoans and any ApprovedLoans entries
-          console.log('Loan fully paid - removing from CurrentLoans');
+        // Track remainingBalance (principal + total interest not yet paid) and cumulative amountPaid (principal + interest only)
+        const prevRemainingBalance = parseFloat(
+          (currentLoanData && currentLoanData.remainingBalance) ?? (approvedLoanData && approvedLoanData.totalTermPayment) ?? 0
+        ) || 0;
+        const prevAmountPaid = parseFloat(currentLoanData?.amountPaid) || 0;
+        const amountPaidThisApproval = (interestPaid + principalPaid);
+        const newAmountPaid = Math.ceil((prevAmountPaid + amountPaidThisApproval) * 100) / 100;
+        const newRemainingBalance = Math.max(0, Math.ceil((prevRemainingBalance - amountPaidThisApproval) * 100) / 100);
+
+        if (newRemainingBalance <= 0) {
+          // Fully settled (principal and scheduled interest cleared)
+          console.log('Loan fully settled - removing from CurrentLoans');
           await memberLoansRef.child(currentLoanKey).remove();
           // Remove potential ApprovedLoans records in both possible paths
           try { await database.ref(`Loans/ApprovedLoans/${id}`).remove(); } catch (_) {}
@@ -921,17 +930,17 @@ const PaymentApplications = ({
           const originalTerm = parseFloat(approvedLoanData?.term) || 1;
           const remainingTerm = Math.max(1, originalTerm - paymentsMade);
           
-          // If this is the last payment term, calculate based on remaining loan
+          // If this is the last payment term, calculate based on remaining principal portion only
           let newMonthlyPayment;
           if (remainingTerm === 1) {
-            // Last payment: monthly payment = remaining loan amount
-            newMonthlyPayment = remainingLoan;
+            // Last payment: monthly principal portion equals remaining principal
+            newMonthlyPayment = Math.max(0, remainingLoan);
           } else {
             // Normal payment: reduce current monthly payment by excess
             newMonthlyPayment = Math.max(0, currentMonthlyPayment - excessBeyondScheduled);
           }
           
-          // New total monthly payment = new monthly payment + interest
+          // New total monthly payment = new monthly payment + scheduled interest
           const newTotalMonthlyPayment = newMonthlyPayment + interestAmount;
           
           console.log('Payment calculation details:', {
@@ -944,7 +953,10 @@ const PaymentApplications = ({
             newMonthlyPayment,
             interestAmount,
             newTotalMonthlyPayment,
-            isLastPayment: remainingTerm === 1
+            isLastPayment: remainingTerm === 1,
+            prevRemainingBalance,
+            newRemainingBalance,
+            newAmountPaid
           });
 
           // Add 30 days to the current due date, not today's date
@@ -964,16 +976,23 @@ const PaymentApplications = ({
           console.log('New dueDate (adding 30 days):', newDueDate);
           console.log('Loan path:', `Loans/CurrentLoans/${id}/${currentLoanKey}`);
           
-          // Update CurrentLoans in the specific order: loanAmount, dueDate, monthlyPayment, totalMonthlyPayment
+          // Update CurrentLoans in the specific order: loanAmount, dueDate, monthlyPayment, totalMonthlyPayment, amountPaid, remainingBalance
           const loanUpdates = {};
-          loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100; // remaining after applying principal + excess
+          loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100; // remaining principal after applying principal + excess
           loanUpdates['dueDate'] = newDueDate;
           loanUpdates['monthlyPayment'] = Math.ceil(newMonthlyPayment * 100) / 100;
           loanUpdates['totalMonthlyPayment'] = Math.ceil(newTotalMonthlyPayment * 100) / 100;
           loanUpdates['paymentsMade'] = paymentsMade;
+          loanUpdates['amountPaid'] = newAmountPaid; // principal + interest paid so far
+          loanUpdates['remainingBalance'] = newRemainingBalance; // total term outstanding (principal + scheduled interest not yet paid)
           
-          await memberLoansRef.child(currentLoanKey).update(loanUpdates);
-          console.log('CurrentLoans updated successfully with new dueDate:', newDueDate);
+          // Also update mirrored copy under Members/{id}/loans/{loanId}
+          const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
+          await Promise.all([
+            memberLoansRef.child(currentLoanKey).update(loanUpdates),
+            memberLoanRef.update(loanUpdates)
+          ]);
+          console.log('CurrentLoans and Members loans updated with new dueDate and remainingBalance:', newDueDate, newRemainingBalance);
         }
 
         // Principal and any excess increase member's balance

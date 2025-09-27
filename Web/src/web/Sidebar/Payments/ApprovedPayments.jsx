@@ -455,10 +455,6 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                       <span style={styles.fieldLabel}>Email:</span>
                       <span style={styles.fieldValue}>{selectedPayment.email || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Contact:</span>
-                      <span style={styles.fieldValue}>{selectedPayment.phoneNumber || 'N/A'}</span>
-                    </div>
 
                     <div style={styles.sectionTitle}>Payment Details</div>
                     <div style={styles.compactField}>
