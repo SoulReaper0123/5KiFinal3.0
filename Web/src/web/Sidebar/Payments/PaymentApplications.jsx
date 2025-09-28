@@ -850,7 +850,7 @@ const PaymentApplications = ({
         return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
       };
 
-      // Prefer penalty provided in payment application; fallback to computed by overdue days
+      // Prefer penalty provided in payment application; fallback to computed by overdue days (interest-based)
       const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
 
       let overdueDays = 0;
@@ -864,8 +864,14 @@ const PaymentApplications = ({
           const ms = todayStart.getTime() - dueDateParsed.getTime();
           overdueDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
         }
-        penaltyDue = Math.max(0, overdueDays * penaltyPerDay);
+        // Overdue penalty = monthly interest * (days_lapsed / 30)
+        const interestForPenalty = parseFloat(interestAmount) || 0;
+        penaltyDue = Math.max(0, Math.round(((interestForPenalty * (overdueDays / 30)) + Number.EPSILON) * 100) / 100);
       }
+
+      // Include any previously accrued penalties from the loan record
+      const existingAccruedPenalty = parseFloat(currentLoanData?.penaltyAccrued) || 0;
+      penaltyDue = Math.round(((penaltyDue + existingAccruedPenalty) + Number.EPSILON) * 100) / 100;
 
       const penaltyPaid = Math.min(paymentAmount, penaltyDue);
 
@@ -908,12 +914,55 @@ const PaymentApplications = ({
         const newRemainingBalance = Math.max(0, Math.ceil((prevRemainingBalance - amountPaidThisApproval) * 100) / 100);
 
         if (newRemainingBalance <= 0) {
-          // Fully settled (principal and scheduled interest cleared)
-          console.log('Loan fully settled - removing from CurrentLoans');
-          await memberLoansRef.child(currentLoanKey).remove();
-          // Remove potential ApprovedLoans records in both possible paths
-          try { await database.ref(`Loans/ApprovedLoans/${id}`).remove(); } catch (_) {}
-          try { await database.ref(`ApprovedLoans/${id}`).remove(); } catch (_) {}
+          // Fully settled: archive as paid, remove from Current/Approved, and log transaction
+          console.log('Loan fully settled - archiving to PaidLoans and logging paid transaction');
+
+          const nowPaid = new Date();
+          const datePaid = formatDate(nowPaid);
+          const timePaid = formatTime(nowPaid);
+          const paidTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+          // Try to read original loan transaction to get canonical fields like loanAmount
+          let originalLoanTxn = null;
+          try {
+            const origTxnSnap = await database.ref(`Transactions/Loans/${id}/${currentLoanKey}`).once('value');
+            if (origTxnSnap.exists()) originalLoanTxn = origTxnSnap.val();
+          } catch (e) {
+            console.warn('Could not read original loan transaction for', currentLoanKey, e);
+          }
+
+          const loanAmountFromTxn = parseFloat(originalLoanTxn?.loanAmount ?? approvedLoanData?.loanAmount ?? currentLoanData?.loanAmount) || 0;
+
+          const paidRecord = {
+            ...(approvedLoanData || currentLoanData || {}),
+            transactionId: paidTransactionId,
+            originalTransactionId: currentLoanKey,
+            status: 'paid',
+            datePaid,
+            timePaid,
+            timestamp: nowPaid.getTime(),
+            loanAmount: Math.ceil(loanAmountFromTxn * 100) / 100
+          };
+
+          // Write to Loans/PaidLoans and Transactions/Loans (paid event)
+          const paidLoansRef = database.ref(`Loans/PaidLoans/${id}/${paidTransactionId}`);
+          const paidTxnRef = database.ref(`Transactions/Loans/${id}/${paidTransactionId}`);
+          await Promise.all([
+            paidLoansRef.set(paidRecord),
+            paidTxnRef.set(paidRecord)
+          ]);
+
+          // Remove from CurrentLoans and member mirror
+          const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
+          await Promise.all([
+            memberLoansRef.child(currentLoanKey).remove(),
+            memberLoanRef.remove()
+          ]);
+
+          // Remove from ApprovedLoans (both possible paths), specific key only
+          try { await database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).remove(); } catch (_) {}
+          try { await database.ref(`ApprovedLoans/${id}/${currentLoanKey}`).remove(); } catch (_) {}
+
         } else {
           // STEP 1: UPDATE CURRENTLOANS FIRST (in specific order)
           console.log('=== STEP 1: Updating CurrentLoans ===');
@@ -922,11 +971,13 @@ const PaymentApplications = ({
           const currentMonthlyPayment = parseFloat(currentLoanData.monthlyPayment) || 0;
           const currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
           
-          // Calculate excess payment beyond the scheduled total monthly payment
+          // Calculate excess/shortage relative to scheduled payment
           const scheduledPayment = currentTotalMonthlyPayment + penaltyDue;
           const excessBeyondScheduled = Math.max(0, paymentAmount - scheduledPayment);
+          // Shortage should consider only interest+principal (exclude penalty from next cycle)
+          const shortageBeyondScheduled = Math.max(0, currentTotalMonthlyPayment - remainingAfterPenalty);
           
-          // FIXED: Calculate new monthly payment by reducing excess from current monthly payment
+          // Calculate next monthly principal by adjusting for excess/shortage
           const originalTerm = parseFloat(approvedLoanData?.term) || 1;
           const remainingTerm = Math.max(1, originalTerm - paymentsMade);
           
@@ -936,12 +987,12 @@ const PaymentApplications = ({
             // Last payment: monthly principal portion equals remaining principal
             newMonthlyPayment = Math.max(0, remainingLoan);
           } else {
-            // Normal payment: reduce current monthly payment by excess
-            newMonthlyPayment = Math.max(0, currentMonthlyPayment - excessBeyondScheduled);
+            // Normal payment: decrease by excess, increase by shortage
+            newMonthlyPayment = Math.max(0, currentMonthlyPayment - excessBeyondScheduled + shortageBeyondScheduled);
           }
           
-          // New total monthly payment = new monthly payment + scheduled interest
-          const newTotalMonthlyPayment = newMonthlyPayment + interestAmount;
+          // New total monthly payment = new monthly principal + scheduled interest
+          const newTotalMonthlyPayment = newMonthlyPayment + interestAmount + Math.max(0, penaltyDue - penaltyPaid);
           
           console.log('Payment calculation details:', {
             originalTerm,
@@ -950,8 +1001,10 @@ const PaymentApplications = ({
             remainingLoan,
             currentMonthlyPayment,
             excessBeyondScheduled,
+            shortageBeyondScheduled,
             newMonthlyPayment,
             interestAmount,
+            carriedPenaltyToNext: Math.max(0, penaltyDue - penaltyPaid),
             newTotalMonthlyPayment,
             isLastPayment: remainingTerm === 1,
             prevRemainingBalance,
@@ -985,6 +1038,7 @@ const PaymentApplications = ({
           loanUpdates['paymentsMade'] = paymentsMade;
           loanUpdates['amountPaid'] = newAmountPaid; // principal + interest paid so far
           loanUpdates['remainingBalance'] = newRemainingBalance; // total term outstanding (principal + scheduled interest not yet paid)
+          loanUpdates['penaltyAccrued'] = Math.max(0, penaltyDue - penaltyPaid); // carry remaining penalty forward
           
           // Also update mirrored copy under Members/{id}/loans/{loanId}
           const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
@@ -1515,10 +1569,10 @@ const openImageViewer = (url, label) => {
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Payment Method</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Method</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>

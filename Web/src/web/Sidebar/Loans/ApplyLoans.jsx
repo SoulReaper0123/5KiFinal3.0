@@ -680,38 +680,23 @@ const processDatabaseApprove = async (loan) => {
     const { id, transactionId, term, loanAmount } = loan;
 
     const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
-    const memberRef = database.ref(`Members/${id}/balance`);
-    const settingsRef = database.ref('Settings/LoanPercentage');
+    const memberInvestmentRef = database.ref(`Members/${id}/investment`);
     
-    // First check if member has sufficient balance based on loan percentage
-    const [loanSnap, memberSnap, settingsSnap] = await Promise.all([
+    // Check strictly against member's investment (no percentage rule)
+    const [loanSnap, memberInvestmentSnap] = await Promise.all([
       loanRef.once('value'),
-      memberRef.once('value'),
-      settingsRef.once('value')
+      memberInvestmentRef.once('value')
     ]);
 
     if (!loanSnap.exists()) {
       throw new Error('Loan data not found.');
     }
 
-    const memberBalance = parseFloat(memberSnap.val()) || 0;
-    const loanPercentage = parseFloat(settingsSnap.val());
-    let maxLoanAmount;
-    
-    // If loan percentage is 0, allow 100% of balance
-    if (loanPercentage === 0) {
-      maxLoanAmount = memberBalance;
-    } else {
-      // Use the set percentage (default to 80% if not set)
-      const percentage = loanPercentage || 80;
-      maxLoanAmount = memberBalance * (percentage / 100);
-    }
-
+    const memberInvestment = parseFloat(memberInvestmentSnap.val()) || 0;
     const requestedAmount = parseFloat(loanAmount);
 
-    if (requestedAmount > maxLoanAmount) {
-      const percentageUsed = loanPercentage === 0 ? 100 : (loanPercentage || 80);
-      throw new Error(`Loan amount exceeds ${percentageUsed}% of member's balance. Maximum allowed: ${formatCurrency(maxLoanAmount)}`);
+    if (requestedAmount > memberInvestment) {
+      throw new Error(`Loan amount exceeds member's investment. Maximum allowed: ${formatCurrency(memberInvestment)}`);
     }
 
     // Continue with approval process
@@ -726,18 +711,29 @@ const processDatabaseApprove = async (loan) => {
     const loanData = loanSnap.val();
 
     // Fetch per-loan-type interest rate and processing fee
-    const interestRateRef = database.ref(`Settings/InterestRateByType/${encodeURIComponent(loanData.loanType || '')}/${term}`);
+    const loanTypeKey = String(loanData.loanType || '').trim();
+    const termKeyRaw = String(loanData.term ?? '').trim();
+    const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
+    const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
     const processingFeeRef = database.ref('Settings/ProcessingFee');
 
-    const [fundsSnap, interestSnap, feeSnap] = await Promise.all([
+    const [fundsSnap, feeSnap] = await Promise.all([
       fundsRef.once('value'),
-      interestRateRef.once('value'),
       processingFeeRef.once('value'),
     ]);
 
-    const interestRateRaw = interestSnap.val();
-    if (interestRateRaw === null || interestRateRaw === undefined || interestRateRaw === '') {
-      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${term} months. Please set it in Settings > System Settings.`);
+    // Resolve interest rate using canonical structure only: Settings/LoanTypes/{type}/{term}
+    let interestRateRaw = null;
+    for (const tKey of termKeys) {
+      const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
+      const val = snap.val();
+      if (val !== null && val !== undefined && val !== '') {
+        interestRateRaw = val;
+        break;
+      }
+    }
+    if (interestRateRaw === null) {
+      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
     }
 
     const interestRatePercentage = parseFloat(interestRateRaw);
@@ -837,7 +833,10 @@ const processDatabaseApprove = async (loan) => {
     await savingsHistoryRef.update(savingsHistoryUpdate);
     
     // Update member balance: deduct full loan amount as requested
-    const updatedMemberBalance = Math.max(0, Math.ceil((memberBalance - amount) * 100) / 100);
+    const memberRef = database.ref(`Members/${id}/balance`);
+    const currentBalanceSnap = await memberRef.once('value');
+    const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
+    const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - amount) * 100) / 100);
     await memberRef.set(updatedMemberBalance);
     console.log('Member balance deducted for loan approval');
 
@@ -895,26 +894,65 @@ const processDatabaseApprove = async (loan) => {
   const callApiApprove = async (loan) => {
     try {
       const now = new Date();
-      
-      // Get the necessary settings from Firebase
-      const interestRateRef = database.ref(`Settings/InterestRate/${loan.term}`);
-      const processingFeeRef = database.ref('Settings/ProcessingFee');
-      
-      const [interestSnap, feeSnap] = await Promise.all([
-        interestRateRef.once('value'),
-        processingFeeRef.once('value'),
-      ]);
 
-      const interestRate = parseFloat(interestSnap.val()) / 100;
-      const amount = parseFloat(loan.loanAmount);
-      const termMonths = parseInt(loan.term);
-      const processingFee = parseFloat(feeSnap.val());
+      // Robust parsing helpers
+      const toNumber = (v) => {
+        if (v === null || v === undefined) return NaN;
+        const s = String(v).replace(/,/g, '').trim();
+        const n = parseFloat(s);
+        return Number.isFinite(n) ? n : NaN;
+      };
+      const toInt = (v) => {
+        if (v === null || v === undefined) return NaN;
+        const s = String(v).replace(/[^0-9]/g, '');
+        const n = parseInt(s, 10);
+        return Number.isFinite(n) ? n : NaN;
+      };
 
-      // Calculate all loan details
-      const monthlyPayment = amount / termMonths;
-      const interest = amount * interestRate;
-      const totalMonthlyPayment = monthlyPayment + interest;
-      const totalTermPayment = totalMonthlyPayment * termMonths;
+      // Resolve interest rate like processDatabaseApprove: Settings/LoanTypes/{type}/{term}
+      const loanTypeKey = String(loan.loanType || '').trim();
+      const termKeyRaw = String(loan.term ?? '').trim();
+      const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
+      const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
+
+      let interestRateRaw = null;
+      for (const tKey of termKeys) {
+        const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
+        const val = snap.val();
+        if (val !== null && val !== undefined && val !== '') {
+          interestRateRaw = val;
+          break;
+        }
+      }
+      // Backward-compat fallback to old path if needed
+      if (interestRateRaw === null) {
+        const fallbackSnap = await database.ref(`Settings/InterestRate/${termKeyInt || termKeyRaw}`).once('value');
+        const fallbackVal = fallbackSnap.val();
+        if (fallbackVal !== null && fallbackVal !== undefined && fallbackVal !== '') {
+          interestRateRaw = fallbackVal;
+        }
+      }
+
+      const interestRatePercentage = toNumber(interestRateRaw);
+      const interestRate = Number.isFinite(interestRatePercentage) ? interestRatePercentage / 100 : NaN;
+
+      const amount = toNumber(loan.loanAmount);
+      const termMonths = toInt(loan.term);
+
+      // Fetch processing fee
+      const processingFeeSnap = await database.ref('Settings/ProcessingFee').once('value');
+      const processingFee = toNumber(processingFeeSnap.val());
+
+      if (!Number.isFinite(interestRate) || !Number.isFinite(amount) || !Number.isFinite(termMonths) || termMonths <= 0 || !Number.isFinite(processingFee)) {
+        throw new Error('Missing or invalid settings/data for email payload calculation.');
+      }
+
+      // Calculate all loan details (mirror DB logic semantics)
+      const monthlyPrincipal = amount / termMonths;
+      const interestPerTerm = amount * interestRate; // per month interest from rate
+      const totalInterest = interestPerTerm * termMonths;
+      const totalTermPayment = amount + totalInterest;
+      const totalMonthlyPayment = totalTermPayment / termMonths;
       const releaseAmount = amount - processingFee;
 
       const dueDate = new Date(now);
@@ -932,15 +970,15 @@ const processDatabaseApprove = async (loan) => {
         lastName: loan.lastName,
         status: 'approved',
         interestRate: (interestRate * 100).toFixed(2) + '%',
-        interest: interest.toFixed(2),
-        monthlyPayment: monthlyPayment.toFixed(2),
+        interest: (amount * interestRate).toFixed(2),
+        monthlyPayment: monthlyPrincipal.toFixed(2),
         totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
         totalTermPayment: totalTermPayment.toFixed(2),
         releaseAmount: releaseAmount.toFixed(2),
         processingFee: processingFee.toFixed(2),
         dueDate: formatDate(dueDate)
       });
-      
+
       if (!response.ok) {
         console.error('Failed to send approval email');
       }

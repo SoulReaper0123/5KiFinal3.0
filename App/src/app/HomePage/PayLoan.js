@@ -1018,7 +1018,7 @@ const PayLoan = () => {
           if (alertType === 'success' && pendingApiData) {
             // Navigate immediately and run API in background
             resetFormFields();
-            navigation.navigate('Home');
+            navigation.navigate('AppHome');
             
             // Run API call in background after navigation
             setTimeout(async () => {

@@ -226,13 +226,15 @@ const ApplyLoan = () => {
         const processingFeeValue = settings.ProcessingFee || 0; // Default to 0
         setProcessingFee(processingFeeValue);
         
-        // Loan types
-        const loanTypes = settings.LoanTypes || ['Regular Loan', 'Quick Cash'];
-        const formattedLoanTypes = loanTypes.map(type => ({ key: type, label: type }));
+        // Loan types (canonical map under Settings/LoanTypes only)
+        const lt = settings.LoanTypes;
+        const isMap = lt && typeof lt === 'object' && !Array.isArray(lt);
+        const typesArr = isMap ? Object.keys(lt) : [];
+        const formattedLoanTypes = typesArr.map(type => ({ key: type, label: type }));
         setLoanTypeOptions(formattedLoanTypes);
 
-        // New: Per-loan-type interest rates map
-        const byType = settings.InterestRateByType || {};
+        // Per-loan-type interest rates map from canonical LoanTypes only
+        const byType = isMap ? lt : {};
         setInterestRatesByType(byType);
 
         // Initialize available terms for current loanType from per-type map
@@ -511,8 +513,8 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       disbursement,
       accountName,
       accountNumber,
-      // Store percent value (e.g., 3 for 3%) as in SystemSettings
-      interestRate: Number(interestRatesByType?.[loanType]?.[term]) || (Number(interestRate) * 100) || 0,
+      // Store percent value (e.g., 3 for 3%) from canonical LoanTypes only
+      interestRate: Number(interestRatesByType?.[loanType]?.[term]) || 0,
       firstName,
       lastName,
       email,

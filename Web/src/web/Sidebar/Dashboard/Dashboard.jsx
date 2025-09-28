@@ -30,7 +30,8 @@ const Dashboard = () => {
     fiveKISavings: 0,
     activeBorrowers: 0,
     totalMembers: 0,
-    savingsHistory: []
+    savingsHistory: [],
+    yieldsHistory: []
   });
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
@@ -379,6 +380,7 @@ const Dashboard = () => {
         yieldsSnapshot,
         savingsHistorySnapshot,
         fundsHistorySnapshot,
+        yieldsHistorySnapshot,
         membersSnapshot,
         currentLoansSnapshot,
         approvedLoansSnapshot,
@@ -390,6 +392,7 @@ const Dashboard = () => {
         database.ref('Settings/Yields').once('value'),
         database.ref('Settings/SavingsHistory').once('value'),
         database.ref('Settings/FundsHistory').once('value'),
+        database.ref('Settings/YieldsHistory').once('value'),
         database.ref('Members').once('value'),
         database.ref('Loans/CurrentLoans').once('value'),
         database.ref('Loans/ApprovedLoans').once('value'),
@@ -405,6 +408,10 @@ const Dashboard = () => {
         amount: parseFloat(amount) || 0
       }));
       const fundsHistory = Object.entries(fundsHistorySnapshot.val() || {}).map(([date, amount]) => ({
+        date,
+        amount: parseFloat(amount) || 0
+      }));
+      const yieldsHistory = Object.entries(yieldsHistorySnapshot.val() || {}).map(([date, amount]) => ({
         date,
         amount: parseFloat(amount) || 0
       }));
@@ -509,6 +516,7 @@ const Dashboard = () => {
         totalMembers,
         savingsHistory,
         fundsHistory,
+        yieldsHistory,
         investmentSharePercentage,
         patronageSharePercentage,
         activeMonthsPercentage,
@@ -968,6 +976,33 @@ const Dashboard = () => {
         pointBorderWidth: 1,
       }
     ],
+  };
+
+  // Build Yields line data similar to Funds & Savings
+  const yieldsLineData = {
+    labels: earningsData.map(item => item.month),
+    datasets: [
+      {
+        label: 'Yields',
+        data: earningsData.map((_, index) => {
+          const monthYields = (fundsData.yieldsHistory || []).filter(item => {
+            const date = new Date(item.date);
+            return date.getFullYear() === parseInt(selectedYear) && date.getMonth() === index;
+          });
+          return monthYields.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
+        }),
+        backgroundColor: 'rgba(234, 179, 8, 0.08)',
+        borderColor: '#EAB308',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.35,
+        pointRadius: 3,
+        pointHoverRadius: 5,
+        pointBackgroundColor: '#EAB308',
+        pointBorderColor: '#fff',
+        pointBorderWidth: 1,
+      }
+    ]
   };
 
   const chartOptions = {
@@ -1694,6 +1729,19 @@ const Dashboard = () => {
                 <div style={styles.chartWrapper}>
                   <Line 
                     data={fundsLineData} 
+                    options={fundsChartOptions}
+                  />
+                </div>
+              </div>
+
+              {/* Yields Line Graph */}
+              <div style={{ ...styles.chartHeader, marginTop: '20px' }}>
+                <h3 style={styles.chartTitle}>Yields Growth ({selectedYear})</h3>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+                <div style={styles.chartWrapper}>
+                  <Line 
+                    data={yieldsLineData}
                     options={fundsChartOptions}
                   />
                 </div>

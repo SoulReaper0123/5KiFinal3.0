@@ -191,6 +191,8 @@ const SystemSettings = () => {
   const [editContact, setEditContact] = useState(false);
   // Loan & Dividend header-level edit for Loan Reminder + Processing Fee
   const [editLoanAndFee, setEditLoanAndFee] = useState(false);
+  // Edit mode toggle for Types of Loans section
+  const [editLoanTypes, setEditLoanTypes] = useState(false);
 
   // Add Loan Type wizard state
   const [addLoanTypeWizardVisible, setAddLoanTypeWizardVisible] = useState(false);
@@ -219,9 +221,13 @@ const SystemSettings = () => {
           InterestRate: Object.fromEntries(
             Object.entries(data.InterestRate || {}).map(([key, val]) => [key, val.toString()])
           ),
-          InterestRateByType: Object.fromEntries(
-            Object.entries(data.InterestRateByType || {}).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k,v]) => [k, String(v)]))])
-          ),
+          // Build per-type interest view from canonical structure only
+          InterestRateByType: (() => {
+            const source = (data && typeof data.LoanTypes === 'object' && !Array.isArray(data.LoanTypes)) ? data.LoanTypes : {};
+            return Object.fromEntries(
+              Object.entries(source).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), String(v)]))])
+            );
+          })(),
           LoanReminderDays: (data.LoanReminderDays ?? 7).toString(),
           DividendDate: data.DividendDate || '',
           // Dividend Distribution Percentages
@@ -234,7 +240,13 @@ const SystemSettings = () => {
 
           ProcessingFee: data.ProcessingFee?.toString() || '',
           RegistrationMinimumFee: data.RegistrationMinimumFee?.toString() || '5000',
-          LoanTypes: data.LoanTypes || ['Regular Loan', 'Quick Cash'],
+          // For UI, maintain an array of loan type names derived from new structure when available
+          LoanTypes: (() => {
+            if (data && typeof data.LoanTypes === 'object' && !Array.isArray(data.LoanTypes)) {
+              return Object.keys(data.LoanTypes);
+            }
+            return data.LoanTypes || ['Regular Loan', 'Quick Cash'];
+          })(),
           // LoanTermsMapping deprecated; ignore DB value
           LoanPercentage: data.LoanPercentage?.toString() || '80',
           OrientationCode: data.OrientationCode || generateOrientationCode(),
@@ -387,7 +399,7 @@ const SystemSettings = () => {
       return;
     }
 
-    // Remove this term only for the selected loan type
+    // Remove this term only for the selected loan type (local UI state only)
     const updatedByType = { ...(settings.InterestRateByType || {}) };
     const typeMap = { ...(updatedByType[lt] || {}) };
     delete typeMap[t];
@@ -398,6 +410,7 @@ const SystemSettings = () => {
       InterestRateByType: updatedByType,
     }));
     setDeleteModalVisible(false);
+    // Persist happens via section Save (canonical LoanTypes only)
     showMessage('Success', `Deleted ${t} month term for ${lt} only.`);
   };
 
@@ -442,7 +455,7 @@ const SystemSettings = () => {
     }
     return '';
   };
-  const confirmWizardAdd = () => {
+  const confirmWizardAdd = async () => {
     const err = validateWizard();
     if (err) { setWizardError(err); return; }
     const name = wizardLoanTypeName.trim();
@@ -476,14 +489,38 @@ const SystemSettings = () => {
       newInterestByType[name] = typeMap;
     }
 
-    setSettings(prev => ({
-      ...prev,
-      LoanTypes: newLoanTypes,
-      InterestRateByType: newInterestByType,
-    }));
-    setAddLoanTypeWizardVisible(false);
-    showMessage('Success', isEditingLoanType ? 'Loan type updated. Don’t forget to Save Settings.' : 'Loan type and per-term rates added. Don’t forget to Save Settings.');
-    resetWizard();
+    try {
+      setActionInProgress(true);
+      // Persist immediately when saving in the wizard
+      const parsedByType = {};
+      Object.entries(newInterestByType).forEach(([lt, map]) => {
+        parsedByType[lt] = {};
+        Object.entries(map || {}).forEach(([term, rate]) => {
+          const v = parseFloat(rate);
+          if (!isNaN(v)) parsedByType[lt][String(term)] = v;
+        });
+      });
+      const loanTypesNested = Object.fromEntries(
+        Object.entries(parsedByType).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), Number(v)]))])
+      );
+      await update(ref(db, 'Settings'), {
+        LoanTypes: loanTypesNested
+      });
+      // Reflect changes in local state
+      setSettings(prev => ({
+        ...prev,
+        LoanTypes: newLoanTypes,
+        // Stop tracking legacy map locally as source of truth
+      }));
+      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanTypes: loanTypesNested }));
+      setAddLoanTypeWizardVisible(false);
+      showMessage('Success', isEditingLoanType ? 'Loan type updated.' : 'Loan type and per-term rates added.');
+      resetWizard();
+    } catch (e) {
+      showMessage('Error', e.message || 'Failed to save', true);
+    } finally {
+      setActionInProgress(false);
+    }
   };
 
   const requestAddLoanType = () => {
@@ -521,14 +558,45 @@ const SystemSettings = () => {
     setDeleteLoanTypeModalVisible(true);
   };
 
-  const confirmDeleteLoanType = () => {
-    const newLoanTypes = settings.LoanTypes.filter(type => type !== loanTypeToDelete);
-    setSettings({
-      ...settings,
-      LoanTypes: newLoanTypes
-    });
-    setDeleteLoanTypeModalVisible(false);
-    showMessage('Success', 'Loan type deleted successfully!');
+  const confirmDeleteLoanType = async () => {
+    try {
+      setActionInProgress(true);
+      const newLoanTypes = settings.LoanTypes.filter(type => type !== loanTypeToDelete);
+      // Remove also from InterestRateByType
+      const newInterestByType = { ...(settings.InterestRateByType || {}) };
+      delete newInterestByType[loanTypeToDelete];
+
+      // Build canonical nested map
+      const parsedByType = {};
+      Object.entries(newInterestByType).forEach(([lt, map]) => {
+        parsedByType[lt] = {};
+        Object.entries(map || {}).forEach(([term, rate]) => {
+          const v = parseFloat(rate);
+          if (!isNaN(v)) parsedByType[lt][String(term)] = v;
+        });
+      });
+      const loanTypesNested = Object.fromEntries(
+        Object.entries(parsedByType).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), Number(v)]))])
+      );
+
+      await update(ref(db, 'Settings'), {
+        InterestRateByType: parsedByType,
+        LoanTypes: loanTypesNested
+      });
+
+      setSettings({
+        ...settings,
+        LoanTypes: newLoanTypes,
+        InterestRateByType: newInterestByType
+      });
+      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), InterestRateByType: newInterestByType, LoanTypes: loanTypesNested }));
+      setDeleteLoanTypeModalVisible(false);
+      showMessage('Success', 'Loan type deleted successfully!');
+    } catch (e) {
+      showMessage('Error', e.message || 'Failed to delete', true);
+    } finally {
+      setActionInProgress(false);
+    }
   };
 
   const handleSave = () => setConfirmationModalVisible(true);
@@ -571,11 +639,17 @@ const SystemSettings = () => {
         throw new Error('Members Dividend Breakdown must total 100%.');
       }
 
+      // Build canonical nested map under LoanTypes: { [loanType]: { [term]: rate } }
+      const loanTypesNested = Object.fromEntries(
+        Object.entries(parsedByType).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), Number(v)]))])
+      );
+
       const updatedData = {
         LoanPercentage: safeParseFloat(settings.LoanPercentage, 80),
         Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
         Savings: parseFloat(parseFloat(settings.Savings || 0).toFixed(2)),
         InterestRate: parsedInterest,
+        // Keep legacy path during transition; canonical is now LoanTypes nested map
         InterestRateByType: parsedByType,
         LoanReminderDays: parseInt(settings.LoanReminderDays || 7, 10),
         DividendDate: settings.DividendDate,
@@ -588,7 +662,8 @@ const SystemSettings = () => {
         ActiveMonthsPercentage: safeParseFloat(settings.ActiveMonthsPercentage, 15),
         ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
         RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 5000).toFixed(2)),
-        LoanTypes: settings.LoanTypes,
+        // NEW: Replace array with nested map
+        LoanTypes: loanTypesNested,
         // LoanTermsMapping removed per new design; valid months come from InterestRateByType keys
         OrientationCode: settings.OrientationCode,
         Accounts: settings.Accounts,
@@ -960,20 +1035,82 @@ const SystemSettings = () => {
             <div style={styles.loanTypesSection}>
               <h3 style={{ ...styles.subSectionTitle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <span>Types of Loans</span>
-                <button
-                  style={styles.headerIconBtn}
-                  title="Add Type of Loan"
-                  onClick={() => {
-                    setWizardLoanTypeName('');
-                    setWizardRows([{ term: '', rate: '' }]);
-                    setWizardError('');
-                    setIsEditingLoanType(false);
-                    setEditingOriginalLoanType('');
-                    setAddLoanTypeWizardVisible(true);
-                  }}
-                >
-                  <FaPlus />
-                </button>
+                {!editLoanTypes ? (
+                  <button
+                    style={styles.headerIconBtn}
+                    title="Edit Types of Loan"
+                    onClick={() => setEditLoanTypes(true)}
+                  >
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save Types of Loan"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          // Build canonical nested map from current InterestRateByType
+                          const parsedByType = {};
+                          Object.entries(settings.InterestRateByType || {}).forEach(([lt, map]) => {
+                            parsedByType[lt] = {};
+                            Object.entries(map || {}).forEach(([term, rate]) => {
+                              const v = parseFloat(rate);
+                              if (!isNaN(v)) parsedByType[lt][String(term)] = v;
+                            });
+                          });
+                          const loanTypesNested = Object.fromEntries(
+                            Object.entries(parsedByType).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), Number(v)]))])
+                          );
+                          await update(ref(db, 'Settings'), {
+                            LoanTypes: loanTypesNested
+                          });
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanTypes: loanTypesNested }));
+                          setEditLoanTypes(false);
+                          showMessage('Success', 'Types of Loan updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        // Revert UI state to last saved snapshot
+                        if (savedSettingsSnapshot) {
+                          setSettings(prev => ({
+                            ...prev,
+                            InterestRateByType: savedSettingsSnapshot.InterestRateByType ?? prev.InterestRateByType,
+                            LoanTypes: Array.isArray(savedSettingsSnapshot.LoanTypes) ? savedSettingsSnapshot.LoanTypes : Object.keys(savedSettingsSnapshot.LoanTypes || {})
+                          }));
+                        }
+                        setEditLoanTypes(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                    <button
+                      style={styles.headerIconBtn}
+                      title="Add Type of Loan"
+                      onClick={() => {
+                        setWizardLoanTypeName('');
+                        setWizardRows([{ term: '', rate: '' }]);
+                        setWizardError('');
+                        setIsEditingLoanType(false);
+                        setEditingOriginalLoanType('');
+                        setAddLoanTypeWizardVisible(true);
+                      }}
+                    >
+                      <FaPlus />
+                    </button>
+                  </div>
+                )}
               </h3>
               {settings.LoanTypes.map((loanType, index) => (
                 <div key={index} style={styles.loanTypeRow}>
@@ -1000,22 +1137,24 @@ const SystemSettings = () => {
                         : (<span style={{ color: '#888' }}>No terms set</span>)}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    <button 
-                      style={styles.editLoanTypeBtn}
-                      title="Edit terms & rates"
-                      onClick={() => openEditLoanType(loanType)}
-                    >
-                      <FaEdit style={styles.buttonIcon} />
-                    </button>
-                    <button 
-                      style={styles.deleteLoanTypeBtn}
-                      title="Delete loan type"
-                      onClick={() => requestDeleteLoanType(loanType)}
-                    >
-                      <FaTrashAlt style={styles.buttonIcon} />
-                    </button>
-                  </div>
+                  {editLoanTypes && (
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button 
+                        style={styles.editLoanTypeBtn}
+                        title="Edit terms & rates"
+                        onClick={() => openEditLoanType(loanType)}
+                      >
+                        <FaEdit style={styles.buttonIcon} />
+                      </button>
+                      <button 
+                        style={styles.deleteLoanTypeBtn}
+                        title="Delete loan type"
+                        onClick={() => requestDeleteLoanType(loanType)}
+                      >
+                        <FaTrashAlt style={styles.buttonIcon} />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
 

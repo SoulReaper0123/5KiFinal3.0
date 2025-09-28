@@ -385,11 +385,10 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Payment Method</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Approved</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Method</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -402,7 +401,6 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid)}</td>
                 <td style={styles.tableCell}>{item.paymentOption}</td>
-                <td style={styles.tableCell}>{item.dateApproved}</td>
                 <td style={{
                   ...styles.tableCell,
                   ...styles.statusApproved

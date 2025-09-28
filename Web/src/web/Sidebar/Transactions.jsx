@@ -401,6 +401,12 @@ const Transactions = () => {
           }
           
           Object.keys(transactionsData[memberId]).forEach(transactionId => {
+            const details = transactionsData[memberId][transactionId];
+            const status = (details.status || '').toLowerCase();
+            // Only include approved transactions to match the App
+            if (status !== 'approved') {
+              return;
+            }
             // Check if transaction already exists
             const exists = newTransactions[memberId].some(
               t => t.transactionId === transactionId && t.type === type
@@ -408,7 +414,7 @@ const Transactions = () => {
             
             if (!exists) {
               newTransactions[memberId].push({
-                ...transactionsData[memberId][transactionId],
+                ...details,
                 type,
                 transactionId,
               });

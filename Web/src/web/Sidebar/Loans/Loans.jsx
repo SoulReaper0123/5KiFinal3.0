@@ -59,10 +59,13 @@ const Loans = () => {
     const settingsRef = database.ref('Settings');
     const cb = (snap) => {
       const s = snap.val() || {};
-      setLoanTypes(s.LoanTypes || ['Regular Loan', 'Quick Cash']);
-      setInterestByType(s.InterestRateByType || {});
-      if (!addForm.loanType && Array.isArray(s.LoanTypes) && s.LoanTypes.length > 0) {
-        const defaultType = s.LoanTypes[0];
+      const lt = s.LoanTypes;
+      const isMap = lt && typeof lt === 'object' && !Array.isArray(lt);
+      const typesArr = isMap ? Object.keys(lt) : (lt || ['Regular Loan', 'Quick Cash']);
+      setLoanTypes(typesArr);
+      setInterestByType(isMap ? lt : (s.InterestRateByType || {}));
+      if (!addForm.loanType && typesArr.length > 0) {
+        const defaultType = typesArr[0];
         setAddForm(prev => ({ ...prev, loanType: defaultType }));
       }
     };
