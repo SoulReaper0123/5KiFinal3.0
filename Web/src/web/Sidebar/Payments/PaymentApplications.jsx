@@ -959,6 +959,13 @@ const PaymentApplications = ({
             memberLoanRef.remove()
           ]);
 
+          // Note: Borrowed savings have been gradually deducted during payments
+          // No need to return borrowed amount here as it's been handled incrementally
+          const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
+          if (borrowedFromSavings > 0) {
+            console.log(`Loan fully paid. Borrowed amount (${formatCurrency(borrowedFromSavings)}) was gradually deducted during payments.`);
+          }
+
           // Remove from ApprovedLoans (both possible paths), specific key only
           try { await database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).remove(); } catch (_) {}
           try { await database.ref(`ApprovedLoans/${id}/${currentLoanKey}`).remove(); } catch (_) {}
@@ -1056,10 +1063,95 @@ const PaymentApplications = ({
       // STEP 2: UPDATE MEMBERS AND FUNDS AFTER CURRENTLOANS
       console.log('=== STEP 2: Updating Members and Funds ===');
       
-      // Update member savings balance: add principalPaid + excessPayment
-      const memberBalanceToSet = Math.ceil((memberBalance + principalPaid + excessPayment) * 100) / 100;
-      await memberRef.update({ balance: memberBalanceToSet });
-      console.log('Member balance updated (principal + excess)');
+      // Calculate how much of the principal should go back to member vs savings
+      const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
+      const originalLoanAmount = parseFloat(approvedLoanData?.amount) || 0;
+      
+      console.log('=== Savings Calculation Debug ===');
+      console.log('borrowedFromSavings:', borrowedFromSavings);
+      console.log('originalLoanAmount:', originalLoanAmount);
+      console.log('memberBalance:', memberBalance);
+      console.log('principalPaid:', principalPaid);
+      console.log('excessPayment:', excessPayment);
+      
+      // Validate values to prevent division by zero or invalid calculations
+      let memberContributionRatio = 1; // Default: all goes to member
+      if (originalLoanAmount > 0 && borrowedFromSavings > 0 && borrowedFromSavings < originalLoanAmount) {
+        memberContributionRatio = (originalLoanAmount - borrowedFromSavings) / originalLoanAmount;
+      }
+      
+      // Ensure ratio is valid (between 0 and 1)
+      if (isNaN(memberContributionRatio) || memberContributionRatio < 0 || memberContributionRatio > 1) {
+        console.log('Invalid ratio detected, using fallback ratio = 1');
+        memberContributionRatio = 1;
+      }
+      
+      console.log('memberContributionRatio:', memberContributionRatio);
+      
+      // STEP 1: Return any borrowed amount back to savings when principal is paid
+      // borrowedFromSavings is already declared above from approvedLoanData
+      
+      let savingsAfterBorrowedReturn = currentSavings;
+      if (borrowedFromSavings > 0) {
+        // Calculate how much of the borrowed amount to return based on payment progress
+        const totalLoanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+        
+        // Return proportional borrowed amount based on principal payment
+        const borrowedToReturn = borrowedFromSavings * (principalPaid / totalLoanAmount);
+        
+        console.log(`=== Borrowed Savings Return Analysis ===`);
+        console.log(`Total borrowed from savings: ${formatCurrency(borrowedFromSavings)}`);
+        console.log(`Total loan amount: ${formatCurrency(totalLoanAmount)}`);
+        console.log(`Principal paid this payment: ${formatCurrency(principalPaid)}`);
+        console.log(`Proportional borrowed to return: ${formatCurrency(borrowedToReturn)}`);
+        console.log(`Current savings available: ${formatCurrency(currentSavings)}`);
+        
+        if (borrowedToReturn > 0) {
+          savingsAfterBorrowedReturn = Math.ceil((currentSavings + borrowedToReturn) * 100) / 100;
+          await savingsRef.set(savingsAfterBorrowedReturn);
+          console.log(`✅ Borrowed savings returned: ${formatCurrency(borrowedToReturn)}`);
+          console.log(`Savings: ${formatCurrency(currentSavings)} → ${formatCurrency(savingsAfterBorrowedReturn)}`);
+          
+          // Update daily SavingsHistory by adding the borrowed amount back
+          const now = new Date();
+          const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+          const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+          const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+          const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+          const newDaySavings = Math.ceil((currentDaySavings + borrowedToReturn) * 100) / 100;
+          await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+          console.log(`Savings history updated for ${dateKey}`);
+        } else {
+          console.log(`ℹ️ No borrowed amount to return this payment`);
+        }
+      } else {
+        console.log(`ℹ️ No borrowed savings for this loan`);
+      }
+      
+      // STEP 2: Now proceed with normal member balance allocation
+      // Add principal amount minus borrowed portion + excess to member balance
+      // The borrowed portion is returned to savings separately above
+      const principalToMember = principalPaid - borrowedFromSavings;
+      const memberBalanceToSet = Math.ceil((memberBalance + principalToMember + excessPayment) * 100) / 100;
+      
+      console.log('=== Member Balance Update Debug ===');
+      console.log('principalPaid:', principalPaid);
+      console.log('borrowedFromSavings:', borrowedFromSavings);
+      console.log('principalToMember (after deducting borrowed):', principalToMember);
+      console.log('excessPayment:', excessPayment);
+      console.log('memberBalance before:', memberBalance);
+      console.log('memberBalanceToSet:', memberBalanceToSet);
+      
+      // Validate final balance to prevent invalid values
+      if (isNaN(memberBalanceToSet) || !isFinite(memberBalanceToSet)) {
+        console.error('Invalid member balance calculation, using fallback');
+        const fallbackBalance = Math.ceil((memberBalance + principalPaid + excessPayment) * 100) / 100;
+        await memberRef.update({ balance: fallbackBalance });
+        console.log(`Member balance updated (fallback): ${formatCurrency(fallbackBalance)}`);
+      } else {
+        await memberRef.update({ balance: memberBalanceToSet });
+        console.log(`Member balance updated: principal to member (${formatCurrency(principalToMember)}) + excess (${formatCurrency(excessPayment)})`);
+      }
 
       // Update Savings with penalty only, and Yields with interest
       const now = new Date();
@@ -1067,7 +1159,7 @@ const PaymentApplications = ({
 
       // 2a) Add penalties to Savings and SavingsHistory (daily aggregate)
       if (penaltyPaid > 0) {
-        const newSavingsAmount = Math.ceil((currentSavings + penaltyPaid) * 100) / 100;
+        const newSavingsAmount = Math.ceil((savingsAfterBorrowedReturn + penaltyPaid) * 100) / 100;
         await savingsRef.set(newSavingsAmount);
         console.log('Savings (penalties) updated');
 
@@ -1098,12 +1190,22 @@ const PaymentApplications = ({
         console.log('Yields history updated');
       }
 
-      // Update Funds with principal + excess
-      const principalPlusExcess = principalPaid + excessPayment;
-      if (principalPlusExcess > 0) {
-        const newFundsAmount = Math.ceil((currentFunds + principalPlusExcess) * 100) / 100;
+      // Update Funds with principal amount minus borrowed portion + excess
+      // The borrowed portion is returned to savings separately above
+      const principalToFunds = principalPaid - borrowedFromSavings;
+      const fundsIncrease = principalToFunds + excessPayment;
+      
+      console.log('=== Funds Update Debug ===');
+      console.log('principalPaid:', principalPaid);
+      console.log('borrowedFromSavings:', borrowedFromSavings);
+      console.log('principalToFunds (after deducting borrowed):', principalToFunds);
+      console.log('excessPayment:', excessPayment);
+      console.log('fundsIncrease (principal + excess):', fundsIncrease);
+      
+      if (fundsIncrease > 0) {
+        const newFundsAmount = Math.ceil((currentFunds + fundsIncrease) * 100) / 100;
         await fundsRef.set(newFundsAmount);
-        console.log('Funds updated (principal + excess)');
+        console.log(`Funds updated: ${formatCurrency(currentFunds)} + ${formatCurrency(fundsIncrease)} = ${formatCurrency(newFundsAmount)}`);
         
         // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD to match SavingsHistory)
         const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD

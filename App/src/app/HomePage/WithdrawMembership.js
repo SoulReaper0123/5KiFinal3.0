@@ -364,16 +364,19 @@ export default function WithdrawMembership() {
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <SafeAreaView style={styles.container}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <MaterialIcons name="arrow-back" size={30} color="white" />
+          {/* Header with centered title and left back button using invisible spacers */}
+          <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Membership Withdrawal</Text>
+          <View style={styles.headerSide} />
+        </View>
 
-          <Text style={styles.title}>Membership Withdrawal</Text>
-
-          <View style={styles.content}>
+        <View style={styles.content}>
+            <Text style={styles.label}>Email *</Text>
             <View style={styles.emailContainer}>
               <TextInput
-                placeholder="Email *"
                 value={form.email}
                 onChangeText={handleEmailChange}
                 style={[styles.input, emailError ? styles.inputError : null]}
@@ -388,39 +391,40 @@ export default function WithdrawMembership() {
 
             {memberId && !hasPendingWithdrawal && (
               <>
-                <Text style={styles.balanceText}>Balance: ₱{balance.toFixed(2)}</Text>
+                <Text style={styles.label}>Current Balance</Text>
+                <Text style={styles.balanceText}>₱{balance.toFixed(2)}</Text>
 
+                <Text style={styles.label}>First Name</Text>
                 <TextInput
-                  placeholder="First Name"
                   value={form.firstName}
                   editable={false}
                   style={[styles.input, styles.disabledInput]}
                 />
 
+                <Text style={styles.label}>Last Name</Text>
                 <TextInput
-                  placeholder="Last Name"
                   value={form.lastName}
                   editable={false}
                   style={[styles.input, styles.disabledInput]}
                 />
 
+                <Text style={styles.label}>Address</Text>
                 <TextInput
-                  placeholder="Address"
                   value={form.address}
                   onChangeText={(text) => setForm({...form, address: text})}
                   style={styles.input}
                 />
 
+                <Text style={styles.label}>Contact Number</Text>
                 <TextInput
-                  placeholder="Contact Number"
                   value={form.contact}
                   onChangeText={(text) => setForm({...form, contact: text})}
                   style={styles.input}
                   keyboardType="phone-pad"
                 />
 
+                <Text style={styles.label}>Date Joined</Text>
                 <TextInput
-                  placeholder="Date Joined"
                   value={form.joined}
                   editable={false}
                   style={[styles.input, styles.disabledInput]}
@@ -441,12 +445,14 @@ export default function WithdrawMembership() {
                 ))}
 
                 {showOtherReasonInput && (
-                  <TextInput
-                    placeholder="Please specify your reason"
-                    value={form.otherReason}
-                    onChangeText={(text) => setForm({...form, otherReason: text})}
-                    style={styles.input}
-                  />
+                  <>
+                    <Text style={styles.label}>Please specify your reason</Text>
+                    <TextInput
+                      value={form.otherReason}
+                      onChangeText={(text) => setForm({...form, otherReason: text})}
+                      style={styles.input}
+                    />
+                  </>
                 )}
 
                 <Text style={styles.sectionTitle}>Existing Loans</Text>
@@ -589,44 +595,61 @@ export default function WithdrawMembership() {
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: '#2D5783',
+    flexGrow: 1,
+    backgroundColor: '#F8FAFC',
+    padding: 16,
+    paddingBottom: 32,
   },
   scrollContainer: {
     flexGrow: 1,
   },
-  backButton: {
-    marginTop: 40,
-    marginStart: 20,
+  // Header styles for centered title with left back button
+  headerRow: {
+    marginTop: 10,
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  title: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  headerSide: {
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  headerTitle: {
+    flex: 1,
     textAlign: 'center',
-    color: 'white',
+    fontSize: 22,
+    fontWeight: '700',
+    color: '#0F172A',
   },
   content: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 50,
-    borderTopRightRadius: 50,
-    flex: 1,
-    paddingStart: 25,
-    paddingEnd: 25,
-    paddingTop: 20,
-    paddingBottom: 40,
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
   input: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 6,
-    borderColor: '#ccc',
     borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
     marginBottom: 15,
+    backgroundColor: '#f9f9f9',
   },
   disabledInput: {
     backgroundColor: '#f5f5f5',
     color: '#666',
+  },
+  label: {
+    fontSize: 16,
+    marginTop: 10,
+    marginBottom: 5,
   },
   sectionTitle: {
     fontWeight: 'bold',
@@ -679,7 +702,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 30,
     alignItems: 'center',
     marginTop: 20,
-    width: '50%',
+    width: '100%',
     alignSelf: 'center',
   },
   submitButtonDisabled: {
@@ -691,7 +714,7 @@ const styles = StyleSheet.create({
   submitText: {
     color: 'black',
     fontWeight: 'bold',
-    fontSize: 18,
+    fontSize: 16,
   },
   modalOverlay: {
     flex: 1,
@@ -747,11 +770,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   balanceText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#2D5783',
-    marginBottom: 15,
+    fontSize: 28,
+    marginBottom: 12,
     textAlign: 'center',
+    color: '#1E3A5F',
+    fontWeight: '700',
   },
   loanStatusContainer: {
     flexDirection: 'row',

@@ -41,7 +41,14 @@ const AboutUs = () => {
       <ScrollView contentContainerStyle={styles.scrollView}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            const parent = navigation.getParent();
+            if (parent && parent.openDrawer) {
+              parent.openDrawer();
+            } else {
+              navigation.replace('AppHome', { openDrawer: true });
+            }
+          }}
         >
           <MaterialIcons name="arrow-back" size={28} color="#2D5783" />
         </TouchableOpacity>

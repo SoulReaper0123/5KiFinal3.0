@@ -41,7 +41,18 @@ const Terms = () => {
       <ScrollView contentContainerStyle={styles.scrollView}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            const parent = navigation.getParent();
+
+            // When the Terms screen lives inside the Drawer navigator, open it again
+            if (parent && parent.openDrawer) {
+              parent.openDrawer();
+              return;
+            }
+
+            // Otherwise, navigate to AppHome and open the drawer
+            navigation.replace('AppHome', { openDrawer: true });
+          }}
         >
           <MaterialIcons name="arrow-back" size={30} color="black" />
         </TouchableOpacity>

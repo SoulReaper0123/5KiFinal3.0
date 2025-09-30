@@ -340,7 +340,6 @@ const CoAdminLoginPage = () => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoCapitalize="none"
-                  placeholderTextColor="#999"
                   onKeyPress={handleKeyPress}
                 />
                 <div style={styles.rightIconSpacer} />

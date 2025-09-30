@@ -36,9 +36,14 @@ const Withdraw = () => {
   const [alertType, setAlertType] = useState('error');
   const [pendingApiData, setPendingApiData] = useState(null);
 
+  // Cash on hand fields
+  const [receivedBy, setReceivedBy] = useState('');
+  const [dateReceived, setDateReceived] = useState('');
+
   const withdrawOptions = [
     { key: 'GCash', label: 'GCash' },
     { key: 'Bank', label: 'Bank' },
+    { key: 'Cash', label: 'Cash' },
   ];
 
   const fetchUserData = async (userEmail) => {
@@ -76,7 +81,10 @@ const Withdraw = () => {
  const resetFormFields = () => {
     setWithdrawOption('');
     setAccountNumber('');
+    setAccountName('');
     setWithdrawAmount('');
+    setReceivedBy('');
+    setDateReceived('');
     setPendingApiData(null);
   };
   useEffect(() => {
@@ -137,6 +145,9 @@ const Withdraw = () => {
     } else if (key === 'GCash') {
       setAccountName(gcashAccName || '');
       setAccountNumber((gcashAccNum || '').toString());
+    } else if (key === 'Cash') {
+      setAccountName('');
+      setAccountNumber('');
     } else {
       setAccountName('');
       setAccountNumber('');
@@ -146,7 +157,8 @@ const Withdraw = () => {
 const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
 useEffect(() => {
-  const hasEmptyFields = !withdrawOption || !accountName || !accountNumber || !withdrawAmount;
+  const hasEmptyFields = !withdrawOption || !withdrawAmount ||
+    (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
   const amount = parseFloat(withdrawAmount);
   const insufficientBalance = amount > balance;
   const belowMinimum = !isNaN(amount) && amount < 5000;
@@ -154,7 +166,10 @@ useEffect(() => {
 }, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
 
  const handleSubmit = async () => {
-  if (!withdrawOption || !accountName || !accountNumber || !withdrawAmount) {
+  const missingFields = !withdrawOption || !withdrawAmount ||
+    (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
+  
+  if (missingFields) {
     setAlertMessage('All fields are required');
     setAlertType('error');
     setAlertModalVisible(true);
@@ -303,22 +318,26 @@ useEffect(() => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
-        <TextInput
-          value={accountName}
-          editable={false}
-          style={[styles.input, { backgroundColor: '#F3F4F6' }]}
-          placeholder="Auto-filled from your profile"
-        />
+        {withdrawOption !== 'Cash' && (
+          <>
+            <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
+            <TextInput
+              value={accountName}
+              editable={false}
+              style={[styles.input, { backgroundColor: '#F3F4F6' }]}
+              placeholder="Auto-filled from your profile"
+            />
 
-        <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
-        <TextInput
-          value={accountNumber}
-          editable={false}
-          style={[styles.input, { backgroundColor: '#F3F4F6' }]}
-          keyboardType="numeric"
-          placeholder="Auto-filled from your profile"
-        />
+            <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
+            <TextInput
+              value={accountNumber}
+              editable={false}
+              style={[styles.input, { backgroundColor: '#F3F4F6' }]}
+              keyboardType="numeric"
+              placeholder="Auto-filled from your profile"
+            />
+          </>
+        )}
 
         <Text style={styles.label}>Withdraw Amount<Text style={styles.required}>*</Text></Text>
         <TextInput

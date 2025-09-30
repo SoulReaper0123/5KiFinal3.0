@@ -246,7 +246,14 @@ const Profile = () => {
     <View style={styles.container}>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <TouchableOpacity onPress={() => {
+            const parent = navigation.getParent();
+            if (parent && parent.openDrawer) {
+              parent.openDrawer();
+            } else {
+              navigation.replace('AppHome', { openDrawer: true });
+            }
+          }} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={30} color="white" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Profile</Text>

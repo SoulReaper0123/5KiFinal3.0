@@ -184,15 +184,22 @@ const SystemSettings = () => {
   const [editDividend, setEditDividend] = useState(false);
   const [editLoanReminder, setEditLoanReminder] = useState(false);
   const [editProcessingFee, setEditProcessingFee] = useState(false);
-  // Content Management per-card edit flags
-  const [editTerms, setEditTerms] = useState(false);
-  const [editPrivacy, setEditPrivacy] = useState(false);
-  const [editAbout, setEditAbout] = useState(false);
-  const [editContact, setEditContact] = useState(false);
+  // Content Management per-card edit flags - now using modals
+  const [editTermsModal, setEditTermsModal] = useState(false);
+  const [editPrivacyModal, setEditPrivacyModal] = useState(false);
+  const [editAboutModal, setEditAboutModal] = useState(false);
+  const [editContactModal, setEditContactModal] = useState(false);
   // Loan & Dividend header-level edit for Loan Reminder + Processing Fee
   const [editLoanAndFee, setEditLoanAndFee] = useState(false);
   // Edit mode toggle for Types of Loans section
   const [editLoanTypes, setEditLoanTypes] = useState(false);
+  // General Settings edit modes
+  const [editOrientationCode, setEditOrientationCode] = useState(false);
+  const [editGeneralSettings, setEditGeneralSettings] = useState(false);
+  // Savings addition amount (separate from total savings)
+  const [savingsAddAmount, setSavingsAddAmount] = useState('');
+  // Add to Savings modal
+  const [addToSavingsModalVisible, setAddToSavingsModalVisible] = useState(false);
 
   // Add Loan Type wizard state
   const [addLoanTypeWizardVisible, setAddLoanTypeWizardVisible] = useState(false);
@@ -201,6 +208,12 @@ const SystemSettings = () => {
   const [wizardError, setWizardError] = useState('');
   const [isEditingLoanType, setIsEditingLoanType] = useState(false);
   const [editingOriginalLoanType, setEditingOriginalLoanType] = useState('');
+  
+  // Temporary content states for modal editing
+  const [tempTermsContent, setTempTermsContent] = useState({ title: '', content: '' });
+  const [tempPrivacyContent, setTempPrivacyContent] = useState({ title: '', content: '' });
+  const [tempAboutContent, setTempAboutContent] = useState({ title: '', content: '' });
+  const [tempContactContent, setTempContactContent] = useState({ title: '', content: '' });
 
   const db = getDatabase();
 
@@ -813,23 +826,128 @@ const SystemSettings = () => {
         {/* General Settings Section */}
         {activeSection === 'general' && (
           <div style={styles.section}>
+            {/* General Settings Header with Edit/Save */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+              <h3 style={styles.subSectionTitle}>Financial Settings</h3>
+              {!editGeneralSettings ? (
+                <button style={styles.headerIconBtn} title="Edit Financial Settings" onClick={() => setEditGeneralSettings(true)}>
+                  <FaEdit />
+                </button>
+              ) : (
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                    title="Save Financial Settings"
+                    onClick={async () => {
+                      try {
+                        setActionInProgress(true);
+                        
+                        const updateData = {
+                          RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 0).toFixed(2))
+                        };
+                        
+                        await update(ref(db, 'Settings'), updateData);
+                        
+                        setSavedSettingsSnapshot(prev => ({ 
+                          ...(prev || {}), 
+                          RegistrationMinimumFee: settings.RegistrationMinimumFee
+                        }));
+                        
+                        setEditGeneralSettings(false);
+                        showMessage('Success', 'Financial settings updated successfully!');
+                      } catch (e) {
+                        showMessage('Error', e.message || 'Failed to save financial settings', true);
+                      } finally {
+                        setActionInProgress(false);
+                      }
+                    }}
+                  >
+                    <FaSave />
+                  </button>
+                  <button
+                    style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                    title="Cancel"
+                    onClick={() => {
+                      setSettings(prev => ({
+                        ...prev,
+                        RegistrationMinimumFee: savedSettingsSnapshot?.RegistrationMinimumFee ?? prev.RegistrationMinimumFee,
+                      }));
+                      setEditGeneralSettings(false);
+                    }}
+                  >
+                    <FaTimes />
+                  </button>
+                </div>
+              )}
+            </div>
+
             {/* Minimum Registration Fee */}
-            <div style={styles.rateRow}>
-              <span style={styles.termText}>Minimum Registration Fee</span>
-              <span style={styles.staticText}>₱{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
+            <div style={styles.inputRow}>
+              <label style={styles.label}>Minimum Registration Fee</label>
+              {!editGeneralSettings ? (
+                <span style={styles.staticText}>₱{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 'bold' }}>₱</span>
+                  <input
+                    style={styles.input}
+                    value={settings.RegistrationMinimumFee}
+                    onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
+                    type="text"
+                    placeholder="0.00"
+                  />
+                </div>
+              )}
             </div>
             
-            {/* Available Funds */}
-            <div style={styles.rateRow}>
-              <span style={styles.termText}>Available Funds</span>
+            {/* Available Funds - Read Only */}
+            <div style={styles.inputRow}>
+              <label style={styles.label}>Available Funds</label>
               <span style={styles.staticText}>₱{formatPesoAmount(settings.Funds)}</span>
             </div>
 
             {/* Savings */}
-            <div style={styles.rateRow}>
-              <span style={styles.termText}>Savings</span>
+            <div style={styles.inputRow}>
+              <label style={styles.label}>Current Savings</label>
               <span style={styles.staticText}>₱{formatPesoAmount(settings.Savings)}</span>
             </div>
+
+            {/* Add to Savings Button - Only visible in edit mode */}
+            {editGeneralSettings && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
+                <button
+                  style={{
+                    backgroundColor: '#2D5783',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '12px 24px',
+                    cursor: 'pointer',
+                    fontSize: '14px',
+                    fontWeight: '500',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    transition: 'all 0.2s',
+                  }}
+                  onClick={() => {
+                    setSavingsAddAmount('');
+                    setAddToSavingsModalVisible(true);
+                  }}
+                  onMouseOver={(e) => {
+                    e.target.style.backgroundColor = '#1a3d66';
+                    e.target.style.transform = 'translateY(-1px)';
+                  }}
+                  onMouseOut={(e) => {
+                    e.target.style.backgroundColor = '#2D5783';
+                    e.target.style.transform = 'translateY(0)';
+                  }}
+                >
+                  <FaPlus />
+                  Add to Savings
+                </button>
+              </div>
+            )}
 
 
 
@@ -917,7 +1035,54 @@ const SystemSettings = () => {
 
             {/* Orientation Code */}
             <div style={styles.orientationCodeContainer}>
-              <h3 style={styles.accountTitle}>Orientation Attendance Code</h3>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={styles.accountTitle}>Orientation Attendance Code</h3>
+                {!editOrientationCode ? (
+                  <button style={styles.headerIconBtn} title="Edit Orientation Code" onClick={() => setEditOrientationCode(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      title="Save Orientation Code"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          await update(ref(db, 'Settings'), {
+                            OrientationCode: settings.OrientationCode
+                          });
+                          setSavedSettingsSnapshot(prev => ({ 
+                            ...(prev || {}), 
+                            OrientationCode: settings.OrientationCode
+                          }));
+                          setEditOrientationCode(false);
+                          showMessage('Success', 'Orientation code updated successfully!');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save orientation code', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        setSettings(prev => ({
+                          ...prev,
+                          OrientationCode: savedSettingsSnapshot?.OrientationCode ?? prev.OrientationCode,
+                        }));
+                        setEditOrientationCode(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
               <div style={styles.orientationCodeRow}>
                 <div style={styles.orientationCodeValue}>
                   {settings.OrientationCode || 'Not set'}
@@ -931,10 +1096,21 @@ const SystemSettings = () => {
                     <FaCopy style={styles.buttonIcon} />
                   </button>
                 )}
+                {editOrientationCode && (
+                  <button 
+                    style={{ ...styles.copyBtn, backgroundColor: '#2196F3' }}
+                    onClick={handleGenerateOrientationCode}
+                    aria-label="Generate new orientation code"
+                    title="Generate New Code"
+                  >
+                    <FaRedo style={styles.buttonIcon} />
+                  </button>
+                )}
                 {orientationCopied && <span style={styles.copiedText}>Copied!</span>}
               </div>
               <p style={styles.orientationCodeDescription}>
                 This code is used for registration when attending the orientation. Share this code with attendees.
+                {editOrientationCode && <span style={{ color: '#2196F3', fontWeight: 'bold' }}> Click the refresh button to generate a new code.</span>}
               </p>
             </div>
           </div>
@@ -1387,81 +1563,29 @@ const SystemSettings = () => {
             <div style={styles.contentCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={styles.accountTitle}>Terms and Conditions</h3>
-                {!editTerms ? (
-                  <button style={styles.headerIconBtn} title="Edit Terms and Conditions" onClick={() => setEditTerms(true)}>
-                    <FaEdit />
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                      title="Save"
-                      onClick={async () => {
-                        try {
-                          setActionInProgress(true);
-                          await update(ref(db, 'Settings/TermsAndConditions'), settings.TermsAndConditions);
-                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), TermsAndConditions: settings.TermsAndConditions }));
-                          setEditTerms(false);
-                          showMessage('Success', 'Terms and Conditions updated');
-                        } catch (e) {
-                          showMessage('Error', e.message || 'Failed to save', true);
-                        } finally {
-                          setActionInProgress(false);
-                        }
-                      }}
-                    >
-                      <FaSave />
-                    </button>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                      title="Cancel"
-                      onClick={() => {
-                        if (savedSettingsSnapshot?.TermsAndConditions) {
-                          setSettings(prev => ({ ...prev, TermsAndConditions: savedSettingsSnapshot.TermsAndConditions }));
-                        }
-                        setEditTerms(false);
-                      }}
-                    >
-                      <FaTimes />
-                    </button>
-                  </div>
-                )}
+                <button 
+                  style={styles.headerIconBtn} 
+                  title="Edit Terms and Conditions" 
+                  onClick={() => {
+                    setTempTermsContent({
+                      title: settings.TermsAndConditions.title,
+                      content: settings.TermsAndConditions.content
+                    });
+                    setEditTermsModal(true);
+                  }}
+                >
+                  <FaEdit />
+                </button>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editTerms ? (
-                  <input
-                    style={styles.input}
-                    value={settings.TermsAndConditions.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      TermsAndConditions: {
-                        ...settings.TermsAndConditions,
-                        title: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={styles.staticText}>{settings.TermsAndConditions.title}</div>
-                )}
+                <div style={styles.staticText}>{settings.TermsAndConditions.title}</div>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editTerms ? (
-                  <textarea
-                    style={styles.textarea}
-                    value={settings.TermsAndConditions.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      TermsAndConditions: {
-                        ...settings.TermsAndConditions,
-                        content: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.TermsAndConditions.content}</div>
-                )}
+                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
+                  {settings.TermsAndConditions.content}
+                </div>
               </div>
             </div>
 
@@ -1469,81 +1593,29 @@ const SystemSettings = () => {
             <div style={styles.contentCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={styles.accountTitle}>Privacy Policy</h3>
-                {!editPrivacy ? (
-                  <button style={styles.headerIconBtn} title="Edit Privacy Policy" onClick={() => setEditPrivacy(true)}>
-                    <FaEdit />
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                      title="Save"
-                      onClick={async () => {
-                        try {
-                          setActionInProgress(true);
-                          await update(ref(db, 'Settings/PrivacyPolicy'), settings.PrivacyPolicy);
-                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), PrivacyPolicy: settings.PrivacyPolicy }));
-                          setEditPrivacy(false);
-                          showMessage('Success', 'Privacy Policy updated');
-                        } catch (e) {
-                          showMessage('Error', e.message || 'Failed to save', true);
-                        } finally {
-                          setActionInProgress(false);
-                        }
-                      }}
-                    >
-                      <FaSave />
-                    </button>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                      title="Cancel"
-                      onClick={() => {
-                        if (savedSettingsSnapshot?.PrivacyPolicy) {
-                          setSettings(prev => ({ ...prev, PrivacyPolicy: savedSettingsSnapshot.PrivacyPolicy }));
-                        }
-                        setEditPrivacy(false);
-                      }}
-                    >
-                      <FaTimes />
-                    </button>
-                  </div>
-                )}
+                <button 
+                  style={styles.headerIconBtn} 
+                  title="Edit Privacy Policy" 
+                  onClick={() => {
+                    setTempPrivacyContent({
+                      title: settings.PrivacyPolicy.title,
+                      content: settings.PrivacyPolicy.content
+                    });
+                    setEditPrivacyModal(true);
+                  }}
+                >
+                  <FaEdit />
+                </button>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editPrivacy ? (
-                  <input
-                    style={styles.input}
-                    value={settings.PrivacyPolicy.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      PrivacyPolicy: {
-                        ...settings.PrivacyPolicy,
-                        title: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={styles.staticText}>{settings.PrivacyPolicy.title}</div>
-                )}
+                <div style={styles.staticText}>{settings.PrivacyPolicy.title}</div>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editPrivacy ? (
-                  <textarea
-                    style={styles.textarea}
-                    value={settings.PrivacyPolicy.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      PrivacyPolicy: {
-                        ...settings.PrivacyPolicy,
-                        content: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.PrivacyPolicy.content}</div>
-                )}
+                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
+                  {settings.PrivacyPolicy.content}
+                </div>
               </div>
             </div>
 
@@ -1551,81 +1623,29 @@ const SystemSettings = () => {
             <div style={styles.contentCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={styles.accountTitle}>About Us</h3>
-                {!editAbout ? (
-                  <button style={styles.headerIconBtn} title="Edit About Us" onClick={() => setEditAbout(true)}>
-                    <FaEdit />
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                      title="Save"
-                      onClick={async () => {
-                        try {
-                          setActionInProgress(true);
-                          await update(ref(db, 'Settings/AboutUs'), settings.AboutUs);
-                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), AboutUs: settings.AboutUs }));
-                          setEditAbout(false);
-                          showMessage('Success', 'About Us updated');
-                        } catch (e) {
-                          showMessage('Error', e.message || 'Failed to save', true);
-                        } finally {
-                          setActionInProgress(false);
-                        }
-                      }}
-                    >
-                      <FaSave />
-                    </button>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                      title="Cancel"
-                      onClick={() => {
-                        if (savedSettingsSnapshot?.AboutUs) {
-                          setSettings(prev => ({ ...prev, AboutUs: savedSettingsSnapshot.AboutUs }));
-                        }
-                        setEditAbout(false);
-                      }}
-                    >
-                      <FaTimes />
-                    </button>
-                  </div>
-                )}
+                <button 
+                  style={styles.headerIconBtn} 
+                  title="Edit About Us" 
+                  onClick={() => {
+                    setTempAboutContent({
+                      title: settings.AboutUs.title,
+                      content: settings.AboutUs.content
+                    });
+                    setEditAboutModal(true);
+                  }}
+                >
+                  <FaEdit />
+                </button>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editAbout ? (
-                  <input
-                    style={styles.input}
-                    value={settings.AboutUs.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      AboutUs: {
-                        ...settings.AboutUs,
-                        title: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={styles.staticText}>{settings.AboutUs.title}</div>
-                )}
+                <div style={styles.staticText}>{settings.AboutUs.title}</div>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editAbout ? (
-                  <textarea
-                    style={styles.textarea}
-                    value={settings.AboutUs.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      AboutUs: {
-                        ...settings.AboutUs,
-                        content: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.AboutUs.content}</div>
-                )}
+                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
+                  {settings.AboutUs.content}
+                </div>
               </div>
             </div>
 
@@ -1633,81 +1653,29 @@ const SystemSettings = () => {
             <div style={styles.contentCard}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={styles.accountTitle}>Contact Us</h3>
-                {!editContact ? (
-                  <button style={styles.headerIconBtn} title="Edit Contact Us" onClick={() => setEditContact(true)}>
-                    <FaEdit />
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                      title="Save"
-                      onClick={async () => {
-                        try {
-                          setActionInProgress(true);
-                          await update(ref(db, 'Settings/ContactUs'), settings.ContactUs);
-                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ContactUs: settings.ContactUs }));
-                          setEditContact(false);
-                          showMessage('Success', 'Contact Us updated');
-                        } catch (e) {
-                          showMessage('Error', e.message || 'Failed to save', true);
-                        } finally {
-                          setActionInProgress(false);
-                        }
-                      }}
-                    >
-                      <FaSave />
-                    </button>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                      title="Cancel"
-                      onClick={() => {
-                        if (savedSettingsSnapshot?.ContactUs) {
-                          setSettings(prev => ({ ...prev, ContactUs: savedSettingsSnapshot.ContactUs }));
-                        }
-                        setEditContact(false);
-                      }}
-                    >
-                      <FaTimes />
-                    </button>
-                  </div>
-                )}
+                <button 
+                  style={styles.headerIconBtn} 
+                  title="Edit Contact Us" 
+                  onClick={() => {
+                    setTempContactContent({
+                      title: settings.ContactUs.title,
+                      content: settings.ContactUs.content
+                    });
+                    setEditContactModal(true);
+                  }}
+                >
+                  <FaEdit />
+                </button>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Title</label>
-                {editContact ? (
-                  <input
-                    style={styles.input}
-                    value={settings.ContactUs.title}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      ContactUs: {
-                        ...settings.ContactUs,
-                        title: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={styles.staticText}>{settings.ContactUs.title}</div>
-                )}
+                <div style={styles.staticText}>{settings.ContactUs.title}</div>
               </div>
               <div style={styles.inputRow}>
                 <label style={styles.label}>Content</label>
-                {editContact ? (
-                  <textarea
-                    style={styles.textarea}
-                    value={settings.ContactUs.content}
-                    onChange={(e) => setSettings({
-                      ...settings,
-                      ContactUs: {
-                        ...settings.ContactUs,
-                        content: e.target.value
-                      }
-                    })}
-                  />
-                ) : (
-                  <div style={{ ...styles.contentText, flex: 1 }}>{settings.ContactUs.content}</div>
-                )}
+                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
+                  {settings.ContactUs.content}
+                </div>
               </div>
             </div>
           </div>
@@ -1995,6 +1963,330 @@ const SystemSettings = () => {
               >
                 OK
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Terms and Conditions Edit Modal */}
+        {editTermsModal && (
+          <div style={styles.centeredModal}>
+            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
+              <h3 style={styles.modalTitle}>Edit Terms and Conditions</h3>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <input
+                  style={styles.modalInput}
+                  value={tempTermsContent.title}
+                  onChange={(e) => setTempTermsContent(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter title"
+                />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <textarea
+                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  value={tempTermsContent.content}
+                  onChange={(e) => setTempTermsContent(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Enter content"
+                />
+              </div>
+              <div style={styles.modalButtons}>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  onClick={async () => {
+                    try {
+                      setActionInProgress(true);
+                      const updatedTerms = {
+                        title: tempTermsContent.title,
+                        content: tempTermsContent.content
+                      };
+                      await update(ref(db, 'Settings/TermsAndConditions'), updatedTerms);
+                      setSettings(prev => ({ ...prev, TermsAndConditions: updatedTerms }));
+                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), TermsAndConditions: updatedTerms }));
+                      setEditTermsModal(false);
+                      showMessage('Success', 'Terms and Conditions updated successfully!');
+                    } catch (e) {
+                      showMessage('Error', e.message || 'Failed to save Terms and Conditions', true);
+                    } finally {
+                      setActionInProgress(false);
+                    }
+                  }}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  onClick={() => setEditTermsModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Privacy Policy Edit Modal */}
+        {editPrivacyModal && (
+          <div style={styles.centeredModal}>
+            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
+              <h3 style={styles.modalTitle}>Edit Privacy Policy</h3>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <input
+                  style={styles.modalInput}
+                  value={tempPrivacyContent.title}
+                  onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter title"
+                />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <textarea
+                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  value={tempPrivacyContent.content}
+                  onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Enter content"
+                />
+              </div>
+              <div style={styles.modalButtons}>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  onClick={async () => {
+                    try {
+                      setActionInProgress(true);
+                      const updatedPrivacy = {
+                        title: tempPrivacyContent.title,
+                        content: tempPrivacyContent.content
+                      };
+                      await update(ref(db, 'Settings/PrivacyPolicy'), updatedPrivacy);
+                      setSettings(prev => ({ ...prev, PrivacyPolicy: updatedPrivacy }));
+                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), PrivacyPolicy: updatedPrivacy }));
+                      setEditPrivacyModal(false);
+                      showMessage('Success', 'Privacy Policy updated successfully!');
+                    } catch (e) {
+                      showMessage('Error', e.message || 'Failed to save Privacy Policy', true);
+                    } finally {
+                      setActionInProgress(false);
+                    }
+                  }}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  onClick={() => setEditPrivacyModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* About Us Edit Modal */}
+        {editAboutModal && (
+          <div style={styles.centeredModal}>
+            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
+              <h3 style={styles.modalTitle}>Edit About Us</h3>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <input
+                  style={styles.modalInput}
+                  value={tempAboutContent.title}
+                  onChange={(e) => setTempAboutContent(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter title"
+                />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <textarea
+                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  value={tempAboutContent.content}
+                  onChange={(e) => setTempAboutContent(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Enter content"
+                />
+              </div>
+              <div style={styles.modalButtons}>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  onClick={async () => {
+                    try {
+                      setActionInProgress(true);
+                      const updatedAbout = {
+                        title: tempAboutContent.title,
+                        content: tempAboutContent.content
+                      };
+                      await update(ref(db, 'Settings/AboutUs'), updatedAbout);
+                      setSettings(prev => ({ ...prev, AboutUs: updatedAbout }));
+                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), AboutUs: updatedAbout }));
+                      setEditAboutModal(false);
+                      showMessage('Success', 'About Us updated successfully!');
+                    } catch (e) {
+                      showMessage('Error', e.message || 'Failed to save About Us', true);
+                    } finally {
+                      setActionInProgress(false);
+                    }
+                  }}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  onClick={() => setEditAboutModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Contact Us Edit Modal */}
+        {editContactModal && (
+          <div style={styles.centeredModal}>
+            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
+              <h3 style={styles.modalTitle}>Edit Contact Us</h3>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <input
+                  style={styles.modalInput}
+                  value={tempContactContent.title}
+                  onChange={(e) => setTempContactContent(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Enter title"
+                />
+              </div>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <textarea
+                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  value={tempContactContent.content}
+                  onChange={(e) => setTempContactContent(prev => ({ ...prev, content: e.target.value }))}
+                  placeholder="Enter content"
+                />
+              </div>
+              <div style={styles.modalButtons}>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  onClick={async () => {
+                    try {
+                      setActionInProgress(true);
+                      const updatedContact = {
+                        title: tempContactContent.title,
+                        content: tempContactContent.content
+                      };
+                      await update(ref(db, 'Settings/ContactUs'), updatedContact);
+                      setSettings(prev => ({ ...prev, ContactUs: updatedContact }));
+                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ContactUs: updatedContact }));
+                      setEditContactModal(false);
+                      showMessage('Success', 'Contact Us updated successfully!');
+                    } catch (e) {
+                      showMessage('Error', e.message || 'Failed to save Contact Us', true);
+                    } finally {
+                      setActionInProgress(false);
+                    }
+                  }}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Saving...' : 'Save'}
+                </button>
+                <button
+                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  onClick={() => setEditContactModal(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add to Savings Modal */}
+        {addToSavingsModalVisible && (
+          <div style={styles.centeredModal}>
+            <div style={{ ...styles.modalContent, width: '400px' }}>
+              <h3 style={styles.modalTitle}>Add to Savings</h3>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Amount</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 16, fontWeight: 'bold' }}>₱</span>
+                  <input
+                    style={styles.modalInput}
+                    value={savingsAddAmount}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      // Allow only numbers and decimal point
+                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                        setSavingsAddAmount(value);
+                      }
+                    }}
+                    type="text"
+                    placeholder="0.00"
+                    autoFocus
+                  />
+                </div>
+                {savingsAddAmount && parseFloat(savingsAddAmount) > 0 && (
+                  <div style={{ fontSize: 12, color: '#666', marginTop: 8, textAlign: 'center' }}>
+                    Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) + parseFloat(savingsAddAmount)).toFixed(2))}
+                  </div>
+                )}
+              </div>
+              <div style={styles.modalButtons}>
+                <button
+                  style={{ ...styles.modalBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                  onClick={async () => {
+                    try {
+                      const addAmount = parseFloat(savingsAddAmount || 0);
+                      if (addAmount <= 0) {
+                        showMessage('Error', 'Please enter a valid amount greater than 0', true);
+                        return;
+                      }
+
+                      setActionInProgress(true);
+                      
+                      // Calculate new savings total
+                      const currentSavings = parseFloat(settings.Savings || 0);
+                      const newSavingsTotal = currentSavings + addAmount;
+                      
+                      const updateData = {
+                        Savings: parseFloat(newSavingsTotal.toFixed(2))
+                      };
+                      
+                      await update(ref(db, 'Settings'), updateData);
+                      
+                      // Update local state
+                      setSettings(prev => ({ ...prev, Savings: newSavingsTotal.toString() }));
+                      setSavedSettingsSnapshot(prev => ({ 
+                        ...(prev || {}), 
+                        Savings: newSavingsTotal.toString()
+                      }));
+                      
+                      // Reset and close modal
+                      setSavingsAddAmount('');
+                      setAddToSavingsModalVisible(false);
+                      showMessage('Success', `₱${formatPesoAmount(addAmount)} added to savings successfully!`);
+                    } catch (e) {
+                      showMessage('Error', e.message || 'Failed to add to savings', true);
+                    } finally {
+                      setActionInProgress(false);
+                    }
+                  }}
+                  disabled={actionInProgress || !savingsAddAmount || parseFloat(savingsAddAmount) <= 0}
+                >
+                  {actionInProgress ? 'Adding...' : 'Add to Savings'}
+                </button>
+                <button
+                  style={{ ...styles.modalBtn, backgroundColor: '#f44336', color: '#fff' }}
+                  onClick={() => {
+                    setSavingsAddAmount('');
+                    setAddToSavingsModalVisible(false);
+                  }}
+                >
+                  Cancel
+                </button>
+              </div>
             </div>
           </div>
         )}

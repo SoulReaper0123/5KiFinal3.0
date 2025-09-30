@@ -620,6 +620,12 @@ const Dashboard = () => {
           const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
           if (transactionDate && transactionDate.getFullYear() === parseInt(selectedYear)) {
             const month = transactionDate.getMonth();
+
+            // Only include approved transactions for dividends (ignore any 'paid' status)
+            const status = (transaction.status || '').toLowerCase();
+            if (status !== 'approved') {
+              return; // skip non-approved or missing status
+            }
             
             // Extract amount using correct field name for each transaction type
             // Exclude Deposits from monthly table (Jan-Dec)
@@ -2559,10 +2565,9 @@ const Dashboard = () => {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', tableLayout: 'fixed', margin: 0 }}>
           <thead>
             <tr style={styles.dividendsHeaderRow}>
-              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
-              <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
-              <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
-              <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Status</th>
+              <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Date</th>
+              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Type</th>
+              <th style={{...styles.dividendsHeaderCell, width: '180px'}}>Amount</th>
             </tr>
           </thead>
           <tbody>
@@ -2596,18 +2601,7 @@ const Dashboard = () => {
                     </div>
                   </div>
                 </td>
-                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  <span style={{
-                    backgroundColor: transaction.status === 'approved' ? '#d1fae5' : '#fef3c7',
-                    color: transaction.status === 'approved' ? '#059669' : '#d97706',
-                    padding: '2px 6px',
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    textTransform: 'capitalize'
-                  }}>
-                    {transaction.status || 'Processed'}
-                  </span>
-                </td>
+
               </tr>
             ))}
           </tbody>

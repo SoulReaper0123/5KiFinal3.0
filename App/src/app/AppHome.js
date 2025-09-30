@@ -49,6 +49,9 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const screenWidth = Dimensions.get('window').width;
   const [withdrawModalVisible, setWithdrawModalVisible] = useState(false);
   const [marqueeMessages, setMarqueeMessages] = useState([]);
+  const [hasNewInboxItems, setHasNewInboxItems] = useState(false);
+  const previousInboxCount = useRef(0);
+  const lastInboxCheckRef = useRef(null);
 
 
   useEffect(() => {
@@ -299,6 +302,19 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     }
   };
 
+  // Handle openDrawer param from navigation
+  useEffect(() => {
+    if (route.params?.openDrawer) {
+      handleOpenMenu();
+    }
+  }, [route.params?.openDrawer]);
+
+  const handleInboxOpen = () => {
+    setHasNewInboxItems(false);
+    lastInboxCheckRef.current = Date.now();
+    navigation.navigate('InboxTab');
+  };
+
   const handleLogoutFallback = async () => {
     try {
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
@@ -342,9 +358,10 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
             <TouchableOpacity
               style={styles.bellButton}
-              onPress={() => navigation.navigate('InboxTab')}
+              onPress={handleInboxOpen}
             >
               <Ionicons name="notifications-outline" size={26} color="#1E3A5F" />
+              {hasNewInboxItems && <View style={styles.notificationDot} />}
             </TouchableOpacity>
           </View>
 
@@ -591,6 +608,30 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
                 <Text style={styles.fallbackMenuText}>Contact Us</Text>
                 <MaterialIcons name="chevron-right" size={20} color="#ccc" />
               </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.fallbackMenuItem} 
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Terms and Conditions'); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fallbackMenuIcon}>
+                  <MaterialIcons name="description" size={22} color="#2D5783" />
+                </View>
+                <Text style={styles.fallbackMenuText}>Terms & Conditions</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={styles.fallbackMenuItem} 
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Privacy Policy'); }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.fallbackMenuIcon}>
+                  <MaterialIcons name="privacy-tip" size={22} color="#2D5783" />
+                </View>
+                <Text style={styles.fallbackMenuText}>Privacy Policy</Text>
+                <MaterialIcons name="chevron-right" size={20} color="#ccc" />
+              </TouchableOpacity>
             </View>
 
             {/* Enhanced Logout Section */}
@@ -612,42 +653,48 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         <View style={styles.modalContainer}>
           <View style={styles.modalBox}>
             <Text style={styles.modalTitle}>Choose Withdrawal Type</Text>
+
             <TouchableOpacity
-              style={styles.modalButton}
+              style={[styles.modalButton, styles.withdrawMoneyButton]}
               onPress={() => {
                 setWithdrawModalVisible(false);
-                navigation.navigate('Withdraw', { 
-                  user: { 
-                    email, 
-                    memberId, 
+                navigation.navigate('Withdraw', {
+                  user: {
+                    email,
+                    memberId,
                     firstName,
-                    balance 
-                  } 
+                    balance
+                  }
                 });
               }}
             >
+              <MaterialIcons name="account-balance-wallet" size={20} color="white" />
               <Text style={styles.modalButtonText}>Withdraw Money</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
-              style={styles.modalButton}
+              style={[styles.modalButton, styles.withdrawMembershipButton]}
               onPress={() => {
                 setWithdrawModalVisible(false);
-                navigation.navigate('WithdrawMembership', { 
-                  user: { 
-                    email, 
-                    memberId, 
+                navigation.navigate('WithdrawMembership', {
+                  user: {
+                    email,
+                    memberId,
                     firstName,
-                    balance 
-                  } 
+                    balance
+                  }
                 });
               }}
             >
+              <MaterialIcons name="person-remove" size={20} color="white" />
               <Text style={styles.modalButtonText}>Withdraw Membership</Text>
             </TouchableOpacity>
+
             <TouchableOpacity
+              style={styles.cancelButton}
               onPress={() => setWithdrawModalVisible(false)}
             >
-              <Text style={{ color: 'gray', marginTop: 10, textAlign: 'center' }}>Cancel</Text>
+              <Text style={styles.cancelButtonText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -798,6 +845,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: '#1E3A5F',
+    position: 'relative',
+  },
+  notificationDot: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: '#FF3B30',
   },
 
   // Wallet Card
@@ -1089,8 +1146,16 @@ const styles = StyleSheet.create({
     zIndex: 999,
   },
   modalBox: {
-    width: '80%',
-    backgroundColor: 'white',
+    width: '85%',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 15,
+    padding: 25,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    elevation: 10,
+    alignItems: 'center',
   },
 
   // Enhanced Fallback drawer styles
@@ -1262,21 +1327,54 @@ const styles = StyleSheet.create({
     marginLeft: 6,
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 15,
+    marginBottom: 25,
     textAlign: 'center',
+    color: '#1E3A5F',
   },
   modalButton: {
-    backgroundColor: '#1E3A5F',
-    paddingVertical: 10,
-    borderRadius: 5,
-    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    marginTop: 12,
+    width: '100%',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  withdrawMoneyButton: {
+    backgroundColor: '#28a745', // Green for money withdrawal
+  },
+  withdrawMembershipButton: {
+    backgroundColor: '#dc3545', // Red for membership withdrawal (more serious action)
   },
   modalButtonText: {
     color: 'white',
-    textAlign: 'center',
     fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  cancelButton: {
+    marginTop: 20,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    width: '100%',
+  },
+  cancelButtonText: {
+    color: '#6c757d',
+    fontSize: 16,
+    fontWeight: '600',
+    textAlign: 'center',
   },
 
 

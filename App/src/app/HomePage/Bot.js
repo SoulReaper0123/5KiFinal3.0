@@ -19,7 +19,9 @@ import Constants from 'expo-constants';
 import * as SecureStore from 'expo-secure-store';
 import { auth, database } from '../../firebaseConfig';
 import { ref as dbRef, get } from 'firebase/database';
-import { generateEnhancedAIResponse, checkEnhancedAIServiceStatus } from '../../services/enhancedFirebaseAI';
+// Using REST-based enhanced service with v1beta models
+import { generateEnhancedAIResponse } from '../../services/enhancedFirebaseAI';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 // Firebase AI is now initialized in the service
 console.log('Using Firebase AI with Gemini 2.0 Flash');
@@ -35,8 +37,10 @@ export default function Bot() {
   const flatListRef = useRef(null);
   const navigation = useNavigation();
   const route = useRoute();
-  // State for email
+  const insets = useSafeAreaInsets();
+  // State for email and memberId
   const [userEmail, setUserEmail] = useState(null);
+  const [memberIdOverride, setMemberIdOverride] = useState(null);
   
   // Get email and load user data from all possible sources
   useEffect(() => {
@@ -62,21 +66,34 @@ export default function Bot() {
           console.error('Error getting email from SecureStore:', error);
         }
         
+        // Also try to resolve memberId for stricter matching
+        const routeMemberId = route.params?.memberId;
+        let storedMemberId = null;
+        try {
+          storedMemberId = await SecureStore.getItemAsync('currentMemberId');
+        } catch (error) {
+          console.error('Error getting memberId from SecureStore:', error);
+        }
+        const resolvedMemberId = routeMemberId || storedMemberId || null;
+        setMemberIdOverride(resolvedMemberId);
+        
         // Use the first available email
         const email = routeEmail || parentRouteEmail || authEmail || storedEmail || 'Guest User';
         
-        console.log('Bot - Using email:', email, 'from sources:', { 
+        console.log('Bot - Using email:', email, 'and memberId:', resolvedMemberId, 'from sources:', { 
           routeEmail, 
           parentRouteEmail, 
           authEmail, 
-          storedEmail 
+          storedEmail,
+          routeMemberId,
+          storedMemberId
         });
         
         setUserEmail(email);
         
         // Load user loans if we have a valid email
         if (email && email !== 'Guest User') {
-          loadUserLoans(email);
+          loadUserLoans(email, resolvedMemberId);
         }
       } catch (error) {
         console.error('Error getting email in Bot:', error);
@@ -89,7 +106,8 @@ export default function Bot() {
   }, [route.params, navigation]);
   
   // Function to load user data (loans, deposits, payments, withdrawals)
-  const loadUserData = async (email) => {
+  // Load user data by email or memberId (prefers memberId when provided)
+const loadUserData = async (email, memberIdOverride = null) => {
     try {
       const userData = {
         loans: [],
@@ -107,7 +125,8 @@ export default function Bot() {
         const membersData = membersSnapshot.val();
         Object.keys(membersData).forEach(memberId => {
           const member = membersData[memberId];
-          if (member && member.email === email) {
+          const isMatch = memberIdOverride ? (memberId === memberIdOverride) : (member && member.email === email);
+          if (isMatch) {
             userData.memberInfo = { id: memberId, ...member };
             // Get the actual balance from the Members table
             userData.totalBalance = parseFloat(member.balance) || 0;
@@ -126,7 +145,8 @@ export default function Bot() {
           if (memberLoans) {
             Object.keys(memberLoans).forEach(loanId => {
               const loan = memberLoans[loanId];
-              if (loan && loan.email === email) {
+              const matchesMember = memberIdOverride ? (memberId === memberIdOverride) : (loan && loan.email === email);
+              if (matchesMember) {
                 userData.loans.push({ id: loanId, memberId, ...loan });
               }
             });
@@ -141,7 +161,10 @@ export default function Bot() {
         const currentLoansData = currentLoansSnapshot.val();
         Object.keys(currentLoansData).forEach(memberId => {
           const memberCurrentLoans = currentLoansData[memberId];
-          if (memberCurrentLoans && userData.memberInfo && userData.memberInfo.id === memberId) {
+          if (memberCurrentLoans && (
+            (memberIdOverride && memberId === memberIdOverride) ||
+            (userData.memberInfo && userData.memberInfo.id === memberId)
+          )) {
             Object.keys(memberCurrentLoans).forEach(loanId => {
               const currentLoan = memberCurrentLoans[loanId];
               if (currentLoan) {
@@ -163,7 +186,8 @@ export default function Bot() {
           if (memberDeposits) {
             Object.keys(memberDeposits).forEach(depositId => {
               const deposit = memberDeposits[depositId];
-              if (deposit && deposit.email === email) {
+              const matchesMember = memberIdOverride ? (memberId === memberIdOverride) : (deposit && deposit.email === email);
+              if (matchesMember) {
                 userData.deposits.push({ id: depositId, ...deposit });
               }
             });
@@ -181,7 +205,8 @@ export default function Bot() {
           if (memberPayments) {
             Object.keys(memberPayments).forEach(paymentId => {
               const payment = memberPayments[paymentId];
-              if (payment && payment.email === email) {
+              const matchesMember = memberIdOverride ? (memberId === memberIdOverride) : (payment && payment.email === email);
+              if (matchesMember) {
                 userData.payments.push({ id: paymentId, ...payment });
               }
             });
@@ -199,7 +224,8 @@ export default function Bot() {
           if (memberWithdrawals) {
             Object.keys(memberWithdrawals).forEach(withdrawalId => {
               const withdrawal = memberWithdrawals[withdrawalId];
-              if (withdrawal && withdrawal.email === email) {
+              const matchesMember = memberIdOverride ? (memberId === memberIdOverride) : (withdrawal && withdrawal.email === email);
+              if (matchesMember) {
                 userData.withdrawals.push({ id: withdrawalId, ...withdrawal });
               }
             });
@@ -215,9 +241,9 @@ export default function Bot() {
   };
 
   // Function to load user loans (keeping for backward compatibility)
-  const loadUserLoans = async (email) => {
+  const loadUserLoans = async (email, memberId = null) => {
     try {
-      const userData = await loadUserData(email);
+      const userData = await loadUserData(email, memberId);
       if (userData && userData.loans.length > 0) {
         const loanInfo = userData.loans.map(loan => 
           `Loan ID: ${loan.id}, Amount: ₱${loan.loanAmount}, Status: ${loan.status}, Date: ${loan.dateApplied}`
@@ -269,27 +295,23 @@ export default function Bot() {
   const [currentOptions, setCurrentOptions] = useState(initialOptions);
   const [currentContext, setCurrentContext] = useState('initial');
 
-  // Check if Firebase AI service is available
+  // Check if AI service is available by calling REST wrapper
   useEffect(() => {
-    const checkFirebaseAI = async () => {
-      console.log('Checking Firebase AI service...');
+    const checkService = async () => {
       try {
-        const status = await checkEnhancedAIServiceStatus();
-        if (status.available) {
-          setUseAI(true);
-          console.log('Firebase AI connected successfully:', status.model);
-        } else {
-          console.log('Firebase AI not available:', status.error);
-          setUseAI(false);
-        }
-      } catch (error) {
-        console.log('Firebase AI connection check failed - Will try to use AI anyway');
-        setUseAI(true);
-        console.log('Will attempt to use Firebase AI but may fall back to predefined responses');
+        const raw = (process.env?.EXPO_PUBLIC_GEMINI_API_KEY
+          || Constants?.expoConfig?.extra?.geminiApiKey
+          || Constants?.manifest?.extra?.geminiApiKey
+          || '').toString();
+        const hasKey = raw.split(',').map(s => s.trim()).filter(Boolean).length > 0;
+        setUseAI(!!hasKey);
+        console.log('Gemini REST availability:', hasKey ? 'OK' : 'Missing key');
+      } catch (e) {
+        setUseAI(false);
+        console.log('Gemini REST check failed:', e?.message);
       }
     };
-    
-    checkFirebaseAI();
+    checkService();
   }, []);
 
   const handleOptionSelect = (option) => {
@@ -346,12 +368,12 @@ export default function Bot() {
         
         if (userData) {
           // Calculate approved deposits total
-          const approvedDeposits = userData.deposits.filter(d => d.status === 'approved');
-          const totalDeposited = approvedDeposits.reduce((sum, d) => sum + (parseFloat(d.depositAmount) || 0), 0);
+          const approvedDeposits = userData.deposits.filter(d => String(d.status).toLowerCase() === 'approved');
+          const totalDeposited = approvedDeposits.reduce((sum, d) => sum + (parseFloat(d.depositAmount ?? d.amount ?? 0) || 0), 0);
           
           // Calculate approved withdrawals total
-          const approvedWithdrawals = userData.withdrawals.filter(w => w.status === 'approved');
-          const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + (parseFloat(w.withdrawAmount) || 0), 0);
+          const approvedWithdrawals = userData.withdrawals.filter(w => String(w.status).toLowerCase() === 'approved');
+          const totalWithdrawn = approvedWithdrawals.reduce((sum, w) => sum + (parseFloat(w.withdrawAmount ?? w.amount ?? 0) || 0), 0);
           
           // Calculate current loan balances
           const currentLoanBalance = userData.currentLoans ? 
@@ -438,24 +460,25 @@ ${userDataContext}`;
         const prompt = `${context}\n\nUser question: ${userQuery}`;
         
         console.log('Sending query to Google AI...');
-        // Load display-only user data for context
-        const displayUserData = await loadUserData(userEmail);
-        const result = await generateEnhancedAIResponse(userQuery, displayUserData, {
-          maxOutputTokens: 512,
-          temperature: 0.7
-        });
-        
-        if (!result.success) {
-          throw new Error(result.message || 'AI service unavailable');
-        }
-        
-        const aiResponse = result.text;
-        console.log('Received response from Google AI (Gemini 1.5 Flash)');
-        
+        // Build prompt with display-only user data (prefer memberId when available)
+        const displayUserData = await loadUserData(userEmail, memberIdOverride);
+        const raw = (process.env?.EXPO_PUBLIC_GEMINI_API_KEY
+          || Constants?.expoConfig?.extra?.geminiApiKey
+          || Constants?.manifest?.extra?.geminiApiKey
+          || '').toString();
+        const keys = raw.split(',').map(s => s.trim()).filter(Boolean);
+        if (!keys.length) throw new Error('API Key not found. Please pass a valid API key.');
+
+        const finalPrompt = `${context}\n\nUser question: ${userQuery}`;
+
+        // Call REST-based enhanced AI with v1 (gemini-1.5-flash)
+        const { success, text, message } = await generateEnhancedAIResponse(finalPrompt, displayUserData);
+        if (!success || !text) throw new Error(message || 'AI service unavailable');
+
         const botMessage = {
           id: Date.now().toString() + '-bot',
           sender: 'bot',
-          text: aiResponse,
+          text: text,
         };
         
         // Add a slight delay to make the response feel more natural
@@ -762,17 +785,13 @@ You can apply for a loan in the Apply Loan section.
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { paddingBottom: insets.bottom }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
-          onPress={() =>
-            navigation.reset({
-              routes: [{ name: 'HomeTab' }],
-            })
-          }
+          onPress={() => navigation.goBack()}
         >
-          <MaterialIcons name="arrow-back" size={28} color="#fff" />
+          <MaterialIcons name="arrow-back" size={28} color="#234E70" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>AI Assistant</Text>
       </View>
@@ -860,12 +879,12 @@ You can apply for a loan in the Apply Loan section.
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F2F2F2',
+    backgroundColor: '#F8FAFC',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#234E70',
+    backgroundColor: '#F8FAFC',
     paddingHorizontal: 15,
     paddingVertical: 12,
     borderBottomLeftRadius: 20,
@@ -874,8 +893,8 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   headerTitle: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#234E70',
+    fontSize: 18, 
     fontWeight: 'bold',
     marginLeft: 10,
   },

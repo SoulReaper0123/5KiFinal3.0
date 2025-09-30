@@ -201,12 +201,71 @@ const PaymentApplications = () => {
   
           // Check if loanAmount is 0 and remove entry from ApprovedLoans
           if (updatedLoanAmount === 0) {
+            // Return borrowed savings to savings account if any
+            const borrowedFromSavings = parseFloat(approvedLoansData?.borrowedFromSavings) || 0;
+            if (borrowedFromSavings > 0) {
+              console.log(`Returning ${borrowedFromSavings} to savings account (loan fully paid)`);
+              
+              // Get current savings amount
+              const savingsSnapshot = await get(ref(database, 'Settings/Savings'));
+              const currentSavings = parseFloat(savingsSnapshot.val()) || 0;
+              
+              // Add borrowed amount back to savings
+              const newSavingsAmount = Math.ceil((currentSavings + borrowedFromSavings) * 100) / 100;
+              await set(ref(database, 'Settings/Savings'), newSavingsAmount);
+              
+              // Update daily savings history
+              const now = new Date();
+              const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+              const savingsHistorySnapshot = await get(ref(database, `Settings/SavingsHistory/${dateKey}`));
+              const currentDaySavings = parseFloat(savingsHistorySnapshot.val()) || 0;
+              const newDaySavings = Math.ceil((currentDaySavings + borrowedFromSavings) * 100) / 100;
+              await set(ref(database, `Settings/SavingsHistory/${dateKey}`), newDaySavings);
+              
+              console.log(`Savings updated: ${currentSavings} + ${borrowedFromSavings} = ${newSavingsAmount}`);
+            }
+            
             await set(ref(database, `ApprovedLoans/${selectedPayment.id}`), null);
           }
   
-          // Step 7: Update funds with the actual payment amount
-          const updatedFunds = fundsAmount + paymentAmount;
-          await set(ref(database, 'Funds/fundsAmount'), updatedFunds); // Update funds total
+          // Step 7: Update funds with the actual payment amount (excluding portion that should go back to savings)
+          const borrowedFromSavings = parseFloat(approvedLoansData?.borrowedFromSavings) || 0;
+          const originalLoanAmount = parseFloat(approvedLoansData?.amount) || 0;
+          
+          console.log('=== App Funds Calculation Debug ===');
+          console.log('borrowedFromSavings:', borrowedFromSavings);
+          console.log('originalLoanAmount:', originalLoanAmount);
+          console.log('paymentAmount:', paymentAmount);
+          console.log('fundsAmount:', fundsAmount);
+          
+          // Validate values to prevent division by zero or invalid calculations
+          let memberContributionRatio = 1; // Default: all goes to funds
+          if (originalLoanAmount > 0 && borrowedFromSavings > 0 && borrowedFromSavings < originalLoanAmount) {
+            memberContributionRatio = (originalLoanAmount - borrowedFromSavings) / originalLoanAmount;
+          }
+          
+          // Ensure ratio is valid (between 0 and 1)
+          if (isNaN(memberContributionRatio) || memberContributionRatio < 0 || memberContributionRatio > 1) {
+            console.log('Invalid ratio detected, using fallback ratio = 1');
+            memberContributionRatio = 1;
+          }
+          
+          console.log('memberContributionRatio:', memberContributionRatio);
+          
+          // Only add back the portion of payment that came from member's original contribution
+          const paymentToFunds = paymentAmount * memberContributionRatio;
+          const updatedFunds = fundsAmount + paymentToFunds;
+          
+          // Validate final funds amount to prevent invalid values
+          if (isNaN(updatedFunds) || !isFinite(updatedFunds)) {
+            console.error('Invalid funds calculation, using fallback');
+            const fallbackFunds = fundsAmount + paymentAmount;
+            await set(ref(database, 'Funds/fundsAmount'), fallbackFunds);
+            console.log(`Funds updated (fallback): ${fallbackFunds.toFixed(2)}`);
+          } else {
+            await set(ref(database, 'Funds/fundsAmount'), updatedFunds);
+            console.log(`Funds updated: payment to funds (${paymentToFunds.toFixed(2)}) of total payment (${paymentAmount})`);
+          }
   
           // Record the payment in ApprovedPayments and Transactions
           await set(ref(database, `ApprovedPayments/${selectedPayment.id}/${selectedPayment.transactionId}`), {

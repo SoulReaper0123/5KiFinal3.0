@@ -42,7 +42,7 @@ import {
   UserGroupIcon
 } from "hugeicons-react";
 import { GrTransaction } from "react-icons/gr";
-import { GoogleGenerativeAI } from '@google/generative-ai';
+
 import { database } from '../../../Database/firebaseConfig';
 import { generateEnhancedAdminAIResponse } from '../services/enhancedAdminAI';
 
@@ -68,7 +68,11 @@ const AdminHome = () => {
   const [aiMessages, setAiMessages] = useState([]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  // Model selector removed; using Gemini only
+
+  // Build visible UI context for the AI (display-only snapshot)
+  const buildVisibleContext = () => {
+    return `UI STATE\n- Active Section: ${activeSection}\n- Pending Registrations: ${pendingCounts.registrations}\n- Pending Deposits: ${pendingCounts.deposits}\n- Pending Loans: ${pendingCounts.loans}\n- Pending Payments: ${pendingCounts.payments}\n- Pending Withdrawals: ${pendingCounts.withdraws}\n`;
+  };
   
   // Chat Management States
   const [chatSessions, setChatSessions] = useState([]);
@@ -80,37 +84,71 @@ const AdminHome = () => {
   const messagesEndRef = React.useRef(null);
 
   const scrollToBottom = () => {
-  messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-};
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
 
-useEffect(() => {
-  scrollToBottom();
-}, [aiMessages]);
+  useEffect(() => {
+    scrollToBottom();
+  }, [aiMessages]);
   
   const navigate = useNavigate();
   const { logout } = useAuth();
   const isSmallScreen = windowWidth < 1024;
 
-// Initialize Gemini AI - Updated for free version
-const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-
-// Use the correct model for the free version
-const model = genAI.getGenerativeModel({ 
-  model: "gemini-1.5-flash"
-});
-
-  // Test function to verify AI is working
+  // Test AI connection (Gemini v1 endpoint) with dynamic model probe
+// Test AI connection (Gemini v1beta endpoint) with dynamic model probe
 const testAI = async () => {
-try {
-    const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-    const result = await model.generateContent("Hello");
-    console.log(result.response.text());
-    return true;
-  } catch (error) {
-    console.error("Connection test failed:", error);
+  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+  if (!geminiKey) {
+    console.log('⚠️ No Gemini API key found');
     return false;
   }
+
+  const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'; // Changed from v1 to v1beta
+  
+  // Use updated model names that work with v1beta
+  const CANDIDATE_MODELS = [
+    'gemini-1.5-flash-latest',
+    'gemini-1.5-pro-latest',
+    'gemini-pro',
+    'gemini-pro-latest',
+  ];
+
+  const probe = async (model) => {
+    const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${geminiKey}`;
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            { role: 'user', parts: [{ text: 'Hello' }] }
+          ]
+        }),
+      });
+      return res.ok ? null : (await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } })));
+    } catch (e) {
+      return { error: { message: e.message } };
+    }
+  };
+
+  try {
+    for (const m of CANDIDATE_MODELS) {
+      const err = await probe(m);
+      if (!err) {
+        console.log(`✅ Gemini API working with model: ${m}`);
+        return true;
+      } else {
+        console.warn(`Model ${m} not working:`, err?.error?.message || err);
+      }
+    }
+    console.error('❌ No supported Gemini model found');
+  } catch (e) {
+    console.warn('❌ Gemini test failed:', e.message);
+  }
+  
+  // Even if testing fails, return true to allow the AI to try anyway
+  return true;
 };
 
   useEffect(() => {
@@ -160,7 +198,7 @@ try {
     loadSection();
     loadChatSessions();
 
-    // Subscribe to pending counts (registrations, deposits, loans, payments, withdraws)
+    // Subscribe to pending counts
     const refs = {
       registrations: database.ref('Registrations/RegistrationApplications'),
       deposits: database.ref('Deposits/DepositApplications'),
@@ -170,7 +208,6 @@ try {
     };
 
     const computePending = (root) => {
-      // Handles both flat and nested-by-member structures
       let count = 0;
       if (!root) return 0;
       Object.values(root).forEach(group => {
@@ -179,10 +216,6 @@ try {
             if (item && (item.status === 'pending' || item.status === 'Pending')) count += 1;
           });
         }
-      });
-      // Also check direct items (if stored flat)
-      Object.values(root).forEach(item => {
-        if (item && typeof item === 'object' && item.status && (item.status === 'pending' || item.status === 'Pending')) count += 0; // already counted above for nested
       });
       return count;
     };
@@ -202,7 +235,7 @@ try {
     refs.payments.on('value', handlers.payments);
     refs.withdraws.on('value', handlers.withdraws);
     
-    // Test AI connection on component mount
+    // Test AI connection
     testAI();
 
     // Cleanup
@@ -223,7 +256,6 @@ try {
         const parsedChats = JSON.parse(savedChats);
         setChatSessions(parsedChats);
         
-        // Load the most recent chat if available
         if (parsedChats.length > 0) {
           const mostRecent = parsedChats[0];
           setCurrentChatId(mostRecent.id);
@@ -249,7 +281,6 @@ try {
     setActiveSection(section);
     await localStorage.setItem('activeSection', section);
     setIsDropdownVisible(false);
-    // Force re-render/re-mount of current section on every click to trigger fresh fetches
     setSectionReloadCounter((c) => c + 1);
   };
 
@@ -306,7 +337,7 @@ try {
     const newChatId = Date.now().toString();
     const welcomeMessage = {
       type: 'ai',
-      content: 'Hello! I\'m your AI Assistant for the Financial Management System. I can help you with:\n\n• Database queries and statistics\n• User and member management\n• Loan applications and approvals\n• Deposit and withdrawal tracking\n• Transaction analysis\n• System navigation and features\n• Troubleshooting and support\n\nFeel free to ask me anything about your system!',
+      content: 'Hi! How may I help you today? 😊\n\nI have access to your database and can help you with member information, financial data, loan applications, and more!',
       timestamp: new Date().toLocaleTimeString()
     };
     
@@ -325,16 +356,15 @@ try {
     setShowChatHistory(false);
   };
 
-const loadChat = (chatId) => {
-  const chat = chatSessions.find(session => session.id === chatId);
-  if (chat) {
-    setCurrentChatId(chatId);
-    setAiMessages(chat.messages || []);
-    setShowChatHistory(false);
-    // Scroll to bottom after state updates
-    setTimeout(scrollToBottom, 0);
-  }
-};
+  const loadChat = (chatId) => {
+    const chat = chatSessions.find(session => session.id === chatId);
+    if (chat) {
+      setCurrentChatId(chatId);
+      setAiMessages(chat.messages || []);
+      setShowChatHistory(false);
+      setTimeout(scrollToBottom, 0);
+    }
+  };
 
   const confirmDeleteChat = (chatId) => {
     setChatToDelete(chatId);
@@ -360,7 +390,6 @@ const loadChat = (chatId) => {
     setShowDeleteModal(false);
     setChatToDelete(null);
     
-    // Show success message
     setShowSuccessMessage(true);
     setTimeout(() => {
       setShowSuccessMessage(false);
@@ -377,7 +406,6 @@ const loadChat = (chatId) => {
     
     const updatedSessions = chatSessions.map(session => {
       if (session.id === currentChatId) {
-        // Update title based on first user message
         let title = session.title;
         if (title === 'New Chat' && messages.length > 1) {
           const firstUserMessage = messages.find(msg => msg.type === 'user');
@@ -396,651 +424,69 @@ const loadChat = (chatId) => {
       return session;
     });
     
-    // Sort by last updated (most recent first)
     updatedSessions.sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
     saveChatSessions(updatedSessions);
   };
 
-  const getProjectContext = () => {
-    return `
-You are an AI assistant for 5KI Financial Services management system with comprehensive database access.
 
-DATABASE COLLECTIONS (Firebase Realtime Database):
-- Members: User registrations and profiles
-- Loans/LoanApplications: Loan applications and approvals
-- Deposits/DepositApplications: Deposit applications and records
-- Withdraws/WithdrawApplications: Withdrawal requests and approvals
-- Payments/PaymentApplications: Payment records and applications
 
-CAPABILITIES:
-- I can access real-time data from the Firebase database
-- I can provide statistics on members, loans, deposits, payments, and withdrawals
-- I can look up specific member information by email address
-- I can calculate totals, counts, and financial summaries
-- I can provide detailed breakdowns by status (pending, approved, rejected)
+  const handleAIQuery = async (userMessage) => {
+    if (!userMessage.trim()) return;
 
-MAIN SECTIONS:
-- Dashboard: Analytics and overview with real-time data
-- Registrations: User membership management
-- Deposits: Deposit applications and approvals
-- Loans: Loan applications and management
-- Payments: Payment processing
-- Withdrawals: Withdrawal requests
-- Transactions: Transaction history
-- Co-Admins: Admin user management
-- Settings: System configuration
-
-CURRENT ACTIVE SECTION: ${activeSection}
-
-QUERY EXAMPLES I CAN HANDLE:
-- "How many members do we have?"
-- "What's the total loan amount?"
-- "Show me statistics for john@example.com"
-- "How many pending deposits are there?"
-- "What's our available funds?"
-
-The system uses React.js frontend with Firebase Realtime Database. All amounts are in Philippine Peso (₱).
-`;
-  };
-
-  // Fallback responses for common queries when AI fails
-  const getFallbackResponse = (userMessage) => {
-    const message = userMessage.toLowerCase();
-    
-    if (message.includes('how many') || message.includes('count') || message.includes('total')) {
-      return `I'd be happy to help you get counts and statistics! However, I'm currently unable to access the live database. 
-
-To get this information, you can:
-• Check the Dashboard section for overview statistics
-• Go to the specific sections (Members, Loans, Deposits, etc.) to see current data
-• Use the browser's developer console to check for any connection issues
-
-Common queries I can help with:
-• System structure and navigation
-• Feature explanations
-• Troubleshooting steps
-• Code-related questions`;
-    }
-    
-    if (message.includes('member') || message.includes('user')) {
-      return `For member/user information:
-
-• Members Section: View all registered users, their profiles, and membership status
-• Registrations: Handle new membership applications
-• Dashboard: See member statistics and overview
-
-The users are stored in the 'users' collection in Firebase with fields like:
-- Personal information (name, email, phone)
-- Membership status
-- Registration date
-- Profile details
-
-Would you like me to explain any specific aspect of user management?`;
-    }
-    
-    if (message.includes('loan')) {
-      return `For loan information:
-
-• Loans Section: View all loan applications and their status
-• Payments Section: Handle loan payments and repayments
-• Dashboard: See loan statistics
-
-Loan statuses typically include:
-- Pending: Awaiting approval
-- Approved: Loan has been approved
-- Rejected: Application was declined
-- Active: Currently being repaid
-
-Would you like me to explain the loan approval process or payment handling?`;
-    }
-    
-    if (message.includes('deposit')) {
-      return `For deposit information:
-
-• Deposits Section: View all deposit applications and records
-• Dashboard: See deposit statistics and trends
-
-Deposit types and statuses:
-- Pending deposits awaiting processing
-- Approved deposits that have been confirmed
-- Various deposit categories and amounts
-
-The system tracks deposit history, amounts, and processing status.`;
-    }
-    
-    return `I'm here to help! While I'm currently unable to access live data, I can assist with:
-
-• System Navigation: How to use different sections
-• Feature Explanations: What each section does
-• Data Structure: How information is organized
-• Troubleshooting: Common issues and solutions
-
-What specific aspect of the system would you like to know about?`;
-  };
-
-  const queryFirebaseData = async (collection, filters = {}) => {
-    try {
-      console.log(`Querying Firebase collection: ${collection}`);
-      const ref = database.ref(collection);
-      
-      // Add timeout to prevent hanging
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Firebase query timeout')), 10000)
-      );
-      
-      const dataPromise = ref.once('value');
-      const snapshot = await Promise.race([dataPromise, timeoutPromise]);
-      const data = snapshot.val();
-      
-      console.log(`Firebase data for ${collection}:`, data ? 'Data found' : 'No data');
-      
-      if (!data) return [];
-      
-      // Convert to array and apply basic filters
-      const dataArray = Object.keys(data).map(key => ({
-        id: key,
-        ...data[key]
-      }));
-      
-      console.log(`Converted ${collection} to array:`, dataArray.length, 'items');
-      return dataArray;
-    } catch (error) {
-      console.error(`Firebase query error for ${collection}:`, error);
-      throw error; // Re-throw to handle in calling function
-    }
-  };
-
-const handleAIQuery = async (userMessage) => {
-  if (!userMessage.trim()) return;
-
-  // Add user message
-  const newUserMessage = {
-    type: 'user',
-    content: userMessage,
-    timestamp: new Date().toLocaleTimeString()
-  };
-
-  const updatedMessages = [...aiMessages, newUserMessage];
-  setAiMessages(updatedMessages);
-  setAiInput('');
-  setAiLoading(true);
-
-  try {
-    console.log('Processing admin AI query:', userMessage);
-    
-    // Build minimal, display-only UI context for AI (no DB access)
-    let visibleContext = `\nActive Section: ${activeSection}\nWindow: ${windowWidth}px\n`;
-
-    try {
-      // Preload summary counts and key totals (display-only snapshot)
-      const [
-        membersSnap,
-        loansAppsSnap,
-        approvedLoansSnap,
-        currentLoansSnap,
-        depositsSnap,
-        paymentsSnap,
-        withdrawAppsSnap,
-        fundsSnap,
-        savingsSnap
-      ] = await Promise.all([
-        database.ref('Members').once('value'),
-        database.ref('Loans/LoanApplications').once('value'),
-        database.ref('Loans/ApprovedLoans').once('value'),
-        database.ref('Loans/CurrentLoans').once('value'),
-        database.ref('Deposits/DepositApplications').once('value'),
-        database.ref('Payments/PaymentApplications').once('value'),
-        database.ref('Withdraws/WithdrawApplications').once('value'),
-        database.ref('Settings/Funds').once('value'),
-        database.ref('Settings/Savings').once('value')
-      ]);
-
-      const membersData = membersSnap.val() || {};
-      const totalMembers = Object.keys(membersData).length;
-
-      const countNested = (obj) => {
-        let count = 0;
-        Object.values(obj || {}).forEach(v => {
-          if (v && typeof v === 'object') count += Object.keys(v).length; else count += 1;
-        });
-        return count;
-      };
-
-      const loansApps = loansAppsSnap.val() || {};
-      const approvedLoans = approvedLoansSnap.val() || {};
-      const currentLoans = currentLoansSnap.val() || {};
-      const deposits = depositsSnap.val() || {};
-      const payments = paymentsSnap.val() || {};
-      const withdraws = withdrawAppsSnap.val() || {};
-
-      // Totals (best-effort from applications where amounts exist)
-      const sumAmounts = (root, amountKeys) => {
-        let total = 0;
-        Object.values(root || {}).forEach(member => {
-          Object.values(member || {}).forEach(item => {
-            for (const k of amountKeys) {
-              if (item && item[k] != null && !isNaN(parseFloat(item[k]))) {
-                total += parseFloat(item[k]);
-                break;
-              }
-            }
-          });
-        });
-        return total;
-      };
-
-      const totalLoanApplications = countNested(loansApps);
-      const totalApprovedLoans = countNested(approvedLoans);
-      const totalCurrentLoans = countNested(currentLoans);
-      const totalDepositApplications = countNested(deposits);
-      const totalPaymentApplications = countNested(payments);
-      const totalWithdrawApplications = countNested(withdraws);
-
-      const totalLoanAmount = sumAmounts(approvedLoans, ['loanAmount']);
-      const totalPaymentAmount = sumAmounts(payments, ['amountToBePaid', 'amount']);
-      const totalDepositAmount = sumAmounts(deposits, ['amountToBeDeposited', 'amount']);
-      const totalWithdrawAmount = sumAmounts(withdraws, ['withdrawAmount', 'amountWithdrawn', 'amount']);
-
-      const availableFunds = parseFloat(fundsSnap.val() || 0) || 0;
-      const fiveKISavings = parseFloat(savingsSnap.val() || 0) || 0;
-
-      visibleContext += `\nOVERVIEW (display-only):\n`;
-      visibleContext += `- Members: ${totalMembers}\n`;
-      visibleContext += `- Funds: ₱${availableFunds.toLocaleString()}\n`;
-      visibleContext += `- Savings: ₱${fiveKISavings.toLocaleString()}\n`;
-      visibleContext += `- Loan Applications: ${totalLoanApplications}\n`;
-      visibleContext += `- Approved Loans: ${totalApprovedLoans} | Current Loans: ${totalCurrentLoans}\n`;
-      visibleContext += `- Deposit Applications: ${totalDepositApplications}\n`;
-      visibleContext += `- Payment Applications: ${totalPaymentApplications}\n`;
-      visibleContext += `- Withdraw Applications: ${totalWithdrawApplications}\n`;
-      visibleContext += `- Totals — Loans: ₱${totalLoanAmount.toLocaleString()}, Payments: ₱${totalPaymentAmount.toLocaleString()}, Deposits: ₱${totalDepositAmount.toLocaleString()}, Withdrawals: ₱${totalWithdrawAmount.toLocaleString()}\n`;
-    } catch (e) {
-      console.warn('Visible context preload failed (non-blocking):', e?.message);
-    }
-
-    // Use the enhanced admin AI service with visible UI context only (Gemini only)
-    const result = await generateEnhancedAdminAIResponse(userMessage, visibleContext);
-    
-    if (!result.success) {
-      throw new Error(result.message || 'AI service unavailable');
-    }
-
-    // Add AI response
-    const newAIMessage = {
-      type: 'ai',
-      content: result.text,
-      timestamp: new Date().toLocaleTimeString(),
-      provider: result.provider
-    };
-
-    const finalMessages = [...updatedMessages, newAIMessage];
-    setAiMessages(finalMessages);
-    updateCurrentChat(finalMessages);
-
-    console.log('Admin AI response generated successfully');
-
-  } catch (error) {
-    console.error('Admin AI processing error:', error);
-    
-    // Enhanced fallback response for admin
-    let fallbackResponse = '';
-    const lowerMessage = userMessage.toLowerCase();
-    
-    if (lowerMessage.includes('member') || lowerMessage.includes('user')) {
-      fallbackResponse = 'I can help you with member information. Try asking about specific member details, account summaries, or member statistics.';
-    } else if (lowerMessage.includes('loan')) {
-      fallbackResponse = 'I can provide loan information including applications, current loans, approval rates, and loan statistics.';
-    } else if (lowerMessage.includes('deposit') || lowerMessage.includes('saving')) {
-      fallbackResponse = 'I can help with deposit information, savings balances, and deposit transaction analysis.';
-    } else if (lowerMessage.includes('withdrawal')) {
-      fallbackResponse = 'I can provide withdrawal information, transaction history, and withdrawal patterns.';
-    } else if (lowerMessage.includes('payment')) {
-      fallbackResponse = 'I can help with payment information, transaction records, and payment analysis.';
-    } else if (lowerMessage.includes('report') || lowerMessage.includes('statistic')) {
-      fallbackResponse = 'I can generate various reports and statistics about members, loans, deposits, withdrawals, and overall system performance.';
-    } else {
-      fallbackResponse = 'I can assist using only what is currently visible on your admin UI (no database access).';
-    }
-    
-    const errorMessage = {
-      type: 'ai',
-      content: `${fallbackResponse}\n\nPlease try again once the dashboard has loaded relevant data.`,
+    // Add user message
+    const newUserMessage = {
+      type: 'user',
+      content: userMessage,
       timestamp: new Date().toLocaleTimeString()
     };
-    
-    
-    const finalMessages = [...updatedMessages, errorMessage];
-    setAiMessages(finalMessages);
-    updateCurrentChat(finalMessages);
-    
-  } finally {
-    setAiLoading(false);
-  }
-};
 
-// Helper function to get specific member data
-const getMemberData = async (email) => {
-  try {
-    const membersSnapshot = await database.ref('Members').once('value');
-    const membersData = membersSnapshot.val();
-    
-    if (!membersData) return null;
-    
-    // Find member by email
-    let memberInfo = null;
-    let memberId = null;
-    
-    Object.keys(membersData).forEach(id => {
-      const member = membersData[id];
-      if (member && member.email && member.email.toLowerCase() === email.toLowerCase()) {
-        memberInfo = { id, ...member };
-        memberId = id;
-      }
-    });
-    
-    if (!memberInfo) return null;
-    
-    // Get member's transactions
-    const memberData = {
-      info: memberInfo,
-      loans: [],
-      deposits: [],
-      payments: [],
-      withdrawals: [],
-      totalBalance: 0
-    };
-    
-    // Get loans
-    const loansSnapshot = await database.ref(`Loans/LoanApplications/${memberId}`).once('value');
-    const loansData = loansSnapshot.val();
-    if (loansData) {
-      memberData.loans = Object.keys(loansData).map(loanId => ({
-        id: loanId,
-        ...loansData[loanId]
-      }));
-    }
-    
-    // Get deposits
-    const depositsSnapshot = await database.ref(`Deposits/DepositApplications/${memberId}`).once('value');
-    const depositsData = depositsSnapshot.val();
-    if (depositsData) {
-      memberData.deposits = Object.keys(depositsData).map(depositId => ({
-        id: depositId,
-        ...depositsData[depositId]
-      }));
+    const updatedMessages = [...aiMessages, newUserMessage];
+    setAiMessages(updatedMessages);
+    setAiInput('');
+    setAiLoading(true);
+
+    try {
+      console.log('Processing admin AI query:', userMessage);
       
-      // Calculate balance from approved deposits
-      memberData.deposits.forEach(deposit => {
-        if (deposit.status === 'approved') {
-          memberData.totalBalance += parseFloat(deposit.depositAmount) || 0;
-        }
-      });
-    }
-    
-    // Get payments
-    const paymentsSnapshot = await database.ref(`Payments/PaymentApplications/${memberId}`).once('value');
-    const paymentsData = paymentsSnapshot.val();
-    if (paymentsData) {
-      memberData.payments = Object.keys(paymentsData).map(paymentId => ({
-        id: paymentId,
-        ...paymentsData[paymentId]
-      }));
-    }
-    
-    // Get withdrawals
-    const withdrawalsSnapshot = await database.ref(`Withdraws/WithdrawApplications/${memberId}`).once('value');
-    const withdrawalsData = withdrawalsSnapshot.val();
-    if (withdrawalsData) {
-      memberData.withdrawals = Object.keys(withdrawalsData).map(withdrawalId => ({
-        id: withdrawalId,
-        ...withdrawalsData[withdrawalId]
-      }));
+      // Use enhanced AI service with database access + visible UI snapshot
+      const result = await generateEnhancedAdminAIResponse(userMessage, buildVisibleContext());
+
+      // Add AI response
+      const newAIMessage = {
+        type: 'ai',
+        content: result.text || result.message || 'Sorry, I could not process your request.',
+        timestamp: new Date().toLocaleTimeString(),
+        provider: result.provider || 'AI Assistant'
+      };
+
+      const finalMessages = [...updatedMessages, newAIMessage];
+      setAiMessages(finalMessages);
+      updateCurrentChat(finalMessages);
+
+      console.log('AI response generated successfully');
+
+    } catch (error) {
+      console.error('AI processing error:', error);
       
-      // Subtract approved withdrawals from balance
-      memberData.withdrawals.forEach(withdrawal => {
-        if (withdrawal.status === 'approved') {
-          memberData.totalBalance -= parseFloat(withdrawal.withdrawAmount) || 0;
-        }
-      });
-    }
-    
-    return memberData;
-  } catch (error) {
-    console.error('Error getting member data:', error);
-    return null;
-  }
-};
-
-// Helper function to fetch relevant data
-const fetchRelevantData = async (userMessage) => {
-  const message = userMessage.toLowerCase();
-  
-  // Check if the message is asking for database information
-  const isDataQuery = message.includes('data') || message.includes('count') || 
-                     message.includes('how many') || message.includes('total') ||
-                     message.includes('member') || message.includes('loan') ||
-                     message.includes('deposit') || message.includes('payment') ||
-                     message.includes('withdraw') || message.includes('balance') ||
-                     message.includes('statistics') || message.includes('summary');
-
-  if (!isDataQuery) {
-    return '';
-  }
-
-  try {
-    // Check if asking for specific member data
-    const emailRegex = /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/;
-    const emailMatch = userMessage.match(emailRegex);
-    
-    if (emailMatch) {
-      const email = emailMatch[0];
-      const memberData = await getMemberData(email);
+      // Fallback response
+      let fallbackResponse = 'I apologize, but I\'m currently unable to access the AI service. ';
+      fallbackResponse += 'Please check your internet connection and try again. ';
+      fallbackResponse += 'You can still navigate through the system using the sidebar menu.';
       
-      if (memberData) {
-        let memberSummary = `\n\nMember Data for ${email}:`;
-        memberSummary += `\n\n👤 MEMBER INFO:`;
-        memberSummary += `\n- Name: ${memberData.info.firstName || ''} ${memberData.info.lastName || ''}`;
-        memberSummary += `\n- Member ID: ${memberData.info.id}`;
-        memberSummary += `\n- Status: ${memberData.info.status || 'N/A'}`;
-        memberSummary += `\n- Current Balance: ₱${memberData.totalBalance.toLocaleString()}`;
-        
-        memberSummary += `\n\n💰 LOANS (${memberData.loans.length}):`;
-        if (memberData.loans.length > 0) {
-          memberData.loans.slice(0, 5).forEach(loan => {
-            memberSummary += `\n- ${loan.id}: ₱${loan.loanAmount} (${loan.status}) - ${loan.dateApplied}`;
-          });
-          if (memberData.loans.length > 5) {
-            memberSummary += `\n- ... and ${memberData.loans.length - 5} more loans`;
-          }
-        } else {
-          memberSummary += `\n- No loans found`;
-        }
-        
-        memberSummary += `\n\n💳 DEPOSITS (${memberData.deposits.length}):`;
-        if (memberData.deposits.length > 0) {
-          memberData.deposits.slice(0, 5).forEach(deposit => {
-            memberSummary += `\n- ${deposit.id}: ₱${deposit.depositAmount} (${deposit.status}) - ${deposit.dateApplied}`;
-          });
-          if (memberData.deposits.length > 5) {
-            memberSummary += `\n- ... and ${memberData.deposits.length - 5} more deposits`;
-          }
-        } else {
-          memberSummary += `\n- No deposits found`;
-        }
-        
-        memberSummary += `\n\n💸 PAYMENTS (${memberData.payments.length}):`;
-        if (memberData.payments.length > 0) {
-          memberData.payments.slice(0, 5).forEach(payment => {
-            memberSummary += `\n- ${payment.id}: ₱${payment.paymentAmount} (${payment.status}) - ${payment.dateApplied}`;
-          });
-          if (memberData.payments.length > 5) {
-            memberSummary += `\n- ... and ${memberData.payments.length - 5} more payments`;
-          }
-        } else {
-          memberSummary += `\n- No payments found`;
-        }
-        
-        return memberSummary;
-      } else {
-        return `\n\nMember with email ${email} not found in the system.`;
-      }
+      const errorMessage = {
+        type: 'ai',
+        content: fallbackResponse,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      
+      const finalMessages = [...updatedMessages, errorMessage];
+      setAiMessages(finalMessages);
+      updateCurrentChat(finalMessages);
+      
+    } finally {
+      setAiLoading(false);
     }
-    let dataSummary = '\n\nCurrent System Data Summary:';
-    
-    // Get Members data
-    const membersSnapshot = await database.ref('Members').once('value');
-    const membersData = membersSnapshot.val();
-    const totalMembers = membersData ? Object.keys(membersData).length : 0;
-    
-    // Get active/inactive members
-    let activeMembers = 0, inactiveMembers = 0;
-    if (membersData) {
-      Object.values(membersData).forEach(member => {
-        if (member.status === 'active') activeMembers++;
-        else inactiveMembers++;
-      });
-    }
-    
-    dataSummary += `\n\n📊 MEMBERS:`;
-    dataSummary += `\n- Total Members: ${totalMembers}`;
-    dataSummary += `\n- Active Members: ${activeMembers}`;
-    dataSummary += `\n- Inactive Members: ${inactiveMembers}`;
-
-    // Get Loans data
-    const loansSnapshot = await database.ref('Loans/LoanApplications').once('value');
-    const loansData = loansSnapshot.val();
-    let totalLoans = 0, pendingLoans = 0, approvedLoans = 0, rejectedLoans = 0;
-    let totalLoanAmount = 0;
-    
-    if (loansData) {
-      Object.values(loansData).forEach(memberLoans => {
-        if (memberLoans) {
-          Object.values(memberLoans).forEach(loan => {
-            totalLoans++;
-            if (loan.status === 'pending') pendingLoans++;
-            else if (loan.status === 'approved') approvedLoans++;
-            else if (loan.status === 'rejected') rejectedLoans++;
-            
-            if (loan.loanAmount) {
-              totalLoanAmount += parseFloat(loan.loanAmount) || 0;
-            }
-          });
-        }
-      });
-    }
-    
-    dataSummary += `\n\n💰 LOANS:`;
-    dataSummary += `\n- Total Loan Applications: ${totalLoans}`;
-    dataSummary += `\n- Pending: ${pendingLoans}`;
-    dataSummary += `\n- Approved: ${approvedLoans}`;
-    dataSummary += `\n- Rejected: ${rejectedLoans}`;
-    dataSummary += `\n- Total Loan Amount: ₱${totalLoanAmount.toLocaleString()}`;
-
-    // Get Deposits data
-    const depositsSnapshot = await database.ref('Deposits/DepositApplications').once('value');
-    const depositsData = depositsSnapshot.val();
-    let totalDeposits = 0, pendingDeposits = 0, approvedDeposits = 0, rejectedDeposits = 0;
-    let totalDepositAmount = 0;
-    
-    if (depositsData) {
-      Object.values(depositsData).forEach(memberDeposits => {
-        if (memberDeposits) {
-          Object.values(memberDeposits).forEach(deposit => {
-            totalDeposits++;
-            if (deposit.status === 'pending') pendingDeposits++;
-            else if (deposit.status === 'approved') approvedDeposits++;
-            else if (deposit.status === 'rejected') rejectedDeposits++;
-            
-            if (deposit.depositAmount) {
-              totalDepositAmount += parseFloat(deposit.depositAmount) || 0;
-            }
-          });
-        }
-      });
-    }
-    
-    dataSummary += `\n\n💳 DEPOSITS:`;
-    dataSummary += `\n- Total Deposit Applications: ${totalDeposits}`;
-    dataSummary += `\n- Pending: ${pendingDeposits}`;
-    dataSummary += `\n- Approved: ${approvedDeposits}`;
-    dataSummary += `\n- Rejected: ${rejectedDeposits}`;
-    dataSummary += `\n- Total Deposit Amount: ₱${totalDepositAmount.toLocaleString()}`;
-
-    // Get Payments data
-    const paymentsSnapshot = await database.ref('Payments/PaymentApplications').once('value');
-    const paymentsData = paymentsSnapshot.val();
-    let totalPayments = 0, pendingPayments = 0, approvedPayments = 0, rejectedPayments = 0;
-    let totalPaymentAmount = 0;
-    
-    if (paymentsData) {
-      Object.values(paymentsData).forEach(memberPayments => {
-        if (memberPayments) {
-          Object.values(memberPayments).forEach(payment => {
-            totalPayments++;
-            if (payment.status === 'pending') pendingPayments++;
-            else if (payment.status === 'approved') approvedPayments++;
-            else if (payment.status === 'rejected') rejectedPayments++;
-            
-            if (payment.paymentAmount) {
-              totalPaymentAmount += parseFloat(payment.paymentAmount) || 0;
-            }
-          });
-        }
-      });
-    }
-    
-    dataSummary += `\n\n💸 PAYMENTS:`;
-    dataSummary += `\n- Total Payment Applications: ${totalPayments}`;
-    dataSummary += `\n- Pending: ${pendingPayments}`;
-    dataSummary += `\n- Approved: ${approvedPayments}`;
-    dataSummary += `\n- Rejected: ${rejectedPayments}`;
-    dataSummary += `\n- Total Payment Amount: ₱${totalPaymentAmount.toLocaleString()}`;
-
-    // Get Withdrawals data
-    const withdrawalsSnapshot = await database.ref('Withdraws/WithdrawApplications').once('value');
-    const withdrawalsData = withdrawalsSnapshot.val();
-    let totalWithdrawals = 0, pendingWithdrawals = 0, approvedWithdrawals = 0, rejectedWithdrawals = 0;
-    let totalWithdrawalAmount = 0;
-    
-    if (withdrawalsData) {
-      Object.values(withdrawalsData).forEach(memberWithdrawals => {
-        if (memberWithdrawals) {
-          Object.values(memberWithdrawals).forEach(withdrawal => {
-            totalWithdrawals++;
-            if (withdrawal.status === 'pending') pendingWithdrawals++;
-            else if (withdrawal.status === 'approved') approvedWithdrawals++;
-            else if (withdrawal.status === 'rejected') rejectedWithdrawals++;
-            
-            if (withdrawal.withdrawAmount) {
-              totalWithdrawalAmount += parseFloat(withdrawal.withdrawAmount) || 0;
-            }
-          });
-        }
-      });
-    }
-    
-    dataSummary += `\n\n🏦 WITHDRAWALS:`;
-    dataSummary += `\n- Total Withdrawal Applications: ${totalWithdrawals}`;
-    dataSummary += `\n- Pending: ${pendingWithdrawals}`;
-    dataSummary += `\n- Approved: ${approvedWithdrawals}`;
-    dataSummary += `\n- Rejected: ${rejectedWithdrawals}`;
-    dataSummary += `\n- Total Withdrawal Amount: ₱${totalWithdrawalAmount.toLocaleString()}`;
-
-    // Calculate system totals
-    const totalFunds = totalDepositAmount - totalWithdrawalAmount;
-    const totalOutstanding = totalLoanAmount - totalPaymentAmount;
-    
-    dataSummary += `\n\n📈 SYSTEM TOTALS:`;
-    dataSummary += `\n- Available Funds: ₱${totalFunds.toLocaleString()}`;
-    dataSummary += `\n- Outstanding Loans: ₱${totalOutstanding.toLocaleString()}`;
-    dataSummary += `\n- Net Position: ₱${(totalFunds - totalOutstanding).toLocaleString()}`;
-    
-    return dataSummary;
-  } catch (error) {
-    console.error('Data fetch error:', error);
-    throw error;
-  }
-};
+  };
 
   const handleAIInputSubmit = (e) => {
     e.preventDefault();
@@ -1057,7 +503,6 @@ const fetchRelevantData = async (userMessage) => {
       margin: 0,
       padding: 0,
       overflow: 'hidden',
-      overflowX: 'hidden',
       position: 'relative',
     },
     sidebar: {
@@ -1180,14 +625,14 @@ const fetchRelevantData = async (userMessage) => {
       marginLeft: '5px',
       fontSize: '18px',
     },
-content: {
-  flex: 1,
-  overflowY: 'auto',
-  overflowX: 'hidden',
-  height: '100vh',
-  padding: '20px',
-  backgroundColor: '#f5f7fa',
-},
+    content: {
+      flex: 1,
+      overflowY: 'auto',
+      overflowX: 'hidden',
+      height: '100vh',
+      padding: '20px',
+      backgroundColor: '#f5f7fa',
+    },
     dropdownWrapper: {
       position: 'absolute',
       top: '40px',
@@ -1456,7 +901,7 @@ content: {
       backgroundColor: '#2D5783',
       animation: 'pulse 1.5s ease-in-out infinite'
     },
-    // Chat Management Styles - ChatGPT-like Layout
+    // Chat Management Styles
     aiSidebar: {
       width: '280px',
       backgroundColor: '#f7f7f8',
@@ -1509,14 +954,10 @@ content: {
       alignItems: 'center',
       transition: 'background-color 0.2s',
       position: 'relative',
-      group: true
     },
     chatHistoryItemActive: {
       backgroundColor: '#e3f2fd',
       borderLeft: '3px solid #2D5783'
-    },
-    chatHistoryItemHover: {
-      backgroundColor: '#f0f0f0'
     },
     chatItemContent: {
       flex: 1,
@@ -1610,7 +1051,6 @@ content: {
       overflowY: 'auto',
       paddingTop: '60px'
     },
-
     collapsedButton: {
       display: 'flex',
       justifyContent: 'center',
@@ -1624,9 +1064,6 @@ content: {
       position: 'relative',
       borderRadius: '8px',
       transition: 'background-color 0.2s ease',
-      ':hover': {
-        backgroundColor: 'rgba(0,0,0,0.1)'
-      }
     },
     collapsedIcon: {
       fontSize: '28px',
@@ -2178,37 +1615,36 @@ content: {
                 </button>
               </div>
               
-<div style={styles.aiMessagesContainer}>
-  {aiMessages.map((message, index) => (
-    <div 
-      key={index}
-      style={{
-        ...styles.aiMessage,
-        ...(message.type === 'user' ? styles.aiMessageUser : styles.aiMessageAI)
-      }}
-    >
-      <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
-      <div style={styles.aiMessageTime}>{message.timestamp}</div>
-    </div>
-  ))}
-  
-  {aiLoading && (
-    <div style={{...styles.aiMessage, ...styles.aiMessageAI}}>
-      <div style={styles.aiLoadingDots}>
-        <div style={{...styles.aiLoadingDot, animationDelay: '0s'}}></div>
-        <div style={{...styles.aiLoadingDot, animationDelay: '0.2s'}}></div>
-        <div style={{...styles.aiLoadingDot, animationDelay: '0.4s'}}></div>
-        <span style={{ marginLeft: '8px', fontSize: '14px', color: '#666' }}>
-          AI is thinking...
-        </span>
-      </div>
-    </div>
-  )}
-  <div ref={messagesEndRef} />
-</div>
+              <div style={styles.aiMessagesContainer}>
+                {aiMessages.map((message, index) => (
+                  <div 
+                    key={index}
+                    style={{
+                      ...styles.aiMessage,
+                      ...(message.type === 'user' ? styles.aiMessageUser : styles.aiMessageAI)
+                    }}
+                  >
+                    <div style={{ whiteSpace: 'pre-wrap' }}>{message.content}</div>
+                    <div style={styles.aiMessageTime}>{message.timestamp}</div>
+                  </div>
+                ))}
+                
+                {aiLoading && (
+                  <div style={{...styles.aiMessage, ...styles.aiMessageAI}}>
+                    <div style={styles.aiLoadingDots}>
+                      <div style={{...styles.aiLoadingDot, animationDelay: '0s'}}></div>
+                      <div style={{...styles.aiLoadingDot, animationDelay: '0.2s'}}></div>
+                      <div style={{...styles.aiLoadingDot, animationDelay: '0.4s'}}></div>
+                      <span style={{ marginLeft: '8px', fontSize: '14px', color: '#666' }}>
+                        AI is thinking...
+                      </span>
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
               
               <form onSubmit={handleAIInputSubmit} style={styles.aiInputContainer}>
-
                 <input
                   type="text"
                   value={aiInput}

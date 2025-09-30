@@ -19,8 +19,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import ImagePickerModal from '../../components/ImagePickerModal';
-import { ref as dbRef, set, get } from 'firebase/database';
-import { database, auth } from '../../firebaseConfig';
+import { database, auth, storage } from '../../firebaseConfig';
 
 // Safely extract an error message without assuming shape
 const getErrorMessage = (err) => {
@@ -28,6 +27,44 @@ const getErrorMessage = (err) => {
   if (typeof err === 'string') return err;
   if (typeof err.message === 'string') return err.message;
   try { return JSON.stringify(err); } catch { return 'Unknown error'; }
+};
+
+// Upload image to Firebase Storage using v8 compat
+const uploadImageToFirebase = async (uri, folder, memberId) => {
+  try {
+    // Create a unique filename with timestamp and user ID to avoid collisions
+    const timestamp = new Date().getTime();
+    const uniqueFilename = `${memberId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+    const fileExtension = uri.split('.').pop() || 'jpeg';
+    const filename = `${uniqueFilename}.${fileExtension}`;
+    
+    // Use a user-specific folder path to improve security
+    const userFolder = `users/${memberId}/${folder}`;
+    const imageRef = storage.ref(`${userFolder}/${filename}`);
+    
+    const response = await fetch(uri);
+    const blob = await response.blob();
+    
+    // Upload the image using v8 compat syntax
+    await imageRef.put(blob);
+    
+    // Get the download URL
+    const downloadURL = await imageRef.getDownloadURL();
+    return downloadURL;
+  } catch (error) {
+    console.error('Image upload failed:', error);
+    
+    // Provide more specific error messages based on the error type
+    if (error.code === 'storage/unauthorized') {
+      throw new Error('Permission denied: You do not have permission to upload images. Please contact support.');
+    } else if (error.code === 'storage/canceled') {
+      throw new Error('Upload was canceled');
+    } else if (error.code === 'storage/unknown') {
+      throw new Error('An unknown error occurred during upload');
+    } else {
+      throw new Error('Failed to upload image: ' + error.message);
+    }
+  }
 };
 
 const ApplyLoan = () => {
@@ -54,6 +91,7 @@ const ApplyLoan = () => {
   const [userId, setUserId] = useState('');
   const [memberId, setMemberId] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   
   // Collateral related states
   const [requiresCollateral, setRequiresCollateral] = useState(false);
@@ -123,7 +161,8 @@ const ApplyLoan = () => {
       return basicFieldsValid &&
         collateralType &&
         collateralValue &&
-        collateralDescription;
+        collateralDescription &&
+        proofOfCollateral;
     }
 
     return basicFieldsValid;
@@ -131,8 +170,8 @@ const ApplyLoan = () => {
 
   const logTransactionApplication = async (memberId, transactionId, payload) => {
     try {
-      const txnRef = dbRef(database, `Transactions/Loans/${memberId}/${transactionId}`);
-      await set(txnRef, { ...payload, label: 'Loan', type: 'Loans' });
+      const txnRef = database.ref(`Transactions/Loans/${memberId}/${transactionId}`);
+      await txnRef.set({ ...payload, label: 'Loan', type: 'Loans' });
     } catch (e) { /* ignore */ }
   };
 
@@ -215,8 +254,8 @@ const ApplyLoan = () => {
 
   const fetchSystemSettings = async () => {
     try {
-      const settingsRef = dbRef(database, 'Settings');
-      const snapshot = await get(settingsRef);
+      const settingsRef = database.ref('Settings');
+      const snapshot = await settingsRef.once('value');
       if (snapshot.exists()) {
         const settings = snapshot.val();
         const loanPercentage = settings.LoanPercentage || 80; // Default to 80%
@@ -275,9 +314,9 @@ const ApplyLoan = () => {
   };
 
   const fetchUserData = async (userEmail) => {
-    const membersRef = dbRef(database, 'Members');
+    const membersRef = database.ref('Members');
     try {
-      const snapshot = await get(membersRef);
+      const snapshot = await membersRef.once('value');
       if (snapshot.exists()) {
         const members = snapshot.val();
         const foundUser = Object.values(members).find(member => member.email === userEmail);
@@ -324,8 +363,8 @@ const ApplyLoan = () => {
   const checkExistingLoans = async (userEmail) => {
     try {
       // Check CurrentLoans table for existing active loans
-      const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
-      const currentSnapshot = await get(currentLoansRef);
+      const currentLoansRef = database.ref('Loans/CurrentLoans');
+      const currentSnapshot = await currentLoansRef.once('value');
 
       if (currentSnapshot.exists()) {
         const allCurrentLoans = currentSnapshot.val();
@@ -354,8 +393,8 @@ const ApplyLoan = () => {
   // Check if user has any existing pending application in LoanApplications
   const hasAnyPendingApplication = async (memberId) => {
     try {
-      const applicationsRef = dbRef(database, `Loans/LoanApplications/${memberId}`);
-      const snapshot = await get(applicationsRef);
+      const applicationsRef = database.ref(`Loans/LoanApplications/${memberId}`);
+      const snapshot = await applicationsRef.once('value');
       if (!snapshot.exists()) return false;
       const apps = snapshot.val();
       for (const id in apps) {
@@ -416,6 +455,28 @@ const ApplyLoan = () => {
     }
   }, [balance, loanableAmountPercentage]);
 
+  // Auto-trigger collateral requirement when loan amount exceeds member balance
+  useEffect(() => {
+    const loanAmountNum = parseFloat(loanAmount) || 0;
+    const memberBalance = parseFloat(balance) || 0;
+    
+    if (loanAmountNum > 0 && memberBalance > 0) {
+      if (loanAmountNum > memberBalance) {
+        // Loan amount exceeds balance, require collateral
+        if (!requiresCollateral) {
+          setRequiresCollateral(true);
+          // Show a brief message to inform the user
+          setAlertMessage('Loan amount exceeds your balance. Collateral is required for this loan.');
+          setAlertType('info');
+          setAlertModalVisible(true);
+        }
+      } else {
+        // Loan amount is within balance, collateral not required (but user can still choose to provide it)
+        // Don't automatically set to false as user might want to provide collateral anyway
+      }
+    }
+  }, [loanAmount, balance, requiresCollateral]);
+
   useEffect(() => {
     const handleBackPress = () => {
       navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
@@ -459,12 +520,12 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       status: 'pending' // Explicit status
     };
 
-    const applicationRef = dbRef(database, `Loans/LoanApplications/${userId}/${transactionId}`);
-    await set(applicationRef, applicationDataWithMeta);
+    const applicationRef = database.ref(`Loans/LoanApplications/${userId}/${transactionId}`);
+    await applicationRef.set(applicationDataWithMeta);
 
     // Log into Transactions for unified feed (Applications table)
-    const txnRef = dbRef(database, `Transactions/Loans/${userId}/${transactionId}`);
-    await set(txnRef, { ...applicationDataWithMeta, label: 'Loan', type: 'Loans' });
+    const txnRef = database.ref(`Transactions/Loans/${userId}/${transactionId}`);
+    await txnRef.set({ ...applicationDataWithMeta, label: 'Loan', type: 'Loans' });
 
     return true;
   } catch (error) {
@@ -507,6 +568,27 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   
   try {
     const loanAmountNum = parseFloat(loanAmount);
+    
+    // Upload collateral image to Firebase Storage if provided
+    let proofOfCollateralUrl = '';
+    if (requiresCollateral && proofOfCollateral) {
+      try {
+        setIsUploadingImage(true);
+        console.log('Uploading collateral image to Firebase Storage...');
+        proofOfCollateralUrl = await uploadImageToFirebase(proofOfCollateral, 'collateral_proofs', memberId);
+        console.log('Collateral image uploaded successfully:', proofOfCollateralUrl);
+        setIsUploadingImage(false);
+      } catch (uploadError) {
+        console.error('Failed to upload collateral image:', uploadError);
+        setIsUploadingImage(false);
+        setAlertMessage(uploadError.message || 'Failed to upload collateral image. Please try again.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+        setIsLoading(false);
+        return;
+      }
+    }
+    
     const applicationData = {
       loanAmount: loanAmountNum,
       term,
@@ -525,7 +607,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         collateralType,
         collateralValue,
         collateralDescription,
-        proofOfCollateralUrl: proofOfCollateral || '' // will be URL after upload if you choose to upload now
+        proofOfCollateralUrl // Now contains the Firebase Storage URL
       })
     };
 
@@ -604,8 +686,27 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   };
 
   const handleSubmit = async () => {
+    console.log('Form validation debug:', {
+      isFormValid: isFormValid(),
+      requiresCollateral,
+      isCollateralValid: isCollateralValid(),
+      collateralType,
+      collateralValue,
+      collateralDescription,
+      proofOfCollateral: !!proofOfCollateral,
+      loanAmount,
+      term,
+      disbursement,
+      accountName,
+      accountNumber
+    });
+    
     if (!isFormValid()) {
-      setAlertMessage('All required fields must be filled');
+      let message = 'All required fields must be filled';
+      if (requiresCollateral && !isCollateralValid()) {
+        message = 'Please complete all collateral details including uploading proof of collateral';
+      }
+      setAlertMessage(message);
       setAlertType('error');
       setAlertModalVisible(true);
       return;
@@ -627,7 +728,8 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     // 2) Ensure the member's BALANCE will remain above 0 after considering all active loans + this request
     let currentLoansTotal = 0;
     try {
-      const currSnap = await get(dbRef(database, `Loans/CurrentLoans/${memberId}`));
+      const currRef = database.ref(`Loans/CurrentLoans/${memberId}`);
+      const currSnap = await currRef.once('value');
       if (currSnap.exists()) {
         const loans = currSnap.val();
         for (const k in loans) {
@@ -651,13 +753,32 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       return;
     }
 
-    // Require that remaining BALANCE stays above 0 (not equal)
+    // Require that remaining BALANCE stays above 0 (not equal), unless collateral is provided
     const remaining = userBalance - projectedTotal;
+    console.log('Validation Debug:', {
+      remaining,
+      userBalance,
+      projectedTotal,
+      requiresCollateral,
+      isCollateralValid: isCollateralValid(),
+      collateralType,
+      collateralValue,
+      collateralDescription,
+      proofOfCollateral: !!proofOfCollateral
+    });
+    
     if (remaining <= 0) {
-      setAlertMessage('Your requested amount would use up all your balance. Please lower the amount so your remaining balance stays above ₱0.00.');
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
+      // If collateral is required and properly filled, allow the loan to proceed
+      if (requiresCollateral && isCollateralValid()) {
+        console.log('Collateral validation passed, proceeding with loan');
+        // Collateral covers the shortfall, proceed with loan
+      } else {
+        console.log('Collateral validation failed or not provided');
+        setAlertMessage('Your requested amount would use up all your balance. Please lower the amount or provide collateral to cover the shortfall.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+        return;
+      }
     }
 
     showConfirmationAlert();
@@ -734,6 +855,40 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           style={styles.input}
           keyboardType="numeric"
         />
+        
+        {/* Collateral Required Indicator */}
+        {requiresCollateral && parseFloat(loanAmount) > parseFloat(balance) && (
+          <View style={styles.collateralIndicator}>
+            <MaterialIcons name="security" size={16} color="#ff9800" />
+            <Text style={styles.collateralIndicatorText}>
+              Collateral required - Loan amount exceeds your balance
+            </Text>
+          </View>
+        )}
+
+        {/* Collateral Details Button */}
+        {requiresCollateral && (
+          <TouchableOpacity 
+            style={styles.collateralButton}
+            onPress={() => setShowCollateralModal(true)}
+          >
+            <MaterialIcons name="security" size={20} color="#2D5783" />
+            <Text style={styles.collateralButtonText}>
+              {collateralType ? 'Edit Collateral Details' : 'Add Collateral Details'}
+            </Text>
+            <MaterialIcons name="arrow-forward-ios" size={16} color="#2D5783" />
+          </TouchableOpacity>
+        )}
+
+        {/* Collateral Summary */}
+        {requiresCollateral && collateralType && (
+          <View style={styles.collateralSummary}>
+            <Text style={styles.collateralSummaryTitle}>Collateral Summary</Text>
+            <Text style={styles.collateralSummaryText}>Type: {collateralType}</Text>
+            <Text style={styles.collateralSummaryText}>Value: ₱{parseFloat(collateralValue || 0).toLocaleString()}</Text>
+            <Text style={styles.collateralSummaryText}>Description: {collateralDescription}</Text>
+          </View>
+        )}
 
         <Text style={styles.label}><RequiredField>Term</RequiredField></Text>
         <ModalSelector
@@ -816,7 +971,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
               <TouchableOpacity style={styles.headerSide} onPress={() => setShowCollateralModal(false)}>
                 <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
               </TouchableOpacity>
-              <Text style={styles.headerTitle}>Collateral</Text>
+              <Text style={styles.headerTitle}>Collateral Details</Text>
               <View style={styles.headerSide} />
             </View>
 
@@ -879,38 +1034,28 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
 
               <View style={{ height: 8 }} />
 
-              <View style={{ marginTop: 20 }}>
+              <View style={{ marginTop: 20, gap: 12 }}>
                 <TouchableOpacity 
                   style={[styles.submitButton, !isCollateralValid() && styles.disabledButton]}
                   onPress={() => {
                     if (isCollateralValid()) {
                       setRequiresCollateral(true);
-                      // Show loan confirmation directly like ApplyLoan Submit
-                      const loanAmountNum = parseFloat(loanAmount) || 0;
-                      const processingFeeNum = parseFloat(processingFee) || 0;
-                      const releaseAmount = loanAmountNum - processingFeeNum;
-                      let message = `Loan Type: ${loanType}\n` +
-                        `Loan Amount: ₱${loanAmountNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
-                        `Processing Fee: ₱${processingFeeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
-                        `Release Amount: ₱${releaseAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
-                        `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
-                        `Disbursement: ${disbursement}\n` +
-                        `Account Name: ${accountName}\n` +
-                        `Account Number: ${accountNumber}` +
-                        `\n\nCollateral Details\n` +
-                        `Type: ${collateralType}\n` +
-                        `Value: ₱${collateralValue}\n` +
-                        `Description: ${collateralDescription}`;
-                      setConfirmMessage(message);
-                      setConfirmAction(() => () => {
-                        submitLoanApplication();
-                      });
-                      setConfirmModalVisible(true);
+                      setShowCollateralModal(false);
+                      setAlertMessage('Collateral details saved successfully!');
+                      setAlertType('success');
+                      setAlertModalVisible(true);
                     }
                   }}
                   disabled={!isCollateralValid()}
                 >
-                  <Text style={styles.submitButtonText}>Continue</Text>
+                  <Text style={styles.submitButtonText}>Save Collateral Details</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.submitButton, styles.secondaryButton]}
+                  onPress={() => setShowCollateralModal(false)}
+                >
+                  <Text style={[styles.submitButtonText, styles.secondaryButtonText]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -933,7 +1078,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           {isLoading ? (
             <>
               <ActivityIndicator size="small" color="#000" />
-              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>Submitting...</Text>
+              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
+                {isUploadingImage ? 'Uploading Image...' : 'Submitting...'}
+              </Text>
             </>
           ) : (
             <Text style={styles.submitButtonText}>Submit</Text>
@@ -1004,7 +1151,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
                 style={[styles.modalButton, styles.cancelButton]} 
                 onPress={() => {
                   setConfirmModalVisible(false);
-                  if (requiresCollateral) setShowCollateralModal(true);
+                  if (requiresCollateral && confirmMessage.toLowerCase().includes('requires collateral')) {
+                    setShowCollateralModal(true);
+                  }
                 }}
               >
                 <Text style={styles.cancelButtonText}>{requiresCollateral ? 'No' : 'Cancel'}</Text>
@@ -1099,6 +1248,59 @@ const styles = StyleSheet.create({
     marginBottom: 15,
     backgroundColor: '#f9f9f9',
   },
+  collateralIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff3cd',
+    borderColor: '#ffeaa7',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 15,
+    gap: 8,
+  },
+  collateralIndicatorText: {
+    fontSize: 14,
+    color: '#856404',
+    fontWeight: '500',
+    flex: 1,
+  },
+  collateralButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#EAF3FF',
+    borderColor: '#2D5783',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 15,
+    gap: 8,
+  },
+  collateralButtonText: {
+    fontSize: 14,
+    color: '#2D5783',
+    fontWeight: '600',
+    flex: 1,
+  },
+  collateralSummary: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#dee2e6',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 15,
+  },
+  collateralSummaryTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#2D5783',
+    marginBottom: 8,
+  },
+  collateralSummaryText: {
+    fontSize: 13,
+    color: '#495057',
+    marginBottom: 4,
+  },
   picker: {
     marginBottom: 10,
   },
@@ -1133,6 +1335,14 @@ const styles = StyleSheet.create({
     color: 'black',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  secondaryButton: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#6c757d',
+    borderWidth: 1,
+  },
+  secondaryButtonText: {
+    color: '#6c757d',
   },
   modalContainer: {
     flex: 1,

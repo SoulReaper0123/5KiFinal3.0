@@ -45,6 +45,10 @@ const Deposit = () => {
   const [showImageOptions, setShowImageOptions] = useState(false);
   const [pendingDepositData, setPendingDepositData] = useState(null);
 
+  // Cash on hand fields
+  const [receivedBy, setReceivedBy] = useState('');
+  const [dateReceived, setDateReceived] = useState('');
+
   useEffect(() => {
     const initializeUserData = async () => {
       try {
@@ -143,12 +147,12 @@ const Deposit = () => {
   const depositOptions = [
     { key: 'Bank', label: 'Bank' },
     { key: 'GCash', label: 'GCash' },
-    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
+    { key: 'Cash', label: 'Cash' },
   ];
 
   const handleDepositOptionChange = (option) => {
     setDepositOption(option.key);
-    if (option.key === 'Cash-on-Hand') {
+    if (option.key === 'Cash') {
       setAccountNumber('');
       setAccountName('');
       return;
@@ -264,7 +268,15 @@ const Deposit = () => {
   };
 
   const handleSubmit = async () => {
-    if (!depositOption || !amountToBeDeposited || !proofOfDeposit) {
+    if (!depositOption || !amountToBeDeposited) {
+      setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    // Proof of deposit is only required for non-cash deposits
+    if (depositOption !== 'Cash' && !proofOfDeposit) {
       setAlertMessage('All fields are required');
       setAlertType('error');
       setAlertModalVisible(true);
@@ -285,14 +297,17 @@ const Deposit = () => {
   const submitDeposit = async () => {
     setLoading(true);
     setConfirmModalVisible(false);
-    
+
     try {
       // Generate a single transaction ID to use for both database entries
       const transactionId = generateTransactionId();
-      
-      // Use 'deposit_proofs' instead of 'proofsOfDeposit' for better naming consistency
-      const proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs');
-      
+
+      // Proof of deposit is only required for non-cash deposits
+      let proofOfDepositUrl = null;
+      if (depositOption !== 'Cash') {
+        proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs');
+      }
+
       // Store in Firebase Realtime Database with the transaction ID
       await storeDepositDataInDatabase(proofOfDepositUrl, transactionId);
 
@@ -344,6 +359,8 @@ const Deposit = () => {
     setAccountName('');
     setAmountToBeDeposited('');
     setProofOfDeposit(null);
+    setReceivedBy('');
+    setDateReceived('');
     setPendingDepositData(null);
   };
 
@@ -390,21 +407,25 @@ const Deposit = () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}>Account Name</Text>
-        <TextInput 
-          value={accountName} 
-          placeholder={depositOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
-          style={[styles.input, styles.fixedInput]} 
-          editable={false} 
-        />
+        {depositOption !== 'Cash' && (
+          <>
+            <Text style={styles.label}>Account Name</Text>
+            <TextInput
+              value={accountName}
+              placeholder={''}
+              style={[styles.input, styles.fixedInput]}
+              editable={false}
+            />
 
-        <Text style={styles.label}>Account Number</Text>
-        <TextInput 
-          value={accountNumber} 
-          placeholder={depositOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
-          style={[styles.input, styles.fixedInput]} 
-          editable={false} 
-        />
+            <Text style={styles.label}>Account Number</Text>
+            <TextInput
+              value={accountNumber}
+              placeholder={''}
+              style={[styles.input, styles.fixedInput]}
+              editable={false}
+            />
+          </>
+        )}
 
         <Text style={styles.label}>
           Deposit Amount <Text style={styles.required}>*</Text>
@@ -417,21 +438,25 @@ const Deposit = () => {
           keyboardType="numeric"
         />
 
-        <Text style={styles.label}>
-          Proof of Deposit <Text style={styles.required}>*</Text>
-        </Text>
-        <TouchableOpacity onPress={handleSelectProofOfDeposit} style={styles.imagePreviewContainer}>
-          {proofOfDeposit ? (
-            <Image source={{ uri: proofOfDeposit }} style={styles.imagePreview} />
-          ) : (
-            <View style={styles.uploadPlaceholder}>
-              <MaterialIcons name="photo" size={100} color="#ccc" />
-              <Text style={styles.uploadPromptText}>Tap To Upload</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        {depositOption !== 'Cash' && (
+          <>
+            <Text style={styles.label}>
+              Proof of Deposit <Text style={styles.required}>*</Text>
+            </Text>
+            <TouchableOpacity onPress={handleSelectProofOfDeposit} style={styles.imagePreviewContainer}>
+              {proofOfDeposit ? (
+                <Image source={{ uri: proofOfDeposit }} style={styles.imagePreview} />
+              ) : (
+                <View style={styles.uploadPlaceholder}>
+                  <MaterialIcons name="photo" size={100} color="#ccc" />
+                  <Text style={styles.uploadPromptText}>Tap To Upload</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          </>
+        )}
 
-        <TouchableOpacity 
+        <TouchableOpacity
           style={[
             styles.submitButton,
             (
@@ -439,7 +464,7 @@ const Deposit = () => {
               !amountToBeDeposited ||
               isNaN(parseFloat(amountToBeDeposited)) ||
               parseFloat(amountToBeDeposited) <= 0 ||
-              !proofOfDeposit ||
+              (depositOption !== 'Cash' && !proofOfDeposit) ||
               loading
             ) && styles.disabledButton
           ]}
@@ -449,7 +474,7 @@ const Deposit = () => {
             !amountToBeDeposited ||
             isNaN(parseFloat(amountToBeDeposited)) ||
             parseFloat(amountToBeDeposited) <= 0 ||
-            !proofOfDeposit ||
+            (depositOption !== 'Cash' && !proofOfDeposit) ||
             loading
           }
         >

@@ -275,6 +275,13 @@ export default function Inbox() {
   };
 
   const fetchMessages = async () => {
+    if (!userEmail) {
+      setMessages([]);
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     setLoading(true);
     try {
       const transactionsRef = ref(database, 'Transactions');

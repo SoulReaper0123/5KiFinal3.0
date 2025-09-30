@@ -28,6 +28,7 @@ const ApplyLoans = () => {
   const [currentPage, setCurrentPage] = useState(0); // State for current page
   const pageSize = 20; // Number of registrations to display
   const [searchQuery, setSearchQuery] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false); // Processing modal state
  
 
   const fetchLoans = async () => {
@@ -191,9 +192,14 @@ const ApplyLoans = () => {
         } else {
           console.error("Failed to approve loan:", response);
         }
+        
+        // Refresh the loans data
+        await fetchLoans();
       } catch (error) {
         console.error("Error approving loan:", error);
         // Optionally handle error (e.g., show a notification to the user)
+      } finally {
+        setIsProcessing(false); // Hide processing modal
       }
     }
   };
@@ -277,9 +283,14 @@ const ApplyLoans = () => {
         } else {
           console.error("Failed to reject loan:", response);
         }
+        
+        // Refresh the loans data
+        await fetchLoans();
       } catch (error) {
         console.error("Error rejecting loan:", error);
         // Optionally handle error (e.g., show a notification to the user)
+      } finally {
+        setIsProcessing(false); // Hide processing modal
       }
     }
   };
@@ -288,12 +299,14 @@ const ApplyLoans = () => {
   
 
   const confirmAction = () => {
+    setModalVisible(false); // Close the confirmation modal
+    setIsProcessing(true); // Show processing modal
+    
     if (currentAction === 'approve') {
       handleApprove(); // Call handleApprove without parameters
     } else if (currentAction === 'reject') {
       handleReject(); // Call handleReject without parameters
     }
-    setModalVisible(false); // Close the confirmation modal
   };
   
   
@@ -437,6 +450,16 @@ const totalPages = Math.ceil(filteredLoans.length / pageSize);
   </View>
 </Modal>
 
+      {/* Processing Modal */}
+      {isProcessing && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
+
 {/* Pagination and "X of Y" Display */}
 <View style={styles.paginationContainer}>
   <Text style={styles.paginationInfo}>
@@ -557,6 +580,29 @@ const styles = {
   paginationText: {
     fontWeight: 'bold',
     color: '#fff',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2C5282',
   },
 };
 

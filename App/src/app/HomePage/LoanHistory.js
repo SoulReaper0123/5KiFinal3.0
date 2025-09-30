@@ -33,53 +33,219 @@ export default function LoanHistory() {
 
   const email = getEmailFromSources();
 
+  const getUserIdFromSources = () => {
+    const user = auth.currentUser;
+    return (
+      user?.uid ||
+      user?.userId ||
+      route.params?.user?.id ||
+      route.params?.user?.userId ||
+      route.params?.userId ||
+      route.params?.id ||
+      null
+    );
+  };
+
+  const normalizedEmail = (email || '').toLowerCase();
+  const normalizedUserId = (() => {
+    const id = getUserIdFromSources();
+    if (id === null || id === undefined) return '';
+    return String(id).toLowerCase();
+  })();
+
   const fetchLoans = async () => {
     setLoading(true);
     try {
-      // Read only Loans branch from Transactions
-      const loansRef = ref(database, 'Transactions/Loans');
-      const snapshot = await get(loansRef);
+      // Read paid loans from Loans/PaidLoans
+      const paidRef = ref(database, 'Loans/PaidLoans');
+      const snapshot = await get(paidRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
         const parsed = [];
 
-        for (const [memberId, list] of Object.entries(data)) {
-          for (const [transactionId, details] of Object.entries(list)) {
-            // only approved
-            if ((details.status || '').toLowerCase() !== 'approved') continue;
+        const parseNumeric = (value) => {
+          if (value === null || value === undefined) return 0;
+          if (typeof value === 'number') return Number.isNaN(value) ? 0 : value;
+          if (typeof value === 'string') {
+            const sanitized = value.replace(/[^0-9.-]/g, '');
+            if (!sanitized.trim()) return 0;
+            const num = Number(sanitized);
+            return Number.isNaN(num) ? 0 : num;
+          }
+          return 0;
+        };
 
-            const itemEmail = (details.email || '').toLowerCase();
-            if ((email || '').toLowerCase() !== itemEmail) continue;
+        const normalizeTimestamp = (value) => {
+          if (value === null || value === undefined) return null;
+          if (typeof value === 'number') {
+            return value < 1e12 ? value * 1000 : value;
+          }
+          if (typeof value === 'object') {
+            if (typeof value.seconds === 'number') {
+              return value.seconds * 1000;
+            }
+            if (typeof value.toDate === 'function') {
+              return value.toDate().getTime();
+            }
+          }
+          if (typeof value === 'string') {
+            const parsedValue = Date.parse(value);
+            if (!Number.isNaN(parsedValue)) {
+              return parsedValue;
+            }
+          }
+          return null;
+        };
 
-            // Build a timestamp for sorting
-            const getTimestamp = () => {
-              if (details.timestamp && typeof details.timestamp === 'number') return details.timestamp;
-              const dateToUse = details.dateApproved || details.dateApplied;
-              if (!dateToUse) return Date.now();
-              if (typeof dateToUse === 'object' && dateToUse.seconds) return dateToUse.seconds * 1000;
-              const d = new Date(dateToUse);
-              return isNaN(d.getTime()) ? Date.now() : d.getTime();
-            };
+        const resolveTimestamp = (txnDetails, memberData) => {
+          const timestampCandidates = [
+            txnDetails?.timestamp,
+            txnDetails?.paidAt,
+            txnDetails?.approvedAt,
+            txnDetails?.createdAt,
+            txnDetails?.updatedAt,
+            memberData?.timestamp,
+            memberData?.paidAt,
+            memberData?.approvedAt,
+            memberData?.createdAt,
+            memberData?.updatedAt,
+          ];
 
-            // We try to keep an identifier that links payments to this loan. The app uses selectedLoanId
-            // in Payments. If not present, fall back to transactionId as a loose link.
+          for (const candidate of timestampCandidates) {
+            const normalized = normalizeTimestamp(candidate);
+            if (normalized !== null) {
+              return normalized;
+            }
+          }
+
+          const dateCandidates = [
+            txnDetails?.dateApproved,
+            txnDetails?.datePaid,
+            txnDetails?.paymentDate,
+            txnDetails?.paymentDateTime,
+            memberData?.dateApproved,
+            memberData?.datePaid,
+            memberData?.paymentDate,
+          ];
+
+          for (const candidate of dateCandidates) {
+            const normalized = normalizeTimestamp(candidate);
+            if (normalized !== null) {
+              return normalized;
+            }
+          }
+
+          return Date.now();
+        };
+
+        const resolveLoanType = (txnDetails, memberData) => (
+          txnDetails?.loanType ||
+          txnDetails?.loanName ||
+          txnDetails?.loanTypeName ||
+          txnDetails?.type ||
+          memberData?.loanType ||
+          memberData?.loanName ||
+          memberData?.loanTypeName ||
+          memberData?.type ||
+          null
+        );
+
+        const matchesCurrentUser = (txnEmail, txnUserId, memberIdFromPath) => {
+          const emailMatches = normalizedEmail && txnEmail === normalizedEmail;
+          const idMatches = normalizedUserId &&
+            (String(txnUserId ?? memberIdFromPath).toLowerCase() === normalizedUserId);
+
+          if (!normalizedEmail && !normalizedUserId) return true;
+          return emailMatches || idMatches;
+        };
+
+        Object.entries(data).forEach(([memberId, memberNode]) => {
+          if (!memberNode || typeof memberNode !== 'object') return;
+
+          const memberData = memberNode.data || memberNode.loanData || memberNode.details || {};
+          const transactionsNode =
+            memberNode.transaction ||
+            memberNode.transactions ||
+            memberNode.txn ||
+            memberNode; // fallback for flat structures
+
+          if (!transactionsNode || typeof transactionsNode !== 'object') return;
+
+          Object.entries(transactionsNode).forEach(([transactionKey, txnDetailsRaw]) => {
+            if (!txnDetailsRaw || typeof txnDetailsRaw !== 'object') return;
+            if (['data', 'loanData', 'details'].includes(transactionKey)) return;
+
+            const txnDetails = txnDetailsRaw;
+            const txnEmail = (
+              txnDetails.email ||
+              txnDetails.memberEmail ||
+              txnDetails.borrowerEmail ||
+              memberData.email ||
+              memberData.memberEmail ||
+              ''
+            )
+              .toString()
+              .toLowerCase();
+
+            const txnUserId = txnDetails.userId || txnDetails.memberId || txnDetails.borrowerId || memberData.userId;
+
+            if (!matchesCurrentUser(txnEmail, txnUserId, memberId)) return;
+
+            const status = String(txnDetails.status || memberData.status || 'paid').toLowerCase();
+            if (status !== 'paid') return;
+
             parsed.push({
               memberId,
-              transactionId,
-              email: details.email,
-              amount: Number(details.loanAmount) || 0,
-              dateApplied: details.dateApplied || null,
-              dateApproved: details.dateApproved || null,
-              timestamp: getTimestamp(),
-              disbursement: details.disbursement || null,
-              status: details.status || 'Approved',
-              // carry possible IDs to match payments later
-              loanId: details._loanId || details.loanId || details.selectedLoanId || null,
+              transactionId:
+                txnDetails.transactionId ||
+                txnDetails.txnId ||
+                txnDetails.referenceId ||
+                transactionKey,
+              email: txnEmail,
+              amount: parseNumeric(
+                txnDetails.amountPaid ||
+                  txnDetails.totalTermPayment ||
+                  txnDetails.totalAmount ||
+                  txnDetails.amount ||
+                  txnDetails.amountToBePaid ||
+                  memberData.amountPaid ||
+                  memberData.totalTermPayment ||
+                  memberData.totalAmount ||
+                  memberData.amount
+              ),
+              dateApproved:
+                txnDetails.dateApproved ||
+                txnDetails.datePaid ||
+                txnDetails.paymentDate ||
+                txnDetails.dateApplied ||
+                memberData.dateApproved ||
+                memberData.datePaid ||
+                memberData.paymentDate ||
+                null,
+              timestamp: resolveTimestamp(txnDetails, memberData),
+              status: 'paid',
+              loanType: resolveLoanType(txnDetails, memberData),
+              loanId:
+                txnDetails.selectedLoanId ||
+                txnDetails.loanId ||
+                txnDetails.loan_id ||
+                memberData.selectedLoanId ||
+                memberData.loanId ||
+                memberData.loan_id ||
+                null,
+              relatedLoanId:
+                txnDetails.relatedLoanId ||
+                txnDetails.loanTransactionId ||
+                txnDetails.loanTxnId ||
+                memberData.relatedLoanId ||
+                memberData.loanTransactionId ||
+                memberData.loanTxnId ||
+                null,
+              rawDetails: { ...memberData, ...txnDetails },
             });
-          }
-        }
+          });
+        });
 
-        // Sort newest first
         parsed.sort((a, b) => b.timestamp - a.timestamp);
         setLoans(parsed);
       } else {
@@ -103,119 +269,35 @@ export default function LoanHistory() {
   };
 
   const formatCurrency = (n) => `₱${(Number(n) || 0).toFixed(2)}`;
-  const formatDate = (d) => {
-    if (!d) return 'N/A';
-    try {
-      const date = new Date(d);
-      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    } catch {
-      return String(d);
+
+  const formatLoanType = (loan) => {
+    const directType = loan.loanType || loan.loanName || loan.type || null;
+    if (directType) return directType;
+
+    const details = loan.rawDetails || loan;
+    if (details && typeof details === 'object') {
+      const candidate =
+        details.loanType ||
+        details.loanName ||
+        details.loanTypeName ||
+        details.type ||
+        details.selectedLoan ||
+        details.selectedLoanType;
+      if (candidate) return candidate;
     }
-  };
 
-  // Helpers for expandable payments per-loan
-  const loanKeyFor = (loan) => loan.loanId || loan.transactionId;
-
-  const loadPaymentsForLoan = async (loan) => {
-    const key = loanKeyFor(loan);
-    setLoadingByLoan((prev) => ({ ...prev, [key]: true }));
-    try {
-      // Pull from both ApprovedPayments and Transactions/Payments then merge
-      const approvedRef = ref(database, `Payments/ApprovedPayments/${loan.memberId}`);
-      const txRef = ref(database, `Transactions/Payments/${loan.memberId}`);
-      const [approvedSnap, txSnap] = await Promise.all([get(approvedRef), get(txRef)]);
-
-      const collected = [];
-      const sameLoan = (t) => {
-        // Prefer exact link by selectedLoanId/loanId
-        const tLoanId = t.selectedLoanId || t.loanId || null;
-        if (loan.loanId && tLoanId) return String(tLoanId) === String(loan.loanId);
-        // fallback: try to match by transactionId if system uses that to mark a loan
-        const tRelated = t.relatedLoanId || t.loanTransactionId || t.loanTxnId || null;
-        if (tRelated) return String(tRelated) === String(loan.transactionId);
-        // weakest fallback: if none, include payments for same member filtered later by status/date
-        return true;
-      };
-
-      if (approvedSnap.exists()) {
-        const data = approvedSnap.val();
-        Object.entries(data).forEach(([id, t]) => {
-          if (!sameLoan(t)) return;
-          collected.push({
-            source: 'approved',
-            id,
-            amount: Number(t.amount || t.amountToBePaid || 0),
-            dateApproved: t.dateApproved,
-            timestamp: typeof t.timestamp === 'number' ? t.timestamp : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now()),
-            status: 'paid',
-            paymentOption: t.paymentOption || t.modeOfPayment,
-          });
-        });
-      }
-
-      if (txSnap.exists()) {
-        const data = txSnap.val();
-        Object.entries(data).forEach(([id, t]) => {
-          if (!sameLoan(t)) return;
-          const status = String(t.status || '').toLowerCase();
-          collected.push({
-            source: 'tx',
-            id,
-            amount: Number(t.amount || t.amountToBePaid || 0),
-            dateApproved: t.dateApproved,
-            timestamp: typeof t.timestamp === 'number' ? t.timestamp : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now()),
-            status: status === 'approved' ? 'paid' : status, // normalize approved -> paid
-            paymentOption: t.paymentOption || t.modeOfPayment,
-          });
-        });
-      }
-
-      // Sort newest first
-      collected.sort((a, b) => b.timestamp - a.timestamp);
-      setPaymentsByLoan((prev) => ({ ...prev, [key]: collected }));
-    } catch (e) {
-      console.error('Error loading payments:', e);
-      setPaymentsByLoan((prev) => ({ ...prev, [key]: [] }));
-    } finally {
-      setLoadingByLoan((prev) => ({ ...prev, [key]: false }));
-    }
-  };
-
-  const toggleExpand = (loan) => {
-    const key = loanKeyFor(loan);
-    setExpandedLoanId((prev) => (prev === key ? null : key));
-    if (!paymentsByLoan[key]) {
-      loadPaymentsForLoan(loan);
-    }
-  };
-
-  // Derive status for the loan summary card (Paid if any paid this month, else Pending)
-  const computeLoanStatus = (loan) => {
-    try {
-      const key = loanKeyFor(loan);
-      const list = paymentsByLoan[key] || [];
-      const now = new Date();
-      const year = now.getFullYear();
-      const month = now.getMonth();
-      const paidThisMonth = list.some((p) => {
-        const ts = typeof p.timestamp === 'number' ? p.timestamp : (p.dateApproved ? new Date(p.dateApproved).getTime() : 0);
-        if (!ts) return false;
-        const d = new Date(ts);
-        return (p.status === 'paid') && d.getFullYear() === year && d.getMonth() === month;
-      });
-      return paidThisMonth ? 'Paid' : 'Pending';
-    } catch {
-      return 'Pending';
-    }
+    return 'Loan';
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
-        <TouchableOpacity onPress={() => navigation.navigate('HomeTab')} style={{ padding: 6, borderRadius: 8 }}>
+        <TouchableOpacity onPress={() => navigation.navigate('HomeTab')} style={styles.headerBackBtn}>
           <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
         </TouchableOpacity>
-        <Text style={styles.headerTitleText}>Loan History</Text>
+        <View style={styles.headerTitleWrapper}>
+          <Text style={styles.headerTitleText}>Loan History</Text>
+        </View>
         <View style={{ width: 22 }} />
       </View>
 
@@ -227,31 +309,24 @@ export default function LoanHistory() {
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         >
           {loans.length > 0 ? (
-            loans.map((loan) => {
-              // Decide card status: Pending (default) or Paid (if we detect any paid tx this calendar month)
-              const status = computeLoanStatus(loan);
-              const statusColor = status === 'Paid' ? '#4CAF50' : '#FFA000';
-              const key = loanKeyFor(loan);
-              return (
-                <View key={loan.transactionId}>
-                  <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LoanPaymentHistory', { loan })}>
-                    <View style={styles.iconContainer}>
-                      <MaterialIcons name="history" size={22} color="#1E3A5F" />
-                    </View>
-                    <View style={styles.info}>
-                      <Text style={styles.title}>Transaction ID: {loan.transactionId}</Text>
-                      <Text style={styles.sub}>{loan.dateApproved ? `Approved: ${formatDate(loan.dateApproved)}` : (loan.dateApplied ? `Applied: ${formatDate(loan.dateApplied)}` : 'Date: N/A')}</Text>
-                    </View>
-                    <View style={styles.rightCol}>
-                      <Text style={[styles.status, { color: statusColor }]}>{status}</Text>
-                      <Text style={styles.amount}>-{formatCurrency(loan.amount)}</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-              );
-            })
+            loans.map((loan) => (
+              <View key={loan.transactionId}>
+                <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LoanPaymentHistory', { loan })}>
+                  <View style={styles.iconContainer}>
+                    <MaterialIcons name="history" size={22} color="#1E3A5F" />
+                  </View>
+                  <View style={styles.info}>
+                    <Text style={styles.title}>{formatLoanType(loan)}</Text>
+                    <Text style={styles.sub}>{formatCurrency(loan.amount)}</Text>
+                  </View>
+                  <View style={styles.rightCol}>
+                    <Text style={[styles.status, { color: '#4CAF50' }]}>PAID</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))
           ) : (
-            <Text style={styles.emptyText}>No loan history found</Text>
+            <Text style={styles.emptyText}>No paid loans found</Text>
           )}
         </ScrollView>
       )}
@@ -275,11 +350,24 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     backgroundColor: '#E8F1FB',
     borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+  },
+  headerBackBtn: {
+    padding: 6,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  headerTitleWrapper: {
+    flex: 1,
+    alignItems: 'center',
   },
   headerTitleText: {
     fontSize: 18,
     fontWeight: '700',
     color: '#1E3A5F',
+    textAlign: 'center',
   },
   scrollContainer: {
     paddingHorizontal: 15,
