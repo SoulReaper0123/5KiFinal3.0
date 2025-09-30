@@ -2064,6 +2064,7 @@ const processDatabaseApprove = async (reg) => {
         firstName: reg.firstName,
         lastName: reg.lastName,
         email: reg.email,
+        password: reg.password,
         dateApproved: reg.dateApproved,
         approvedTime: reg.approvedTime,
         memberId: reg.memberId

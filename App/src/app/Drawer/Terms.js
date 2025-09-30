@@ -42,16 +42,22 @@ const Terms = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            const parent = navigation.getParent();
-
-            // When the Terms screen lives inside the Drawer navigator, open it again
-            if (parent && parent.openDrawer) {
-              parent.openDrawer();
+            // If navigated from CreatePasswordPage, go back there
+            const state = navigation.getState?.();
+            const currentRoute = state?.routes?.[state.index];
+            const fromFlag = currentRoute?.params?.from;
+            if (fromFlag === 'CreatePassword') {
+              navigation.goBack();
               return;
             }
 
-            // Otherwise, navigate to AppHome and open the drawer
-            navigation.replace('AppHome', { openDrawer: true });
+            // Otherwise, default to drawer/AppHome behavior
+            const parent = navigation.getParent();
+            if (parent && parent.openDrawer) {
+              parent.openDrawer();
+            } else {
+              navigation.replace('AppHome', { openDrawer: true });
+            }
           }}
         >
           <MaterialIcons name="arrow-back" size={30} color="black" />

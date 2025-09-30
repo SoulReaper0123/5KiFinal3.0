@@ -20,6 +20,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import ImagePickerModal from '../../components/ImagePickerModal';
 import { database, auth, storage } from '../../firebaseConfig';
+import { MemberLoan } from '../../api';
 
 // Safely extract an error message without assuming shape
 const getErrorMessage = (err) => {
@@ -136,7 +137,7 @@ const ApplyLoan = () => {
   const disbursementOptions = [
     { key: 'GCash', label: 'GCash' },
     { key: 'Bank', label: 'Bank' },
-    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
+    { key: 'Cash', label: 'Cash' },
   ];
 
   const collateralOptions = [
@@ -147,10 +148,21 @@ const ApplyLoan = () => {
     { key: 'Other', label: 'Other' },
   ];
 
+  // Auto-toggle collateral requirement based on amount vs balance
+  useEffect(() => {
+    const amt = Number(loanAmount) || 0;
+    const bal = Number(balance) || 0;
+    if (amt > bal) {
+      setRequiresCollateral(true);
+    } else {
+      setRequiresCollateral(false);
+    }
+  }, [loanAmount, balance]);
+
   // Check if all required fields are filled
   const isFormValid = () => {
     const disb = disbursement;
-    const accountsOk = disb === 'Cash-on-Hand' || (accountName && accountNumber);
+    const accountsOk = disb === 'Cash' || (accountName && accountNumber);
     const basicFieldsValid =
       loanAmount &&
       term &&
@@ -508,6 +520,14 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       return `${hours}:${minutes}`;
     }).replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2');
 
+    // Also capture a separate time and a numeric timestamp for consistency with approvals
+    const timeApplied = now.toLocaleString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false
+    });
+    const timestamp = now.getTime();
+
     const applicationDataWithMeta = {
       ...applicationData,
       id: userId,
@@ -515,7 +535,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       lastName,
       email,
       transactionId,
-      dateApplied, // Now in "August 01, 2025 at 20:15" format
+      dateApplied, // "August 01, 2025 at 20:15"
+      timeApplied, // e.g., "20:15"
+      timestamp, // Unix ms
       loanType,
       status: 'pending' // Explicit status
     };
@@ -541,21 +563,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
   const runApiOperationsInBackground = async (loanData) => {
     try {
       console.log('Running API operations in background...');
-      
-      // Make API call for loan application
-      const response = await fetch('http://192.168.1.9:3000/apply-loan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(loanData),
-      });
-
-      if (response.ok) {
-        console.log('API call completed successfully in background');
-      } else {
-        console.log('API call failed, but user already navigated away');
-      }
+      // Use centralized API client (picks URL from api.js)
+      await MemberLoan(loanData);
+      console.log('API call completed successfully in background');
     } catch (error) {
       console.log('API error in background (non-critical):', error?.message || error || 'Unknown API error');
       // Don't show error to user since they've already moved on
@@ -668,7 +678,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       `Release Amount: ₱${releaseAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
       `Disbursement: ${disbursement}` +
-      (disbursement === 'Cash-on-Hand' ? '' : `\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}`);
+      (disbursement === 'Cash' ? '' : `\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}`);
 
     // Include collateral details if required
     if (requiresCollateral) {
@@ -725,27 +735,10 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       }
     }
 
-    // 2) Ensure the member's BALANCE will remain above 0 after considering all active loans + this request
-    let currentLoansTotal = 0;
-    try {
-      const currRef = database.ref(`Loans/CurrentLoans/${memberId}`);
-      const currSnap = await currRef.once('value');
-      if (currSnap.exists()) {
-        const loans = currSnap.val();
-        for (const k in loans) {
-          const l = loans[k];
-          const amt = Number(l?.loanAmount) || 0;
-          currentLoansTotal += amt;
-        }
-      }
-    } catch (e) {
-      // fail open to avoid blocking due to read error
-    }
-
+    // 2) Collateral rule: you can borrow up to your full balance without collateral. Above balance requires collateral.
     const loanAmountNum = Number(loanAmount) || 0;
-    const projectedTotal = currentLoansTotal + loanAmountNum;
-
     const userBalance = Number(balance) || 0;
+
     if (userBalance <= 0) {
       setAlertMessage('You have no available balance to support a new loan.');
       setAlertType('error');
@@ -753,32 +746,20 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       return;
     }
 
-    // Require that remaining BALANCE stays above 0 (not equal), unless collateral is provided
-    const remaining = userBalance - projectedTotal;
-    console.log('Validation Debug:', {
-      remaining,
-      userBalance,
-      projectedTotal,
-      requiresCollateral,
-      isCollateralValid: isCollateralValid(),
-      collateralType,
-      collateralValue,
-      collateralDescription,
-      proofOfCollateral: !!proofOfCollateral
-    });
-    
-    if (remaining <= 0) {
-      // If collateral is required and properly filled, allow the loan to proceed
-      if (requiresCollateral && isCollateralValid()) {
-        console.log('Collateral validation passed, proceeding with loan');
-        // Collateral covers the shortfall, proceed with loan
-      } else {
-        console.log('Collateral validation failed or not provided');
-        setAlertMessage('Your requested amount would use up all your balance. Please lower the amount or provide collateral to cover the shortfall.');
+    // If amount exceeds balance, require collateral; otherwise, no collateral needed
+    if (loanAmountNum > userBalance) {
+      // Ensure collateral details are provided
+      if (!isCollateralValid()) {
+        setRequiresCollateral(true);
+        setAlertMessage('Loan amount exceeds your balance. Please add collateral or lower the amount.');
         setAlertType('error');
         setAlertModalVisible(true);
         return;
       }
+      // Collateral provided; proceed
+      setRequiresCollateral(true);
+    } else {
+      setRequiresCollateral(false);
     }
 
     showConfirmationAlert();
@@ -914,14 +895,14 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           onChange={(option) => {
             const key = option.key;
             setDisbursement(key);
-            // Auto-fill from saved accounts, clear for Cash-on-Hand
+            // Auto-fill from saved accounts, clear for Cash
             if (key === 'Bank') {
               setAccountName(bankAccName || '');
               setAccountNumber((bankAccNum || '').toString());
             } else if (key === 'GCash') {
               setAccountName(gcashAccName || '');
               setAccountNumber((gcashAccNum || '').toString());
-            } else if (key === 'Cash-on-Hand') {
+            } else if (key === 'Cash') {
               setAccountName('');
               setAccountNumber('');
             } else {
@@ -946,7 +927,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           value={accountName} 
           editable={false}
           style={[styles.input, { backgroundColor: '#F3F4F6' }]} 
-          placeholder={disbursement === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : 'Auto-filled from your profile'}
+          placeholder={disbursement === 'Cash' ? 'Not required for Cash' : 'Auto-filled from your profile'}
         />
 
         <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
@@ -956,7 +937,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           style={[styles.input, { backgroundColor: '#F3F4F6' }]}
           keyboardType="numeric"
           ref={accountNumberInput}
-          placeholder={disbursement === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : 'Auto-filled from your profile'}
+          placeholder={disbursement === 'Cash' ? 'Not required for Cash' : 'Auto-filled from your profile'}
         />
 
         {/* Collateral Modal */}
@@ -1071,9 +1052,9 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
         />
 
         <TouchableOpacity 
-          style={[styles.submitButton, !isFormValid() && styles.disabledButton]} 
+          style={[styles.submitButton, (!isFormValid() || isLoading) && styles.disabledButton]} 
           onPress={handleSubmit}
-          disabled={!isFormValid()}
+          disabled={!isFormValid() || isLoading}
         >
           {isLoading ? (
             <>
@@ -1090,6 +1071,16 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       </ScrollView>
 
 
+
+      {/* Loading Overlay */}
+      {isLoading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
 
       {/* Custom Alert Modal */}
       <CustomModal

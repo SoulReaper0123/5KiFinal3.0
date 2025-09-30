@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import ModalSelector from 'react-native-modal-selector';
 
 const AccountDetailsPage = () => {
   const navigation = useNavigation();
@@ -10,10 +11,13 @@ const AccountDetailsPage = () => {
 
   const [bankAccName, setBankAccName] = useState('');
   const [bankAccNum, setBankAccNum] = useState('');
+  const [bankType, setBankType] = useState('');
+  const [isOtherBank, setIsOtherBank] = useState(false);
+  const [otherBankName, setOtherBankName] = useState('');
   const [gcashAccName, setGcashAccName] = useState('');
   const [gcashAccNum, setGcashAccNum] = useState('');
 
-  const isNextDisabled = !bankAccName.trim() || !bankAccNum.trim() || !gcashAccName.trim() || !gcashAccNum.trim();
+  const isNextDisabled = !bankAccName.trim() || !bankAccNum.trim() || (!isOtherBank && !bankType) || (isOtherBank && !otherBankName.trim()) || !gcashAccName.trim() || !gcashAccNum.trim();
 
   const handleNext = () => {
     if (isNextDisabled) return;
@@ -21,6 +25,7 @@ const AccountDetailsPage = () => {
       ...registrationData,
       bankAccName: bankAccName.trim(),
       bankAccNum: bankAccNum.trim(),
+      bankType: isOtherBank ? otherBankName.trim() : bankType,
       gcashAccName: gcashAccName.trim(),
       gcashAccNum: gcashAccNum.trim(),
     });
@@ -52,6 +57,52 @@ const AccountDetailsPage = () => {
 
         <View style={styles.card}>
           <Text style={styles.sectionTitle}>Bank Account</Text>
+          <Text style={styles.label}>Type of Bank<Text style={styles.required}>*</Text></Text>
+          <ModalSelector
+            data={[
+              { key: 'BDO', label: 'BDO' },
+              { key: 'Security Bank', label: 'Security Bank' },
+              { key: 'ChinaBank', label: 'ChinaBank' },
+              { key: 'BPI', label: 'BPI' },
+              { key: 'other', label: 'Others' },
+            ]}
+            initValue="Select Bank"
+            cancelText="Cancel"
+            onChange={(option) => {
+              const isOther = option.key === 'other';
+              setIsOtherBank(isOther);
+              if (isOther) {
+                setBankType('Other');
+                setOtherBankName('');
+              } else {
+                setBankType(option.label);
+                setOtherBankName('');
+              }
+            }}
+            style={styles.picker}
+            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+            overlayStyle={{ justifyContent: 'flex-end' }}
+          >
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>
+                {isOtherBank ? `Other: ${otherBankName || ''}` : (bankType || 'Select Bank')}
+              </Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+            </TouchableOpacity>
+          </ModalSelector>
+          {isOtherBank && (
+            <View style={{ marginTop: 8 }}>
+              <TextInput
+                placeholder="Please specify your Bank"
+                value={otherBankName}
+                onChangeText={(text) => {
+                  setOtherBankName(text);
+                }}
+                style={styles.input}
+              />
+            </View>
+          )}
+
           <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
           <TextInput
             value={bankAccName}
@@ -166,6 +217,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     marginBottom: 10,
     backgroundColor: 'white',
+  },
+  picker: {
+    marginBottom: 10,
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 10,
+    borderColor: '#ccc',
+    height: 50,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  pickerText: {
+    fontSize: 14,
+    color: 'grey',
   },
   divider: {
     height: 1,

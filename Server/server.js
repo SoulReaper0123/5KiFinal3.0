@@ -50,6 +50,15 @@ const formatAmount = (amount) => {
     });
 };
 
+// Helper to mask password like u*****3 (keep first and last char if length >= 2)
+const maskPassword = (pwd) => {
+    if (!pwd) return '';
+    if (pwd.length <= 2) return pwd[0] + '*';
+    const first = pwd[0];
+    const last = pwd[pwd.length - 1];
+    return `${first}${'*'.repeat(Math.max(1, pwd.length - 2))}${last}`;
+};
+
 app.get('/', (req, res) => {
     res.send(`
         <!DOCTYPE html>
@@ -255,7 +264,6 @@ app.post('/send-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -355,7 +363,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -412,7 +419,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -522,14 +528,6 @@ app.post('/register', async (req, res) => {
                     
                     <p>In the meantime, if you have any questions or would like to know more about our services, feel free to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
-                    <p>
-                        <a href="${FACEBOOK_LINK}" 
-                           style="display: inline-block; background-color: #3b5998; color: white; 
-                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
-                            Connect With Us on Facebook
-                        </a>
-                    </p>
-                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -549,7 +547,7 @@ app.post('/register', async (req, res) => {
 
 app.post('/approveRegistrations', async (req, res) => {
     console.log('[NOTIFICATION] Initiating registration approval email', req.body);
-    const { email, firstName, lastName, dateApproved, approvedTime, memberId } = req.body;
+    const { email, firstName, lastName, dateApproved, approvedTime, memberId, password } = req.body;
 
     if (!email || !firstName || !lastName || !dateApproved || !approvedTime || !memberId) {
         console.log('[NOTIFICATION ERROR] Missing required fields for registration approval');
@@ -592,6 +590,14 @@ app.post('/approveRegistrations', async (req, res) => {
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Approval Date</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${dateApproved}</td>
                         </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Password</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${maskPassword(password)}</td>
+                        </tr>
                     </table>
                     
                     <p style="font-weight: bold;">Welcome aboard! Please log in to your account to get started.</p>
@@ -601,14 +607,6 @@ app.post('/approveRegistrations', async (req, res) => {
                            style="display: inline-block; background-color: #3498db; color: white; 
                                   padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
                             Login to Your Account
-                        </a>
-                    </p>
-                    
-                    <p>
-                        <a href="${FACEBOOK_LINK}" 
-                           style="display: inline-block; background-color: #3b5998; color: white; 
-                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
-                            Connect With Us on Facebook
                         </a>
                     </p>
                     
@@ -774,12 +772,6 @@ app.post('/send-verification-code', async (req, res) => {
                             </td>
                         </tr>
                     </table>
-                    
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
-                    </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -955,7 +947,6 @@ app.post('/deposit', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -1327,7 +1318,7 @@ app.post('/rejectWithdraws', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount Requested</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         ${rejectionReason ? `
                         <tr>
@@ -1396,7 +1387,7 @@ app.post('/applyLoan', async (req, res) => {
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Term</td>
@@ -1442,7 +1433,7 @@ app.post('/applyLoan', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Term</td>
@@ -1522,15 +1513,15 @@ app.post('/approveLoans', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Approved Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Processing Fee</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${processingFee}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(processingFee)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Release Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${releaseAmount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(releaseAmount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Terms</td>
@@ -1542,15 +1533,15 @@ app.post('/approveLoans', async (req, res) => {
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${monthlyPayment}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(monthlyPayment)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Interest</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${interest}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(interest)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Amortization</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${totalMonthlyPayment}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(totalMonthlyPayment)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Maturity</td>
@@ -1638,25 +1629,8 @@ app.post('/rejectLoans', async (req, res) => {
                     `}
                     
                     <p>Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}</p>
-        
-                    ${rejectionReason ? `
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Reason:</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${rejectionReason}</td>
-                        </tr>
-                    </table>
-                    ` : ''}
                     
                     <p>If you have any questions or need clarification, please don't hesitate to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
-                    
-                    <p>
-                        <a href="${FACEBOOK_LINK}" 
-                           style="display: inline-block; background-color: #3b5998; color: white; 
-                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin-top: 15px;">
-                            Connect With Us on Facebook
-                        </a>
-                    </p>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -1717,7 +1691,7 @@ app.post('/payment', async (req, res) => {
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount Paid</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date</td>
@@ -1761,7 +1735,7 @@ app.post('/payment', async (req, res) => {
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            We have received your payment application for an amount of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
+                            We have received your payment application for an amount of ₱${formatAmount(amount)} on ${formatDisplayDate(date)} via ${paymentMethod}.
                         </p>
                     </div>
                     
@@ -1861,16 +1835,16 @@ app.post('/approvePayments', async (req, res) => {
                                 <table style="width: 100%; border-collapse: collapse;">
                                     <tr>
                                         <td style="padding: 4px; border: none;">Principal Paid:</td>
-                                        <td style="padding: 4px; border: none;">₱${principalPaid}</td>
+                                        <td style="padding: 4px; border: none;">₱${formatAmount(principalPaid)}</td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 4px; border: none;">Interest Paid:</td>
-                                        <td style="padding: 4px; border: none;">₱${interestPaid}</td>
+                                        <td style="padding: 4px; border: none;">₱${formatAmount(interestPaid)}</td>
                                     </tr>
                                     ${excessPayment > 0 ? `
                                     <tr>
                                         <td style="padding: 4px; border: none;">Excess Payment:</td>
-                                        <td style="padding: 4px; border: none;">₱${excessPayment}</td>
+                                        <td style="padding: 4px; border: none;">₱${formatAmount(excessPayment)}</td>
                                     </tr>
                                     ` : ''}
                                 </table>
@@ -2406,7 +2380,6 @@ app.post('/send-loan-reminder', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
@@ -2500,7 +2473,6 @@ app.post('/send-coadmin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -2555,7 +2527,6 @@ app.post('/send-coadmin-email', async (req, res) => {
                     <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
                     <ul style="padding-left: 20px;">
                         <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                        <li><a href="${facebookLink || FACEBOOK_LINK}" style="color: #3498db;">Facebook Page</a></li>
                     </ul>
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}

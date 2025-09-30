@@ -173,6 +173,7 @@ const CreatePasswordPage = () => {
         paymentStatus: registrationData.proofOfPayment ? 'paid' : 'unpaid',
         bankAccName: registrationData.bankAccName || '',
         bankAccNum: registrationData.bankAccNum || '',
+        bankType: registrationData.bankType || '',
         gcashAccName: registrationData.gcashAccName || '',
         gcashAccNum: registrationData.gcashAccNum || ''
       };
@@ -366,14 +367,14 @@ const CreatePasswordPage = () => {
               I agree to the{' '}
               <Text 
                 style={styles.link} 
-                onPress={() => navigation.navigate('Terms')}
+                onPress={() => navigation.navigate('Terms', { from: 'CreatePassword' })}
               >
                 Terms and Conditions
               </Text>{' '}
               and{' '}
               <Text 
                 style={styles.link} 
-                onPress={() => navigation.navigate('Privacy')}
+                onPress={() => navigation.navigate('Privacy', { from: 'CreatePassword' })}
               >
                 Privacy Policy
               </Text>.

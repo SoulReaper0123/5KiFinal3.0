@@ -36,6 +36,14 @@ export default function VerifyCode({ route, navigation }) {
     return () => clearInterval(t);
   }, [secondsLeft]);
 
+  // Invalidate code and clear inputs when timer expires
+  useEffect(() => {
+    if (secondsLeft <= 0) {
+      setExpectedCode(''); // invalidate previous code after expiry
+      setDigits(['', '', '', '', '', '']); // clear any entered digits
+    }
+  }, [secondsLeft]);
+
   const handleChange = (text, index) => {
     if (!/^\d?$/.test(text)) return;
 
@@ -48,7 +56,11 @@ export default function VerifyCode({ route, navigation }) {
     }
 
     if (index === 5 && text) {
-      handleVerify();
+      if (secondsLeft > 0 && expectedCode) {
+        handleVerify();
+      } else {
+        Alert.alert('Code expired', 'Please resend a new verification code.');
+      }
     }
   };
 
@@ -64,6 +76,14 @@ export default function VerifyCode({ route, navigation }) {
   const handleVerify = () => {
     const code = digits.join('');
     if (code.length < 6) return;
+
+    // Prevent verification if the code is expired or invalidated
+    if (secondsLeft <= 0 || !expectedCode) {
+      Alert.alert('Code expired', 'Please resend a new verification code.');
+      setDigits(['', '', '', '', '', '']);
+      inputRefs.current[0]?.focus();
+      return;
+    }
 
     if (code === expectedCode) {
       // Prefer DrawerNav; if it fails, fallback to AppHomeStandalone
@@ -154,9 +174,12 @@ export default function VerifyCode({ route, navigation }) {
 
             {/* Continue */}
             <TouchableOpacity
-              style={[styles.primaryButton, digits.join('').length < 6 && styles.disabledButton]}
+              style={[
+                styles.primaryButton,
+                (digits.join('').length < 6 || secondsLeft <= 0 || !expectedCode) && styles.disabledButton
+              ]}
               onPress={handleVerify}
-              disabled={digits.join('').length < 6}
+              disabled={digits.join('').length < 6 || secondsLeft <= 0 || !expectedCode}
             >
               <Text style={styles.primaryButtonText}>Continue</Text>
             </TouchableOpacity>
