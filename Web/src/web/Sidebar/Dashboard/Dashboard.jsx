@@ -573,6 +573,12 @@ const Dashboard = () => {
       
       // Process each member's transactions
       const memberProcessingPromises = Object.entries(membersData).map(async ([memberId, member]) => {
+        // Skip members that are inactive (e.g., those who permanently withdrew)
+        const status = (member?.status || '').toLowerCase();
+        if (status === 'inactive') {
+          return null;
+        }
+
         const memberTransactions = allTransactions[memberId] || [];
         const monthlyDividends = Array(12).fill(0);
         const monthlyTransactions = Array(12).fill(null).map(() => []); // Store actual transactions for each month
