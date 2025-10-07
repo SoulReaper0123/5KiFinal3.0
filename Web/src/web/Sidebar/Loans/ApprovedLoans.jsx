@@ -595,10 +595,6 @@ const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                       <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
                     </div>
                     <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>Time Approved:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.timeApproved || 'N/A'}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Status:</span>
                       <span style={{
                         ...styles.statusBadge,

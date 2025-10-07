@@ -552,13 +552,6 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
                       </span>
                       <span style={styles.fieldValue}>{selectedDeposit.email || 'N/A'}</span>
                     </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaPhone />
-                        Contact:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedDeposit.phoneNumber || 'N/A'}</span>
-                    </div>
                   </div>
 
                   <div style={styles.section}>

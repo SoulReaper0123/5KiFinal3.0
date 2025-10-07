@@ -79,7 +79,6 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
-    marginBottom: '24px'
   },
   controlsRow: {
     display: 'flex',
@@ -238,33 +237,36 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '16px 24px',
+    padding: '8px 16px', // Reduced from 16px 24px
     backgroundColor: '#f8fafc',
     borderBottom: '1px solid #e2e8f0',
     flexWrap: 'wrap',
-    gap: '12px'
+    gap: '8px', // Reduced from 12px
+    minHeight: '40px' // Add fixed height to prevent layout shifts
   },
   paginationInfo: {
-    fontSize: '14px',
+    fontSize: '12px', // Reduced from 14px
     color: '#64748b',
     whiteSpace: 'nowrap'
   },
   paginationControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '8px'
+    gap: '4px' // Reduced from 8px
   },
   paginationButton: {
-    padding: '8px 12px',
+    padding: '4px 8px', // Reduced from 8px 12px
     backgroundColor: '#fff',
     border: '1px solid #d1d5db',
-    borderRadius: '6px',
+    borderRadius: '4px', // Reduced from 6px
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
-    fontSize: '12px'
+    fontSize: '10px', // Reduced from 12px
+    minWidth: '24px', // Add fixed width
+    minHeight: '24px' // Add fixed height
   },
   paginationButtonDisabled: {
     backgroundColor: '#f3f4f6',
@@ -1150,7 +1152,7 @@ const Admins = () => {
           {!noMatch && filteredData.length > 0 && (
             <div style={styles.paginationContainer}>
               <span style={styles.paginationInfo}>
-                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length} entries
+                {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length}
               </span>
               <div style={styles.paginationControls}>
                 <button
@@ -1163,9 +1165,7 @@ const Admins = () => {
                 >
                   <FaChevronLeft />
                 </button>
-                <span style={styles.paginationInfo}>
-                  Page {currentPage + 1} of {totalPages}
-                </span>
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
                   disabled={currentPage === totalPages - 1}
@@ -1236,19 +1236,6 @@ const Admins = () => {
           )}
         </div>
 
-        {/* Add Admin Button */}
-        <button 
-          style={{
-            ...styles.addAdminButton,
-            ...(isHovered.addAdmin ? styles.addAdminButtonHover : {})
-          }}
-          onMouseEnter={() => handleMouseEnter('addAdmin')}
-          onMouseLeave={() => handleMouseLeave('addAdmin')}
-          onClick={() => setAddModalVisible(true)}
-          className="hover-lift"
-        >
-          <FaPlus />
-        </button>
 
         {/* Add Admin Modal */}
         {addModalVisible && (

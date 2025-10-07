@@ -579,13 +579,6 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                       </span>
                       <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
                     </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaPhone />
-                        Contact:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedLoan.phoneNumber || 'N/A'}</span>
-                    </div>
                   </div>
 
                   <div style={styles.section}>
@@ -600,10 +593,6 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Date Rejected:</span>
                       <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>Time Rejected:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.timeRejected || 'N/A'}</span>
                     </div>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Status:</span>

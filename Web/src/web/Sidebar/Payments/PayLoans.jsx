@@ -2,12 +2,14 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
   FaDownload, 
+  FaFilter, 
   FaChevronLeft, 
   FaChevronRight,
   FaPlus,
   FaCheckCircle,
   FaTimes,
-  FaExclamationCircle
+  FaExclamationCircle,
+  FaFileAlt
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -25,8 +27,6 @@ const paymentOptions = [
   { key: 'GCash', label: 'GCash' },
   { key: 'Cash', label: 'Cash on Hand' }
 ];
-
-const pageSize = 10;
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('en-PH', {
@@ -48,7 +48,211 @@ const formatTime = (date) => {
 };
 
 const styles = {
-  centeredModal: {
+  safeAreaView: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    minHeight: '100vh',
+    padding: '0'
+  },
+  mainContainer: {
+    padding: '24px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+    position: 'relative'
+  },
+  headerSection: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '32px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  headerText: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0'
+  },
+  headerSubtitle: {
+    fontSize: '16px',
+    color: '#64748b',
+    marginTop: '4px'
+  },
+  controlsSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  controlsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+    width: '100%'
+  },
+  tabContainer: {
+    display: 'flex',
+    backgroundColor: 'transparent',
+    borderRadius: '12px',
+    padding: '4px',
+    gap: '4px',
+    flexWrap: 'wrap',
+    flex: '1',
+    minWidth: '0'
+  },
+  tabButton: {
+    padding: '12px 20px',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+    outline: 'none',
+    background: 'transparent',
+    color: '#64748b',
+    whiteSpace: 'nowrap'
+  },
+  activeTabButton: {
+    backgroundColor: '#fff',
+    color: '#1e40af',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  },
+  tabIcon: {
+    fontSize: '16px'
+  },
+  searchDownloadContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    position: 'relative',
+    zIndex: '10',
+    flexShrink: '0'
+  },
+  searchContainer: {
+    position: 'relative',
+    width: '280px'
+  },
+  searchInput: {
+    width: '100%',
+    padding: '10px 16px 10px 40px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    transition: 'all 0.2s ease',
+    boxSizing: 'border-box'
+  },
+  searchInputFocus: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: '#9ca3af',
+    zIndex: '1'
+  },
+  downloadButton: {
+    padding: '10px 12px',
+    backgroundColor: '#059669',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.2s ease',
+    width: '40px',
+    height: '40px',
+    flexShrink: '0'
+  },
+  downloadButtonHover: {
+    backgroundColor: '#047857'
+  },
+  dataContainer: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    overflow: 'hidden',
+    marginBottom: '80px'
+  },
+  paginationContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 16px', // Reduced from 16px 24px
+    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    flexWrap: 'wrap',
+    gap: '8px', // Reduced from 12px
+    minHeight: '40px' // Add fixed height to prevent layout shifts
+  },
+  paginationInfo: {
+    fontSize: '12px', // Reduced from 14px
+    color: '#64748b',
+    whiteSpace: 'nowrap'
+  },
+  paginationControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px' // Reduced from 8px
+  },
+  paginationButton: {
+    padding: '4px 8px', // Reduced from 8px 12px
+    backgroundColor: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px', // Reduced from 6px
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    fontSize: '10px', // Reduced from 12px
+    minWidth: '24px', // Add fixed width
+    minHeight: '24px' // Add fixed height
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+    borderColor: '#e5e7eb'
+  },
+  addPaymentButton: {
+    position: 'fixed',
+    right: '32px',
+    bottom: '32px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
+    width: '60px',
+    height: '60px',
+    borderRadius: '50%',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 10px 25px rgba(30, 64, 175, 0.3)',
+    transition: 'all 0.3s ease',
+    zIndex: '100',
+    fontSize: '18px'
+  },
+  addPaymentButtonHover: {
+    transform: 'scale(1.05)',
+    boxShadow: '0 15px 30px rgba(30, 64, 175, 0.4)'
+  },
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -58,128 +262,203 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
+    zIndex: 1000,
+    padding: '20px',
+    overflowY: 'auto'
   },
   modalCard: {
-    width: '40%',
-    maxWidth: '800px',
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    borderRadius: '16px',
+    width: '90%',
+    maxWidth: '900px',
     maxHeight: '90vh',
-    height: '80vh',
+    overflow: 'hidden',
+    boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
     flexDirection: 'column'
   },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none'
-  },
   modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-    marginBottom: '12px'
+    padding: '24px',
+    borderBottom: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexShrink: 0
   },
   modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
-    textAlign: 'center'
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: 0
+  },
+  closeButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  closeButtonHover: {
+    backgroundColor: '#f1f5f9',
+    color: '#374151'
   },
   modalContent: {
-    paddingBottom: '12px',
+    padding: '24px',
     overflowY: 'auto',
     flex: 1
   },
-  formColumns: {
+  formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '30px',
-    flex: 1
+    gap: '16px'
   },
-  formColumn: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  formGroup: {
-    marginBottom: '20px',
-    width: '100%'
+  formSection: {
+    marginBottom: '16px'
   },
   formLabel: {
-    fontWeight: '600',
-    marginBottom: '5px',
     display: 'block',
     fontSize: '14px',
-    color: '#333'
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '6px'
   },
   requiredAsterisk: {
-    color: 'red',
-    marginLeft: '3px'
+    color: '#dc2626',
+    marginLeft: '2px'
   },
   formInput: {
     width: '100%',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '5px',
-    boxSizing: 'border-box',
-    fontSize: '14px'
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
+    backgroundColor: '#fff',
+    boxSizing: 'border-box'
+  },
+  formInputFocus: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
   },
   formSelect: {
     width: '100%',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '5px',
-    boxSizing: 'border-box',
-    backgroundColor: 'white',
-    fontSize: '14px'
-  },
-  fileInputLabel: {
-    display: 'block',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '5px',
-    backgroundColor: '#f8f9fa',
-    cursor: 'pointer',
-    textAlign: 'center',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
     fontSize: '14px',
-    color: '#495057'
+    backgroundColor: '#fff',
+    transition: 'all 0.2s ease',
+    boxSizing: 'border-box'
+  },
+  fileUploadSection: {
+    border: '2px dashed #d1d5db',
+    borderRadius: '8px',
+    padding: '16px',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    backgroundColor: '#fafafa',
+    minHeight: '80px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  fileUploadSectionHover: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#f0f9ff'
   },
   fileInput: {
     display: 'none'
   },
-  bottomButtons: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '16px',
-    gap: '12px',
-    paddingTop: '12px',
-    borderTop: '1px solid #eee'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
+  fileUploadText: {
     fontSize: '14px',
+    color: '#64748b',
+    marginBottom: '4px',
+    textAlign: 'center'
+  },
+  fileName: {
+    fontSize: '12px',
+    color: '#059669',
+    fontWeight: '500',
+    marginTop: '4px',
+    textAlign: 'center',
+    wordBreak: 'break-word'
+  },
+  modalActions: {
+    padding: '24px',
+    borderTop: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    flexShrink: 0
+  },
+  primaryButton: {
+    padding: '10px 20px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
     display: 'flex',
     alignItems: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap'
+  },
+  primaryButtonHover: {
+    backgroundColor: '#1e3a8a'
+  },
+  secondaryButton: {
+    padding: '10px 20px',
+    backgroundColor: '#6b7280',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
+    whiteSpace: 'nowrap'
+  },
+  secondaryButtonHover: {
+    backgroundColor: '#4b5563'
+  },
+  loadingContainer: {
+    display: 'flex',
     justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none'
+    alignItems: 'center',
+    height: '200px'
+  },
+  spinner: {
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #1e40af',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
+  },
+  noDataContainer: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    color: '#64748b'
+  },
+  noDataIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+    color: '#d1d5db'
+  },
+  noDataText: {
+    fontSize: '16px',
+    margin: 0
   }
 };
 
@@ -217,415 +496,46 @@ const PayLoans = () => {
     Cash: { accountName: '', accountNumber: '' }
   });
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isHovered, setIsHovered] = useState({});
 
+  const pageSize = 10;
+
+  // Tab configuration
+  const tabs = [
+    { 
+      key: 'pendingPayments', 
+      label: 'Pending', 
+      icon: FaFileAlt,
+      color: '#f59e0b'
+    },
+    { 
+      key: 'completedPayments', 
+      label: 'Approved', 
+      icon: FaCheckCircle,
+      color: '#059669'
+    },
+    { 
+      key: 'failedPayments', 
+      label: 'Rejected', 
+      icon: FaTimes,
+      color: '#dc2626'
+    }
+  ];
+
+  // Create style element and append to head
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
-      .safe-area-view {
-        flex: 1;
-        background-color: #F5F5F5;
-        height: 100%;
-        width: 100%;
-        overflow: auto;
-      }
-      .main-container {
-        flex: 1;
-      }
-      .header-text {
-        font-weight: bold;
-        font-size: 40px;
-        margin-bottom: 10px;
-        margin-left: 25px;
-        margin-right: 25px;
-        margin-top: 100px;
-      }
-      .top-controls {
-        display: flex;
-        justify-content: space-between;
-        margin: 0 25px;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .circle-tab-wrapper {
-        display: flex;
-        background-color: #ddd;
-        height: 40px;
-        border-radius: 30px;
-      }
-      .tab-button {
-        padding: 0 16px;
-        height: 40px;
-        border-radius: 30px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0 1px;
-        border: none;
-        cursor: pointer;
-        outline: none;
-      }
-      .tab-button:focus {
-        outline: none;
-        box-shadow: none;
-      }
-      .tab-text {
-        font-size: 14px;
-      }
-      .search-download-container {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .search-bar {
-        display: flex;
-        border: 1px solid #ccc;
-        border-radius: 25px;
-        background-color: #fff;
-        padding: 0 10px;
-        align-items: center;
-        height: 40px;
-        width: 250px;
-      }
-      .search-input {
-        height: 36px;
-        width: 100%;
-        font-size: 16px;
-        padding-left: 8px;
-        border: none;
-        outline: none;
-        background: transparent;
-      }
-      .search-icon {
-        padding: 4px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #666;
-      }
-      .download-icon {
-        padding: 6px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #2D5783;
-      }
-      .pagination-container {
-        display: flex;
-        justify-content: flex-end;
-        margin: 0 25px;
-        margin-top: 10px;
-        align-items: center;
-      }
-      .pagination-info {
-        font-size: 12px;
-        margin-right: 10px;
-        color: #333;
-      }
-      .pagination-button {
-        padding: 0;
-        background-color: #2D5783;
-        border-radius: 5px;
-        margin: 0 3px;
-        color: white;
-        border: none;
-        cursor: pointer;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      .pagination-button svg {
-        font-size: 10px;
-        display: block;
-        margin: 0 auto;
-      }
-      .disabled-button {
-        background-color: #ccc;
-        cursor: not-allowed;
-      }
-      .data-container {
-        flex: 1;
-        margin: 0 25px;
-        margin-top: 10px;
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-      .no-match-text {
-        text-align: center;
-        margin-top: 20px;
-        font-size: 16px;
-        color: #666;
-      }
-      .plus-button {
-        position: fixed;
-        right: 30px;
-        bottom: 30px;
-        background-color: #2D5783;
-        border-radius: 50%;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.2);
-        border: none;
-        width: 60px;
-        height: 60px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        cursor: pointer;
-        color: white;
-        z-index: 100;
-      }
-      .plus-icon {
-        font-size: 24px;
-      }
-      .modal-overlay {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.4);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-      .modal-container {
-        background-color: #f9f9f9;
-        padding: 24px;
-        border-radius: 10px;
-        width: 40%;
-        max-width: 600px;
-        max-height: 80vh;
-        overflow-y: auto;
-      }
-      .modal-title {
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 16px;
-        color: #2D5783;
-        text-align: center;
-      }
-      .form-group {
-        margin-bottom: 12px;
-      }
-      .form-label {
-        font-weight: 600;
-        margin-bottom: 4px;
-        color: #333;
-        display: block;
-      }
-      .required {
-        color: red;
-      }
-      .form-input {
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        padding: 10px;
-        background-color: #fff;
-        width: 100%;
-        box-sizing: border-box;
-      }
-      .form-select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 6px;
-        box-sizing: border-box;
-        background-color: white;
-      }
-      .modal-button-container {
-        display: flex;
-        justify-content: space-between;
-        margin-top: 24px;
-      }
-      .modal-submit-button {
-        background-color: #2D5783;
-        padding: 12px;
-        border-radius: 8px;
-        width: 48%;
-        text-align: center;
-        border: none;
-        cursor: pointer;
-        color: white;
-        font-weight: bold;
-      }
-      .modal-cancel-button {
-        background-color: #ccc;
-        padding: 12px;
-        border-radius: 8px;
-        width: 48%;
-        text-align: center;
-        border: none;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .centered-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0,0,0,0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-      .confirm-modal-card {
-        width: 300px;
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 20px;
-      }
-      .small-modal-card {
-        width: 300px;
-        height: 200px;
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 20px;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-      }
-      .confirm-icon {
-        align-self: center;
-        margin-bottom: 10px;
-        font-size: 30px;
-      }
-      .modal-text {
-        font-size: 14px;
-        margin-bottom: 20px;
-        text-align: center;
-      }
-      .bottom-buttons {
-        display: flex;
-        justify-content: center;
-        margin-top: 10px;
-      }
-      .confirm-btn {
-        background-color: #4CAF50;
-        width: 100px;
-        height: 40px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border-radius: 5px;
-        margin: 0 10px;
-        border: none;
-        color: white;
-        font-weight: bold;
-        cursor: pointer;
-      }
-      .cancel-btn {
-        background-color: #f44336;
-        width: 100px;
-        height: 40px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        border-radius: 5px;
-        margin: 0 10px;
-        border: none;
-        color: white;
-        font-weight: bold;
-        cursor: pointer;
-      }
-      .close-button {
-        position: absolute;
-        top: 10px;
-        right: 10px;
-        z-index: 10;
-        padding: 5px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #666;
-      }
-      .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-      }
-      .spinner {
-        border: 4px solid rgba(0, 0, 0, 0.1);
-        width: 36px;
-        height: 36px;
-        border-radius: 50%;
-        border-left-color: #2D5783;
-        animation: spin 1s linear infinite;
-      }
       @keyframes spin {
         0% { transform: rotate(0deg); }
         100% { transform: rotate(360deg); }
       }
-      .file-input-label {
-        display: block;
-        padding: 10px;
-        border: 1px dashed #ccc;
-        border-radius: 5px;
-        text-align: center;
-        cursor: pointer;
-        margin-bottom: 5px;
+      .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
-      .file-input {
-        display: none;
-      }
-      .file-name {
-        font-size: 12px;
-        color: #666;
-        margin-top: 5px;
-      }
-      .table {
-        width: 100%;
-        border-collapse: collapse;
-        table-layout: fixed;
-        min-width: 800px;
-      }
-      .table-header {
-        background-color: #2D5783;
-        color: #fff;
-        height: 50px;
-        text-align: center;
-        font-weight: bold;
-        font-size: 16px;
-      }
-      .table-header-cell {
-        white-space: nowrap;
-      }
-      .table-row {
-        height: 50px;
-      }
-      .table-row:nth-child(even) {
-        background-color: #f5f5f5;
-      }
-      .table-row:nth-child(odd) {
-        background-color: #ddd;
-      }
-      .table-cell {
-        text-align: center;
-        font-size: 14px;
-        border-bottom: 1px solid #ddd;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-      .status-approved {
-        color: green;
-      }
-      .status-rejected {
-        color: red;
-      }
-      .view-text {
-        color: #2D5783;
-        font-size: 14px;
-        text-decoration: underline;
-        cursor: pointer;
-        font-weight: 500;
+      .hover-lift:hover {
+        transform: translateY(-2px);
+        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
       }
     `;
     document.head.appendChild(styleElement);
@@ -663,14 +573,12 @@ const PayLoans = () => {
       if (settingsSnap.exists()) {
         setPaymentAccounts(settingsSnap.val());
       } else {
-        // Fallback to old path if Accounts doesn't exist
         const oldSettingsSnap = await database.ref('Settings/PaymentAccounts').once('value');
         if (oldSettingsSnap.exists()) {
           setPaymentAccounts(oldSettingsSnap.val());
         }
       }
       
-      // Update filtered data based on active section
       const newFilteredData = 
         activeSection === 'pendingPayments' ? toArray(pSnap) :
         activeSection === 'completedPayments' ? toArray(cSnap) :
@@ -689,6 +597,19 @@ const PayLoans = () => {
   useEffect(() => {
     fetchAllData();
   }, []);
+
+  useEffect(() => {
+    const currentData =
+      activeSection === 'pendingPayments'
+        ? pending
+        : activeSection === 'completedPayments'
+        ? completed
+        : failed;
+    
+    setFilteredData(currentData);
+    setCurrentPage(0);
+    setNoMatch(false);
+  }, [activeSection, pending, completed, failed]);
 
   const handleSearch = (text) => {
     setSearchQuery(text);
@@ -887,7 +808,6 @@ const PayLoans = () => {
     setIsProcessing(true);
 
     try {
-      // Upload proof of payment
       const proofOfPaymentUrl = await uploadImageToStorage(
         proofOfPaymentFile, 
         `proofsOfPayment/${formData.memberId}_${Date.now()}`
@@ -899,7 +819,6 @@ const PayLoans = () => {
       const approvalTime = formatTime(now);
       const amount = parseFloat(formData.amount);
 
-      // Create payment record
       const paymentData = {
         transactionId,
         id: formData.memberId,
@@ -918,7 +837,6 @@ const PayLoans = () => {
         status: 'approved'
       };
 
-      // Get references to all needed paths
       const approvedRef = database.ref(`Payments/ApprovedPayments/${formData.memberId}/${transactionId}`);
       const transactionRef = database.ref(`Transactions/Payments/${formData.memberId}/${transactionId}`);
       const memberRef = database.ref(`Members/${formData.memberId}`);
@@ -929,27 +847,22 @@ const PayLoans = () => {
       if (memberSnap.exists()) {
         const member = memberSnap.val();
 
-        // Execute all operations in sequence
         await approvedRef.set(paymentData);
         await transactionRef.set(paymentData);
 
-        // Update member balance (for loan payments, this would be different)
         const newBalance = parseFloat(member.balance || 0) + amount;
         await memberRef.update({ balance: newBalance });
 
-        // Update funds
         const fundSnap = await fundsRef.once('value');
         const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
         await fundsRef.set(updatedFund);
 
-        // Call API to send email
         await callApiApprove(paymentData);
 
         setSuccessMessage('Payment added and approved successfully!');
         setSuccessModalVisible(true);
         closeAddModal();
 
-        // Refresh data after successful addition
         await fetchAllData();
       } else {
         throw new Error('Member not found');
@@ -995,10 +908,18 @@ const PayLoans = () => {
     setSuccessModalVisible(false);
   };
 
+  const handleMouseEnter = (element) => {
+    setIsHovered(prev => ({ ...prev, [element]: true }));
+  };
+
+  const handleMouseLeave = (element) => {
+    setIsHovered(prev => ({ ...prev, [element]: false }));
+  };
+
   if (loading) {
     return (
-      <div className="loading-container">
-        <div className="spinner"></div>
+      <div style={styles.loadingContainer}>
+        <div style={styles.spinner}></div>
       </div>
     );
   }
@@ -1007,80 +928,120 @@ const PayLoans = () => {
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
-    <div className="safe-area-view">
-      <div className="main-container">
-        <h2 className="header-text">Pay Loans</h2>
-
-        <div className="top-controls">
-          <div className="circle-tab-wrapper">
-            {[
-              { key: 'pendingPayments', label: 'Pending', color: '#2D5783' },
-              { key: 'completedPayments', label: 'Approved', color: '#008000' },
-              { key: 'failedPayments', label: 'Rejected', color: '#FF0000' },
-            ].map((tab) => {
-              const isActive = activeSection === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => handleTabSwitch(tab.key)}
-                  className={`tab-button ${isActive ? 'active-tab' : ''}`}
-                  style={{ 
-                    backgroundColor: isActive ? tab.color : 'transparent',
-                    outline: 'none'
-                  }}
-                >
-                  <span
-                    className="tab-text"
-                    style={{ color: isActive ? '#fff' : '#000' }}
-                  >
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="search-download-container">
-            <div className="search-bar">
-              <input
-                className="search-input"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => handleSearch(e.target.value)}
-              />
-              <button className="search-icon">
-                <FaSearch />
-              </button>
-            </div>
-            <button onClick={handleDownload} className="download-icon">
-              <FaDownload />
-            </button>
+    <div style={styles.safeAreaView}>
+      <div style={styles.mainContainer}>
+        {/* Header Section */}
+        <div style={styles.headerSection}>
+          <div>
+            <h1 style={styles.headerText}>Payment Management</h1>
+            <p style={styles.headerSubtitle}>
+              Manage payment applications, approvals, and rejections
+            </p>
           </div>
         </div>
 
-        {!noMatch && filteredData.length > 0 && (
-          <div className="pagination-container">
-            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
-              disabled={currentPage === 0}
-              className={`pagination-button ${currentPage === 0 ? 'disabled-button' : ''}`}
-            >
-              <FaChevronLeft />
-            </button>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
-              disabled={currentPage === totalPages - 1}
-              className={`pagination-button ${currentPage === totalPages - 1 ? 'disabled-button' : ''}`}
-            >
-              <FaChevronRight />
-            </button>
-          </div>
-        )}
+        {/* Controls Section */}
+        <div style={styles.controlsSection}>
+          <div style={styles.controlsRow}>
+            {/* Tabs - Left side */}
+            <div style={styles.tabContainer}>
+              {tabs.map((tab) => {
+                const isActive = activeSection === tab.key;
+                const IconComponent = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleTabSwitch(tab.key)}
+                    style={{
+                      ...styles.tabButton,
+                      ...(isActive ? styles.activeTabButton : {})
+                    }}
+                    className="hover-lift"
+                  >
+                    <IconComponent style={styles.tabIcon} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="data-container">
+            {/* Search and Download - Right side */}
+            <div style={styles.searchDownloadContainer}>
+              <div style={styles.searchContainer}>
+                <FaSearch style={styles.searchIcon} />
+                <input
+                  style={{
+                    ...styles.searchInput,
+                    ...(isHovered.search ? styles.searchInputFocus : {})
+                  }}
+                  placeholder="Search by name, ID, or transaction..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => handleMouseEnter('search')}
+                  onBlur={() => handleMouseLeave('search')}
+                />
+              </div>
+
+              <button 
+                style={{
+                  ...styles.downloadButton,
+                  ...(isHovered.download ? styles.downloadButtonHover : {})
+                }}
+                onMouseEnter={() => handleMouseEnter('download')}
+                onMouseLeave={() => handleMouseLeave('download')}
+                onClick={handleDownload}
+                title="Export to Excel"
+              >
+                <FaDownload />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Container */}
+        <div style={styles.dataContainer}>
+          {/* Pagination at the top */}
+          {!noMatch && filteredData.length > 0 && (
+            <div style={styles.paginationContainer}>
+              <span style={styles.paginationInfo}>
+                {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length} 
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
+                  disabled={currentPage === 0}
+                  style={{
+                    ...styles.paginationButton,
+                    ...(currentPage === 0 ? styles.paginationButtonDisabled : {})
+                  }}
+                >
+                  <FaChevronLeft />
+                </button>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
+                  disabled={currentPage === totalPages - 1}
+                  style={{
+                    ...styles.paginationButton,
+                    ...(currentPage === totalPages - 1 ? styles.paginationButtonDisabled : {})
+                  }}
+                >
+                  <FaChevronRight />
+                </button>
+              </div>
+            </div>
+          )}
+
           {noMatch ? (
-            <span className="no-match-text">No Matches Found</span>
+            <div style={styles.noDataContainer}>
+              <FaSearch style={styles.noDataIcon} />
+              <p style={styles.noDataText}>No matches found for your search</p>
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div style={styles.noDataContainer}>
+              <FaFileAlt style={styles.noDataIcon} />
+              <p style={styles.noDataText}>No data available</p>
+            </div>
           ) : (
             <>
               {activeSection === 'pendingPayments' && (
@@ -1112,60 +1073,72 @@ const PayLoans = () => {
           )}
         </div>
 
-        {/* Add Payment Button - Only show on Approved Payments */}
+        {/* Add Payment Button - Only show on Completed Payments tab */}
         {activeSection === 'completedPayments' && (
           <button 
-            className="plus-button" 
+            style={{
+              ...styles.addPaymentButton,
+              ...(isHovered.addPayment ? styles.addPaymentButtonHover : {})
+            }}
+            onMouseEnter={() => handleMouseEnter('addPayment')}
+            onMouseLeave={() => handleMouseLeave('addPayment')}
             onClick={openAddModal}
+            className="hover-lift"
           >
-            <FaPlus className="plus-icon" />
+            <FaPlus />
           </button>
         )}
 
         {/* Add Payment Modal */}
         {addModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCard}>
-              <button 
-                onClick={closeAddModal}
-                style={styles.closeButton}
-                aria-label="Close modal"
-              >
-                <AiOutlineClose />
-              </button>
+          <div style={styles.modalOverlay} onClick={closeAddModal}>
+            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Add Payment</h2>
+                <h2 style={styles.modalTitle}>Add New Payment</h2>
+                <button 
+                  onClick={closeAddModal}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closeModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeModal')}
+                  onMouseLeave={() => handleMouseLeave('closeModal')}
+                >
+                  <AiOutlineClose />
+                </button>
               </div>
+
               <div style={styles.modalContent}>
-                <div style={styles.formColumns}>
-                  <div style={styles.formColumn}>
-                    <div style={styles.formGroup}>
+                <div style={styles.formGrid}>
+                  {/* Left Column */}
+                  <div>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Member ID<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="Member ID"
+                        placeholder="Enter member ID"
                         value={formData.memberId}
                         onChange={(e) => handleInputChange('memberId', e.target.value)}
                         type="text"
                       />
                     </div>
 
-                    <div style={styles.formGroup}>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        Last Name<span style={styles.requiredAsterisk}>*</span>
+                        First Name<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="Last Name"
-                        value={formData.lastName}
-                        onChange={(e) => handleInputChange('lastName', e.target.value)}
+                        placeholder="Enter first name"
+                        value={formData.firstName}
+                        onChange={(e) => handleInputChange('firstName', e.target.value)}
                         autoCapitalize="words"
                       />
                     </div>
 
-                    <div style={styles.formGroup}>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Payment Option<span style={styles.requiredAsterisk}>*</span>
                       </label>
@@ -1183,56 +1156,42 @@ const PayLoans = () => {
                       </select>
                     </div>
 
-                    <div style={styles.formGroup}>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        Account Number
+                        Account Name
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="Account Number"
-                        value={formData.accountNumber}
-                        onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                        placeholder="Account name"
+                        value={formData.accountName}
+                        onChange={(e) => handleInputChange('accountName', e.target.value)}
                         readOnly
                       />
                     </div>
-
-                    <div style={styles.formGroup}>
-                      <label style={styles.formLabel}>
-                        Proof of Payment<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <label style={styles.fileInputLabel}>
-                        {proofOfPaymentFile ? proofOfPaymentFile.name : "Choose file"}
-                        <input
-                          style={styles.fileInput}
-                          type="file"
-                          accept="image/*"
-                          onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
-                        />
-                      </label>
-                    </div>
                   </div>
 
-                  <div style={styles.formColumn}>
-                    <div style={styles.formGroup}>
+                  {/* Right Column */}
+                  <div>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        First Name<span style={styles.requiredAsterisk}>*</span>
+                        Last Name<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="First Name"
-                        value={formData.firstName}
-                        onChange={(e) => handleInputChange('firstName', e.target.value)}
+                        placeholder="Enter last name"
+                        value={formData.lastName}
+                        onChange={(e) => handleInputChange('lastName', e.target.value)}
                         autoCapitalize="words"
                       />
                     </div>
 
-                    <div style={styles.formGroup}>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Email<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="Email"
+                        placeholder="Enter email address"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         type="email"
@@ -1240,26 +1199,26 @@ const PayLoans = () => {
                       />
                     </div>
 
-                    <div style={styles.formGroup}>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        Account Name
+                        Account Number
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="Account Name"
-                        value={formData.accountName}
-                        onChange={(e) => handleInputChange('accountName', e.target.value)}
+                        placeholder="Account number"
+                        value={formData.accountNumber}
+                        onChange={(e) => handleInputChange('accountNumber', e.target.value)}
                         readOnly
                       />
                     </div>
 
-                    <div style={styles.formGroup}>
+                    <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Amount<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder="Amount"
+                        placeholder="Enter amount"
                         value={formData.amount}
                         onChange={(e) => handleInputChange('amount', e.target.value)}
                         type="number"
@@ -1270,29 +1229,72 @@ const PayLoans = () => {
                   </div>
                 </div>
 
-                <div style={styles.bottomButtons}>
-                  <button 
+                {/* Proof of Payment Upload */}
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>
+                    Proof of Payment<span style={styles.requiredAsterisk}>*</span>
+                  </label>
+                  <div 
                     style={{
-                      ...styles.actionButton,
-                      backgroundColor: '#2D5783',
-                      color: '#FFF'
+                      ...styles.fileUploadSection,
+                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
                     }}
-                    onClick={handleSubmitConfirmation}
-                    disabled={uploading}
+                    onMouseEnter={() => handleMouseEnter('proofOfPayment')}
+                    onMouseLeave={() => handleMouseLeave('proofOfPayment')}
+                    onClick={() => document.getElementById('proofOfPayment').click()}
                   >
-                    {uploading ? 'Adding...' : 'Add Payment'}
-                  </button>
-                  <button
-                    style={{
-                      ...styles.actionButton,
-                      backgroundColor: '#6c757d',
-                      color: '#FFF'
-                    }}
-                    onClick={closeAddModal}
-                  >
-                    Cancel
-                  </button>
+                    <input
+                      id="proofOfPayment"
+                      style={styles.fileInput}
+                      type="file"
+                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                      accept="image/*"
+                    />
+                    <p style={styles.fileUploadText}>
+                      {proofOfPaymentFile ? 'Change file' : 'Click to upload proof of payment'}
+                    </p>
+                    {proofOfPaymentFile && (
+                      <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
+                    )}
+                  </div>
                 </div>
+              </div>
+
+              <div style={styles.modalActions}>
+                <button
+                  style={{
+                    ...styles.secondaryButton,
+                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('cancelButton')}
+                  onMouseLeave={() => handleMouseLeave('cancelButton')}
+                  onClick={closeAddModal}
+                  disabled={uploading}
+                >
+                  Cancel
+                </button>
+                <button
+                  style={{
+                    ...styles.primaryButton,
+                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('submitButton')}
+                  onMouseLeave={() => handleMouseLeave('submitButton')}
+                  onClick={handleSubmitConfirmation}
+                  disabled={uploading}
+                >
+                  {uploading ? (
+                    <>
+                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
+                      <span>Adding Payment...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaCheckCircle />
+                      <span>Add Payment</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
@@ -1300,22 +1302,29 @@ const PayLoans = () => {
 
         {/* Confirmation Modal */}
         {confirmModalVisible && (
-          <div className="centered-modal">
-            <div className="confirm-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Are you sure you want to add this payment?</p>
-              <div className="bottom-buttons">
+          <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Confirm Payment</h2>
+              </div>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  Are you sure you want to add this payment? This action cannot be undone.
+                </p>
+              </div>
+              <div style={styles.modalActions}>
                 <button
-                  className="confirm-btn"
-                  onClick={submitPayment}
-                >
-                  Yes
-                </button>
-                <button
-                  className="cancel-btn"
+                  style={styles.secondaryButton}
                   onClick={() => setConfirmModalVisible(false)}
                 >
-                  No
+                  Cancel
+                </button>
+                <button
+                  style={styles.primaryButton}
+                  onClick={submitPayment}
+                >
+                  Confirm Payment
                 </button>
               </div>
             </div>
@@ -1324,34 +1333,52 @@ const PayLoans = () => {
 
         {/* Success Modal */}
         {successModalVisible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              <FaCheckCircle className="confirm-icon" />
-              <p className="modal-text">{successMessage}</p>
-              <button className="confirm-btn" onClick={handleSuccessOk}>
-                OK
-              </button>
+          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {successMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={handleSuccessOk}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Error Modal */}
         {errorModalVisible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">{errorMessage}</p>
-              <button className="cancel-btn" onClick={() => setErrorModalVisible(false)}>
-                OK
-              </button>
+          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {errorMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => setErrorModalVisible(false)}
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Processing Modal */}
+        {/* Processing Overlay */}
         {isProcessing && (
-          <div className="centered-modal">
-            <div className="spinner"></div>
+          <div style={styles.modalOverlay}>
+            <div style={styles.loadingContainer}>
+              <div style={styles.spinner}></div>
+            </div>
           </div>
         )}
       </div>
