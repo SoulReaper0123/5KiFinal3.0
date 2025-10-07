@@ -1,12 +1,17 @@
-import React, { useState, useEffect } from 'react'; 
+import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
   FaDownload, 
   FaChevronLeft, 
   FaChevronRight,
+  FaPlus,
   FaCheckCircle,
   FaTimes,
-  FaExclamationCircle
+  FaExclamationCircle,
+  FaFileAlt,
+  FaUser,
+  FaEye,
+  FaTrash
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -39,60 +44,258 @@ const formatTime = (date) => {
 };
 
 const styles = {
-  tableContainer: {
+  safeAreaView: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    minHeight: '100vh',
+    padding: '0'
+  },
+  mainContainer: {
+    padding: '24px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+    position: 'relative'
+  },
+  headerSection: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '32px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  headerText: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0'
+  },
+  headerSubtitle: {
+    fontSize: '16px',
+    color: '#64748b',
+    marginTop: '4px'
+  },
+  controlsSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    marginBottom: '24px'
+  },
+  controlsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+    width: '100%'
+  },
+  searchDownloadContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    position: 'relative',
+    zIndex: '10',
+    flexShrink: '0'
+  },
+  searchContainer: {
+    position: 'relative',
+    width: '280px'
+  },
+  searchInput: {
+    width: '100%',
+    padding: '10px 16px 10px 40px',
+    border: '1px solid #d1d5db',
     borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    transition: 'all 0.2s ease',
+    boxSizing: 'border-box'
+  },
+  searchInputFocus: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: '#9ca3af',
+    zIndex: '1'
+  },
+  downloadButton: {
+    padding: '10px 12px',
+    backgroundColor: '#059669',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.2s ease',
+    width: '40px',
+    height: '40px',
+    flexShrink: '0'
+  },
+  downloadButtonHover: {
+    backgroundColor: '#047857'
+  },
+  createButton: {
+    padding: '12px 24px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap'
+  },
+  createButtonHover: {
+    backgroundColor: '#1e3a8a',
+    transform: 'translateY(-1px)'
+  },
+  dataContainer: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    overflow: 'hidden',
+    marginBottom: '80px'
+  },
+  tableContainer: {
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #e2e8f0',
+    background: 'white',
+    overflowX: 'auto'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     tableLayout: 'fixed',
-    minWidth: '800px'
+    minWidth: '1000px'
   },
   tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    height: '56px',
+    fontWeight: '600',
+    fontSize: '0.875rem'
   },
   tableHeaderCell: {
-    whiteSpace: 'nowrap'
+    padding: '1rem 0.75rem',
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    fontSize: '0.875rem',
+    fontWeight: '600'
   },
   tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
+    height: '52px',
+    transition: 'background-color 0.2s ease',
+    borderBottom: '1px solid #f1f5f9',
+    '&:hover': {
+      backgroundColor: '#f8fafc'
     }
   },
   tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
+    padding: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap'
   },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
+  viewButton: {
+    background: 'transparent',
+    color: '#2563eb',
+    border: '1px solid #2563eb',
+    borderRadius: '6px',
+    padding: '0.5rem 1rem',
+    fontSize: '0.75rem',
     fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
+      background: '#2563eb',
+      color: 'white',
+      transform: 'translateY(-1px)'
     }
   },
-  centeredModal: {
+  paginationContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px 24px',
+    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    flexWrap: 'wrap',
+    gap: '12px'
+  },
+  paginationInfo: {
+    fontSize: '14px',
+    color: '#64748b',
+    whiteSpace: 'nowrap'
+  },
+  paginationControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  paginationButton: {
+    padding: '8px 12px',
+    backgroundColor: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    fontSize: '12px'
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+    borderColor: '#e5e7eb'
+  },
+  addAdminButton: {
+    position: 'fixed',
+    right: '32px',
+    bottom: '32px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
+    width: '60px',
+    height: '60px',
+    borderRadius: '50%',
+    border: 'none',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 10px 25px rgba(30, 64, 175, 0.3)',
+    transition: 'all 0.3s ease',
+    zIndex: '100',
+    fontSize: '18px'
+  },
+  addAdminButtonHover: {
+    transform: 'scale(1.05)',
+    boxShadow: '0 15px 30px rgba(30, 64, 175, 0.4)'
+  },
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -102,96 +305,177 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
-  },
-  modalCardSmall: {
-    width: '300px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
+    zIndex: 1000,
     padding: '20px',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
+    overflowY: 'auto'
   },
   modalCard: {
-    width: '40%',
-    maxWidth: '800px',
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    borderRadius: '16px',
+    width: '90%',
+    maxWidth: '900px',
     maxHeight: '90vh',
-    height: '80vh',
+    overflow: 'hidden',
+    boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
     flexDirection: 'column'
   },
+  modalHeader: {
+    padding: '24px',
+    borderBottom: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexShrink: 0
+  },
+  modalTitle: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: 0
+  },
+  closeButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  closeButtonHover: {
+    backgroundColor: '#f1f5f9',
+    color: '#374151'
+  },
   modalContent: {
-    paddingBottom: '12px',
+    padding: '24px',
     overflowY: 'auto',
     flex: 1
   },
+  formGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '16px'
+  },
+  formSection: {
+    marginBottom: '16px'
+  },
+  formLabel: {
+    display: 'block',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '6px'
+  },
+  requiredAsterisk: {
+    color: '#dc2626',
+    marginLeft: '2px'
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
+    backgroundColor: '#fff',
+    boxSizing: 'border-box'
+  },
+  formInputFocus: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  },
+  formSelect: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    transition: 'all 0.2s ease',
+    boxSizing: 'border-box'
+  },
+  modalActions: {
+    padding: '24px',
+    borderTop: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    flexShrink: 0
+  },
+  primaryButton: {
+    padding: '10px 20px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap'
+  },
+  primaryButtonHover: {
+    backgroundColor: '#1e3a8a'
+  },
+  secondaryButton: {
+    padding: '10px 20px',
+    backgroundColor: '#6b7280',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
+    whiteSpace: 'nowrap'
+  },
+  secondaryButtonHover: {
+    backgroundColor: '#4b5563'
+  },
+  deleteButton: {
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    '&:hover': {
+      backgroundColor: '#b91c1c'
+    }
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px'
+  },
+  spinner: {
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #1e40af',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
+  },
+  noDataContainer: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    color: '#64748b'
+  },
+  noDataIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+    color: '#d1d5db'
+  },
+  noDataText: {
+    fontSize: '16px',
+    margin: 0
+  },
+  // Detail Modal Styles
   columns: {
     display: 'flex',
     flexDirection: 'row',
@@ -206,40 +490,6 @@ const styles = {
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-  },
-  modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
-    textAlign: 'center'
-  },
-  modalDetailText: {
-    fontSize: '13px',
-    marginBottom: '6px',
-    color: '#333',
-    wordBreak: 'break-word',
-    lineHeight: '1.3'
-  },
-  imageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    marginBottom: '12px',
-    gap: '10px'
-  },
-  imageBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start'
-  },
-  imageLabel: {
-    fontSize: '13px',
-    fontWeight: 'bold',
-    color: '#333',
-    width: '100%',
-    textAlign: 'left',
-    marginLeft: 0,
-    paddingLeft: 0
   },
   compactField: {
     display: 'flex',
@@ -264,46 +514,42 @@ const styles = {
   sectionTitle: {
     fontSize: '14px',
     fontWeight: 'bold',
-    color: '#2D5783',
+    color: '#1e40af',
     margin: '12px 0 8px 0',
     paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
+    borderBottom: '1px solid #e2e8f0',
     textAlign: 'left',
     width: '100%'
   },
-  bottomButtons: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '16px',
-    gap: '12px',
-    paddingTop: '12px',
-    borderTop: '1px solid #eee'
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px'
   },
-  deleteButton: {
-    backgroundColor: '#f44336',
-    color: '#FFF',
-    '&:hover': {
-      backgroundColor: '#d32f2f'
-    }
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-    opacity: '0.7'
-  },
-  modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '10px',
     marginBottom: '12px'
   },
-  imageThumbnail: {
+  imageContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start'
+  },
+  imageLabel: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: '4px'
+  },
+  imagePreview: {
     width: '100px',
     height: '100px',
     borderRadius: '4px',
     border: '1px solid #ddd',
     objectFit: 'cover',
-    cursor: 'pointer',
-    marginRight: '10px'
+    cursor: 'pointer'
   },
   imageViewerModal: {
     position: 'fixed',
@@ -347,10 +593,7 @@ const styles = {
     padding: '8px',
     backgroundColor: 'transparent',
     border: 'none',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    outline: 'none'
   },
   imageViewerNav: {
     position: 'absolute',
@@ -362,446 +605,68 @@ const styles = {
     padding: '16px',
     backgroundColor: 'transparent',
     border: 'none',
-    outline: 'none',
-    '&:hover': {
-      color: '#2D5783'
-    },
-    '&:focus': {
-      outline: 'none'
-    }
+    outline: 'none'
   },
   prevButton: {
     left: '50px'
   },
   nextButton: { 
     right: '50px'
-  },
-  formColumns: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '30px',
-    flex: 1
-  },
-  formColumn: {
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  formGroup: {
-    marginBottom: '20px',
-    width: '100%'
-  },
-  formLabel: {
-    fontWeight: '600',
-    marginBottom: '5px',
-    display: 'block',
-    fontSize: '14px',
-    color: '#333'
-  },
-  requiredAsterisk: {
-    color: 'red',
-    marginLeft: '3px'
-  },
-  formInput: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '5px',
-    boxSizing: 'border-box',
-    fontSize: '14px'
-  },
-  formSelect: {
-    width: '100%',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '5px',
-    boxSizing: 'border-box',
-    backgroundColor: 'white',
-    fontSize: '14px'
-  },
-  errorText: {
-    color: 'red',
-    fontSize: '12px',
-    marginTop: '5px'
-  },
-  fileInputLabel: {
-    display: 'block',
-    padding: '10px',
-    border: '1px solid #ccc',
-    borderRadius: '5px',
-    backgroundColor: '#f8f9fa',
-    cursor: 'pointer',
-    textAlign: 'center',
-    fontSize: '14px',
-    color: '#495057'
-  },
-  fileInput: {
-    display: 'none'
   }
 };
 
-const genderOptions = [
-  { key: 'Male', label: 'Male' },
-  { key: 'Female', label: 'Female' }
-];
-
-const civilStatusOptions = [
-  { key: 'Single', label: 'Single' },
-  { key: 'Married', label: 'Married' },
-  { key: 'Widowed', label: 'Widowed' },
-  { key: 'Separated', label: 'Separated' }
-];
-
-const governmentIdOptions = [
-  { key: 'national', label: 'National ID (PhilSys)' },
-  { key: 'sss', label: 'SSS ID' },
-  { key: 'philhealth', label: 'PhilHealth ID' },
-  { key: 'drivers_license', label: 'Drivers License' }
-];
-
 const Admins = () => {
   const [admins, setAdmins] = useState([]);
+  const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [noMatch, setNoMatch] = useState(false);
+  const [currentPage, setCurrentPage] = useState(0);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [addModalVisible, setAddModalVisible] = useState(false);
+  const [adminModalVisible, setAdminModalVisible] = useState(false);
+  const [confirmAddVisible, setConfirmAddVisible] = useState(false);
+  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isHovered, setIsHovered] = useState({});
+  const [selectedAdmin, setSelectedAdmin] = useState(null);
+  const [pendingAdd, setPendingAdd] = useState(null);
+  const [pendingDelete, setPendingDelete] = useState(null);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [availableImages, setAvailableImages] = useState([]);
+
+  // Form states
   const [firstName, setFirstName] = useState('');
   const [middleName, setMiddleName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [contactNumber, setContactNumber] = useState('');
-  const [gender, setGender] = useState('');
-  const [civilStatus, setCivilStatus] = useState('');
-  const [placeOfBirth, setPlaceOfBirth] = useState('');
-  const [address, setAddress] = useState('');
-  const [age, setAge] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState(new Date());
-
-  const [governmentId, setGovernmentId] = useState('');
-  const [validIdFrontFile, setValidIdFrontFile] = useState(null);
-  const [validIdBackFile, setValidIdBackFile] = useState(null);
-  const [selfieFile, setSelfieFile] = useState(null);
-  const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
   const [emailError, setEmailError] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [contactNumberError, setContactNumberError] = useState('');
-  const [genderError, setGenderError] = useState('');
-  const [civilStatusError, setCivilStatusError] = useState('');
-  const [placeOfBirthError, setPlaceOfBirthError] = useState('');
-  const [addressError, setAddressError] = useState('');
-  const [governmentIdError, setGovernmentIdError] = useState('');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [modalVisible, setModalVisible] = useState(false);
-  const [confirmAddVisible, setConfirmAddVisible] = useState(false);
-  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
-  const [successVisible, setSuccessVisible] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [pendingAdd, setPendingAdd] = useState(null);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [currentPage, setCurrentPage] = useState(0);
-  const [selectedAdmin, setSelectedAdmin] = useState(null);
-  const [adminModalVisible, setAdminModalVisible] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [filteredData, setFilteredData] = useState([]);
-  const [noMatch, setNoMatch] = useState(false);
-  const [actionInProgress, setActionInProgress] = useState(false);
-  const [imageViewerVisible, setImageViewerVisible] = useState(false);
-  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [availableImages, setAvailableImages] = useState([]);
-  
+
   const pageSize = 10;
 
+  // Create style element and append to head
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
-      .safe-area-view {
-        flex: 1;
-        background-color: #F5F5F5;
-        height: 100%;
-        width: 100%;
-        overflow: auto;
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
-      .main-container {
-        flex: 1;
+      .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
-      .header-text {
-        font-weight: bold;
-        font-size: 40px;
-        margin-bottom: 10px;
-        margin-left: 25px;
-        margin-right: 25px;
-        margin-top: 100px;
-      }
-      .top-controls {
-        display: flex;
-        justify-content: space-between;
-        margin: 0 25px;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .search-download-container {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .search-bar {
-        display: flex;
-        border: 1px solid #ccc;
-        border-radius: 25px;
-        background-color: #fff;
-        padding: 0 10px;
-        align-items: center;
-        height: 40px;
-        width: 250px;
-      }
-      .search-input {
-        height: 36px;
-        width: 100%;
-        font-size: 16px;
-        padding-left: 8px;
-        border: none;
-        outline: none;
-        background: transparent;
-      }
-      .search-icon {
-        padding: 4px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #666;
-      }
-      .download-icon {
-        padding: 6px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #2D5783;
-      }
-      .create-button {
-        background-color: #2D5783;
-        padding: 0 16px;
-        border-radius: 30px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 40px;
-        border: none;
-        cursor: pointer;
-      }
-      .create-button-text {
-        color: #fff;
-        font-size: 14px;
-        font-weight: bold;
-      }
-      .pagination-container {
-        display: flex;
-        justify-content: flex-end;
-        margin: 0 25px;
-        margin-top: 10px;
-        align-items: center;
-      }
-      .pagination-info {
-        font-size: 12px;
-        margin-right: 10px;
-        color: #333;
-      }
-      .pagination-button {
-        padding: 0;
-        background-color: #2D5783;
-        border-radius: 5px;
-        margin: 0 3px;
-        color: white;
-        border: none;
-        cursor: pointer;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      .pagination-button svg {
-        font-size: 10px;
-        display: block;
-        margin: 0 auto;
-      }
-      .disabled-button {
-        background-color: #ccc;
-        cursor: not-allowed;
-      }
-      .data-container {
-        flex: 1;
-        margin: 0 25px;
-        margin-top: 10px;
-        background-color: #fff;
-        border-radius: 8px;
-        boxShadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-      .no-match-text {
-        text-align: center;
-        margin-top: 20px;
-        font-size: 16px;
-        color: #666;
-      }
-      .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-      }
-      .modal-container {
-        width: 800px;
-        height: 550px;
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 20px;
-        position: relative;
-        overflow: hidden;
-      }
-      @media (max-width: 800px) {
-        .modal-container {
-            width: 90%;
-            max-width: 90%;
-            height: auto;
-            max-height: 90vh;
-        }
-      }
-      .modal-title {
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 16px;
-        color: #2D5783;
-        text-align: center;
-      }
-      .modal-content {
-        padding-bottom: 20px;
-        height: calc(100% - 100px);
-        display: flex;
-        flex-direction: column;
-      }
-      .form-columns {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 30px;
-        flex: 1;
-      }
-      .form-column {
-        display: flex;
-        flex-direction: column;
-      }
-      .form-group {
-        margin-bottom: 20px;
-        width: 100%;
-      }
-      .form-label {
-        font-weight: 600;
-        margin-bottom: 5px;
-        display: block;
-      }
-      .required-asterisk {
-        color: red;
-        margin-left: 3px;
-      }
-      .form-input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-sizing: border-box;
-      }
-      .form-select {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        box-sizing: border-box;
-        background-color: white;
-      }
-      .error-text {
-        color: red;
-        font-size: 12px;
-        margin-top: 5px;
-      }
-      .modal-button-container {
-        display: flex;
-        justify-content: space-between;
-        margin-top: auto;
-        width: 100%;
-        padding-top: 20px;
-      }
-      .modal-submit-button {
-        background-color: #2D5783;
-        color: white;
-        padding: 10px;
-        border: none;
-        border-radius: 5px;
-        width: 48%;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .modal-cancel-button {
-        background-color: #ccc;
-        padding: 10px;
-        border: none;
-        border-radius: 5px;
-        width: 48%;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .confirm-modal-card {
-        width: 300px;
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 20px;
-        overflow: hidden;
-      }
-      .action-buttons-container {
-        display: flex;
-        justify-content: center;
-        margin-top: 20px;
-        width: 100%;
-      }
-      .delete-button {
-        background-color: #f44336;
-        color: white;
-        padding: 8px 16px;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-      }
-      .date-input-container {
-        display: flex;
-        align-items: center;
-      }
-      .date-input {
-        width: 100%;
-        padding: 10px;
-        border: 1px solid #ccc;
-        border-radius: 5px;
-        cursor: pointer;
-        box-sizing: border-box;
-      }
-      .date-input:hover {
-        border-color: #2D5783;
-      }
-      .file-input-label {
-        display: block;
-        padding: 10px;
-        border: 1px dashed #ccc;
-        border-radius: 5px;
-        text-align: center;
-        cursor: pointer;
-        margin-bottom: 5px;
-      }
-      .file-input {
-        display: none;
-      }
-      .file-name {
-        font-size: 12px;
-        color: #666;
-        margin-top: 5px;
+      .hover-lift:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
       }
     `;
     document.head.appendChild(styleElement);
@@ -921,42 +786,6 @@ const Admins = () => {
     return isValid;
   };
 
-  const handleDateChange = (date) => {
-    setDateOfBirth(date);
-    
-    // Calculate accurate age considering full date
-    const today = new Date();
-    const birthDate = new Date(date);
-    let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-    
-    // Check if birthday hasn't occurred this year yet
-    const monthDiff = today.getMonth() - birthDate.getMonth();
-    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-      calculatedAge--;
-    }
-    
-    setAge(calculatedAge);
-  };
-
-  const handleFileChange = (e, setFileFunction) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFileFunction(file);
-    }
-  };
-
-  const uploadImageToStorage = async (file, path) => {
-    try {
-      const fileRef = storageRef(storage, path);
-      await uploadBytes(fileRef, file);
-      const downloadURL = await getDownloadURL(fileRef);
-      return downloadURL;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
-
   const openImageViewer = (url, label, index) => {
     const images = [];
     
@@ -1011,29 +840,9 @@ const Admins = () => {
     setCurrentImage(availableImages[newIndex]);
   };
 
-  const onPressAdd = async () => {
-    if (!validateFields()) return;
-    
-    const emailExists = admins.some(admin => admin.email.toLowerCase() === email.toLowerCase());
-    if (emailExists) {
-      setEmailError('Email address is already in use');
-      return;
-    }
-
-    setPendingAdd({
-      firstName,
-      middleName,
-      lastName,
-      email,
-      contactNumber
-    });
-    setConfirmAddVisible(true);
-  };
-
   const handleAddAdmin = async () => {
     setConfirmAddVisible(false);
     setIsProcessing(true);
-    setActionInProgress(true);
 
     try {
       const password = generateRandomPassword();
@@ -1042,7 +851,6 @@ const Admins = () => {
       const dateAdded = formatDate(now);
       const timeAdded = formatTime(now);
 
-      // Create Firebase Auth account
       const userCredential = await auth.createUserWithEmailAndPassword(email, password);
       
       const displayName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim();
@@ -1052,7 +860,6 @@ const Admins = () => {
 
       await auth.currentUser.updatePassword(password);
 
-      // Save admin data to Realtime Database
       await database.ref(`Users/Admin/${newId}`).set({
         id: newId,
         firstName,
@@ -1067,7 +874,6 @@ const Admins = () => {
         initialPassword: password
       });
 
-      // Also save to Members node
       await database.ref(`Members/${newId}`).set({
         id: newId,
         firstName,
@@ -1092,21 +898,19 @@ const Admins = () => {
       });
 
       setSuccessMessage(`Admin account created successfully!`);
-      setSuccessVisible(true);
+      setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error adding admin:', error);
       setErrorMessage(error.message || 'Failed to add admin');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
-      setActionInProgress(false);
     }
   };
 
   const handleDeleteAdmin = async () => {
     setConfirmDeleteVisible(false);
     setIsProcessing(true);
-    setActionInProgress(true);
 
     try {
       const idToDelete = pendingDelete.id;
@@ -1115,31 +919,13 @@ const Admins = () => {
       await database.ref(`Members/${idToDelete}`).remove();
 
       setSuccessMessage(`Admin account deleted successfully!`);
-      setSuccessVisible(true);
-      
-      // Close the view modal and refresh data
-      setAdminModalVisible(false);
-      setSelectedAdmin(null);
-      
-      // Refresh the admin list
-      const snapshot = await database.ref('Users/Admin').once('value');
-      const data = snapshot.val() || {};
-      const adminList = Object.entries(data).map(([id, admin]) => ({
-        id,
-        ...admin,
-        name: admin.firstName 
-          ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
-          : admin.name || ''
-      }));
-      setAdmins(adminList);
-      setFilteredData(adminList);
+      setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error deleting admin:', error);
       setErrorMessage(error.message || 'Failed to delete admin');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
-      setActionInProgress(false);
     }
   };
 
@@ -1154,7 +940,7 @@ const Admins = () => {
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Admins');
 
-      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added', 'Time Added'];
+      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added'];
       worksheet.addRow(headers);
 
       filteredData.forEach(admin => {
@@ -1166,7 +952,6 @@ const Admins = () => {
           admin.email,
           admin.contactNumber,
           admin.dateAdded,
-          admin.timeAdded || ''
         ];
         worksheet.addRow(row);
       });
@@ -1185,7 +970,7 @@ const Admins = () => {
       window.URL.revokeObjectURL(url);
       
       setSuccessMessage('Data exported successfully!');
-      setSuccessVisible(true);
+      setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error downloading data:', error);
       setErrorMessage('Failed to export data');
@@ -1194,7 +979,7 @@ const Admins = () => {
   };
 
   const handleSuccessOk = () => {
-    setSuccessVisible(false);
+    setSuccessModalVisible(false);
   
     if (pendingAdd) {
       sendAdminCredentialsEmail({
@@ -1205,24 +990,13 @@ const Admins = () => {
         lastName: pendingAdd.lastName
       }).catch(error => console.error('Error sending admin credentials email:', error));
       
+      // Reset form
       setFirstName('');
       setMiddleName('');
       setLastName('');
       setEmail('');
       setContactNumber('');
-      setGender('');
-      setCivilStatus('');
-      setPlaceOfBirth('');
-      setAddress('');
-      setAge('');
-      setDateOfBirth(new Date());
-
-      setGovernmentId('');
-      setValidIdFrontFile(null);
-      setValidIdBackFile(null);
-      setSelfieFile(null);
-      setSelfieWithIdFile(null);
-      setModalVisible(false);
+      setAddModalVisible(false);
     } 
     else if (pendingDelete) {
       sendAdminDeleteData({
@@ -1236,6 +1010,7 @@ const Admins = () => {
     setPendingAdd(null);
     setPendingDelete(null);
     
+    // Refresh the list
     const fetchAdmins = async () => {
       try {
         const snapshot = await database.ref('Users/Admin').once('value');
@@ -1257,71 +1032,165 @@ const Admins = () => {
     fetchAdmins();
   };
 
-  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
-  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+  const handleSubmitConfirmation = () => {
+    if (!validateFields()) return;
+    
+    const emailExists = admins.some(admin => admin.email.toLowerCase() === email.toLowerCase());
+    if (emailExists) {
+      setEmailError('Email address is already in use');
+      return;
+    }
+
+    setConfirmAddVisible(true);
+  };
+
+  const handleSearch = (text) => {
+    setSearchQuery(text);
+    setCurrentPage(0);
+  };
+
+  const handleMouseEnter = (element) => {
+    setIsHovered(prev => ({ ...prev, [element]: true }));
+  };
+
+  const handleMouseLeave = (element) => {
+    setIsHovered(prev => ({ ...prev, [element]: false }));
+  };
+
+  const resetForm = () => {
+    setFirstName('');
+    setMiddleName('');
+    setLastName('');
+    setEmail('');
+    setContactNumber('');
+    setFirstNameError('');
+    setLastNameError('');
+    setEmailError('');
+    setContactNumberError('');
+  };
 
   if (loading) {
     return (
-      <div className="loading-container">
+      <div style={styles.loadingContainer}>
         <div style={styles.spinner}></div>
       </div>
     );
   }
 
+  const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
+  const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
   return (
-    <div className="safe-area-view">
-      <div className="main-container">
-        <h2 className="header-text">Admins</h2>
-
-        <div className="top-controls">
-          <button
-            onClick={() => setModalVisible(true)}
-            className="create-button"
-          >
-            <span className="create-button-text">Create New Admin</span>
-          </button>
-
-          <div className="search-download-container">
-            <div className="search-bar">
-              <input
-                className="search-input"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <button className="search-icon">
-                <FaSearch />
-              </button>
-            </div>
-            <button onClick={handleDownload} className="download-icon">
-              <FaDownload />
-            </button>
+    <div style={styles.safeAreaView}>
+      <div style={styles.mainContainer}>
+        {/* Header Section */}
+        <div style={styles.headerSection}>
+          <div>
+            <h1 style={styles.headerText}>Admins Management</h1>
+            <p style={styles.headerSubtitle}>
+              Manage admin accounts and permissions
+            </p>
           </div>
         </div>
 
-        {!noMatch && filteredData.length > 0 && (
-          <div className="pagination-container">
-            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
+        {/* Controls Section */}
+        <div style={styles.controlsSection}>
+          <div style={styles.controlsRow}>
+            {/* Create Button - Left side */}
             <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
-              disabled={currentPage === 0}
-              className={`pagination-button ${currentPage === 0 ? 'disabled-button' : ''}`}
+              style={{
+                ...styles.createButton,
+                ...(isHovered.create ? styles.createButtonHover : {})
+              }}
+              onMouseEnter={() => handleMouseEnter('create')}
+              onMouseLeave={() => handleMouseLeave('create')}
+              onClick={() => setAddModalVisible(true)}
+              className="hover-lift"
             >
-              <FaChevronLeft />
+              <FaPlus />
+              <span>Create New Admin</span>
             </button>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
-              disabled={currentPage === totalPages - 1}
-              className={`pagination-button ${currentPage === totalPages - 1 ? 'disabled-button' : ''}`}
-            >
-              <FaChevronRight />
-            </button>
-          </div>
-        )}
 
-        <div className="data-container">
+            {/* Search and Download - Right side */}
+            <div style={styles.searchDownloadContainer}>
+              <div style={styles.searchContainer}>
+                <FaSearch style={styles.searchIcon} />
+                <input
+                  style={{
+                    ...styles.searchInput,
+                    ...(isHovered.search ? styles.searchInputFocus : {})
+                  }}
+                  placeholder="Search by name, ID, or email..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => handleMouseEnter('search')}
+                  onBlur={() => handleMouseLeave('search')}
+                />
+              </div>
+
+              <button 
+                style={{
+                  ...styles.downloadButton,
+                  ...(isHovered.download ? styles.downloadButtonHover : {})
+                }}
+                onMouseEnter={() => handleMouseEnter('download')}
+                onMouseLeave={() => handleMouseLeave('download')}
+                onClick={handleDownload}
+                title="Export to Excel"
+              >
+                <FaDownload />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Container */}
+        <div style={styles.dataContainer}>
+          {/* Pagination at the top */}
+          {!noMatch && filteredData.length > 0 && (
+            <div style={styles.paginationContainer}>
+              <span style={styles.paginationInfo}>
+                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length} entries
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
+                  disabled={currentPage === 0}
+                  style={{
+                    ...styles.paginationButton,
+                    ...(currentPage === 0 ? styles.paginationButtonDisabled : {})
+                  }}
+                >
+                  <FaChevronLeft />
+                </button>
+                <span style={styles.paginationInfo}>
+                  Page {currentPage + 1} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
+                  disabled={currentPage === totalPages - 1}
+                  style={{
+                    ...styles.paginationButton,
+                    ...(currentPage === totalPages - 1 ? styles.paginationButtonDisabled : {})
+                  }}
+                >
+                  <FaChevronRight />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table Content */}
           {noMatch ? (
-            <span className="no-match-text">No Matches Found</span>
+            <div style={styles.noDataContainer}>
+              <FaSearch style={styles.noDataIcon} />
+              <p style={styles.noDataText}>No matches found for your search</p>
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div style={styles.noDataContainer}>
+              <FaUser style={styles.noDataIcon} />
+              <p style={styles.noDataText}>No admin accounts found</p>
+            </div>
           ) : (
             <div style={styles.tableContainer}>
               <table style={styles.table}>
@@ -1331,16 +1200,16 @@ const Admins = () => {
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>First Name</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Middle Name</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Last Name</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email Address</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Email Address</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Contact Number</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Added</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Action</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedData.map((admin) => (
                     <tr key={admin.id} style={styles.tableRow}>
-                      <td style={styles.tableCell}>{admin.id}</td>
+                      <td style={styles.tableCell}>#{admin.id}</td>
                       <td style={styles.tableCell}>{admin.firstName || 'N/A'}</td>
                       <td style={styles.tableCell}>{admin.middleName || 'N/A'}</td>
                       <td style={styles.tableCell}>{admin.lastName || 'N/A'}</td>
@@ -1348,15 +1217,16 @@ const Admins = () => {
                       <td style={styles.tableCell}>{admin.contactNumber || 'N/A'}</td>
                       <td style={styles.tableCell}>{admin.dateAdded || 'N/A'}</td>
                       <td style={styles.tableCell}>
-                        <span 
-                          style={styles.viewText} 
+                        <button 
+                          style={styles.viewButton}
                           onClick={() => {
                             setSelectedAdmin(admin);
                             setAdminModalVisible(true);
                           }}
                         >
+                          <FaEye />
                           View
-                        </span>
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1366,220 +1236,248 @@ const Admins = () => {
           )}
         </div>
 
+        {/* Add Admin Button */}
+        <button 
+          style={{
+            ...styles.addAdminButton,
+            ...(isHovered.addAdmin ? styles.addAdminButtonHover : {})
+          }}
+          onMouseEnter={() => handleMouseEnter('addAdmin')}
+          onMouseLeave={() => handleMouseLeave('addAdmin')}
+          onClick={() => setAddModalVisible(true)}
+          className="hover-lift"
+        >
+          <FaPlus />
+        </button>
+
         {/* Add Admin Modal */}
-        {modalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCard}>
-              <button 
-                onClick={() => {
-                  setModalVisible(false);
-                  setFirstName('');
-                  setMiddleName('');
-                  setLastName('');
-                  setEmail('');
-                  setContactNumber('');
-                }} 
-                style={styles.closeButton}
-                aria-label="Close modal"
-              >
-                <AiOutlineClose />
-              </button>
+        {addModalVisible && (
+          <div style={styles.modalOverlay} onClick={() => { setAddModalVisible(false); resetForm(); }}>
+            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>New Admin</h2>
+                <h2 style={styles.modalTitle}>Create New Admin</h2>
+                <button 
+                  onClick={() => { setAddModalVisible(false); resetForm(); }}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closeModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeModal')}
+                  onMouseLeave={() => handleMouseLeave('closeModal')}
+                >
+                  <AiOutlineClose />
+                </button>
               </div>
+
               <div style={styles.modalContent}>
-                <div style={styles.formColumn}>
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>
-                      First Name<span style={styles.requiredAsterisk}>*</span>
-                    </label>
-                    <input
-                      style={styles.formInput}
-                      placeholder="First Name"
-                      value={firstName}
-                      onChange={(e) => setFirstName(e.target.value)}
-                      autoCapitalize="words"
-                    />
-                    {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
+                <div style={styles.formGrid}>
+                  {/* Left Column */}
+                  <div>
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        First Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Enter first name"
+                        value={firstName}
+                        onChange={(e) => setFirstName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                      {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
+                    </div>
+
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        Last Name<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Enter last name"
+                        value={lastName}
+                        onChange={(e) => setLastName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                      {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
+                    </div>
+
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        Email<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Enter email address"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        type="email"
+                        autoCapitalize="none"
+                      />
+                      {emailError && <span style={styles.errorText}>{emailError}</span>}
+                    </div>
                   </div>
 
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>Middle Name</label>
-                    <input
-                      style={styles.formInput}
-                      placeholder="Middle Name"
-                      value={middleName}
-                      onChange={(e) => setMiddleName(e.target.value)}
-                      autoCapitalize="words"
-                    />
-                  </div>
+                  {/* Right Column */}
+                  <div>
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>Middle Name</label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Enter middle name"
+                        value={middleName}
+                        onChange={(e) => setMiddleName(e.target.value)}
+                        autoCapitalize="words"
+                      />
+                    </div>
 
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>
-                      Last Name<span style={styles.requiredAsterisk}>*</span>
-                    </label>
-                    <input
-                      style={styles.formInput}
-                      placeholder="Last Name"
-                      value={lastName}
-                      onChange={(e) => setLastName(e.target.value)}
-                      autoCapitalize="words"
-                    />
-                    {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>
-                      Email<span style={styles.requiredAsterisk}>*</span>
-                    </label>
-                    <input
-                      style={styles.formInput}
-                      placeholder="Email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      type="email"
-                      autoCapitalize="none"
-                    />
-                    {emailError && <span style={styles.errorText}>{emailError}</span>}
-                  </div>
-
-                  <div style={styles.formGroup}>
-                    <label style={styles.formLabel}>
-                      Contact Number<span style={styles.requiredAsterisk}>*</span>
-                    </label>
-                    <input
-                      style={styles.formInput}
-                      placeholder="Contact Number (11 digits)"
-                      value={contactNumber}
-                      onChange={(e) => {
-                        const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
-                        setContactNumber(numericText);
-                      }}
-                      type="tel"
-                    />
-                    {contactNumberError && <span style={styles.errorText}>{contactNumberError}</span>}
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        Contact Number<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <input
+                        style={styles.formInput}
+                        placeholder="Enter 11-digit contact number"
+                        value={contactNumber}
+                        onChange={(e) => {
+                          const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                          setContactNumber(numericText);
+                        }}
+                        type="tel"
+                      />
+                      {contactNumberError && <span style={styles.errorText}>{contactNumberError}</span>}
+                    </div>
                   </div>
                 </div>
+              </div>
 
-
-
-                <div style={styles.bottomButtons}>
-                  <button 
-                    style={{
-                      ...styles.actionButton,
-                      backgroundColor: '#2D5783',
-                      color: '#FFF'
-                    }}
-                    onClick={onPressAdd}
-                  >
-                    Add Admin
-                  </button>
-                  <button
-                    style={{
-                      ...styles.actionButton,
-                      backgroundColor: '#6c757d',
-                      color: '#FFF'
-                    }}
-                    onClick={() => {
-                      setModalVisible(false);
-                      setFirstName('');
-                      setMiddleName('');
-                      setLastName('');
-                      setEmail('');
-                      setContactNumber('');
-                    }}
-                  >
-                    Cancel
-                  </button>
-                </div>
+              <div style={styles.modalActions}>
+                <button
+                  style={{
+                    ...styles.secondaryButton,
+                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('cancelButton')}
+                  onMouseLeave={() => handleMouseLeave('cancelButton')}
+                  onClick={() => { setAddModalVisible(false); resetForm(); }}
+                  disabled={isProcessing}
+                >
+                  Cancel
+                </button>
+                <button
+                  style={{
+                    ...styles.primaryButton,
+                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('submitButton')}
+                  onMouseLeave={() => handleMouseLeave('submitButton')}
+                  onClick={handleSubmitConfirmation}
+                  disabled={isProcessing}
+                >
+                  {isProcessing ? (
+                    <>
+                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
+                      <span>Creating...</span>
+                    </>
+                  ) : (
+                    <>
+                      <FaCheckCircle />
+                      <span>Create Admin</span>
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {/* Admin Details Modal */}
-        {adminModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCard}>
-              <button 
-                onClick={() => setAdminModalVisible(false)} 
-                style={styles.closeButton}
-                aria-label="Close modal"
-              >
-                <AiOutlineClose />
-              </button>
+        {adminModalVisible && selectedAdmin && (
+          <div style={styles.modalOverlay} onClick={() => setAdminModalVisible(false)}>
+            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <h2 style={styles.modalTitle}>Admin Details</h2>
+                <button 
+                  onClick={() => setAdminModalVisible(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closeModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeModal')}
+                  onMouseLeave={() => handleMouseLeave('closeModal')}
+                >
+                  <AiOutlineClose />
+                </button>
               </div>
+              
               <div style={styles.modalContent}>
                 <div style={styles.columns}>
                   <div style={styles.leftColumn}>
                     <div style={styles.sectionTitle}>Personal Information</div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>ID:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.id || 'N/A'}</span>
+                      <span style={styles.fieldValue}>#{selectedAdmin.id}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>First Name:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.firstName || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.firstName || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Middle Name:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.middleName || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.middleName || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Last Name:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.lastName || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.lastName || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Gender:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.gender || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.gender || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Date of Birth:</span>
                       <span style={styles.fieldValue}>
-                        {selectedAdmin?.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}
+                        {selectedAdmin.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}
                       </span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Age:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.age || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.age || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Place of Birth:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.placeOfBirth || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.placeOfBirth || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Address:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.address || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.address || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Civil Status:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.civilStatus || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.civilStatus || 'N/A'}</span>
                     </div>
                     
                     <div style={styles.sectionTitle}>Contact Information</div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Email:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.email || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.email || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Contact Number:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.contactNumber || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.contactNumber || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Government ID:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.governmentId || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.governmentId || 'N/A'}</span>
                     </div>
                     
                     <div style={styles.sectionTitle}>Account Information</div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Date Added:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.dateAdded || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.dateAdded || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Time Added:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin?.timeAdded || 'N/A'}</span>
+                      <span style={styles.fieldValue}>{selectedAdmin.timeAdded || 'N/A'}</span>
                     </div>
                     <div style={styles.compactField}>
                       <span style={styles.fieldLabel}>Status:</span>
@@ -1590,46 +1488,46 @@ const Admins = () => {
                   <div style={styles.rightColumn}>
                     <div style={styles.sectionTitle}>Submitted Documents</div>
                     <div style={styles.imageGrid}>
-                      {selectedAdmin?.validIdFront && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Valid ID Front</p>
+                      {selectedAdmin.validIdFront && (
+                        <div style={styles.imageContainer}>
+                          <span style={styles.imageLabel}>Valid ID Front</span>
                           <img
                             src={selectedAdmin.validIdFront}
                             alt="Valid ID Front"
-                            style={styles.imageThumbnail}
+                            style={styles.imagePreview}
                             onClick={() => openImageViewer(selectedAdmin.validIdFront, 'Valid ID Front', 0)}
                           />
                         </div>
                       )}
-                      {selectedAdmin?.validIdBack && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Valid ID Back</p>
+                      {selectedAdmin.validIdBack && (
+                        <div style={styles.imageContainer}>
+                          <span style={styles.imageLabel}>Valid ID Back</span>
                           <img
                             src={selectedAdmin.validIdBack}
                             alt="Valid ID Back"
-                            style={styles.imageThumbnail}
+                            style={styles.imagePreview}
                             onClick={() => openImageViewer(selectedAdmin.validIdBack, 'Valid ID Back', 1)}
                           />
                         </div>
                       )}
-                      {selectedAdmin?.selfie && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Selfie</p>
+                      {selectedAdmin.selfie && (
+                        <div style={styles.imageContainer}>
+                          <span style={styles.imageLabel}>Selfie</span>
                           <img
                             src={selectedAdmin.selfie}
                             alt="Selfie"
-                            style={styles.imageThumbnail}
+                            style={styles.imagePreview}
                             onClick={() => openImageViewer(selectedAdmin.selfie, 'Selfie', 2)}
                           />
                         </div>
                       )}
-                      {selectedAdmin?.selfieWithId && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Selfie with ID</p>
+                      {selectedAdmin.selfieWithId && (
+                        <div style={styles.imageContainer}>
+                          <span style={styles.imageLabel}>Selfie with ID</span>
                           <img
                             src={selectedAdmin.selfieWithId}
                             alt="Selfie with ID"
-                            style={styles.imageThumbnail}
+                            style={styles.imagePreview}
                             onClick={() => openImageViewer(selectedAdmin.selfieWithId, 'Selfie with ID', 3)}
                           />
                         </div>
@@ -1638,12 +1536,13 @@ const Admins = () => {
                   </div>
                 </div>
               </div>
-              <div style={styles.bottomButtons}>
+
+              <div style={styles.modalActions}>
                 <button
                   style={{
-                    ...styles.actionButton,
+                    ...styles.primaryButton,
                     ...styles.deleteButton,
-                    ...(isProcessing ? styles.disabledButton : {})
+                    ...(isProcessing ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {})
                   }}
                   onClick={() => {
                     setPendingDelete(selectedAdmin);
@@ -1651,6 +1550,7 @@ const Admins = () => {
                   }}
                   disabled={isProcessing}
                 >
+                  <FaTrash />
                   Delete Admin
                 </button>
               </div>
@@ -1660,32 +1560,29 @@ const Admins = () => {
 
         {/* Confirmation Modals */}
         {confirmAddVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-              <p style={styles.modalText}>Are you sure you want to add this admin?</p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#2D5783',
-                    color: '#fff'
-                  }} 
-                  onClick={handleAddAdmin}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Yes'}
-                </button>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#f44336',
-                    color: '#fff'
-                  }} 
+          <div style={styles.modalOverlay} onClick={() => setConfirmAddVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Confirm Creation</h2>
+              </div>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  Are you sure you want to create this admin account?
+                </p>
+              </div>
+              <div style={styles.modalActions}>
+                <button
+                  style={styles.secondaryButton}
                   onClick={() => setConfirmAddVisible(false)}
-                  disabled={actionInProgress}
                 >
-                  No
+                  Cancel
+                </button>
+                <button
+                  style={styles.primaryButton}
+                  onClick={handleAddAdmin}
+                >
+                  Confirm Creation
                 </button>
               </div>
             </div>
@@ -1693,32 +1590,32 @@ const Admins = () => {
         )}
 
         {confirmDeleteVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-              <p style={styles.modalText}>Are you sure you want to delete this admin?</p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#2D5783',
-                    color: '#fff'
-                  }} 
-                  onClick={handleDeleteAdmin}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Yes'}
-                </button>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    backgroundColor: '#f44336',
-                    color: '#fff'
-                  }} 
+          <div style={styles.modalOverlay} onClick={() => setConfirmDeleteVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Confirm Deletion</h2>
+              </div>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  Are you sure you want to delete this admin account? This action cannot be undone.
+                </p>
+              </div>
+              <div style={styles.modalActions}>
+                <button
+                  style={styles.secondaryButton}
                   onClick={() => setConfirmDeleteVisible(false)}
-                  disabled={actionInProgress}
                 >
-                  No
+                  Cancel
+                </button>
+                <button
+                  style={{
+                    ...styles.primaryButton,
+                    ...styles.deleteButton
+                  }}
+                  onClick={handleDeleteAdmin}
+                >
+                  Delete Account
                 </button>
               </div>
             </div>
@@ -1726,51 +1623,53 @@ const Admins = () => {
         )}
 
         {/* Success Modal */}
-        {successVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-              <p style={styles.modalText}>{successMessage}</p>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={handleSuccessOk}
-                autoFocus
-              >
-                OK
-              </button>
+        {successModalVisible && (
+          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {successMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={handleSuccessOk}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         )}
 
         {/* Error Modal */}
         {errorModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-              <p style={styles.modalText}>{errorMessage}</p>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={() => setErrorModalVisible(false)}
-                autoFocus
-              >
-                OK
-              </button>
+          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {errorMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => setErrorModalVisible(false)}
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Processing Spinner */}
+        {/* Processing Overlay */}
         {isProcessing && (
-          <div style={styles.centeredModal}>
-            <div style={styles.spinner}></div>
+          <div style={styles.modalOverlay}>
+            <div style={styles.loadingContainer}>
+              <div style={styles.spinner}></div>
+            </div>
           </div>
         )}
 
@@ -1798,7 +1697,6 @@ const Admins = () => {
               <button 
                 style={styles.imageViewerClose} 
                 onClick={closeImageViewer}
-                aria-label="Close image viewer"
               >
                 <FaTimes />
               </button>

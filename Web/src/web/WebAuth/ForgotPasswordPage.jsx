@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaEnvelope, FaCheckCircle } from 'react-icons/fa';
+import { FaArrowLeft, FaEnvelope, FaCheckCircle, FaLock } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { auth } from '../../../../Database/firebaseConfig';
 
@@ -11,6 +11,7 @@ const ForgotPasswordPage = () => {
   const [confirmVisible, setConfirmVisible] = useState(false);
   const [successVisible, setSuccessVisible] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [focusedInput, setFocusedInput] = useState(null);
   const navigate = useNavigate();
 
   const handlePasswordReset = async () => {
@@ -51,179 +52,243 @@ const ForgotPasswordPage = () => {
     }
   };
 
-  // Styles matching your AdminLoginPage
+  // Enhanced professional styles matching banking design
   const styles = {
     container: {
       display: 'flex',
       flexDirection: 'row',
-      height: '100vh',
+      minHeight: '100vh',
       width: '100vw',
-      position: 'relative'
+      backgroundColor: '#F8FAFC',
+      position: 'relative',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     },
     leftSection: {
-      flex: 3,
+      flex: 1,
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: '#fff',
-      padding: '0 60px'
+      backgroundColor: '#FFFFFF',
+      padding: '60px 80px',
+      position: 'relative',
     },
     leftSectionWrapper: {
       width: '100%',
-      maxWidth: '400px'
+      maxWidth: '440px',
     },
     titleBlock: {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'flex-start',
-      marginBottom: '20px'
+      marginBottom: '32px',
     },
     formBlock: {
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      width: '100%'
+      width: '100%',
     },
     errorContainer: {
-      height: '30px',
+      height: '40px',
       width: '100%',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: '5px'
+      marginBottom: '8px',
+      backgroundColor: '#FEF2F2',
+      border: '1px solid #FECACA',
+      borderRadius: '12px',
+      padding: '8px 16px',
     },
     errorText: {
-      color: 'red',
+      color: '#DC2626',
       textAlign: 'center',
-      fontSize: '14px'
+      fontSize: '14px',
+      fontWeight: '500',
     },
     successText: {
-      color: '#10b981',
+      color: '#10B981',
       fontSize: '14px',
-      margin: '0.5rem 0 1rem',
+      fontWeight: '500',
       textAlign: 'center',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '0.5rem',
+      gap: '8px',
+      backgroundColor: '#F0FDF4',
+      border: '1px solid #BBF7D0',
+      borderRadius: '12px',
+      padding: '12px 16px',
+      width: '100%',
     },
     rightSection: {
-      flex: 2,
+      flex: 1,
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: '#2D5783',
-      padding: '40px'
+      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+      padding: '60px 80px',
+      position: 'relative',
+      overflow: 'hidden',
+    },
+    rightSectionOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      background: 'radial-gradient(circle at 70% 30%, rgba(59, 130, 246, 0.3) 0%, rgba(30, 58, 138, 0.2) 100%)',
     },
     title: {
-      fontSize: '30px',
-      fontWeight: 'bold',
-      color: '#001F3F',
-      margin: 0
+      fontSize: '42px',
+      fontWeight: '700',
+      color: '#1E293B',
+      margin: '0 0 8px 0',
+      background: 'linear-gradient(135deg, #1E293B 0%, #3B82F6 100%)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
     },
     subtitle: {
-      fontSize: '15px',
-      color: '#555',
-      margin: 0
+      fontSize: '16px',
+      color: '#64748B',
+      margin: 0,
+      fontWeight: '500',
     },
     inputGroup: {
       width: '100%',
-      marginBottom: '12px'
+      marginBottom: '20px',
     },
     inputLabel: {
-      color: '#001F3F',
-      fontSize: '16px',
-      marginBottom: '4px',
-      fontWeight: '500'
+      color: '#374151',
+      fontSize: '14px',
+      marginBottom: '8px',
+      fontWeight: '600',
+      display: 'block',
     },
     required: {
-      color: 'red'
+      color: '#DC2626',
     },
     inputContainer: {
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#fff',
-      borderRadius: '10px',
-      border: '1px solid #ddd',
+      backgroundColor: '#FFFFFF',
+      borderRadius: '12px',
+      border: '2px solid #E5E7EB',
       width: '100%',
-      height: '50px',
-      padding: '0 10px',
-      overflow: 'hidden'
+      height: '56px',
+      padding: '0 16px',
+      overflow: 'hidden',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
+    },
+    inputContainerFocused: {
+      borderColor: '#3B82F6',
+      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)',
     },
     iconWrapper: {
-      width: '24px',
+      width: '20px',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: '10px'
+      marginRight: '12px',
+      color: '#6B7280',
     },
     input: {
       flex: 1,
       fontSize: '16px',
-      color: '#000',
+      color: '#111827',
       height: '100%',
       padding: 0,
       border: 'none',
-      outline: 'none'
+      outline: 'none',
+      backgroundColor: 'transparent',
+      fontWeight: '500',
     },
-    rightIconSpacer: {
-      width: '24px'
-    },
-    forgotPasswordButton: {
-      alignSelf: 'flex-end',
-      marginBottom: '15px',
-      background: 'none',
-      border: 'none',
-      cursor: 'pointer',
-      padding: 0
+    inputPlaceholder: {
+      color: '#9CA3AF',
+      fontWeight: '400',
     },
     button: {
-      padding: '12px 20px',
-      borderRadius: '15px',
-      marginBottom: '20px',
+      padding: '16px 32px',
+      borderRadius: '12px',
+      marginBottom: '16px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      minWidth: 'auto',
-      width: 'auto',
+      width: '100%',
       cursor: 'pointer',
       border: 'none',
-      fontSize: '18px',
-      fontWeight: '600'
+      fontSize: '16px',
+      fontWeight: '600',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      position: 'relative',
+      overflow: 'hidden',
     },
     submitButton: {
-      backgroundColor: '#001F3F',
-      width: '40%',
-      color: 'white'
+      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+      color: 'white',
+      boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3), 0 2px 4px -1px rgba(59, 130, 246, 0.2)',
+    },
+    submitButtonHover: {
+      transform: 'translateY(-2px)',
+      boxShadow: '0 20px 25px -5px rgba(59, 130, 246, 0.4), 0 10px 10px -5px rgba(59, 130, 246, 0.2)',
     },
     backButton: {
-      backgroundColor: 'transparent',
-      border: '1px solid #FFFFFF',
-      marginTop: '50px',
-      padding: '12px 30px',
-      whiteSpace: 'nowrap',
-      color: 'white'
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      border: '2px solid rgba(255, 255, 255, 0.3)',
+      color: 'white',
+      backdropFilter: 'blur(10px)',
+      marginTop: '40px',
+      padding: '14px 28px',
+      width: 'auto',
+      minWidth: '200px',
+    },
+    backButtonHover: {
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 10px 25px -5px rgba(255, 255, 255, 0.2)',
     },
     buttonText: {
-      color: 'white',
-      whiteSpace: 'nowrap'
+      color: 'inherit',
+      fontWeight: '600',
     },
     welcomeTitle: {
-      fontSize: '60px',
-      fontWeight: 'bold',
+      fontSize: '48px',
+      fontWeight: '700',
       color: '#FFFFFF',
-      marginBottom: '10px',
-      textAlign: 'center'
+      marginBottom: '16px',
+      textAlign: 'center',
+      lineHeight: 1.1,
+      zIndex: 2,
     },
     welcomeSubtitle: {
-      fontSize: '20px',
-      color: '#FFFFFF',
+      fontSize: '18px',
+      color: 'rgba(255, 255, 255, 0.9)',
       textAlign: 'center',
-      marginBottom: '20px',
-      lineHeight: '24px',
-      maxWidth: '80%'
+      marginBottom: '32px',
+      lineHeight: 1.6,
+      maxWidth: '400px',
+      zIndex: 2,
+      fontWeight: '400',
+    },
+    securityBadge: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      padding: '12px 20px',
+      borderRadius: '12px',
+      backdropFilter: 'blur(10px)',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      marginTop: '40px',
+      zIndex: 2,
+    },
+    securityText: {
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontSize: '14px',
+      fontWeight: '500',
     },
     modalOverlay: {
       position: 'fixed',
@@ -231,96 +296,133 @@ const ForgotPasswordPage = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(15, 23, 42, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)',
+      padding: '20px',
     },
     modalCardSmall: {
-      width: '300px',
+      width: '400px',
       backgroundColor: 'white',
-      borderRadius: '8px',
-      padding: '20px',
+      borderRadius: '16px',
+      padding: '32px',
       position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      textAlign: 'center'
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      textAlign: 'center',
+      border: '1px solid #F1F5F9',
     },
     confirmIcon: {
-      marginBottom: '12px',
-      fontSize: '32px'
+      marginBottom: '20px',
+      fontSize: '48px',
     },
     modalText: {
-      fontSize: '14px',
-      marginBottom: '16px',
+      fontSize: '16px',
+      marginBottom: '24px',
       textAlign: 'center',
-      color: '#333',
-      lineHeight: '1.4'
+      color: '#475569',
+      lineHeight: '1.6',
+      fontWeight: '500',
+    },
+    modalEmail: {
+      fontWeight: '600',
+      color: '#1E293B',
+      backgroundColor: '#F8FAFC',
+      padding: '8px 12px',
+      borderRadius: '8px',
+      margin: '8px 0',
     },
     actionButton: {
-      padding: '8px 16px',
-      borderRadius: '4px',
+      padding: '12px 24px',
+      borderRadius: '8px',
       border: 'none',
       cursor: 'pointer',
-      fontWeight: 'bold',
+      fontWeight: '600',
       fontSize: '14px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '6px',
-      transition: 'all 0.2s',
+      gap: '8px',
+      transition: 'all 0.2s ease',
       minWidth: '100px',
       outline: 'none',
-      '&:focus': {
-        outline: 'none',
-        boxShadow: 'none'
-      }
     },
     closeButton: {
       position: 'absolute',
-      top: '10px',
-      right: '10px',
+      top: '16px',
+      right: '16px',
       cursor: 'pointer',
-      fontSize: '18px',
-      color: 'grey',
+      fontSize: '20px',
+      color: '#64748B',
       backgroundColor: 'transparent',
       border: 'none',
-      padding: '4px',
-      outline: 'none',
-      '&:focus': {
-        outline: 'none',
-        boxShadow: 'none'
-      }
+      padding: '8px',
+      borderRadius: '6px',
+      transition: 'all 0.2s ease',
     },
     spinner: {
-      border: '4px solid rgba(0, 0, 0, 0.1)',
-      borderLeftColor: '#2D5783',
+      border: '3px solid rgba(59, 130, 246, 0.3)',
+      borderTop: '3px solid #3B82F6',
       borderRadius: '50%',
-      width: '36px',
-      height: '36px',
-      animation: 'spin 1s linear infinite'
+      width: '48px',
+      height: '48px',
+      animation: 'spin 1s linear infinite',
     },
-    '@keyframes spin': {
-      '0%': { transform: 'rotate(0deg)' },
-      '100%': { transform: 'rotate(360deg)' }
-    }
+    loadingText: {
+      color: '#FFFFFF',
+      marginTop: '16px',
+      fontSize: '16px',
+      fontWeight: '500',
+    },
+  };
+
+  // Button Component with hover states
+  const Button = ({ 
+    style, 
+    hoverStyle, 
+    onClick, 
+    disabled, 
+    children, 
+    icon,
+    type = 'button'
+  }) => {
+    const [isHovered, setIsHovered] = useState(false);
+
+    return (
+      <button
+        style={{
+          ...style,
+          ...(isHovered && !disabled ? hoverStyle : {})
+        }}
+        onClick={onClick}
+        disabled={disabled}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        type={type}
+      >
+        {icon && <span style={{ marginRight: '8px', display: 'flex', alignItems: 'center' }}>{icon}</span>}
+        {children}
+      </button>
+    );
   };
 
   return (
     <div style={styles.container}>
-      {/* Left Section */}
+      {/* Left Section - Reset Form */}
       <div style={styles.leftSection}>
         <div style={styles.leftSectionWrapper}>
           <div style={styles.titleBlock}>
             <h1 style={styles.title}>Reset Password</h1>
-            <p style={styles.subtitle}>Enter your email to receive a reset link</p>
+            <p style={styles.subtitle}>Enter your email to receive a secure reset link</p>
           </div>
 
           <div style={styles.formBlock}>
-            {/* Error message container with fixed height */}
+            {/* Error/Success message */}
             <div style={styles.errorContainer}>
               {error && <p style={styles.errorText}>{error}</p>}
               {message && (
@@ -331,83 +433,118 @@ const ForgotPasswordPage = () => {
               )}
             </div>
 
-            {/* Email */}
+            {/* Email Input */}
             <div style={styles.inputGroup}>
-              <label style={styles.inputLabel}>Email <span style={styles.required}>*</span></label>
-              <div style={styles.inputContainer}>
+              <label style={styles.inputLabel}>
+                Email Address <span style={styles.required}>*</span>
+              </label>
+              <div style={{
+                ...styles.inputContainer,
+                ...(focusedInput === 'email' ? styles.inputContainerFocused : {})
+              }}>
                 <div style={styles.iconWrapper}>
-                  <FaEnvelope size={18} color="#001F3F" />
+                  <FaEnvelope size={16} />
                 </div>
                 <input
                   style={styles.input}
                   type="email"
-                  placeholder="Enter your email"
+                  placeholder="admin@5kibanking.com"
                   value={email}
                   onChange={(e) => {
                     setEmail(e.target.value);
                     setError('');
                   }}
+                  onFocus={() => setFocusedInput('email')}
+                  onBlur={() => setFocusedInput(null)}
                   onKeyPress={handleKeyPress}
                   autoCapitalize="none"
+                  autoComplete="email"
                 />
-                <div style={styles.rightIconSpacer} />
               </div>
             </div>
 
-            <button
+            {/* Submit Button */}
+            <Button
               style={{ ...styles.button, ...styles.submitButton }}
+              hoverStyle={styles.submitButtonHover}
               onClick={handlePasswordReset}
               disabled={isProcessing}
+              icon={isProcessing ? null : <FaLock />}
             >
-              <span style={styles.buttonText}>
-                {isProcessing ? 'Sending...' : 'Send Reset Link'}
-              </span>
-            </button>
+              {isProcessing ? 'Sending Reset Link...' : 'Send Secure Reset Link'}
+            </Button>
           </div>
         </div>
       </div>
 
-      {/* Right Section */}
+      {/* Right Section - Welcome Content */}
       <div style={styles.rightSection}>
-        <h1 style={styles.welcomeTitle}>Forgot Password?</h1>
+        <div style={styles.rightSectionOverlay} />
+        <h1 style={styles.welcomeTitle}>Forgot Your Password?</h1>
         <p style={styles.welcomeSubtitle}>
-          No worries! We'll send you instructions to reset your password.
+          Don't worry! We'll send you a secure password reset link to your email address. 
+          Follow the instructions in the email to regain access to your account.
         </p>
-        <button
+        
+        <div style={styles.securityBadge}>
+          <FaLock size={16} color="rgba(255, 255, 255, 0.9)" />
+          <span style={styles.securityText}>Banking-Grade Security</span>
+        </div>
+
+        <Button
           style={{ ...styles.button, ...styles.backButton }}
+          hoverStyle={styles.backButtonHover}
           onClick={() => navigate('/')}
-        > 
-          <span style={styles.buttonText}>Back to Home</span>
-        </button>
+          icon={<FaArrowLeft />}
+        >
+          Back to Home
+        </Button>
       </div>
 
       {/* Confirmation Modal */}
       {confirmVisible && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>Are you sure you want to send a password reset link to {email}?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
+            <button 
+              style={styles.closeButton}
+              onClick={() => setConfirmVisible(false)}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <FiAlertCircle />
+            </button>
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#3B82F6' }} />
+            <p style={styles.modalText}>
+              Are you sure you want to send a password reset link to:
+            </p>
+            <div style={styles.modalEmail}>{email}</div>
+            <p style={styles.modalText}>
+              This will send a secure reset link to your email address.
+            </p>
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <Button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
+                  backgroundColor: '#3B82F6',
+                  color: '#fff',
                 }} 
+                hoverStyle={{ backgroundColor: '#2563EB' }}
                 onClick={handleConfirmReset}
               >
-                Yes
-              </button>
-              <button 
+                <FaCheckCircle style={{ marginRight: '6px' }} />
+                Yes, Send Link
+              </Button>
+              <Button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
+                  backgroundColor: '#6B7280',
+                  color: '#fff',
                 }} 
+                hoverStyle={{ backgroundColor: '#4B5563' }}
                 onClick={() => setConfirmVisible(false)}
               >
-                No
-              </button>
+                Cancel
+              </Button>
             </div>
           </div>
         </div>
@@ -417,29 +554,51 @@ const ForgotPasswordPage = () => {
       {successVisible && (
         <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
-            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-            <p style={styles.modalText}>Password reset email sent successfully!</p>
             <button 
+              style={styles.closeButton}
+              onClick={() => {
+                setSuccessVisible(false);
+                setEmail('');
+              }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <FiAlertCircle />
+            </button>
+            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10B981' }} />
+            <p style={styles.modalText}>
+              Password reset email sent successfully!
+            </p>
+            <p style={{...styles.modalText, fontSize: '14px', color: '#64748B'}}>
+              Please check your inbox and follow the instructions to reset your password. 
+              The link will expire in 1 hour for security reasons.
+            </p>
+            <Button 
               style={{
                 ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
+                backgroundColor: '#10B981',
+                color: '#fff',
               }} 
+              hoverStyle={{ backgroundColor: '#059669' }}
               onClick={() => {
                 setSuccessVisible(false);
                 setEmail('');
               }}
             >
-              OK
-            </button>
+              <FaCheckCircle style={{ marginRight: '6px' }} />
+              Continue
+            </Button>
           </div>
         </div>
       )}
 
-      {/* Processing Overlay (no modal, just overlay like logout) */}
+      {/* Processing Overlay */}
       {isProcessing && (
         <div style={styles.modalOverlay}>
-          <div style={styles.spinner}></div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+            <div style={styles.spinner}></div>
+            <div style={styles.loadingText}>Sending secure reset link...</div>
+          </div>
         </div>
       )}
     </div>

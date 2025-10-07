@@ -443,7 +443,7 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2000,
+    zIndex: 1001
   },
   rejectionModalContent: {
     backgroundColor: 'white',
@@ -1285,10 +1285,10 @@ const ApplyDeposits = ({
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Option</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Option</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
@@ -1380,6 +1380,13 @@ const ApplyDeposits = ({
                       </span>
                       <span style={styles.fieldValue}>{selectedDeposit.email || 'N/A'}</span>
                     </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaPhone />
+                        Contact:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedDeposit.phoneNumber || 'N/A'}</span>
+                    </div>
                   </div>
 
                   <div style={styles.section}>
@@ -1387,6 +1394,10 @@ const ApplyDeposits = ({
                       <FaMapMarkerAlt />
                       Member Details
                     </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Address:</span>
+                      <span style={styles.fieldValue}>{selectedDeposit.address || 'N/A'}</span>
+                    </div>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Current Balance:</span>
                       <span style={styles.fieldValue}>{formatCurrency(selectedDeposit.currentBalance || 0)}</span>
@@ -1642,7 +1653,7 @@ const ApplyDeposits = ({
 
       {/* Error Modal */}
       {errorModalVisible && (
-        <div style={{ ...styles.modalOverlay, zIndex: 3000 }}>
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
             <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
             <p style={styles.modalText}>{errorMessage}</p>
@@ -1693,12 +1704,23 @@ const ApplyDeposits = ({
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+              onClick={() => navigateImages('prev')}
+            >
+              <FaChevronLeft />
+            </button>
             <img
               src={currentImage.url}
               alt={currentImage.label}
               style={styles.largeImage}
             />
-
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+              onClick={() => navigateImages('next')}
+            >
+              <FaChevronRight />
+            </button>
             <button 
               style={styles.imageViewerClose} 
               onClick={closeImageViewer}

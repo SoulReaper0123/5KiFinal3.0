@@ -458,10 +458,10 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Option</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Option</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>

@@ -1260,7 +1260,7 @@ const Register = () => {
           {!noMatch && filteredData.length > 0 && (
             <div style={styles.paginationContainer}>
               <span style={styles.paginationInfo}>
-                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length} entries
+                {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length}
               </span>
               <div style={styles.paginationControls}>
                 <button
@@ -1273,9 +1273,7 @@ const Register = () => {
                 >
                   <FaChevronLeft />
                 </button>
-                <span style={styles.paginationInfo}>
-                  Page {currentPage + 1} of {totalPages}
-                </span>
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
                   disabled={currentPage === totalPages - 1}

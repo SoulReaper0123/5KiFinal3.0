@@ -3,7 +3,7 @@ import { database } from '../../../../../Database/firebaseConfig';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 import { SendLoanReminder } from '../../../../../Server/api';
-import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner, FaChartLine, FaMoneyBillWave, FaUsers, FaCreditCard, FaExchangeAlt, FaShieldAlt, FaSearch, FaCalendarAlt, FaFilter } from 'react-icons/fa';
 
 // Register Chart.js components
 Chart.register(
@@ -1109,6 +1109,7 @@ const Dashboard = () => {
     loan.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  // Enhanced professional styles for banking dashboard
   const styles = {
     container: {
       width: '100%',
@@ -1116,134 +1117,154 @@ const Dashboard = () => {
       padding: '20px',
       overflowY: 'auto',
       overflowX: 'hidden',
-      backgroundColor: '#f5f7fa',
+      backgroundColor: '#F8FAFC',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     },
     header: {
-      marginBottom: '20px',
-      paddingBottom: '15px',
-      borderBottom: '1px solid #e0e0e0'
+      marginBottom: '24px',
+      paddingBottom: '16px',
+      borderBottom: '1px solid #E5E7EB'
     },
     headerTitle: {
       fontSize: '24px',
-      fontWeight: '600',
-      color: '#2D5783',
-      margin: 0
+      fontWeight: '700',
+      color: '#1E293B',
+      margin: 0,
+      background: 'linear-gradient(135deg, #1E293B 0%, #3B82F6 100%)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
     },
     metricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
-      gap: '20px',
-      marginBottom: '20px',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+      gap: '16px',
+      marginBottom: '24px',
       width: '100%',
       alignItems: 'stretch'
     },
     secondaryMetricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-      gap: '20px',
-      marginBottom: '40px',
-      marginTop: '40px',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gap: '16px',
+      marginBottom: '32px',
+      marginTop: '32px',
       width: '100%',
       alignItems: 'stretch'
     },
     primaryCard: {
-      padding: '12px',
+      padding: '20px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
-      height: '100%',
-      minHeight: '70px'
+      height: 'auto',
+      minHeight: '120px',
+      borderRadius: '12px',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      border: '1px solid #F1F5F9',
+      transition: 'all 0.2s ease',
+      position: 'relative',
+      overflow: 'hidden',
     },
-    secondaryCard: {
-      height: '100%',
-      minHeight: '60px',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between'
+    fundsCard: {
+      background: 'linear-gradient(135deg, #1E3A8A 0%, #2D5783 100%)',
+      color: 'white',
     },
     metricCard: {
       backgroundColor: 'white',
-      borderRadius: '8px',
-      padding: '10px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-    },
-    fundsCard: {
-      background: 'linear-gradient(135deg, #2D5783 0%, #1E3A8A 100%)',
-      color: 'white'
+      borderRadius: '12px',
+      padding: '16px',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      border: '1px solid #F1F5F9',
+      transition: 'all 0.2s ease',
+      height: 'auto',
+      display: 'flex',
+      flexDirection: 'column',
+      justifyContent: 'space-between',
     },
     metricContent: {
-      marginBottom: '10px'
+      marginBottom: '12px'
     },
     metricTitle: {
-      fontSize: '16px',
+      fontSize: '12px',
       fontWeight: '600',
-      marginBottom: '5px',
-      color: '#6B7280'
+      marginBottom: '6px',
+      color: '#6B7280',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    fundsMetricTitle: {
+      color: 'rgba(255, 255, 255, 0.9)',
     },
     metricValue: {
       fontSize: '24px',
       fontWeight: '700',
-      marginBottom: '5px',
+      marginBottom: '6px',
       color: '#1F2937'
     },
     fundsMetricValue: {
       color: 'white'
     },
     metricDescription: {
-      fontSize: '14px',
+      fontSize: '12px',
       color: '#6B7280'
     },
     fundsMetricDescription: {
-      color: 'rgba(255,255,255,0.8)'
+      color: 'rgba(255, 255, 255, 0.8)'
     },
     healthIndicator: {
-      padding: '4px 8px',
+      padding: '6px 10px',
       fontSize: '11px',
       fontWeight: '600',
       textAlign: 'center',
-      backgroundColor: healthColor,
+      backgroundColor: '#10B981',
       color: 'white',
-      borderRadius: '4px',
-      marginTop: '6px'
+      borderRadius: '6px',
+      marginTop: '8px',
+      backdropFilter: 'blur(10px)',
+      border: '1px solid rgba(255, 255, 255, 0.2)'
     },
     chartsSection: {
-      marginBottom: '20px'
+      marginBottom: '24px'
     },
     chartSelector: {
       display: 'flex',
-      gap: '10px',
+      gap: '8px',
       flexWrap: 'wrap',
       marginTop: '16px',
-      marginBottom: '12px'
+      marginBottom: '16px'
     },
     chartButton: {
-      padding: '8px 12px',
+      padding: '10px 16px',
       backgroundColor: 'white',
       border: '1px solid #E5E7EB',
-      borderRadius: '20px',
+      borderRadius: '8px',
       cursor: 'pointer',
       fontSize: '13px',
-      transition: 'all 0.2s'
+      fontWeight: '500',
+      transition: 'all 0.2s ease',
+      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
     },
     selectedChartButton: {
-      backgroundColor: '#2D5783',
+      backgroundColor: '#1E3A8A',
       color: 'white',
-      borderColor: '#2D5783'
+      borderColor: '#1E3A8A',
+      boxShadow: '0 2px 4px rgba(30, 58, 138, 0.2)',
     },
     chartContainer: {
       backgroundColor: 'white',
-      borderRadius: '8px',
+      borderRadius: '12px',
       padding: '20px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      border: '1px solid #F1F5F9',
     },
     chartHeader: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '15px'
+      marginBottom: '16px'
     },
     chartTitle: {
-      fontSize: '18px',
+      fontSize: '16px',
       fontWeight: '600',
       color: '#1F2937'
     },
@@ -1251,17 +1272,21 @@ const Dashboard = () => {
       padding: '8px 12px',
       border: '1px solid #E5E7EB',
       borderRadius: '6px',
-      backgroundColor: 'white'
+      backgroundColor: 'white',
+      fontSize: '13px',
+      fontWeight: '500',
+      transition: 'all 0.2s ease',
     },
     chartWrapper: {
-      height: '260px',
+      height: '240px',
       position: 'relative'
     },
     loansSection: {
       backgroundColor: 'white',
-      borderRadius: '8px',
+      borderRadius: '12px',
       padding: '20px',
-      boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
+      border: '1px solid #F1F5F9',
       width: '100%',
       boxSizing: 'border-box',
       overflow: 'hidden'
@@ -1270,54 +1295,71 @@ const Dashboard = () => {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '15px',
+      marginBottom: '16px',
       flexWrap: 'wrap',
-      gap: '10px',
+      gap: '12px',
       width: '100%'
     },
     sectionTitle: {
-      fontSize: '18px',
+      fontSize: '16px',
       fontWeight: '600',
       color: '#1F2937',
       flex: '1 1 auto',
       minWidth: '0'
     },
     searchBox: {
-      minWidth: '200px',
-      maxWidth: '300px',
-      flex: '0 0 auto'
+      minWidth: '240px',
+      maxWidth: '320px',
+      flex: '0 0 auto',
+      position: 'relative'
     },
     searchInput: {
       width: '100%',
-      padding: '10px 15px',
+      padding: '10px 16px 10px 40px',
       border: '1px solid #E5E7EB',
-      borderRadius: '6px',
-      fontSize: '14px',
+      borderRadius: '8px',
+      fontSize: '13px',
       boxSizing: 'border-box',
-      outline: 'none'
+      outline: 'none',
+      transition: 'all 0.2s ease',
+      backgroundColor: '#F9FAFB',
+    },
+    searchIcon: {
+      position: 'absolute',
+      left: '12px',
+      top: '50%',
+      transform: 'translateY(-50%)',
+      color: '#6B7280',
+      fontSize: '14px'
     },
     tableContainer: {
       overflowX: 'auto',
-      marginTop: '15px',
-      maxWidth: '100%'
+      marginTop: '16px',
+      maxWidth: '100%',
+      borderRadius: '8px',
+      border: '1px solid #E5E7EB',
     },
     loansTable: {
       width: '100%',
       borderCollapse: 'collapse',
-      fontSize: '14px'
+      fontSize: '13px'
     },
     tableHeader: {
-      backgroundColor: '#F9FAFB',
-      color: '#6B7280',
+      backgroundColor: '#F8FAFC',
+      color: '#374151',
       padding: '12px',
       textAlign: 'center',
       fontWeight: '600',
-      borderBottom: '1px solid #E5E7EB'
+      borderBottom: '1px solid #E5E7EB',
+      fontSize: '12px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
     },
     tableCell: {
       padding: '12px',
-      borderBottom: '1px solid #E5E7EB',
-      textAlign: 'center'
+      borderBottom: '1px solid #F1F5F9',
+      textAlign: 'center',
+      fontSize: '13px'
     },
     overdueDate: {
       color: '#EF4444',
@@ -1325,116 +1367,116 @@ const Dashboard = () => {
     },
     overdueBadge: {
       display: 'inline-block',
-      marginLeft: '5px',
-      padding: '2px 6px',
+      marginLeft: '6px',
+      padding: '3px 6px',
       borderRadius: '4px',
-      backgroundColor: '#FEE2E2',
-      color: '#EF4444',
-      fontSize: '12px',
-      fontWeight: '600'
+      backgroundColor: '#FEF2F2',
+      color: '#DC2626',
+      fontSize: '11px',
+      fontWeight: '600',
+      border: '1px solid #FECACA'
     },
     resendButton: {
       padding: '6px 12px',
-      backgroundColor: '#2D5783',
+      backgroundColor: '#1E3A8A',
       color: 'white',
       border: 'none',
-      borderRadius: '4px',
+      borderRadius: '6px',
       cursor: 'pointer',
       fontSize: '12px',
-      transition: 'background-color 0.2s'
+      fontWeight: '600',
+      transition: 'all 0.2s ease',
+      boxShadow: '0 1px 2px rgba(30, 58, 138, 0.2)',
     },
-
-    // Dividends modal table
     dividendsModalTable: {
       width: '100%',
       borderCollapse: 'collapse',
-      minWidth: '700px'
+      minWidth: '600px'
     },
     dividendsModalTh: {
       textAlign: 'left',
-      padding: '10px 8px',
-      borderBottom: '1px solid #eee',
+      padding: '10px 12px',
+      borderBottom: '1px solid #E5E7EB',
       fontWeight: 600,
-      fontSize: '14px'
+      fontSize: '13px',
+      backgroundColor: '#F8FAFC'
     },
     dividendsModalTd: {
-      padding: '8px 8px',
-      borderBottom: '1px solid #f1f1f1',
+      padding: '10px 12px',
+      borderBottom: '1px solid #F1F5F9',
       fontSize: '13px'
     },
     modalFooterRow: {
       display: 'flex',
       justifyContent: 'flex-end',
       gap: '10px',
-      marginTop: '12px'
+      marginTop: '20px',
+      paddingTop: '16px',
+      borderTop: '1px solid #E5E7EB'
     },
-  modalCardSmall: {
-    width: '250px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none'
-  },
-  approveButton: {
-    backgroundColor: '#4CAF50',
-    color: '#FFF'
-  },
-  rejectButton: {
-    backgroundColor: '#f44336',
-    color: '#FFF'
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none'
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-    opacity: '0.7'
-  },
+    modalCardSmall: {
+      width: '360px',
+      backgroundColor: 'white',
+      borderRadius: '12px',
+      padding: '24px',
+      position: 'relative',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+      textAlign: 'center',
+      border: '1px solid #F1F5F9'
+    },
+    confirmIcon: {
+      marginBottom: '16px',
+      fontSize: '40px'
+    },
+    modalText: {
+      fontSize: '14px',
+      marginBottom: '20px',
+      textAlign: 'center',
+      color: '#374151',
+      lineHeight: '1.5',
+      fontWeight: '500'
+    },
+    actionButton: {
+      padding: '10px 20px',
+      borderRadius: '6px',
+      border: 'none',
+      cursor: 'pointer',
+      fontWeight: '600',
+      fontSize: '13px',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '6px',
+      transition: 'all 0.2s ease',
+      minWidth: '100px',
+      outline: 'none',
+    },
+    closeButton: {
+      position: 'absolute',
+      top: '16px',
+      right: '16px',
+      cursor: 'pointer',
+      fontSize: '18px',
+      color: '#64748B',
+      backgroundColor: 'transparent',
+      border: 'none',
+      padding: '6px',
+      borderRadius: '4px',
+      transition: 'all 0.2s ease',
+    },
+    disabledButton: {
+      backgroundColor: '#9CA3AF',
+      cursor: 'not-allowed',
+      opacity: '0.7'
+    },
     noResults: {
       textAlign: 'center',
       color: '#6B7280',
-      padding: '20px'
+      padding: '32px',
+      fontSize: '14px'
     },
     centeredModal: {
       position: 'fixed',
@@ -1442,11 +1484,13 @@ const Dashboard = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(15, 23, 42, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)',
+      padding: '16px'
     },
     modal: {
       position: 'fixed',
@@ -1454,69 +1498,76 @@ const Dashboard = () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(15, 23, 42, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1000
+      zIndex: 1000,
+      backdropFilter: 'blur(4px)'
     },
     modalCard: {
       width: '90%',
-      maxWidth: '800px',
+      maxWidth: '900px',
       backgroundColor: 'white',
-      borderRadius: '8px',
-      padding: '20px',
+      borderRadius: '12px',
+      padding: '24px',
       position: 'relative',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      maxHeight: '90vh',
+      boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)',
+      maxHeight: '85vh',
       height: '80vh',
       display: 'flex',
       flexDirection: 'column',
-      overflowX: 'hidden'
+      overflowX: 'hidden',
+      border: '1px solid #F1F5F9'
     },
     modalContent: {
-      paddingBottom: '12px',
+      paddingBottom: '16px',
       overflowY: 'auto',
       flex: 1
     },
     modalTitle: {
-      fontSize: '18px',
+      fontSize: '20px',
       fontWeight: '600',
-      color: '#2D5783',
+      color: '#1E293B',
       margin: '0 0 20px 0',
       textAlign: 'left'
     },
     modalIcon: {
-      fontSize: '32px',
-      marginBottom: '10px'
+      fontSize: '40px',
+      marginBottom: '12px'
     },
-
     modalActions: {
       display: 'flex',
       justifyContent: 'center',
       gap: '10px'
     },
     modalButton: {
-      padding: '8px 16px',
-      borderRadius: '4px',
+      padding: '10px 20px',
+      borderRadius: '6px',
       border: 'none',
       cursor: 'pointer',
-      fontWeight: '600'
+      fontWeight: '600',
+      fontSize: '13px'
     },
     spinner: {
-      border: '4px solid rgba(0,0,0,0.1)',
-      borderLeftColor: '#2D5783',
+      border: '3px solid rgba(59, 130, 246, 0.3)',
+      borderTop: '3px solid #3B82F6',
       borderRadius: '50%',
-      width: '36px',
-      height: '36px',
+      width: '40px',
+      height: '40px',
       animation: 'spin 1s linear infinite'
     },
-    
+    loadingText: {
+      color: '#FFFFFF',
+      marginTop: '12px',
+      fontSize: '14px',
+      fontWeight: '500'
+    },
     // Dividends Table Styles
     dividendsTableContainer: {
       overflowX: 'auto',
       marginTop: '20px',
-      border: '1px solid #e0e0e0',
+      border: '1px solid #E5E7EB',
       borderRadius: '8px',
       backgroundColor: '#fff',
       maxWidth: '100%'
@@ -1524,33 +1575,34 @@ const Dashboard = () => {
     dividendsTable: {
       width: '100%',
       borderCollapse: 'collapse',
-      fontSize: '14px',
+      fontSize: '13px',
       minWidth: '1400px'
     },
     dividendsHeaderRow: {
-      backgroundColor: '#f8f9fa',
-      borderBottom: '2px solid #e0e0e0'
+      backgroundColor: '#F8FAFC',
+      borderBottom: '2px solid #E5E7EB'
     },
     dividendsHeaderCell: {
-      padding: '12px 8px',
+      padding: '12px 10px',
       textAlign: 'left',
       fontWeight: '600',
-      color: '#2D5783',
-      borderRight: '1px solid #e0e0e0',
+      color: '#374151',
+      borderRight: '1px solid #E5E7EB',
       whiteSpace: 'nowrap',
-      minWidth: '80px'
+      minWidth: '80px',
+      fontSize: '12px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
     },
     dividendsDataRow: {
-      borderBottom: '1px solid #f0f0f0',
+      borderBottom: '1px solid #F1F5F9',
       transition: 'background-color 0.2s',
-      ':hover': {
-        backgroundColor: '#f8f9fa'
-      }
     },
     dividendsDataCell: {
-      padding: '12px 8px',
-      borderRight: '1px solid #f0f0f0',
-      verticalAlign: 'middle'
+      padding: '12px 10px',
+      borderRight: '1px solid #F1F5F9',
+      verticalAlign: 'middle',
+      fontSize: '13px'
     },
     memberInfo: {
       display: 'flex',
@@ -1559,31 +1611,44 @@ const Dashboard = () => {
     },
     memberName: {
       fontWeight: '600',
-      color: '#333',
+      color: '#1F2937',
       marginBottom: '2px'
     },
     memberId: {
-      fontSize: '12px',
-      color: '#666'
+      fontSize: '11px',
+      color: '#6B7280'
     },
     dividendCell: {
       padding: '6px 8px',
-      borderRadius: '4px',
+      borderRadius: '6px',
       textAlign: 'center',
       color: '#fff',
       fontWeight: '500',
-      minHeight: '24px',
+      minHeight: '28px',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'center'
+      justifyContent: 'center',
+      transition: 'all 0.2s ease',
+      cursor: 'pointer',
+      border: '2px solid transparent'
+    },
+    // Card hover effects
+    cardHover: {
+      transform: 'translateY(-2px)',
+      boxShadow: '0 8px 15px rgba(0, 0, 0, 0.1)'
+    },
+    buttonHover: {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
     }
   };
 
   if (loading) {
     return (
       <div style={styles.container}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh', flexDirection: 'column', gap: '12px' }}>
           <div style={styles.spinner}></div>
+          <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: '500' }}>Loading dashboard data...</div>
         </div>
       </div>
     );
@@ -1596,9 +1661,13 @@ const Dashboard = () => {
       </div>
 
       <div style={styles.metricsGrid}>
-        <div style={{...styles.metricCard, ...styles.fundsCard, ...styles.primaryCard}}>
+        <div 
+          style={{...styles.metricCard, ...styles.fundsCard, ...styles.primaryCard}}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div style={{...styles.metricContent, marginBottom: '4px'}}>
-            <h3 style={{...styles.metricTitle, color: 'rgba(255,255,255,0.9)'}}>Available Funds</h3>
+            <h3 style={{...styles.metricTitle, ...styles.fundsMetricTitle}}>Available Funds</h3>
             <div style={{...styles.metricValue, ...styles.fundsMetricValue}}>₱{formatCurrency(fundsData.availableFunds)}</div>
             <div style={{...styles.metricDescription, ...styles.fundsMetricDescription}}>Capital available for new loans</div>
           </div>
@@ -1607,7 +1676,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={{...styles.metricCard, ...styles.primaryCard}}>
+        <div 
+          style={{...styles.metricCard, ...styles.primaryCard}}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Yields</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalYields)}</div>
@@ -1620,7 +1693,11 @@ const Dashboard = () => {
       </div>
 
       <div style={styles.secondaryMetricsGrid}>
-        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
+        <div 
+          style={{...styles.metricCard, ...styles.secondaryCard}}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Members</h3>
             <div style={styles.metricValue}>{fundsData.totalMembers}</div>
@@ -1628,7 +1705,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
+        <div 
+          style={{...styles.metricCard, ...styles.secondaryCard}}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Loans</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalLoans)}</div>
@@ -1636,7 +1717,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
+        <div 
+          style={{...styles.metricCard, ...styles.secondaryCard}}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>Total Receivables</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalReceivables)}</div>
@@ -1644,7 +1729,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        <div style={{...styles.metricCard, ...styles.secondaryCard}}>
+        <div 
+          style={{...styles.metricCard, ...styles.secondaryCard}}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
+        >
           <div style={styles.metricContent}>
             <h3 style={styles.metricTitle}>5KI Earnings</h3>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.fiveKISavings)}</div>
@@ -1661,6 +1750,8 @@ const Dashboard = () => {
               ...(selectedChart === 'loans' && styles.selectedChartButton)
             }}
             onClick={() => setSelectedChart('loans')}
+            onMouseEnter={(e) => !(selectedChart === 'loans') && (e.target.style.transform = 'translateY(-1px)')}
+            onMouseLeave={(e) => !(selectedChart === 'loans') && (e.target.style.transform = 'translateY(0)')}
           >
             Loans Breakdown
           </button>
@@ -1670,6 +1761,8 @@ const Dashboard = () => {
               ...(selectedChart === 'earnings' && styles.selectedChartButton)
             }}
             onClick={() => setSelectedChart('earnings')}
+            onMouseEnter={(e) => !(selectedChart === 'earnings') && (e.target.style.transform = 'translateY(-1px)')}
+            onMouseLeave={(e) => !(selectedChart === 'earnings') && (e.target.style.transform = 'translateY(0)')}
           >
             Funds & Savings
           </button>
@@ -1679,6 +1772,8 @@ const Dashboard = () => {
               ...(selectedChart === 'dividends' && styles.selectedChartButton)
             }}
             onClick={() => setSelectedChart('dividends')}
+            onMouseEnter={(e) => !(selectedChart === 'dividends') && (e.target.style.transform = 'translateY(-1px)')}
+            onMouseLeave={(e) => !(selectedChart === 'dividends') && (e.target.style.transform = 'translateY(0)')}
           >
             Dividends
           </button>
@@ -1701,9 +1796,9 @@ const Dashboard = () => {
                         backgroundColor: ['#2D5783', '#3B82F6'],
                         borderColor: ['#1E3A5F', '#1F5FBF'],
                         borderWidth: 1,
-                        borderRadius: 6,
-                        barThickness: 48,
-                        maxBarThickness: 56
+                        borderRadius: 4,
+                        barThickness: 40,
+                        maxBarThickness: 48
                       }
                     ]
                   }} 
@@ -1737,7 +1832,7 @@ const Dashboard = () => {
                   ))}
                 </select>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
                 <div style={styles.chartWrapper}>
                   <Line 
                     data={fundsLineData} 
@@ -1747,10 +1842,10 @@ const Dashboard = () => {
               </div>
 
               {/* Yields Line Graph */}
-              <div style={{ ...styles.chartHeader, marginTop: '20px' }}>
+              <div style={{ ...styles.chartHeader, marginTop: '16px' }}>
                 <h3 style={styles.chartTitle}>Yields Growth ({selectedYear})</h3>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
                 <div style={styles.chartWrapper}>
                   <Line 
                     data={yieldsLineData}
@@ -1776,13 +1871,13 @@ const Dashboard = () => {
                 </select>
               </div>
               {/* Centered summary labels directly under title + action row */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '8px', marginBottom: '8px', marginTop: '4px', textAlign: 'center', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '6px', marginTop: '2px', textAlign: 'center', flexWrap: 'wrap' }}>
                 {(() => {
                   const totalYields = fundsData.totalYields || 0;
                   const membersDividendValue = totalYields * (fundsData.membersDividendPercentage || 0);
                   const fiveKiEarningsValue = totalYields * (fundsData.fiveKiEarningsPercentage || 0);
                   const chip = (bg, border, color, label) => (
-                    <div style={{ padding: '4px 8px', background: bg, color, border: `1px solid ${border}`, borderRadius: '9999px', fontWeight: 600, fontSize: '12px' }}>{label}</div>
+                    <div style={{ padding: '3px 6px', background: bg, color, border: `1px solid ${border}`, borderRadius: '6px', fontWeight: 600, fontSize: '11px' }}>{label}</div>
                   );
                   return (
                     <>
@@ -1794,7 +1889,7 @@ const Dashboard = () => {
               </div>
 
               {/* Action row: Due badge and distribution button */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <div>
                   {(() => {
                     // Show due/overdue indicator like Overdue Loans when DividendDate is today or past
@@ -1809,15 +1904,21 @@ const Dashboard = () => {
                       return dd.getTime() <= tt.getTime();
                     })();
                     return isDue ? (
-                      <span style={{ ...styles.overdueBadge, backgroundColor: '#FEF3C7', color: '#B45309', borderRadius: 6 }}>Dividends Action Needed</span>
+                      <span style={{ ...styles.overdueBadge, backgroundColor: '#FEF3C7', color: '#B45309', borderRadius: 4 }}>Dividends Action Needed</span>
                     ) : null;
                   })()}
                 </div>
                 <div>
-                  <button onClick={openDividendsModal} style={styles.resendButton}>Distribute Dividends</button>
+                  <button 
+                    onClick={openDividendsModal} 
+                    style={styles.resendButton}
+                    onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+                    onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+                  >
+                    Distribute Dividends
+                  </button>
                 </div>
               </div>
-
 
               {showDividendsModal && (
                 <div style={styles.centeredModal}>
@@ -1826,7 +1927,8 @@ const Dashboard = () => {
                       style={styles.closeButton} 
                       onClick={() => setShowDividendsModal(false)}
                       aria-label="Close modal"
-                      onFocus={(e) => e.target.style.outline = 'none'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
                       <FaTimes />
                     </button>
@@ -1861,6 +1963,8 @@ const Dashboard = () => {
                       <button 
                         style={{ ...styles.actionButton, backgroundColor: '#f1f5f9', color: '#111' }}
                         onClick={() => setShowDividendsModal(false)}
+                        onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+                        onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                       >
                         Cancel
                       </button>
@@ -1868,6 +1972,8 @@ const Dashboard = () => {
                         style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
                         onClick={confirmDistributeDividends}
                         disabled={distributionProcessing || distributionMembers.length === 0}
+                        onMouseEnter={(e) => !distributionProcessing && distributionMembers.length > 0 && (e.target.style.transform = 'translateY(-1px)')}
+                        onMouseLeave={(e) => !distributionProcessing && distributionMembers.length > 0 && (e.target.style.transform = 'translateY(0)')}
                       >
                         {distributionProcessing ? 'Processing...' : 'Distribute'}
                       </button>
@@ -1884,23 +1990,28 @@ const Dashboard = () => {
                       style={styles.closeButton} 
                       onClick={() => setDistributionConfirmVisible(false)}
                       aria-label="Close modal"
-                      onFocus={(e) => e.target.style.outline = 'none'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
                       <FaTimes />
                     </button>
                     <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
                     <p style={styles.modalText}>Are you sure you want to distribute dividends to all listed members?</p>
-                    <div style={{ display: 'flex', gap: '10px' }}>
+                    <div style={{ display: 'flex', gap: '8px' }}>
                       <button 
                         style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
                         onClick={performDistributeDividends}
                         disabled={distributionProcessing}
+                        onMouseEnter={(e) => !distributionProcessing && (e.target.style.transform = 'translateY(-1px)')}
+                        onMouseLeave={(e) => !distributionProcessing && (e.target.style.transform = 'translateY(0)')}
                       >
                         {distributionProcessing ? 'Processing...' : 'Yes'}
                       </button>
                       <button 
                         style={{ ...styles.actionButton, backgroundColor: '#f1f5f9', color: '#111' }}
                         onClick={() => setDistributionConfirmVisible(false)}
+                        onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+                        onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                       >
                         No
                       </button>
@@ -1917,7 +2028,8 @@ const Dashboard = () => {
                       style={styles.closeButton} 
                       onClick={() => setDistributionSuccessVisible(false)}
                       aria-label="Close modal"
-                      onFocus={(e) => e.target.style.outline = 'none'}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
                     >
                       <FaTimes />
                     </button>
@@ -1930,7 +2042,8 @@ const Dashboard = () => {
                         setShowDividendsModal(false);
                         fetchDashboardData({ lightweight: true });
                       }}
-                      onFocus={(e) => e.target.style.outline = 'none'}
+                      onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+                      onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                     >
                       OK
                     </button>
@@ -1939,7 +2052,7 @@ const Dashboard = () => {
               )}
 
               {/* Dividends Pie Charts */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(220px, 1fr))', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: '10px', marginBottom: '10px' }}>
                 <div style={{ ...styles.chartWrapper }}>
                   <Pie
                     data={{
@@ -1969,8 +2082,7 @@ const Dashboard = () => {
                   />
                 </div>
 
-                <div style={{ ...styles.chartWrapper, minWidth: '220px' }}>
-              
+                <div style={{ ...styles.chartWrapper, minWidth: '180px' }}>
                   <Pie
                     data={(() => {
                       // Compute top members by Total % (table logic), shown as percentages
@@ -2025,7 +2137,7 @@ const Dashboard = () => {
                   />
                 </div>
 
-                <div style={{ ...styles.chartWrapper, minWidth: '220px' }}>
+                <div style={{ ...styles.chartWrapper, minWidth: '180px' }}>
                   <Pie
                     data={{
                       labels: ['Investment Share', 'Patronage Share', 'Active Months'],
@@ -2057,8 +2169,8 @@ const Dashboard = () => {
               </div>
 
               {/* Dividends Total % Chart (Top 10) */}
-                <h3 style={styles.chartTitle}>Total Share ({selectedYear})</h3>
-              <div style={{ ...styles.chartWrapper, minHeight: '260px', marginBottom: '12px' }}>
+              <h3 style={styles.chartTitle}>Total Share ({selectedYear})</h3>
+              <div style={{ ...styles.chartWrapper, minHeight: '220px', marginBottom: '10px' }}>
                 {(() => {
                   const totalInvestments = dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
                   const totalLoans = dividendsData.reduce((sum, m) => sum + (m.totalLoanAmount || 0), 0);
@@ -2099,9 +2211,9 @@ const Dashboard = () => {
                               return +(r.value / 100 * totalYields * membersDividendDecimal).toFixed(2);
                             }),
                             backgroundColor: '#2D5783',
-                            borderRadius: 4,
-                            barThickness: 14,
-                            maxBarThickness: 16,
+                            borderRadius: 3,
+                            barThickness: 12,
+                            maxBarThickness: 14,
                           }
                         ]
                       }}
@@ -2128,7 +2240,7 @@ const Dashboard = () => {
                           y: {
                             ticks: { autoSkip: false },
                             grid: { display: false },
-                            afterFit: (scale) => { scale.width = Math.min(scale.width, 160); }
+                            afterFit: (scale) => { scale.width = Math.min(scale.width, 140); }
                           }
                         }
                       }}
@@ -2136,8 +2248,6 @@ const Dashboard = () => {
                   );
                 })()}
               </div>
-
-
 
               <div style={styles.dividendsTableContainer}>
                 {(() => {
@@ -2228,14 +2338,14 @@ const Dashboard = () => {
                                 {hasTransactions && member.monthlyTransactions[monthIndex].length > 1 && (
                                   <span style={{
                                     position: 'absolute',
-                                    top: '2px',
-                                    right: '2px',
-                                    fontSize: '10px',
+                                    top: '1px',
+                                    right: '1px',
+                                    fontSize: '9px',
                                     backgroundColor: 'rgba(255,255,255,0.8)',
                                     color: '#333',
                                     borderRadius: '50%',
-                                    width: '16px',
-                                    height: '16px',
+                                    width: '14px',
+                                    height: '14px',
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
@@ -2367,12 +2477,15 @@ const Dashboard = () => {
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>Active Loans Portfolio</h2>
             <div style={styles.searchBox}>
+              <FaSearch style={styles.searchIcon} />
               <input
                 type="text"
                 placeholder="Search by Member ID or Transaction ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 style={styles.searchInput}
+                onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
+                onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
               />
             </div>
           </div>
@@ -2426,6 +2539,8 @@ const Dashboard = () => {
                         <button 
                           onClick={() => handleResendClick(loan)}
                           style={styles.resendButton}
+                          onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+                          onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
                         >
                           Resend Reminder
                         </button>
@@ -2443,202 +2558,214 @@ const Dashboard = () => {
         </div>
       )}
 
-{showResendConfirmation && (
-  <div style={styles.centeredModal}>
-    <div style={styles.modalCardSmall}>
-      <button 
-        style={styles.closeButton} 
-        onClick={() => setShowResendConfirmation(false)}
-        aria-label="Close modal"
-        onFocus={(e) => e.target.style.outline = 'none'}
-      >
-        <FaTimes />
-      </button>
-      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-      <p style={styles.modalText}>Are you sure you want to resend the payment reminder?</p>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button 
-          style={{
-            ...styles.actionButton,
-            backgroundColor: '#2D5783',
-            color: '#fff'
-          }} 
-          onClick={confirmResendReminder}
-          disabled={actionInProgress}
-        >
-          {actionInProgress ? 'Processing...' : 'Yes'}
-        </button>
-        <button 
-          style={{
-            ...styles.actionButton,
-            backgroundColor: '#f44336',
-            color: '#fff'
-          }} 
-          onClick={() => setShowResendConfirmation(false)}
-          disabled={actionInProgress}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
-{successMessageModalVisible && (
-  <div style={styles.centeredModal}>
-    <div style={styles.modalCardSmall}>
-      <button 
-        style={styles.closeButton} 
-        onClick={() => setSuccessMessageModalVisible(false)}
-        aria-label="Close modal"
-        onFocus={(e) => e.target.style.outline = 'none'}
-      >
-        <FaTimes />
-      </button>
-      <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-      <p style={styles.modalText}>{successMessage}</p>
-      <button 
-        style={{
-          ...styles.actionButton,
-          backgroundColor: '#2D5783',
-          color: '#fff'
-        }} 
-        onClick={() => setSuccessMessageModalVisible(false)}
-        onFocus={(e) => e.target.style.outline = 'none'}
-      >
-        OK
-      </button>
-    </div>
-  </div>
-)}
-
-{errorModalVisible && (
-  <div style={styles.centeredModal}>
-    <div style={styles.modalCardSmall}>
-      <button 
-        style={styles.closeButton} 
-        onClick={() => setErrorModalVisible(false)}
-        aria-label="Close modal"
-        onFocus={(e) => e.target.style.outline = 'none'}
-      >
-        <FaTimes />
-      </button>
-      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-      <p style={styles.modalText}>{errorMessage}</p>
-      <button 
-        style={{
-          ...styles.actionButton,
-          backgroundColor: '#2D5783',
-          color: '#fff'
-        }} 
-        onClick={() => setErrorModalVisible(false)}
-        onFocus={(e) => e.target.style.outline = 'none'}
-      >
-        OK
-      </button>
-    </div>
-  </div>
-)}
-
-{actionInProgress && (
-  <div style={styles.centeredModal}>
-    <div style={styles.spinner}></div>
-  </div>
-)}
-
-{/* Transaction Breakdown Modal */}
-{transactionBreakdownModal && (
-  <div style={styles.centeredModal}>
-    <div style={styles.modalCard}>
-      <button 
-        style={styles.closeButton} 
-        onClick={() => setTransactionBreakdownModal(false)}
-        aria-label="Close modal"
-        onFocus={(e) => e.target.style.outline = 'none'}
-      >
-        <FaTimes />
-      </button>
-      
-      <h3 style={styles.modalTitle}>
-        Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
-      </h3>
-      
-      <div style={{marginBottom: '20px', color: '#666', fontSize: '14px'}}>
-        <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
-      </div>
-
-      <div style={styles.modalContent}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px', tableLayout: 'fixed', margin: 0 }}>
-          <thead>
-            <tr style={styles.dividendsHeaderRow}>
-              <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Date</th>
-              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Type</th>
-              <th style={{...styles.dividendsHeaderCell, width: '180px'}}>Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {selectedMonthTransactions.transactions.map((transaction, index) => (
-              <tr key={index} style={styles.dividendsDataRow}>
-                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  {transaction.formattedDate}
-                </td>
-                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  <span style={{
-                    backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
-                    color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
-                    padding: '4px 8px',
-                    borderRadius: '12px',
-                    fontSize: '12px',
-                    fontWeight: '600'
-                  }}>
-                    {transaction.type}
-                  </span>
-                </td>
-                <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                  <div>
-                    <span style={{
-                      color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
-                      fontWeight: 'bold'
-                    }}>
-                      {transaction.adjustedAmount > 0 ? '+' : '-'}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
-                    </span>
-                    <div style={{fontSize: '11px', color: '#666', marginTop: '2px'}}>
-                      Original: ₱{formatCurrency(transaction.originalAmount)}
-                    </div>
-                  </div>
-                </td>
-
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        
-        <div style={{
-          marginTop: '20px', 
-          padding: '15px', 
-          backgroundColor: '#f8f9fa', 
-          borderRadius: '8px',
-          borderLeft: '4px solid #2D5783'
-        }}>
-          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-            <span style={{fontWeight: '600', color: '#2D5783'}}>
-              Month Total ({selectedMonthTransactions.transactions.length} transactions):
-            </span>
-            <span style={{
-              fontSize: '18px',
-              fontWeight: 'bold',
-              color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
-            }}>
-              {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
-               selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
-              ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
-            </span>
+      {showResendConfirmation && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <button 
+              style={styles.closeButton} 
+              onClick={() => setShowResendConfirmation(false)}
+              aria-label="Close modal"
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <FaTimes />
+            </button>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to resend the payment reminder?</p>
+            <div style={{ display: 'flex', gap: '8px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmResendReminder}
+                disabled={actionInProgress}
+                onMouseEnter={(e) => !actionInProgress && (e.target.style.transform = 'translateY(-1px)')}
+                onMouseLeave={(e) => !actionInProgress && (e.target.style.transform = 'translateY(0)')}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f1f5f9',
+                  color: '#111'
+                }} 
+                onClick={() => setShowResendConfirmation(false)}
+                disabled={actionInProgress}
+                onMouseEnter={(e) => !actionInProgress && (e.target.style.transform = 'translateY(-1px)')}
+                onMouseLeave={(e) => !actionInProgress && (e.target.style.transform = 'translateY(0)')}
+              >
+                No
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
-)}
+      )}
+
+      {successMessageModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <button 
+              style={styles.closeButton} 
+              onClick={() => setSuccessMessageModalVisible(false)}
+              aria-label="Close modal"
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <FaTimes />
+            </button>
+            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+            <p style={styles.modalText}>{successMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setSuccessMessageModalVisible(false)}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {errorModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <button 
+              style={styles.closeButton} 
+              onClick={() => setErrorModalVisible(false)}
+              aria-label="Close modal"
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <FaTimes />
+            </button>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
+            <p style={styles.modalText}>{errorMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setErrorModalVisible(false)}
+              onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
+              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {actionInProgress && (
+        <div style={styles.centeredModal}>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
+            <div style={styles.spinner}></div>
+            <div style={styles.loadingText}>Processing...</div>
+          </div>
+        </div>
+      )}
+
+      {/* Transaction Breakdown Modal */}
+      {transactionBreakdownModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCard}>
+            <button 
+              style={styles.closeButton} 
+              onClick={() => setTransactionBreakdownModal(false)}
+              aria-label="Close modal"
+              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+            >
+              <FaTimes />
+            </button>
+            
+            <h3 style={styles.modalTitle}>
+              Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
+            </h3>
+            
+            <div style={{marginBottom: '16px', color: '#666', fontSize: '13px'}}>
+              <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
+            </div>
+
+            <div style={styles.modalContent}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'fixed', margin: 0 }}>
+                <thead>
+                  <tr style={styles.dividendsHeaderRow}>
+                    <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
+                    <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
+                    <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {selectedMonthTransactions.transactions.map((transaction, index) => (
+                    <tr key={index} style={styles.dividendsDataRow}>
+                      <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                        {transaction.formattedDate}
+                      </td>
+                      <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                        <span style={{
+                          backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
+                          color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
+                          padding: '3px 6px',
+                          borderRadius: '8px',
+                          fontSize: '11px',
+                          fontWeight: '600'
+                        }}>
+                          {transaction.type}
+                        </span>
+                      </td>
+                      <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
+                        <div>
+                          <span style={{
+                            color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
+                            fontWeight: 'bold'
+                          }}>
+                            {transaction.adjustedAmount > 0 ? '+' : transaction.adjustedAmount < 0 ? '-' : ''}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
+                          </span>
+                          <div style={{fontSize: '10px', color: '#666', marginTop: '1px'}}>
+                            Original: ₱{formatCurrency(transaction.originalAmount)}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              
+              <div style={{
+                marginTop: '16px', 
+                padding: '12px', 
+                backgroundColor: '#f8f9fa', 
+                borderRadius: '6px',
+                borderLeft: '4px solid #2D5783'
+              }}>
+                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                  <span style={{fontWeight: '600', color: '#2D5783'}}>
+                    Month Total ({selectedMonthTransactions.transactions.length} transactions):
+                  </span>
+                  <span style={{
+                    fontSize: '16px',
+                    fontWeight: 'bold',
+                    color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
+                  }}>
+                    {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
+                     selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
+                    ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

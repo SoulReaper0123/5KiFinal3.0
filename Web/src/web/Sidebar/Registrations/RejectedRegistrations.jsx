@@ -1,65 +1,84 @@
 import React, { useState } from 'react';
-import { FaTimes, FaExclamationCircle, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { 
+  FaTimes, 
+  FaExclamationCircle, 
+  FaChevronLeft, 
+  FaChevronRight,
+  FaEye,
+  FaUser,
+  FaIdCard,
+  FaCalendarAlt,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
+  FaVenusMars,
+  FaHeart,
+  FaBirthdayCake
+} from 'react-icons/fa';
 
 const styles = {
   container: {
     flex: 1,
-  },
-  loadingView: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%'
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
   tableContainer: {
-    borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #e2e8f0',
+    background: 'white'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     tableLayout: 'fixed',
-    minWidth: '800px'
+    minWidth: '1000px'
   },
   tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    color: 'white',
+    height: '56px',
+    fontWeight: '600',
+    fontSize: '0.875rem'
   },
   tableHeaderCell: {
-    whiteSpace: 'nowrap'
+    padding: '1rem 0.75rem',
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    fontSize: '0.875rem',
+    fontWeight: '600'
   },
   tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
+    height: '52px',
+    transition: 'background-color 0.2s ease',
+    borderBottom: '1px solid #f1f5f9',
+    '&:hover': {
+      backgroundColor: '#f8fafc'
     }
   },
   tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
+    padding: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap'
   },
-  statusRejected: {
-    color: 'red'
+  noDataContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#6b7280'
   },
-  noDataMessage: {
-    textAlign: 'center',
-    marginTop: '50px',
-    fontSize: '16px',
-    color: 'gray'
+  noDataIcon: {
+    fontSize: '3rem',
+    opacity: '0.5'
   },
-  centeredModal: {
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -69,141 +88,174 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
+    zIndex: 1000,
+    padding: '2rem',
+    backdropFilter: 'blur(4px)'
   },
   modalCard: {
-    width: '40%',
-    maxWidth: '800px',
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
-    height: '80vh',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  modalContent: {
-    paddingBottom: '12px',
-    overflowY: 'auto',
-    flex: 1
-  },
-  columns: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '30px'
-  },
-  leftColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  rightColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
-    textAlign: 'center'
-  },
-  modalDetailText: {
-    fontSize: '13px',
-    marginBottom: '6px',
-    color: '#333',
-    wordBreak: 'break-word',
-    lineHeight: '1.3'
-  },
-  imageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    marginBottom: '12px',
-    gap: '10px'
-  },
-  imageBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start'
-  },
-  imageLabel: {
-    fontSize: '13px',
-    fontWeight: 'bold',
-    color: '#333',
-    width: '100%',
-    textAlign: 'left',
-    marginLeft: 0,
-    paddingLeft: 0
-  },
-  imageThumbnail: {
+    borderRadius: '16px',
     width: '90%',
-    height: '120px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    objectFit: 'cover',
-    cursor: 'pointer',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    maxWidth: '900px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    display: 'flex',
+    flexDirection: 'column',
+    border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-    marginBottom: '12px'
+    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    color: 'white',
+    padding: '1.5rem 2rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #E5E7EB'
   },
-  compactField: {
+  modalTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem'
+  },
+  closeButton: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    color: 'white',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    '&:hover': {
+      background: 'rgba(255, 255, 255, 0.2)',
+      transform: 'rotate(90deg)'
+    }
+  },
+  modalContent: {
+    padding: '2rem',
+    overflowY: 'auto',
+    flex: 1,
+    minHeight: 0
+  },
+  columnsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '2rem',
+    marginBottom: '1.5rem'
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  section: {
+    background: '#f8fafc',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  sectionTitle: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#1e3a8a',
+    marginBottom: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingBottom: '0.5rem',
+    borderBottom: '2px solid #e2e8f0'
+  },
+  fieldGroup: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: '6px',
-    gap: '8px'
+    marginBottom: '0.75rem',
+    padding: '0.5rem 0'
   },
   fieldLabel: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '13px',
-    minWidth: '100px'
+    fontWeight: '500',
+    color: '#64748b',
+    fontSize: '0.875rem',
+    minWidth: '120px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
   },
   fieldValue: {
     textAlign: 'right',
     flex: 1,
     wordBreak: 'break-word',
-    color: '#333',
-    fontSize: '13px'
+    color: '#1f2937',
+    fontSize: '0.875rem',
+    fontWeight: '500'
+  },
+  statusBadge: {
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    textTransform: 'uppercase'
+  },
+  statusRejected: {
+    background: '#fee2e2',
+    color: '#991b1b'
+  },
+  documentsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '1rem',
+    marginTop: '1rem'
+  },
+  documentCard: {
+    background: 'white',
+    borderRadius: '8px',
+    padding: '1rem',
+    border: '1px solid #e2e8f0',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    '&:hover': {
+      borderColor: '#2563eb',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.1)'
+    }
+  },
+  documentImage: {
+    width: '100%',
+    height: '120px',
+    borderRadius: '6px',
+    objectFit: 'cover',
+    marginBottom: '0.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  documentLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#374151'
+  },
+  viewButton: {
+    background: 'transparent',
+    color: '#2563eb',
+    border: '1px solid #2563eb',
+    borderRadius: '6px',
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: '#2563eb',
+      color: 'white'
+    }
   },
   imageViewerModal: {
     position: 'fixed',
@@ -215,7 +267,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2000
+    zIndex: 2000,
+    padding: '2rem'
   },
   imageViewerContent: {
     position: 'relative',
@@ -229,62 +282,78 @@ const styles = {
     maxWidth: '100%',
     maxHeight: '70vh',
     objectFit: 'contain',
-    borderRadius: '4px'
+    borderRadius: '8px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   },
   imageViewerLabel: {
     color: 'white',
-    fontSize: '18px',
-    marginTop: '16px',
-    textAlign: 'center'
-  },
-  imageViewerClose: {
-    position: 'absolute',
-    top: '-40px',
-    right: '80px',
-    color: 'white',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '8px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    fontSize: '1.125rem',
+    marginTop: '1rem',
+    textAlign: 'center',
+    fontWeight: '500'
   },
   imageViewerNav: {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '2rem',
     cursor: 'pointer',
-    padding: '16px',
-    backgroundColor: 'transparent',
+    padding: '1rem',
+    background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    outline: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      color: '#2D5783'
-    },
-    '&:focus': {
-      outline: 'none'
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'translateY(-50%) scale(1.1)'
     }
   },
   prevButton: {
-    left: '50px'
+    left: '2rem'
   },
-  nextButton: { 
-    right: '50px'
+  nextButton: {
+    right: '2rem'
   },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'left',
-    width: '100%'
+  imageViewerClose: {
+    position: 'absolute',
+    top: '2rem',
+    right: '2rem',
+    color: 'white',
+    fontSize: '1.5rem',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'scale(1.1)'
+    }
+  },
+  rejectionCard: {
+    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+    border: '1px solid #fca5a5',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
+  },
+  rejectionItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem 0'
+  },
+  rejectionLabel: {
+    fontSize: '0.875rem',
+    color: '#991b1b',
+    fontWeight: '500'
+  },
+  rejectionValue: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#991b1b'
   }
 };
 
@@ -299,6 +368,7 @@ const RejectedRegistrations = ({
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [availableImages, setAvailableImages] = useState([]);
 
   const openModal = (registration) => {
     setSelectedRegistration(registration);
@@ -310,6 +380,34 @@ const RejectedRegistrations = ({
   };
 
   const openImageViewer = (url, label, index) => {
+    const images = [];
+    
+    if (selectedRegistration?.validIdFront) {
+      images.push({ 
+        url: selectedRegistration.validIdFront, 
+        label: 'Valid ID Front' 
+      });
+    }
+    if (selectedRegistration?.validIdBack) {
+      images.push({ 
+        url: selectedRegistration.validIdBack, 
+        label: 'Valid ID Back' 
+      });
+    }
+    if (selectedRegistration?.selfie) {
+      images.push({ 
+        url: selectedRegistration.selfie, 
+        label: 'Selfie' 
+      });
+    }
+    if (selectedRegistration?.selfieWithId) {
+      images.push({ 
+        url: selectedRegistration.selfieWithId, 
+        label: 'Selfie with ID' 
+      });
+    }
+
+    setAvailableImages(images);
     setCurrentImage({ url, label });
     setCurrentImageIndex(index);
     setImageViewerVisible(true);
@@ -317,29 +415,29 @@ const RejectedRegistrations = ({
 
   const closeImageViewer = () => {
     setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+    setCurrentImageIndex(0);
   };
 
   const navigateImages = (direction) => {
-    const images = [
-      { url: selectedRegistration?.validIdFront, label: 'Valid ID Front' },
-      { url: selectedRegistration?.validIdBack, label: 'Valid ID Back' },
-      { url: selectedRegistration?.selfie, label: 'Selfie' },
-      { url: selectedRegistration?.selfieWithId, label: 'Selfie with ID' },
-    ].filter(img => img.url);
+    if (availableImages.length === 0) return;
 
+    let newIndex;
     if (direction === 'prev') {
-      const newIndex = (currentImageIndex - 1 + images.length) % images.length;
-      setCurrentImage(images[newIndex]);
-      setCurrentImageIndex(newIndex);
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
     } else {
-      const newIndex = (currentImageIndex + 1) % images.length;
-      setCurrentImage(images[newIndex]);
-      setCurrentImageIndex(newIndex);
+      newIndex = (currentImageIndex + 1) % availableImages.length;
     }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
   };
 
   if (!rejectedRegistrations.length) return (
-    <p style={styles.noDataMessage}>No rejected registration applications available.</p>
+    <div style={styles.noDataContainer}>
+      <FaUser style={styles.noDataIcon} />
+      <div>No rejected registration applications available</div>
+    </div>
   );
 
   return (
@@ -354,7 +452,7 @@ const RejectedRegistrations = ({
               <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Last Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Date Rejected</th>
-              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Action</th>
+              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -367,13 +465,13 @@ const RejectedRegistrations = ({
                 <td style={styles.tableCell}>{item.dateCreated || ''}</td>
                 <td style={styles.tableCell}>{item.dateRejected || ''}</td>
                 <td style={styles.tableCell}>
-                  <span 
-                    style={styles.viewText} 
+                  <button 
+                    style={styles.viewButton}
                     onClick={() => openModal(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
                   >
+                    <FaEye />
                     View
-                  </span>
+                  </button>
                 </td>
               </tr>
             ))}
@@ -381,131 +479,200 @@ const RejectedRegistrations = ({
         </table>
       </div>
 
-      {/* View Details Modal */}
-      {modalVisible && (
-        <div style={styles.centeredModal}>
+      {/* Registration Details Modal */}
+      {modalVisible && selectedRegistration && (
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
-            <button 
-              style={styles.closeButton} 
-              onClick={closeModal}
-              aria-label="Close modal"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Registration Details</h2>
+              <h2 style={styles.modalTitle}>
+                <FaUser />
+                Rejected Registration Details
+              </h2>
+              <button 
+                style={styles.closeButton}
+                onClick={closeModal}
+              >
+                <FaTimes />
+              </button>
             </div>
+            
             <div style={styles.modalContent}>
-              <div style={styles.columns}>
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Personal Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>First Name:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.firstName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Middle Name:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.middleName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Last Name:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.lastName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.phoneNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Gender:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.gender || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Civil Status:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.civilStatus || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date of Birth:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.dateOfBirth || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Age:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.age || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Birth Place:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.placeOfBirth || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Address:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.address || 'N/A'}</span>
+              <div style={styles.columnsContainer}>
+                {/* Left Column - Personal Information */}
+                <div style={styles.column}>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaUser />
+                      Personal Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUser />
+                        Full Name:
+                      </span>
+                      <span style={styles.fieldValue}>
+                        {selectedRegistration.firstName} {selectedRegistration.middleName} {selectedRegistration.lastName}
+                      </span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaEnvelope />
+                        Email:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.email}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaPhone />
+                        Contact:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.phoneNumber}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaVenusMars />
+                        Gender:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.gender}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaHeart />
+                        Civil Status:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.civilStatus}</span>
+                    </div>
                   </div>
 
-                  <div style={styles.sectionTitle}>Rejection Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Rejected:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.dateRejected || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Rejection Reason:</span>
-                    <span style={styles.fieldValue}>{selectedRegistration?.rejectionReason || 'Rejected by admin'}</span>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaCalendarAlt />
+                      Background Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaBirthdayCake />
+                        Date of Birth:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.dateOfBirth}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Age:</span>
+                      <span style={styles.fieldValue}>{selectedRegistration.age}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaMapMarkerAlt />
+                        Birth Place:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.placeOfBirth}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaMapMarkerAlt />
+                        Address:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedRegistration.address}</span>
+                    </div>
                   </div>
                 </div>
-                <div style={styles.rightColumn}>
-                  <div style={styles.sectionTitle}>Submitted Documents</div>
-                  <div style={styles.imageGrid}>
-                    {selectedRegistration?.validIdFront && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Valid ID Front</p>
-                        <img
-                          src={selectedRegistration.validIdFront}
-                          alt="Valid ID Front"
-                          style={styles.imageThumbnail}
+
+                {/* Right Column - Rejection & Documents */}
+                <div style={styles.column}>
+                  <div style={styles.rejectionCard}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaExclamationCircle />
+                      Rejection Information
+                    </h3>
+                    <div style={styles.rejectionItem}>
+                      <span style={styles.rejectionLabel}>Date Rejected:</span>
+                      <span style={styles.rejectionValue}>{selectedRegistration.dateRejected || 'N/A'}</span>
+                    </div>
+                    <div style={styles.rejectionItem}>
+                      <span style={styles.rejectionLabel}>Rejection Reason:</span>
+                      <span style={styles.rejectionValue}>{selectedRegistration.rejectionReason || 'Rejected by admin'}</span>
+                    </div>
+                  </div>
+
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaCalendarAlt />
+                      Application Timeline
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Date Applied:</span>
+                      <span style={styles.fieldValue}>{selectedRegistration.dateCreated || 'N/A'}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Status:</span>
+                      <span style={{
+                        ...styles.statusBadge,
+                        ...styles.statusRejected
+                      }}>
+                        Rejected
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaIdCard />
+                      Submitted Documents
+                    </h3>
+                    <div style={styles.documentsGrid}>
+                      {selectedRegistration.validIdFront && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedRegistration.validIdFront, 'Valid ID Front', 0)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                    {selectedRegistration?.validIdBack && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Valid ID Back</p>
-                        <img
-                          src={selectedRegistration.validIdBack}
-                          alt="Valid ID Back"
-                          style={styles.imageThumbnail}
+                        >
+                          <img
+                            src={selectedRegistration.validIdFront}
+                            alt="Valid ID Front"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Valid ID Front</div>
+                        </div>
+                      )}
+                      {selectedRegistration.validIdBack && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedRegistration.validIdBack, 'Valid ID Back', 1)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                    {selectedRegistration?.selfie && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Selfie</p>
-                        <img
-                          src={selectedRegistration.selfie}
-                          alt="Selfie"
-                          style={styles.imageThumbnail}
+                        >
+                          <img
+                            src={selectedRegistration.validIdBack}
+                            alt="Valid ID Back"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Valid ID Back</div>
+                        </div>
+                      )}
+                      {selectedRegistration.selfie && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedRegistration.selfie, 'Selfie', 2)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                    {selectedRegistration?.selfieWithId && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Selfie with ID</p>
-                        <img
-                          src={selectedRegistration.selfieWithId}
-                          alt="Selfie with ID"
-                          style={styles.imageThumbnail}
+                        >
+                          <img
+                            src={selectedRegistration.selfie}
+                            alt="Selfie"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Selfie</div>
+                        </div>
+                      )}
+                      {selectedRegistration.selfieWithId && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedRegistration.selfieWithId, 'Selfie with ID', 3)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
+                        >
+                          <img
+                            src={selectedRegistration.selfieWithId}
+                            alt="Selfie with ID"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Selfie with ID</div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -514,14 +681,13 @@ const RejectedRegistrations = ({
         </div>
       )}
 
-      {/* Image Viewer Modal */}
+      {/* Image Viewer */}
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
             <button 
               style={{ ...styles.imageViewerNav, ...styles.prevButton }}
               onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaChevronLeft />
             </button>
@@ -533,15 +699,12 @@ const RejectedRegistrations = ({
             <button 
               style={{ ...styles.imageViewerNav, ...styles.nextButton }}
               onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaChevronRight />
             </button>
             <button 
               style={styles.imageViewerClose} 
               onClick={closeImageViewer}
-              aria-label="Close image viewer"
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaTimes />
             </button>
