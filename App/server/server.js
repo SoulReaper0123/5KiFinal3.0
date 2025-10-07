@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 3000;
 // Constants for links
 const WEBSITE_LINK = 'https://your-official-website.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
-
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
 // Middleware
@@ -49,6 +48,15 @@ const formatAmount = (amount) => {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
     });
+};
+
+// Helper to mask password like u*****3 (keep first and last char if length >= 2)
+const maskPassword = (pwd) => {
+    if (!pwd) return '';
+    if (pwd.length <= 2) return pwd[0] + '*';
+    const first = pwd[0];
+    const last = pwd[pwd.length - 1];
+    return `${first}${'*'.repeat(Math.max(1, pwd.length - 2))}${last}`;
 };
 
 app.get('/', (req, res) => {
@@ -253,10 +261,7 @@ app.post('/send-admin-email', async (req, res) => {
                     
                     <p>For any questions, please contact the system administrator.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
+      
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -408,11 +413,7 @@ app.post('/send-delete-admin-email', async (req, res) => {
                         <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
                     </p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-    
-                    </ul>
+
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -520,7 +521,6 @@ app.post('/register', async (req, res) => {
                     <p>We are pleased to inform you that we have successfully received your registration application on ${formatDisplayDate(registrationDate)}. Our team is currently reviewing your information and you will receive a confirmation once your application is approved.</p>
                     
                     <p>In the meantime, if you have any questions or would like to know more about our services, feel free to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
-        
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -541,7 +541,7 @@ app.post('/register', async (req, res) => {
 
 app.post('/approveRegistrations', async (req, res) => {
     console.log('[NOTIFICATION] Initiating registration approval email', req.body);
-    const { email, firstName, lastName, dateApproved, approvedTime, memberId } = req.body;
+    const { email, firstName, lastName, dateApproved, approvedTime, memberId, password } = req.body;
 
     if (!email || !firstName || !lastName || !dateApproved || !approvedTime || !memberId) {
         console.log('[NOTIFICATION ERROR] Missing required fields for registration approval');
@@ -583,6 +583,14 @@ app.post('/approveRegistrations', async (req, res) => {
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Approval Date</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${dateApproved}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Password</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${maskPassword(password)}</td>
                         </tr>
                     </table>
                     
@@ -759,12 +767,6 @@ app.post('/send-verification-code', async (req, res) => {
                         </tr>
                     </table>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-            
-                    </ul>
-                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -936,11 +938,7 @@ app.post('/deposit', async (req, res) => {
                     
                     <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-            
-                    </ul>
+    
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -1426,7 +1424,7 @@ app.post('/applyLoan', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Term</td>
@@ -1509,15 +1507,15 @@ app.post('/approveLoans', async (req, res) => {
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Release Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(releaseAmount)} (after processing fee)</td>
-                        </tr>
-                        <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Processing Fee</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(processingFee)}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Repayment Term</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Release Amount</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(releaseAmount)}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Terms</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${term} months</td>
                         </tr>
                         <tr>
@@ -1525,23 +1523,19 @@ app.post('/approveLoans', async (req, res) => {
                             <td style="padding: 8px; border: 1px solid #ddd;">${interestRate}</td>
                         </tr>
                         <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(monthlyPayment)}</td>
+                        </tr>
+                        <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Interest</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(interest)}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal Payment</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(monthlyPayment)}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Monthly Payment</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Amortization</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(totalMonthlyPayment)}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Term Payment</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(totalTermPayment)}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Due Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Maturity</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${dueDate}</td>
                         </tr>
                     </table>
@@ -1626,18 +1620,9 @@ app.post('/rejectLoans', async (req, res) => {
                     `}
                     
                     <p>Date of Rejection: ${dateRejected || formatDisplayDate(new Date())}</p>
-        
-                    ${rejectionReason ? `
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Reason:</h3>
-                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${rejectionReason}</td>
-                        </tr>
-                    </table>
-                    ` : ''}
                     
                     <p>If you have any questions or need clarification, please don't hesitate to contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
-                
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -1697,7 +1682,7 @@ app.post('/payment', async (req, res) => {
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount Paid</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date</td>
@@ -1730,18 +1715,18 @@ app.post('/payment', async (req, res) => {
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Payment Confirmed',
+            subject: 'Payment Application Confirmed',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                     <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
-                        Payment Confirmed
+                        Payment Application Confirmed
                     </h2>
                     
                     <p>Hi ${firstName},</p>
                     
                     <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
                         <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            We have received your payment of ₱${amount} on ${formatDisplayDate(date)} via ${paymentMethod}.
+                            We have received your payment application for an amount of ₱${formatAmount(amount)} on ${formatDisplayDate(date)} via ${paymentMethod}.
                         </p>
                     </div>
                     
@@ -1749,7 +1734,7 @@ app.post('/payment', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
@@ -1824,7 +1809,7 @@ app.post('/approvePayments', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
@@ -1841,16 +1826,16 @@ app.post('/approvePayments', async (req, res) => {
                                 <table style="width: 100%; border-collapse: collapse;">
                                     <tr>
                                         <td style="padding: 4px; border: none;">Principal Paid:</td>
-                                        <td style="padding: 4px; border: none;">₱${principalPaid}</td>
+                                        <td style="padding: 4px; border: none;">₱${formatAmount(principalPaid)}</td>
                                     </tr>
                                     <tr>
                                         <td style="padding: 4px; border: none;">Interest Paid:</td>
-                                        <td style="padding: 4px; border: none;">₱${interestPaid}</td>
+                                        <td style="padding: 4px; border: none;">₱${formatAmount(interestPaid)}</td>
                                     </tr>
                                     ${excessPayment > 0 ? `
                                     <tr>
                                         <td style="padding: 4px; border: none;">Excess Payment:</td>
-                                        <td style="padding: 4px; border: none;">₱${excessPayment}</td>
+                                        <td style="padding: 4px; border: none;">₱${formatAmount(excessPayment)}</td>
                                     </tr>
                                     ` : ''}
                                 </table>
@@ -2383,11 +2368,6 @@ app.post('/send-loan-reminder', async (req, res) => {
                     
                     <p>For any questions about your payment, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-
-                    </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -2420,8 +2400,286 @@ app.post('/send-loan-reminder', async (req, res) => {
 });
 
 // ==============================================
-// SERVER INITIALIZATION
+// CO-ADMIN EMAILS
 // ==============================================
+
+app.post('/send-coadmin-email', async (req, res) => {
+    console.log('[NOTIFICATION] Initiating co-admin creation emails', req.body);
+    const { email, firstName, middleName = '', lastName, password, websiteLink, facebookLink } = req.body;
+
+    if (!email || !firstName || !lastName || !password) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for co-admin creation');
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, lastName, and password are required'
+        });
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    try {
+        // Email to system owner
+        console.log('[NOTIFICATION] Sending co-admin creation notification to owner');
+        const ownerMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'New Co-Admin Account Created',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        New Co-Admin Account Created
+                    </h2>
+                    <p>A new co-admin account has been successfully created in the system.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Co-Admin Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Created</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                    </ul>
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        // Email to new co-admin
+        console.log('[NOTIFICATION] Sending co-admin credentials to new co-admin');
+        const coAdminMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Your 5KI Financial Services Co-Admin Account',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Welcome to 5KI Financial Services
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    <p>Your co-administrator account has been successfully created. Below are your login credentials:</p>
+                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+                        <h3 style="color: #2c3e50; margin-top: 0;">Account Information:</h3>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Email</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Temporary Password</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">${password}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Type</td>
+                                <td style="padding: 8px; border: 1px solid #ddd;">Co-Administrator</td>
+                            </tr>
+                        </table>
+                    </div>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Security Notice:</h3>
+                    <ul style="margin-bottom: 20px;">
+                        <li>Change your password immediately after first login</li>
+                        <li>Never share your credentials with anyone</li>
+                        <li>Always log out after your session</li>
+                    </ul>
+                    <p>
+                        <a href="${websiteLink || WEBSITE_LINK}" 
+                           style="display: inline-block; background-color: #3498db; color: white; 
+                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
+                            Login to your account
+                        </a>
+                    </p>
+  
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        await transporter.sendMail(ownerMailOptions);
+        await transporter.sendMail(coAdminMailOptions);
+
+        console.log('[NOTIFICATION SUCCESS] Co-admin creation emails sent successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Co-admin creation emails sent successfully',
+            data: {
+                adminEmail: email,
+                dateSent: currentDate
+            }
+        });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending co-admin creation emails:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send co-admin creation emails',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
+
+app.post('/send-delete-coadmin-email', async (req, res) => {
+    console.log('[NOTIFICATION] Initiating co-admin deletion emails', req.body);
+    const { email, firstName, middleName = '', lastName, websiteLink } = req.body;
+
+    if (!email || !firstName || !lastName) {
+        console.log('[NOTIFICATION ERROR] Missing required fields for co-admin deletion');
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, and lastName are required'
+        });
+    }
+
+    // Validate email format
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({
+            success: false,
+            message: 'Invalid email format'
+        });
+    }
+
+    const fullName = `${firstName} ${middleName} ${lastName}`.replace(/\s+/g, ' ').trim();
+    const currentDate = new Date().toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+    });
+
+    try {
+        // Email to system owner
+        console.log('[NOTIFICATION] Sending co-admin deletion notification to owner');
+        const ownerMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: process.env.GMAIL_USER,
+            subject: 'Co-Admin Account Deleted',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Co-Admin Account Deletion Notification
+                    </h2>
+                    <p>A co-administrator account has been permanently removed from the system.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Account Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Deleted</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
+                    <p style="font-weight: bold; color: #e74c3c;">
+                        Note: This action is irreversible. All access privileges have been revoked.
+                    </p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+                    <ul style="padding-left: 20px;">
+                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+                    </ul>
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        // Email to deleted co-admin
+        console.log('[NOTIFICATION] Sending co-admin deletion notification to deleted co-admin');
+        const coAdminMailOptions = {
+            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+            to: email,
+            subject: 'Your 5KI Financial Services Co-Admin Access Has Been Removed',
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+                    <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+                        Account Access Update
+                    </h2>
+                    <p>Dear ${firstName},</p>
+                    <p>We're writing to inform you that your co-administrator access to the 5KI Financial Services system has been permanently removed as of ${currentDate}.</p>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Details:</h3>
+                    <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Effective Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+                        </tr>
+                    </table>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Information:</h3>
+                    <ul style="margin-bottom: 20px;">
+                        <li>You will no longer have access to the admin dashboard</li>
+                        <li>All admin privileges have been revoked</li>
+                        <li>This action is permanent and cannot be undone</li>
+                    </ul>
+                    <p style="font-weight: bold;">
+                        If this action was taken in error or you have any questions, please contact the system administrator immediately at 
+                        <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
+                    </p>
+     
+                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+                        5KI Financial Services &copy; ${new Date().getFullYear()}
+                    </p>
+                </div>
+            `
+        };
+
+        // Send both emails
+        await transporter.sendMail(ownerMailOptions);
+        await transporter.sendMail(coAdminMailOptions);
+
+        console.log('[NOTIFICATION SUCCESS] Co-admin deletion emails sent successfully');
+        res.status(200).json({ 
+            success: true,
+            message: 'Co-admin deletion emails sent successfully',
+            data: {
+                adminEmail: email,
+                dateSent: currentDate
+            }
+        });
+    } catch (error) {
+        console.error('[NOTIFICATION ERROR] Error sending co-admin deletion emails:', error);
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send co-admin deletion emails',
+            error: error.message,
+            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);

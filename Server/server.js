@@ -261,10 +261,7 @@ app.post('/send-admin-email', async (req, res) => {
                     
                     <p>For any questions, please contact the system administrator.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
+      
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -416,10 +413,7 @@ app.post('/send-delete-admin-email', async (req, res) => {
                         <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
                     </p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
+
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
@@ -944,10 +938,7 @@ app.post('/deposit', async (req, res) => {
                     
                     <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
+    
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -1743,7 +1734,7 @@ app.post('/payment', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
@@ -1818,7 +1809,7 @@ app.post('/approvePayments', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${amount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Payment Method</td>
@@ -2377,10 +2368,6 @@ app.post('/send-loan-reminder', async (req, res) => {
                     
                     <p>For any questions about your payment, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -2524,10 +2511,7 @@ app.post('/send-coadmin-email', async (req, res) => {
                             Login to your account
                         </a>
                     </p>
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
+  
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
                     </p>
@@ -2665,10 +2649,7 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
                         If this action was taken in error or you have any questions, please contact the system administrator immediately at 
                         <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
                     </p>
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Connect With Us:</h3>
-                    <ul style="padding-left: 20px;">
-                        <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
-                    </ul>
+     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
                     </p>
