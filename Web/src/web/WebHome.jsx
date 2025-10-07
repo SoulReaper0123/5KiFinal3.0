@@ -311,7 +311,7 @@ const WebHome = () => {
         <div style={styles.leftColumnOverlay} />
         <img src={logo} alt="5KI Banking Logo" style={styles.logo} />
         <div style={styles.welcomeContainer}>
-          <h1 style={styles.welcomeTitle}>Welcome to 5KI Banking</h1>
+          <h1 style={styles.welcomeTitle}>Welcome to 5KI Financial Services</h1>
           <p style={styles.welcomeSubtitle}>
             Streamline your loan management process with our comprehensive banking solutions. 
             Secure, efficient, and designed for financial excellence.

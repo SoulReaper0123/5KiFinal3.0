@@ -212,15 +212,32 @@ const AdminHome = () => {
     };
 
     const computePending = (root) => {
+      if (!root || typeof root !== 'object') return 0;
       let count = 0;
-      if (!root) return 0;
-      Object.values(root).forEach(group => {
-        if (group && typeof group === 'object') {
-          Object.values(group).forEach(item => {
-            if (item && (item.status === 'pending' || item.status === 'Pending')) count += 1;
-          });
+
+      // Normalize and check various status casings
+      const isPending = (status) => {
+        if (!status) return false;
+        const s = typeof status === 'string' ? status.toLowerCase() : '';
+        return s === 'pending';
+      };
+
+      Object.values(root).forEach((node) => {
+        if (node && typeof node === 'object') {
+          // Case 1: Flat structure id -> record
+          if ('status' in node) {
+            if (isPending(node.status)) count += 1;
+          } else {
+            // Case 2: Nested structure groupId -> { id -> record }
+            Object.values(node).forEach((rec) => {
+              if (rec && typeof rec === 'object' && isPending(rec.status)) {
+                count += 1;
+              }
+            });
+          }
         }
       });
+
       return count;
     };
 

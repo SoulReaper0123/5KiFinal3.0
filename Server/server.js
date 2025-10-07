@@ -10,7 +10,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 // Constants for links
-const WEBSITE_LINK = 'https://your-official-website.com';
+const WEBSITE_LINK = 'https://fivekiapp.onrender.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
@@ -509,7 +509,7 @@ app.post('/register', async (req, res) => {
         const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Registration Successfully Received - Thank You for Signing Up!',
+            subject: 'Registration Application Successfully Received - Thank You for Signing Up!',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                     <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">

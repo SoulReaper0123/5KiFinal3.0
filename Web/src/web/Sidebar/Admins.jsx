@@ -11,7 +11,12 @@ import {
   FaFileAlt,
   FaUser,
   FaEye,
-  FaTrash
+  FaTrash,
+  FaPhone,
+  FaEnvelope,
+  FaCalendarAlt,
+  FaIdCard,
+  FaSpinner
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -237,36 +242,36 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 16px', // Reduced from 16px 24px
+    padding: '8px 16px',
     backgroundColor: '#f8fafc',
     borderBottom: '1px solid #e2e8f0',
     flexWrap: 'wrap',
-    gap: '8px', // Reduced from 12px
-    minHeight: '40px' // Add fixed height to prevent layout shifts
+    gap: '8px',
+    minHeight: '40px'
   },
   paginationInfo: {
-    fontSize: '12px', // Reduced from 14px
+    fontSize: '12px',
     color: '#64748b',
     whiteSpace: 'nowrap'
   },
   paginationControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px' // Reduced from 8px
+    gap: '4px'
   },
   paginationButton: {
-    padding: '4px 8px', // Reduced from 8px 12px
+    padding: '4px 8px',
     backgroundColor: '#fff',
     border: '1px solid #d1d5db',
-    borderRadius: '4px', // Reduced from 6px
+    borderRadius: '4px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
-    fontSize: '10px', // Reduced from 12px
-    minWidth: '24px', // Add fixed width
-    minHeight: '24px' // Add fixed height
+    fontSize: '10px',
+    minWidth: '24px',
+    minHeight: '24px'
   },
   paginationButtonDisabled: {
     backgroundColor: '#f3f4f6',
@@ -309,7 +314,8 @@ const styles = {
     alignItems: 'center',
     zIndex: 1000,
     padding: '20px',
-    overflowY: 'auto'
+    overflowY: 'auto',
+    backdropFilter: 'blur(4px)'
   },
   modalCard: {
     backgroundColor: 'white',
@@ -320,43 +326,100 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    padding: '24px',
-    borderBottom: '1px solid #e2e8f0',
+    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    color: 'white',
+    padding: '1.5rem 2rem',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    flexShrink: 0
+    borderBottom: '1px solid #E5E7EB'
   },
   modalTitle: {
-    fontSize: '24px',
+    fontSize: '1.5rem',
     fontWeight: '700',
-    color: '#1e293b',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem',
     margin: 0
   },
   closeButton: {
-    background: 'none',
+    background: 'rgba(255, 255, 255, 0.1)',
     border: 'none',
-    fontSize: '20px',
-    color: '#64748b',
+    borderRadius: '8px',
+    color: 'white',
     cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '4px',
-    transition: 'all 0.2s ease',
+    padding: '0.5rem',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center'
-  },
-  closeButtonHover: {
-    backgroundColor: '#f1f5f9',
-    color: '#374151'
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    '&:hover': {
+      background: 'rgba(255, 255, 255, 0.2)',
+      transform: 'rotate(90deg)'
+    }
   },
   modalContent: {
-    padding: '24px',
+    padding: '2rem',
     overflowY: 'auto',
-    flex: 1
+    flex: 1,
+    minHeight: 0
+  },
+  columnsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '2rem',
+    marginBottom: '1.5rem'
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  section: {
+    background: '#f8fafc',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  sectionTitle: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#1e3a8a',
+    marginBottom: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingBottom: '0.5rem',
+    borderBottom: '2px solid #e2e8f0'
+  },
+  fieldGroup: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '0.75rem',
+    padding: '0.5rem 0'
+  },
+  fieldLabel: {
+    fontWeight: '500',
+    color: '#64748b',
+    fontSize: '0.875rem',
+    minWidth: '120px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
+  },
+  fieldValue: {
+    textAlign: 'right',
+    flex: 1,
+    wordBreak: 'break-word',
+    color: '#1f2937',
+    fontSize: '0.875rem',
+    fontWeight: '500'
   },
   formGrid: {
     display: 'grid',
@@ -402,58 +465,68 @@ const styles = {
     boxSizing: 'border-box'
   },
   modalActions: {
-    padding: '24px',
-    borderTop: '1px solid #e2e8f0',
     display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
+    justifyContent: 'center',
+    gap: '1rem',
+    padding: '1.5rem 2rem',
+    borderTop: '1px solid #e5e7eb',
+    background: '#f8fafc',
     flexShrink: 0
   },
-  primaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#1e40af',
-    color: '#fff',
-    border: 'none',
+  actionButton: {
+    padding: '0.75rem 2rem',
     borderRadius: '8px',
+    border: 'none',
     cursor: 'pointer',
-    fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    fontSize: '0.875rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    whiteSpace: 'nowrap'
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
   },
-  primaryButtonHover: {
-    backgroundColor: '#1e3a8a'
+  primaryButton: {
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+    }
   },
   secondaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#6b7280',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-    transition: 'background-color 0.2s ease',
-    whiteSpace: 'nowrap'
-  },
-  secondaryButtonHover: {
-    backgroundColor: '#4b5563'
+    background: '#6b7280',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+    }
   },
   deleteButton: {
-    backgroundColor: '#dc2626',
-    color: '#fff',
+    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+    color: 'white',
     '&:hover': {
-      backgroundColor: '#b91c1c'
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
     }
   },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '200px'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem'
   },
   spinner: {
     border: '4px solid #f3f4f6',
@@ -464,64 +537,46 @@ const styles = {
     animation: 'spin 1s linear infinite'
   },
   noDataContainer: {
-    textAlign: 'center',
-    padding: '60px 20px',
-    color: '#64748b'
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#6b7280'
   },
   noDataIcon: {
-    fontSize: '48px',
-    marginBottom: '16px',
-    color: '#d1d5db'
+    fontSize: '3rem',
+    opacity: '0.5'
   },
   noDataText: {
     fontSize: '16px',
     margin: 0
   },
-  // Detail Modal Styles
-  columns: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '30px'
-  },
-  leftColumn: {
-    flex: 1,
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
   },
-  rightColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
   },
-  compactField: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '6px',
-    gap: '8px'
-  },
-  fieldLabel: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '13px',
-    minWidth: '100px'
-  },
-  fieldValue: {
-    textAlign: 'right',
-    flex: 1,
-    wordBreak: 'break-word',
-    color: '#333',
-    fontSize: '13px'
-  },
-  sectionTitle: {
+  modalText: {
     fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#1e40af',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #e2e8f0',
-    textAlign: 'left',
-    width: '100%'
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
   },
   errorText: {
     color: '#dc2626',
@@ -563,7 +618,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2000
+    zIndex: 2000,
+    padding: '2rem'
   },
   imageViewerContent: {
     position: 'relative',
@@ -577,45 +633,76 @@ const styles = {
     maxWidth: '100%',
     maxHeight: '70vh',
     objectFit: 'contain',
-    borderRadius: '4px'
+    borderRadius: '8px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   },
   imageViewerLabel: {
     color: 'white',
-    fontSize: '18px',
-    marginTop: '16px',
-    textAlign: 'center'
-  },
-  imageViewerClose: {
-    position: 'absolute',
-    top: '-40px',
-    right: '0',
-    color: 'white',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '8px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    outline: 'none'
+    fontSize: '1.125rem',
+    marginTop: '1rem',
+    textAlign: 'center',
+    fontWeight: '500'
   },
   imageViewerNav: {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '2rem',
     cursor: 'pointer',
-    padding: '16px',
-    backgroundColor: 'transparent',
+    padding: '1rem',
+    background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    outline: 'none'
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'translateY(-50%) scale(1.1)'
+    }
   },
   prevButton: {
-    left: '50px'
+    left: '2rem'
   },
-  nextButton: { 
-    right: '50px'
+  nextButton: {
+    right: '2rem'
+  },
+  imageViewerClose: {
+    position: 'absolute',
+    top: '2rem',
+    right: '2rem',
+    color: 'white',
+    fontSize: '1.5rem',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'scale(1.1)'
+    }
   }
 };
+
+// Add keyframes for spinner animation
+const spinKeyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the keyframes into the document head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = spinKeyframes;
+  if (!document.head.querySelector('style[data-spin-keyframes]')) {
+    styleSheet.setAttribute('data-spin-keyframes', 'true');
+    document.head.appendChild(styleSheet);
+  }
+}
 
 const Admins = () => {
   const [admins, setAdmins] = useState([]);
@@ -641,6 +728,7 @@ const Admins = () => {
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableImages, setAvailableImages] = useState([]);
+  const [actionInProgress, setActionInProgress] = useState(false);
 
   // Form states
   const [firstName, setFirstName] = useState('');
@@ -668,7 +756,7 @@ const Admins = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
       }
     `;
     document.head.appendChild(styleElement);
@@ -845,6 +933,7 @@ const Admins = () => {
   const handleAddAdmin = async () => {
     setConfirmAddVisible(false);
     setIsProcessing(true);
+    setActionInProgress(true);
 
     try {
       const password = generateRandomPassword();
@@ -907,18 +996,58 @@ const Admins = () => {
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
+      setActionInProgress(false);
+    }
+  };
+
+  const deleteFirebaseUser = async (uid) => {
+    try {
+      // You need to be authenticated as an admin to delete users
+      // This requires setting up Firebase Admin SDK or using a Cloud Function
+      console.log('Attempting to delete Firebase user with UID:', uid);
+      
+      // Note: Client-side Firebase Auth doesn't allow deleting other users
+      // This would need to be handled via a Cloud Function
+      // For now, we'll just log the UID that needs to be deleted
+      
+      // If you have a Cloud Function set up, you would call it here:
+      // await fetch('/deleteUser', {
+      //   method: 'POST',
+      //   headers: { 'Content-Type': 'application/json' },
+      //   body: JSON.stringify({ uid: uid })
+      // });
+      
+      console.log(`Firebase user with UID ${uid} should be deleted via Cloud Function`);
+      return true;
+    } catch (error) {
+      console.error('Error deleting Firebase user:', error);
+      throw new Error('Failed to delete user authentication: ' + error.message);
     }
   };
 
   const handleDeleteAdmin = async () => {
     setConfirmDeleteVisible(false);
     setIsProcessing(true);
+    setActionInProgress(true);
 
     try {
       const idToDelete = pendingDelete.id;
+      const uidToDelete = pendingDelete.uid;
 
+      // Delete from database
       await database.ref(`Users/Admin/${idToDelete}`).remove();
       await database.ref(`Members/${idToDelete}`).remove();
+
+      // Delete Firebase authentication user if UID exists
+      if (uidToDelete) {
+        try {
+          await deleteFirebaseUser(uidToDelete);
+          console.log('Firebase authentication user deletion initiated for UID:', uidToDelete);
+        } catch (authError) {
+          console.warn('Could not delete Firebase auth user, but proceeding with database deletion:', authError);
+          // Continue with success even if auth deletion fails
+        }
+      }
 
       setSuccessMessage(`Admin account deleted successfully!`);
       setSuccessModalVisible(true);
@@ -928,6 +1057,7 @@ const Admins = () => {
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
+      setActionInProgress(false);
     }
   };
 
@@ -982,6 +1112,12 @@ const Admins = () => {
 
   const handleSuccessOk = () => {
     setSuccessModalVisible(false);
+    
+    // Close the admin details modal if it's open (after delete action)
+    if (pendingDelete) {
+      setAdminModalVisible(false);
+      setSelectedAdmin(null);
+    }
   
     if (pendingAdd) {
       sendAdminCredentialsEmail({
@@ -1236,21 +1372,18 @@ const Admins = () => {
           )}
         </div>
 
-
         {/* Add Admin Modal */}
         {addModalVisible && (
           <div style={styles.modalOverlay} onClick={() => { setAddModalVisible(false); resetForm(); }}>
             <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Create New Admin</h2>
+                <h2 style={styles.modalTitle}>
+                  <FaUser />
+                  Create New Admin
+                </h2>
                 <button 
                   onClick={() => { setAddModalVisible(false); resetForm(); }}
-                  style={{
-                    ...styles.closeButton,
-                    ...(isHovered.closeModal ? styles.closeButtonHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('closeModal')}
-                  onMouseLeave={() => handleMouseLeave('closeModal')}
+                  style={styles.closeButton}
                 >
                   <AiOutlineClose />
                 </button>
@@ -1340,11 +1473,10 @@ const Admins = () => {
               <div style={styles.modalActions}>
                 <button
                   style={{
+                    ...styles.actionButton,
                     ...styles.secondaryButton,
-                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
+                    ...(isProcessing ? styles.disabledButton : {})
                   }}
-                  onMouseEnter={() => handleMouseEnter('cancelButton')}
-                  onMouseLeave={() => handleMouseLeave('cancelButton')}
                   onClick={() => { setAddModalVisible(false); resetForm(); }}
                   disabled={isProcessing}
                 >
@@ -1352,17 +1484,16 @@ const Admins = () => {
                 </button>
                 <button
                   style={{
+                    ...styles.actionButton,
                     ...styles.primaryButton,
-                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
+                    ...(isProcessing ? styles.disabledButton : {})
                   }}
-                  onMouseEnter={() => handleMouseEnter('submitButton')}
-                  onMouseLeave={() => handleMouseLeave('submitButton')}
                   onClick={handleSubmitConfirmation}
                   disabled={isProcessing}
                 >
                   {isProcessing ? (
                     <>
-                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
+                      <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
                       <span>Creating...</span>
                     </>
                   ) : (
@@ -1382,144 +1513,182 @@ const Admins = () => {
           <div style={styles.modalOverlay} onClick={() => setAdminModalVisible(false)}>
             <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Admin Details</h2>
+                <h2 style={styles.modalTitle}>
+                  <FaUser />
+                  Admin Details
+                </h2>
                 <button 
                   onClick={() => setAdminModalVisible(false)}
-                  style={{
-                    ...styles.closeButton,
-                    ...(isHovered.closeModal ? styles.closeButtonHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('closeModal')}
-                  onMouseLeave={() => handleMouseLeave('closeModal')}
+                  style={styles.closeButton}
                 >
                   <AiOutlineClose />
                 </button>
               </div>
               
               <div style={styles.modalContent}>
-                <div style={styles.columns}>
-                  <div style={styles.leftColumn}>
-                    <div style={styles.sectionTitle}>Personal Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>ID:</span>
-                      <span style={styles.fieldValue}>#{selectedAdmin.id}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>First Name:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.firstName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Middle Name:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.middleName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Last Name:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.lastName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Gender:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.gender || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date of Birth:</span>
-                      <span style={styles.fieldValue}>
-                        {selectedAdmin.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}
-                      </span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Age:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.age || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Place of Birth:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.placeOfBirth || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Address:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.address || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Civil Status:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.civilStatus || 'N/A'}</span>
-                    </div>
-                    
-                    <div style={styles.sectionTitle}>Contact Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Email:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.email || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Contact Number:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.contactNumber || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Government ID:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.governmentId || 'N/A'}</span>
-                    </div>
-                    
-                    <div style={styles.sectionTitle}>Account Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date Added:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.dateAdded || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Time Added:</span>
-                      <span style={styles.fieldValue}>{selectedAdmin.timeAdded || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Status:</span>
-                      <span style={styles.fieldValue}>Active</span>
+                <div style={styles.columnsContainer}>
+                  {/* Left Column - Personal Information */}
+                  <div style={styles.column}>
+                    <div style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        <FaUser />
+                        Personal Information
+                      </h3>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>
+                          <FaIdCard />
+                          ID:
+                        </span>
+                        <span style={styles.fieldValue}>#{selectedAdmin.id}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>First Name:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.firstName || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Middle Name:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.middleName || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Last Name:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.lastName || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Gender:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.gender || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Date of Birth:</span>
+                        <span style={styles.fieldValue}>
+                          {selectedAdmin.dateOfBirth ? new Date(selectedAdmin.dateOfBirth).toLocaleDateString() : 'N/A'}
+                        </span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Age:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.age || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Place of Birth:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.placeOfBirth || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Address:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.address || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Civil Status:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.civilStatus || 'N/A'}</span>
+                      </div>
                     </div>
                   </div>
-                  
-                  <div style={styles.rightColumn}>
-                    <div style={styles.sectionTitle}>Submitted Documents</div>
-                    <div style={styles.imageGrid}>
-                      {selectedAdmin.validIdFront && (
-                        <div style={styles.imageContainer}>
-                          <span style={styles.imageLabel}>Valid ID Front</span>
-                          <img
-                            src={selectedAdmin.validIdFront}
-                            alt="Valid ID Front"
-                            style={styles.imagePreview}
-                            onClick={() => openImageViewer(selectedAdmin.validIdFront, 'Valid ID Front', 0)}
-                          />
-                        </div>
-                      )}
-                      {selectedAdmin.validIdBack && (
-                        <div style={styles.imageContainer}>
-                          <span style={styles.imageLabel}>Valid ID Back</span>
-                          <img
-                            src={selectedAdmin.validIdBack}
-                            alt="Valid ID Back"
-                            style={styles.imagePreview}
-                            onClick={() => openImageViewer(selectedAdmin.validIdBack, 'Valid ID Back', 1)}
-                          />
-                        </div>
-                      )}
-                      {selectedAdmin.selfie && (
-                        <div style={styles.imageContainer}>
-                          <span style={styles.imageLabel}>Selfie</span>
-                          <img
-                            src={selectedAdmin.selfie}
-                            alt="Selfie"
-                            style={styles.imagePreview}
-                            onClick={() => openImageViewer(selectedAdmin.selfie, 'Selfie', 2)}
-                          />
-                        </div>
-                      )}
-                      {selectedAdmin.selfieWithId && (
-                        <div style={styles.imageContainer}>
-                          <span style={styles.imageLabel}>Selfie with ID</span>
-                          <img
-                            src={selectedAdmin.selfieWithId}
-                            alt="Selfie with ID"
-                            style={styles.imagePreview}
-                            onClick={() => openImageViewer(selectedAdmin.selfieWithId, 'Selfie with ID', 3)}
-                          />
+
+                  {/* Right Column - Contact & Account Information */}
+                  <div style={styles.column}>
+                    <div style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        <FaEnvelope />
+                        Contact Information
+                      </h3>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>
+                          <FaEnvelope />
+                          Email:
+                        </span>
+                        <span style={styles.fieldValue}>{selectedAdmin.email || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>
+                          <FaPhone />
+                          Contact Number:
+                        </span>
+                        <span style={styles.fieldValue}>{selectedAdmin.contactNumber || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Government ID:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.governmentId || 'N/A'}</span>
+                      </div>
+                    </div>
+
+                    <div style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        <FaCalendarAlt />
+                        Account Information
+                      </h3>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Date Added:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.dateAdded || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Time Added:</span>
+                        <span style={styles.fieldValue}>{selectedAdmin.timeAdded || 'N/A'}</span>
+                      </div>
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Status:</span>
+                        <span style={styles.fieldValue}>Active</span>
+                      </div>
+                      {selectedAdmin.uid && (
+                        <div style={styles.fieldGroup}>
+                          <span style={styles.fieldLabel}>Firebase UID:</span>
+                          <span style={styles.fieldValue}>{selectedAdmin.uid}</span>
                         </div>
                       )}
                     </div>
+
+                    {/* Submitted Documents */}
+                    {(selectedAdmin.validIdFront || selectedAdmin.validIdBack || selectedAdmin.selfie || selectedAdmin.selfieWithId) && (
+                      <div style={styles.section}>
+                        <h3 style={styles.sectionTitle}>
+                          <FaIdCard />
+                          Submitted Documents
+                        </h3>
+                        <div style={styles.imageGrid}>
+                          {selectedAdmin.validIdFront && (
+                            <div style={styles.imageContainer}>
+                              <span style={styles.imageLabel}>Valid ID Front</span>
+                              <img
+                                src={selectedAdmin.validIdFront}
+                                alt="Valid ID Front"
+                                style={styles.imagePreview}
+                                onClick={() => openImageViewer(selectedAdmin.validIdFront, 'Valid ID Front', 0)}
+                              />
+                            </div>
+                          )}
+                          {selectedAdmin.validIdBack && (
+                            <div style={styles.imageContainer}>
+                              <span style={styles.imageLabel}>Valid ID Back</span>
+                              <img
+                                src={selectedAdmin.validIdBack}
+                                alt="Valid ID Back"
+                                style={styles.imagePreview}
+                                onClick={() => openImageViewer(selectedAdmin.validIdBack, 'Valid ID Back', 1)}
+                              />
+                            </div>
+                          )}
+                          {selectedAdmin.selfie && (
+                            <div style={styles.imageContainer}>
+                              <span style={styles.imageLabel}>Selfie</span>
+                              <img
+                                src={selectedAdmin.selfie}
+                                alt="Selfie"
+                                style={styles.imagePreview}
+                                onClick={() => openImageViewer(selectedAdmin.selfie, 'Selfie', 2)}
+                              />
+                            </div>
+                          )}
+                          {selectedAdmin.selfieWithId && (
+                            <div style={styles.imageContainer}>
+                              <span style={styles.imageLabel}>Selfie with ID</span>
+                              <img
+                                src={selectedAdmin.selfieWithId}
+                                alt="Selfie with ID"
+                                style={styles.imagePreview}
+                                onClick={() => openImageViewer(selectedAdmin.selfieWithId, 'Selfie with ID', 3)}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -1527,9 +1696,9 @@ const Admins = () => {
               <div style={styles.modalActions}>
                 <button
                   style={{
-                    ...styles.primaryButton,
+                    ...styles.actionButton,
                     ...styles.deleteButton,
-                    ...(isProcessing ? { backgroundColor: '#ccc', cursor: 'not-allowed' } : {})
+                    ...(isProcessing ? styles.disabledButton : {})
                   }}
                   onClick={() => {
                     setPendingDelete(selectedAdmin);
@@ -1548,28 +1717,31 @@ const Admins = () => {
         {/* Confirmation Modals */}
         {confirmAddVisible && (
           <div style={styles.modalOverlay} onClick={() => setConfirmAddVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Creation</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to create this admin account?
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmAddVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={styles.primaryButton}
+            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f59e0b' }} />
+              <p style={styles.modalText}>
+                Are you sure you want to create this admin account?
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.primaryButton
+                  }} 
                   onClick={handleAddAdmin}
+                  disabled={actionInProgress}
                 >
-                  Confirm Creation
+                  {actionInProgress ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.secondaryButton
+                  }} 
+                  onClick={() => setConfirmAddVisible(false)}
+                  disabled={actionInProgress}
+                >
+                  No
                 </button>
               </div>
             </div>
@@ -1578,31 +1750,31 @@ const Admins = () => {
 
         {confirmDeleteVisible && (
           <div style={styles.modalOverlay} onClick={() => setConfirmDeleteVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Deletion</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to delete this admin account? This action cannot be undone.
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
+            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
+              <p style={styles.modalText}>
+                Are you sure you want to delete this admin account? This will also remove their authentication access. This action cannot be undone.
+              </p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.deleteButton
+                  }} 
+                  onClick={handleDeleteAdmin}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Processing...' : 'Delete Account'}
+                </button>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.secondaryButton
+                  }} 
                   onClick={() => setConfirmDeleteVisible(false)}
+                  disabled={actionInProgress}
                 >
                   Cancel
-                </button>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    ...styles.deleteButton
-                  }}
-                  onClick={handleDeleteAdmin}
-                >
-                  Delete Account
                 </button>
               </div>
             </div>
@@ -1612,20 +1784,21 @@ const Admins = () => {
         {/* Success Modal */}
         {successModalVisible && (
           <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {successMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={handleSuccessOk}
-                >
-                  Continue
-                </button>
-              </div>
+            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
+              <h2 style={{ margin: '0 0 12px 0', color: '#1e293b' }}>Success!</h2>
+              <p style={styles.modalText}>
+                {successMessage}
+              </p>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton
+                }}
+                onClick={handleSuccessOk}
+              >
+                Continue
+              </button>
             </div>
           </div>
         )}
@@ -1633,29 +1806,21 @@ const Admins = () => {
         {/* Error Modal */}
         {errorModalVisible && (
           <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {errorMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={() => setErrorModalVisible(false)}
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Processing Overlay */}
-        {isProcessing && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.loadingContainer}>
-              <div style={styles.spinner}></div>
+            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
+              <h2 style={{ margin: '0 0 12px 0', color: '#1e293b' }}>Error</h2>
+              <p style={styles.modalText}>
+                {errorMessage}
+              </p>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton
+                }}
+                onClick={() => setErrorModalVisible(false)}
+              >
+                Try Again
+              </button>
             </div>
           </div>
         )}

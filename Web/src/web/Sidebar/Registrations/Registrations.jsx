@@ -1589,7 +1589,7 @@ const Registrations = ({
 
   const removeFromPendingRegistrations = async (id) => {
     try {
-      await database.ref(`Registrations/RegistrationApplications/${id}`).remove();
+     await database.ref(`Registrations/RegistrationApplications/${id}`).remove();
     } catch (error) {
       console.error('Error removing from pending registrations:', error);
       throw error;
@@ -1642,92 +1642,104 @@ const Registrations = ({
     await processAction(selectedRegistration, 'reject', selectedReason === "Other" ? customReason : selectedReason);
   };
 
-  const processAction = async (registration, action, rejectionReason = '') => {
-    setActionInProgress(true);
-    setIsProcessing(true);
-    setCurrentAction(action);
+const processAction = async (registration, action, rejectionReason = '') => {
+  setActionInProgress(true);
+  setIsProcessing(true);
+  setCurrentAction(action);
 
-    try {
-      if (action === 'approve') {
-        const samePersonCheck = await checkIfSamePersonExists(
-          registration.email, 
-          registration.firstName, 
+  try {
+    if (action === 'approve') {
+      const samePersonCheck = await checkIfSamePersonExists(
+        registration.email, 
+        registration.firstName, 
+        registration.lastName
+      );
+
+      if (!samePersonCheck.exists) {
+        // Only block if email exists with DIFFERENT name
+        const emailWithDifferentName = await checkIfEmailExistsInDatabase(
+          registration.email,
+          registration.firstName,
           registration.lastName
         );
-
-        if (!samePersonCheck.exists) {
-          const onDB = await checkIfEmailExistsInDatabase(registration.email);
-          if (onDB) {
-            setErrorMessage('This email is already registered to a different member.');
-            setErrorModalVisible(true);
-            setIsProcessing(false);
-            setActionInProgress(false);
-            return;
-          }
+        
+        if (emailWithDifferentName) {
+          setErrorMessage('This email is already registered to a different member.');
+          setErrorModalVisible(true);
+          setIsProcessing(false);
+          setActionInProgress(false);
+          return;
         }
-        
-        const memberId = await processDatabaseApprove(registration);
-        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
-        
-        setSuccessMessage('Registration approved successfully!');
-        setSuccessMessageModalVisible(true);
-        
-        const approveData = {
-          ...registration,
-          memberId,
-          dateApproved: formatDate(new Date()),
-          approvedTime: formatTime(new Date())
-        };
-
-        setSelectedRegistration(prev => ({
-          ...prev,
-          memberId,
-          dateApproved: approveData.dateApproved, 
-          approvedTime: approveData.approvedTime,
-          status: 'approved'
-        }));
-
-        setPendingApiCall({
-          type: 'approve',
-          data: approveData
-        });
-
-      } else {
-        await processDatabaseReject(registration, rejectionReason);
-        await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
-        
-        setSuccessMessage('Registration rejected successfully!');
-        setSuccessMessageModalVisible(true);
-        
-        const rejectData = {
-          ...registration,
-          dateRejected: formatDate(new Date()),
-          rejectedTime: formatTime(new Date()),
-          rejectionReason
-        };
-
-        setSelectedRegistration(prev => ({
-          ...prev,
-          dateRejected: rejectData.dateRejected,
-          rejectedTime: rejectData.rejectedTime,
-          rejectionReason,
-          status: 'rejected'
-        }));
-
-        setPendingApiCall({
-          type: 'reject',
-          data: rejectData
-        });
       }
-    } catch (error) {
-      console.error('Error processing action:', error);
-      setErrorMessage(error.message || 'An error occurred. Please try again.');
-      setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
-      setActionInProgress(false);
+      
+      // If we get here, either:
+      // 1. Same person exists (update their record)
+      // 2. Person doesn't exist but email is not used by anyone else (create new)
+      // 3. Email exists in Firebase Auth but not in our database (create new)
+      
+      const memberId = await processDatabaseApprove(registration);
+     await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+      
+      setSuccessMessage('Registration approved successfully!');
+      setSuccessMessageModalVisible(true);
+      
+      const approveData = {
+        ...registration,
+        memberId,
+        dateApproved: formatDate(new Date()),
+        approvedTime: formatTime(new Date())
+      };
+
+      setSelectedRegistration(prev => ({
+        ...prev,
+        memberId,
+        dateApproved: approveData.dateApproved, 
+        approvedTime: approveData.approvedTime,
+        status: 'approved'
+      }));
+
+      setPendingApiCall({
+        type: 'approve',
+        data: approveData
+      });
+
+    } else {
+      // Rejection logic remains the same
+      await processDatabaseReject(registration, rejectionReason);
+      await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
+      
+      setSuccessMessage('Registration rejected successfully!');
+      setSuccessMessageModalVisible(true);
+      
+      const rejectData = {
+        ...registration,
+        dateRejected: formatDate(new Date()),
+        rejectedTime: formatTime(new Date()),
+        rejectionReason
+      };
+
+      setSelectedRegistration(prev => ({
+        ...prev,
+        dateRejected: rejectData.dateRejected,
+        rejectedTime: rejectData.rejectedTime,
+        rejectionReason,
+        status: 'rejected'
+      }));
+
+      setPendingApiCall({
+        type: 'reject',
+        data: rejectData
+      });
     }
-  };
+  } catch (error) {
+    console.error('Error processing action:', error);
+    setErrorMessage(error.message || 'An error occurred. Please try again.');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false);
+    setActionInProgress(false);
+  }
+};
 
   const updateRegistrationStatus = async (id, status) => {
     try {
@@ -1738,59 +1750,73 @@ const Registrations = ({
     }
   };
 
-  const checkIfEmailExistsInDatabase = async (email) => {
-    try {
-      const membersSnap = await database.ref('Members').once('value');
-      const membersData = membersSnap.val() || {};
-      const memberExists = Object.values(membersData).some(u => u.email?.toLowerCase() === email.toLowerCase());
-      
-      if (memberExists) return true;
+const checkIfEmailExistsInDatabase = async (email, firstName, lastName) => {
+  try {
+    const membersSnap = await database.ref('Members').once('value');
+    const membersData = membersSnap.val() || {};
+    
+    // Check if email exists with DIFFERENT name (this should block approval)
+    const emailExistsWithDifferentName = Object.values(membersData).some(u => 
+      u.email?.toLowerCase() === email.toLowerCase() &&
+      (u.firstName?.toLowerCase() !== firstName.toLowerCase() || 
+       u.lastName?.toLowerCase() !== lastName.toLowerCase())
+    );
+    
+    if (emailExistsWithDifferentName) return true;
 
-      const adminsSnap = await database.ref('Users/Admin').once('value');
-      const adminsData = adminsSnap.val() || {};
-      const adminExists = Object.values(adminsData).some(u => u.email?.toLowerCase() === email.toLowerCase());
-      
-      return adminExists;
-    } catch (err) {
-      console.error('DB email check error:', err);
-      return false;
+    const adminsSnap = await database.ref('Users/Admin').once('value');
+    const adminsData = adminsSnap.val() || {};
+    
+    // Check if email exists with DIFFERENT name in Admins
+    const adminEmailExistsWithDifferentName = Object.values(adminsData).some(u => 
+      u.email?.toLowerCase() === email.toLowerCase() &&
+      (u.firstName?.toLowerCase() !== firstName.toLowerCase() || 
+       u.lastName?.toLowerCase() !== lastName.toLowerCase())
+    );
+    
+    return adminEmailExistsWithDifferentName;
+  } catch (err) {
+    console.error('DB email check error:', err);
+    return false;
+  }
+};
+
+const checkIfSamePersonExists = async (email, firstName, lastName) => {
+  try {
+    const membersSnap = await database.ref('Members').once('value');
+    const membersData = membersSnap.val() || {};
+    
+    // Check if same person exists in Members (all three fields must match)
+    const memberEntry = Object.entries(membersData).find(([_, member]) => 
+      member.email?.toLowerCase() === email.toLowerCase() &&
+      member.firstName?.toLowerCase() === firstName.toLowerCase() &&
+      member.lastName?.toLowerCase() === lastName.toLowerCase()
+    );
+
+    if (memberEntry) {
+      return { exists: true, source: 'member', id: memberEntry[0], data: memberEntry[1] };
     }
-  };
 
-  const checkIfSamePersonExists = async (email, firstName, lastName) => {
-    try {
-      const membersSnap = await database.ref('Members').once('value');
-      const membersData = membersSnap.val() || {};
-      
-      const memberEntry = Object.entries(membersData).find(([_, member]) => 
-        member.email?.toLowerCase() === email.toLowerCase() &&
-        member.firstName?.toLowerCase() === firstName.toLowerCase() &&
-        member.lastName?.toLowerCase() === lastName.toLowerCase()
-      );
+    const adminsSnap = await database.ref('Users/Admin').once('value');
+    const adminsData = adminsSnap.val() || {};
+    
+    // Check if same person exists in Admins (all three fields must match)
+    const adminEntry = Object.entries(adminsData).find(([_, admin]) => 
+      admin.email?.toLowerCase() === email.toLowerCase() &&
+      admin.firstName?.toLowerCase() === firstName.toLowerCase() &&
+      admin.lastName?.toLowerCase() === lastName.toLowerCase()
+    );
 
-      if (memberEntry) {
-        return { exists: true, source: 'member', id: memberEntry[0], data: memberEntry[1] };
-      }
-
-      const adminsSnap = await database.ref('Users/Admin').once('value');
-      const adminsData = adminsSnap.val() || {};
-      
-      const adminEntry = Object.entries(adminsData).find(([_, admin]) => 
-        admin.email?.toLowerCase() === email.toLowerCase() &&
-        admin.firstName?.toLowerCase() === firstName.toLowerCase() &&
-        admin.lastName?.toLowerCase() === lastName.toLowerCase()
-      );
-
-      if (adminEntry) {
-        return { exists: true, source: 'admin', id: adminEntry[0], data: adminEntry[1] };
-      }
-
-      return { exists: false };
-    } catch (err) {
-      console.error('DB same person check error:', err);
-      return { exists: false };
+    if (adminEntry) {
+      return { exists: true, source: 'admin', id: adminEntry[0], data: adminEntry[1] };
     }
-  };
+
+    return { exists: false };
+  } catch (err) {
+    console.error('DB same person check error:', err);
+    return { exists: false };
+  }
+};
 
   const updateFunds = async (amount) => {
     try {
@@ -1812,145 +1838,43 @@ const Registrations = ({
     }
   };
 
-  const processDatabaseApprove = async (reg) => {
-    try {
-      const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
-      let userId = null;
-      
-      const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
-      
-      if (samePersonCheck.exists) {
-        const now = new Date();
-        const approvedDate = formatDate(now);
-        const approvedTime = formatTime(now);
-
-        const updateData = {};
-
-        Object.keys(rest).forEach(key => {
-          if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
-            updateData[key] = rest[key];
-          }
-        });
-
-        const currentBalance = samePersonCheck.data.balance || 0;
-        updateData.balance = currentBalance + parseFloat(registrationFee);
-
-        updateData.dateApproved = approvedDate;
-        updateData.approvedTime = approvedTime;
-
-        const existingRole = samePersonCheck.data.role;
-        const existingStatus = samePersonCheck.data.status;
-        const isAdminLike = samePersonCheck.source === 'admin' || existingRole === 'admin' || existingRole === 'coadmin';
-        if (isAdminLike) {
-          updateData.role = existingRole || 'admin';
-          updateData.status = existingStatus || 'active';
-        } else {
-          updateData.status = 'active';
-        }
-
-        const transactionData = {
-          type: 'registration',
-          amount: parseFloat(registrationFee),
-          dateApplied: rest?.dateCreated || rest?.dateApplied || '',
-          dateApproved: approvedDate,
-          approvedTime: approvedTime,
-          timestamp: now.getTime(),
-          status: 'approved',
-          memberId: parseInt(samePersonCheck.id),
-          firstName,
-          lastName,
-          email,
-          transactionId: `REG-${Date.now()}`,
-          description: 'Registration fee payment'
-        };
-
-        await database.ref(`Transactions/Registrations/${samePersonCheck.id}/${transactionData.transactionId}`).set(transactionData);
-
-        if (isAdminLike) {
-          const adminTxnRef = database.ref(`Transactions/Admins/${samePersonCheck.id}`).push();
-          await adminTxnRef.set({
-            transactionId: adminTxnRef.key,
-            type: 'AdminRegistrationApproval',
-            dateApproved: approvedDate,
-            approvedTime: approvedTime,
-            firstName,
-            lastName,
-            email,
-            memberId: parseInt(samePersonCheck.id),
-            status: 'approved',
-            description: 'Registration approved for existing Admin'
-          });
-        }
-
-        const memberRef = database.ref(`Members/${samePersonCheck.id}`);
-        const memberSnap = await memberRef.once('value');
-        if (!memberSnap.exists()) {
-          await memberRef.set({
-            id: parseInt(samePersonCheck.id),
-            firstName,
-            lastName,
-            email,
-            ...rest,
-            dateApproved: approvedDate,
-            approvedTime: approvedTime,
-            investment: updateData.balance || parseFloat(registrationFee) || 0,
-            balance: updateData.balance || parseFloat(registrationFee) || 0,
-            status: isAdminLike ? (existingStatus || 'active') : 'active',
-            role: isAdminLike ? (existingRole || 'admin') : (rest?.role || 'member')
-          });
-        } else {
-          await memberRef.update(updateData);
-        }
-        await updateFunds(registrationFee);
-
-        await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
-          firstName,
-          lastName,
-          ...rest,
-          email,
-          dateCreated: rest?.dateCreated || rest?.dateApplied || '',
-          dateApproved: approvedDate,
-          approvedTime: approvedTime,
-          memberId: parseInt(samePersonCheck.id),
-          status: 'approved'
-        });
-
-        return parseInt(samePersonCheck.id);
-      }
-
-      const emailExists = await checkIfEmailExistsInDatabase(email);
-      if (emailExists) {
-        throw new Error('This email is already registered to a different member.');
-      }
-
-      try {
-        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-        userId = userCredential.user.uid;
-      } catch (authError) {
-        if (authError.code === 'auth/email-already-in-use') {
-          throw new Error('This email is already in use by another account.');
-        } else {
-          throw authError;
-        }
-      }
-
-      const membersSnap = await database.ref('Members').once('value');
-      const members = membersSnap.val() || {};
-      
-      let newId = 5001;
-      const existingIds = Object.keys(members).map(Number).sort((a, b) => a - b);
-      
-      for (const id of existingIds) {
-        if (id === newId) newId++;
-        else if (id > newId) break;
-      }
-      
+const processDatabaseApprove = async (reg) => {
+  try {
+    const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
+    let userId = null;
+    
+    const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
+    
+    if (samePersonCheck.exists) {
+      // Update existing member/admin record
       const now = new Date();
       const approvedDate = formatDate(now);
       const approvedTime = formatTime(now);
-      
-      const initialBalance = parseFloat(registrationFee) || 0;
-      
+
+      const updateData = {};
+
+      Object.keys(rest).forEach(key => {
+        if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
+          updateData[key] = rest[key];
+        }
+      });
+
+      const currentBalance = samePersonCheck.data.balance || 0;
+      updateData.balance = currentBalance + parseFloat(registrationFee);
+
+      updateData.dateApproved = approvedDate;
+      updateData.approvedTime = approvedTime;
+
+      const existingRole = samePersonCheck.data.role;
+      const existingStatus = samePersonCheck.data.status;
+      const isAdminLike = samePersonCheck.source === 'admin' || existingRole === 'admin' || existingRole === 'coadmin';
+      if (isAdminLike) {
+        updateData.role = existingRole || 'admin';
+        updateData.status = existingStatus || 'active';
+      } else {
+        updateData.status = 'active';
+      }
+
       const transactionData = {
         type: 'registration',
         amount: parseFloat(registrationFee),
@@ -1959,7 +1883,7 @@ const Registrations = ({
         approvedTime: approvedTime,
         timestamp: now.getTime(),
         status: 'approved',
-        memberId: newId,
+        memberId: parseInt(samePersonCheck.id),
         firstName,
         lastName,
         email,
@@ -1967,26 +1891,10 @@ const Registrations = ({
         description: 'Registration fee payment'
       };
 
-      await database.ref(`Members/${newId}`).set({
-        id: newId,
-        uid: userId,
-        firstName,
-        lastName,
-        ...rest,
-        email,
-        dateApproved: approvedDate,
-        approvedTime: approvedTime,
-        balance: initialBalance,
-        investment: initialBalance,
-        loans: 0.0,
-        status: 'active'
-      });
+      await database.ref(`Transactions/Registrations/${samePersonCheck.id}/${transactionData.transactionId}`).set(transactionData);
 
-      await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
-
-      const roleFromReg = (rest && rest.role) || (reg && reg.role);
-      if (roleFromReg === 'admin' || roleFromReg === 'coadmin') {
-        const adminTxnRef = database.ref(`Transactions/Admins/${newId}`).push();
+      if (isAdminLike) {
+        const adminTxnRef = database.ref(`Transactions/Admins/${samePersonCheck.id}`).push();
         await adminTxnRef.set({
           transactionId: adminTxnRef.key,
           type: 'AdminRegistrationApproval',
@@ -1995,14 +1903,33 @@ const Registrations = ({
           firstName,
           lastName,
           email,
-          memberId: newId,
+          memberId: parseInt(samePersonCheck.id),
           status: 'approved',
-          description: 'Registration approved for Admin'
+          description: 'Registration approved for existing Admin'
         });
       }
 
+      const memberRef = database.ref(`Members/${samePersonCheck.id}`);
+      const memberSnap = await memberRef.once('value');
+      if (!memberSnap.exists()) {
+        await memberRef.set({
+          id: parseInt(samePersonCheck.id),
+          firstName,
+          lastName,
+          email,
+          ...rest,
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          investment: updateData.balance || parseFloat(registrationFee) || 0,
+          balance: updateData.balance || parseFloat(registrationFee) || 0,
+          status: isAdminLike ? (existingStatus || 'active') : 'active',
+          role: isAdminLike ? (existingRole || 'admin') : (rest?.role || 'member')
+        });
+      } else {
+        await memberRef.update(updateData);
+      }
       await updateFunds(registrationFee);
-      
+
       await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
         firstName,
         lastName,
@@ -2011,16 +1938,121 @@ const Registrations = ({
         dateCreated: rest?.dateCreated || rest?.dateApplied || '',
         dateApproved: approvedDate,
         approvedTime: approvedTime,
-        memberId: newId,
+        memberId: parseInt(samePersonCheck.id),
         status: 'approved'
       });
-      
-      return newId;
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve registration');
+
+      return parseInt(samePersonCheck.id);
     }
-  };
+
+    // Check if email exists with different name (should have been caught earlier, but double-check)
+    const emailWithDifferentName = await checkIfEmailExistsInDatabase(email, firstName, lastName);
+    if (emailWithDifferentName) {
+      throw new Error('This email is already registered to a different member.');
+    }
+
+    // Try to create Firebase Auth account, but handle "email already in use" gracefully
+    try {
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      userId = userCredential.user.uid;
+    } catch (authError) {
+      if (authError.code === 'auth/email-already-in-use') {
+        // Email exists in Firebase Auth but not in our database - this is OK
+        // We'll proceed without creating a new auth account
+        console.log('Email exists in Firebase Auth but not in database, proceeding...');
+        userId = `auth-${Date.now()}`; // Create a placeholder ID
+      } else {
+        throw authError;
+      }
+    }
+
+    const membersSnap = await database.ref('Members').once('value');
+    const members = membersSnap.val() || {};
+    
+    let newId = 5001;
+    const existingIds = Object.keys(members).map(Number).sort((a, b) => a - b);
+    
+    for (const id of existingIds) {
+      if (id === newId) newId++;
+      else if (id > newId) break;
+    }
+    
+    const now = new Date();
+    const approvedDate = formatDate(now);
+    const approvedTime = formatTime(now);
+    
+    const initialBalance = parseFloat(registrationFee) || 0;
+    
+    const transactionData = {
+      type: 'registration',
+      amount: parseFloat(registrationFee),
+      dateApplied: rest?.dateCreated || rest?.dateApplied || '',
+      dateApproved: approvedDate,
+      approvedTime: approvedTime,
+      timestamp: now.getTime(),
+      status: 'approved',
+      memberId: newId,
+      firstName,
+      lastName,
+      email,
+      transactionId: `REG-${Date.now()}`,
+      description: 'Registration fee payment'
+    };
+
+    await database.ref(`Members/${newId}`).set({
+      id: newId,
+      uid: userId,
+      firstName,
+      lastName,
+      ...rest,
+      email,
+      dateApproved: approvedDate,
+      approvedTime: approvedTime,
+      balance: initialBalance,
+      investment: initialBalance,
+      loans: 0.0,
+      status: 'active'
+    });
+
+    await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+
+    const roleFromReg = (rest && rest.role) || (reg && reg.role);
+    if (roleFromReg === 'admin' || roleFromReg === 'coadmin') {
+      const adminTxnRef = database.ref(`Transactions/Admins/${newId}`).push();
+      await adminTxnRef.set({
+        transactionId: adminTxnRef.key,
+        type: 'AdminRegistrationApproval',
+        dateApproved: approvedDate,
+        approvedTime: approvedTime,
+        firstName,
+        lastName,
+        email,
+        memberId: newId,
+        status: 'approved',
+        description: 'Registration approved for Admin'
+      });
+    }
+
+    await updateFunds(registrationFee);
+    
+    await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
+      firstName,
+      lastName,
+      ...rest,
+      email,
+      dateCreated: rest?.dateCreated || rest?.dateApplied || '',
+      dateApproved: approvedDate,
+      approvedTime: approvedTime,
+      memberId: newId,
+      status: 'approved'
+    });
+    
+    return newId;
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve registration');
+  }
+};
   
   const processDatabaseReject = async (reg, rejectionReason) => {
     try {
@@ -2042,68 +2074,81 @@ const Registrations = ({
     }
   };
 
-  const callApiApprove = async (reg) => {
-    try {
-      const response = await ApproveRegistration({
-        firstName: reg.firstName,
-        lastName: reg.lastName,
-        email: reg.email,
-        password: reg.password,
-        dateApproved: reg.dateApproved,
-        approvedTime: reg.approvedTime,
-        memberId: reg.memberId
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to send approval email');
-      }
-    } catch (err) {
-      console.error('API approve error:', err);
-      throw err;
-    }
-  };
-
-  const callApiReject = async (reg) => {
-    try {
-      const response = await RejectRegistration({
-        firstName: reg.firstName,
-        lastName: reg.lastName,
-        email: reg.email,
-        dateRejected: reg.dateRejected,
-        rejectedTime: reg.rejectedTime,
-        rejectionReason: reg.rejectionReason || 'Rejected by admin'
-      });
-      
-      if (!response.ok) {
-        console.error('Failed to send rejection email');
-      }
-    } catch (err) {
-      console.error('API reject error:', err);
-      throw err;
-    }
-  };
-
-  const handleSuccessOk = async () => {
-    setSuccessMessageModalVisible(false);
-    closeModal();
-    setSelectedRegistration(null);
-    setCurrentAction(null);
+const callApiApprove = async (reg) => {
+  try {
+    console.log('Sending approval email in background...');
+    const response = await ApproveRegistration({
+      firstName: reg.firstName,
+      lastName: reg.lastName,
+      email: reg.email,
+      password: reg.password,
+      dateApproved: reg.dateApproved,
+      approvedTime: reg.approvedTime,
+      memberId: reg.memberId
+    });
     
-    if (pendingApiCall) {
-      try {
-        if (pendingApiCall.type === 'approve') {
-          await callApiApprove(pendingApiCall.data);
-        } else if (pendingApiCall.type === 'reject') {
-          await callApiReject(pendingApiCall.data);
-        }
-      } catch (error) {
-        console.error('Error calling API:', error);
-      }
-      setPendingApiCall(null);
+    if (!response.ok) {
+      console.warn('Background: Failed to send approval email');
+    } else {
+      console.log('Background: Approval email sent successfully');
     }
+  } catch (err) {
+    console.error('Background API approve error:', err);
+    // Don't throw error - this runs in background
+  }
+};
+
+const callApiReject = async (reg) => {
+  try {
+    console.log('Sending rejection email in background...');
+    const response = await RejectRegistration({
+      firstName: reg.firstName,
+      lastName: reg.lastName,
+      email: reg.email,
+      dateRejected: reg.dateRejected,
+      rejectedTime: reg.rejectedTime,
+      rejectionReason: reg.rejectionReason || 'Rejected by admin'
+    });
     
+    if (!response.ok) {
+      console.warn('Background: Failed to send rejection email');
+    } else {
+      console.log('Background: Rejection email sent successfully');
+    }
+  } catch (err) {
+    console.error('Background API reject error:', err);
+    // Don't throw error - this runs in background
+  }
+};
+
+const handleSuccessOk = async () => {
+  setSuccessMessageModalVisible(false);
+  closeModal();
+  setSelectedRegistration(null);
+  setCurrentAction(null);
+  
+  // Call API in background without blocking the UI
+  if (pendingApiCall) {
+    // Don't await these calls - let them run in background
+    if (pendingApiCall.type === 'approve') {
+      callApiApprove(pendingApiCall.data).catch(error => {
+        console.error('Background API approval error:', error);
+        // You could show a subtle notification here if needed
+      });
+    } else if (pendingApiCall.type === 'reject') {
+      callApiReject(pendingApiCall.data).catch(error => {
+        console.error('Background API rejection error:', error);
+        // You could show a subtle notification here if needed
+      });
+    }
+    setPendingApiCall(null);
+  }
+  
+  // Refresh data after a short delay to ensure UI is updated first
+  setTimeout(() => {
     refreshData();
-  };
+  }, 500);
+};
 
   const openImageViewer = (url, label, index) => {
     const images = [];

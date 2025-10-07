@@ -94,11 +94,9 @@ const ForgotPasswordPage = () => {
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      marginBottom: '8px',
-      backgroundColor: '#FEF2F2',
-      border: '1px solid #FECACA',
+      backgroundColor: 'transparent',
       borderRadius: '12px',
-      padding: '8px 16px',
+   
     },
     errorText: {
       color: '#DC2626',

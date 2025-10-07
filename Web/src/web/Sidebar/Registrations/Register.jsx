@@ -576,7 +576,7 @@ const Register = () => {
   const [memberFilter, setMemberFilter] = useState('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isHovered, setIsHovered] = useState({});
-  const pageSize = 1;
+  const pageSize = 10;
 
   // Add Member Modal State
   const [addModalVisible, setAddModalVisible] = useState(false);

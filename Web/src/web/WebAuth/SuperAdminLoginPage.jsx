@@ -116,8 +116,6 @@ const SuperAdminLoginPage = () => {
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: 'transparent',
-      borderRadius: '12px',
-      padding: '8px 16px',
     },
     errorText: {
       color: '#DC2626',

@@ -707,6 +707,7 @@ const ApplyDeposits = ({
   const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
   const [validationStatus, setValidationStatus] = useState({});
   const [isVerifying, setIsVerifying] = useState({});
+  const [memberData, setMemberData] = useState({});
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -733,6 +734,47 @@ const ApplyDeposits = ({
       month: 'long', 
       day: 'numeric' 
     });
+  };
+
+  const fetchMemberData = async (memberId) => {
+    try {
+      const memberRef = database.ref(`Members/${memberId}`);
+      const memberSnap = await memberRef.once('value');
+      
+      if (memberSnap.exists()) {
+        const member = memberSnap.val();
+        setMemberData(prev => ({
+          ...prev,
+          [memberId]: {
+            currentBalance: member.balance || 0,
+            investment: member.investment || 0,
+            address: member.address || 'N/A'
+          }
+        }));
+        return member;
+      } else {
+        setMemberData(prev => ({
+          ...prev,
+          [memberId]: {
+            currentBalance: 0,
+            investment: 0,
+            address: 'N/A'
+          }
+        }));
+        return null;
+      }
+    } catch (error) {
+      console.error('Error fetching member data:', error);
+      setMemberData(prev => ({
+        ...prev,
+        [memberId]: {
+          currentBalance: 0,
+          investment: 0,
+          address: 'N/A'
+        }
+      }));
+      return null;
+    }
   };
 
   const showInfoModal = (title, fields) => {
@@ -955,15 +997,21 @@ const ApplyDeposits = ({
     }
   };
 
-  const openModal = (deposit) => {
+  const openModal = async (deposit) => {
     setSelectedDeposit(deposit);
     setModalVisible(true);
     setValidationStatus({});
+    
+    // Fetch member data when opening modal
+    if (deposit.id) {
+      await fetchMemberData(deposit.id);
+    }
   };
 
   const closeModal = () => {
     setModalVisible(false);
     setErrorModalVisible(false);
+    setMemberData({}); // Reset member data when closing modal
   };
 
   const handleApproveClick = () => {
@@ -1009,21 +1057,22 @@ const ApplyDeposits = ({
   };
 
   const processAction = async (deposit, action, rejectionReason = '') => {
+    // Defer DB writes and refresh to success modal OK
     setActionInProgress(true);
     setIsProcessing(true);
     setCurrentAction(action);
 
     try {
       if (action === 'approve') {
-        await processDatabaseApprove(deposit);
         setSuccessMessage('Deposit approved successfully!');
-        
+
         const approveData = {
           ...deposit,
           dateApproved: formatDate(new Date()),
           timeApproved: formatTime(new Date())
         };
-        
+
+        // Local preview only; do not touch DB yet
         setSelectedDeposit(prev => ({
           ...prev,
           dateApproved: approveData.dateApproved,
@@ -1036,16 +1085,16 @@ const ApplyDeposits = ({
           data: approveData
         });
       } else {
-        await processDatabaseReject(deposit, rejectionReason);
         setSuccessMessage('Deposit rejected successfully!');
-        
+
         const rejectData = {
           ...deposit,
           dateRejected: formatDate(new Date()),
           timeRejected: formatTime(new Date()),
           rejectionReason
         };
-        
+
+        // Local preview only; do not touch DB yet
         setSelectedDeposit(prev => ({
           ...prev,
           dateRejected: rejectData.dateRejected,
@@ -1059,10 +1108,10 @@ const ApplyDeposits = ({
           data: rejectData
         });
       }
-      
+
       setSuccessMessageModalVisible(true);
     } catch (error) {
-      console.error('Error processing action:', error);
+      console.error('Error preparing action:', error);
       setErrorMessage(error.message || 'An error occurred. Please try again.');
       setErrorModalVisible(true);
     } finally {
@@ -1106,9 +1155,28 @@ const ApplyDeposits = ({
         await transactionRef.set(approvedDeposit);
 
         const depositAmount = parseFloat(deposit.amountToBeDeposited) || 0;
-        const newBalance = (parseFloat(member.balance || 0) || 0) + depositAmount;
-        const newInvestment = (parseFloat(member.investment || member.investments || 0) || 0) + depositAmount;
-        await memberRef.update({ balance: newBalance, investment: newInvestment });
+        
+        // Use the correct field names from your Members structure
+        const currentBalance = parseFloat(member.balance || 0);
+        const currentInvestment = parseFloat(member.investment || 0);
+        
+        const newBalance = currentBalance + depositAmount;
+        const newInvestment = currentInvestment + depositAmount;
+        
+        await memberRef.update({ 
+          balance: newBalance, 
+          investment: newInvestment 
+        });
+
+        // Update the local memberData state to reflect the changes
+        setMemberData(prev => ({
+          ...prev,
+          [deposit.id]: {
+            ...prev[deposit.id],
+            currentBalance: newBalance,
+            investment: newInvestment
+          }
+        }));
 
         const fundSnap = await fundsRef.once('value');
         const updatedFund = (parseFloat(fundSnap.val()) || 0) + parseFloat(deposit.amountToBeDeposited);
@@ -1211,24 +1279,41 @@ const ApplyDeposits = ({
   };
 
   const handleSuccessOk = async () => {
+    // Finalize DB changes and refresh only after user confirms
+    try {
+      if (pendingApiCall) {
+        if (pendingApiCall.type === 'approve') {
+          await processDatabaseApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await processDatabaseReject(pendingApiCall.data, pendingApiCall.data.rejectionReason || 'Rejected by admin');
+        }
+      }
+    } catch (err) {
+      console.error('Finalize DB on OK error:', err);
+    }
+
+    // Close modal and clean state
     setSuccessMessageModalVisible(false);
     closeModal();
     setSelectedDeposit(null);
     setCurrentAction(null);
-    
-    if (pendingApiCall) {
-      try {
+
+    // Trigger background email after DB success; do not block UI
+    try {
+      if (pendingApiCall) {
         if (pendingApiCall.type === 'approve') {
-          await callApiApprove(pendingApiCall.data);
+          callApiApprove(pendingApiCall.data);
         } else if (pendingApiCall.type === 'reject') {
-          await callApiReject(pendingApiCall.data);
+          callApiReject(pendingApiCall.data);
         }
-      } catch (error) {
-        console.error('Error calling API:', error);
       }
+    } catch (error) {
+      console.error('Error calling API:', error);
+    } finally {
       setPendingApiCall(null);
     }
-    
+
+    // Finally refresh
     refreshData();
   };
 
@@ -1380,13 +1465,6 @@ const ApplyDeposits = ({
                       </span>
                       <span style={styles.fieldValue}>{selectedDeposit.email || 'N/A'}</span>
                     </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaPhone />
-                        Contact:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedDeposit.phoneNumber || 'N/A'}</span>
-                    </div>
                   </div>
 
                   <div style={styles.section}>
@@ -1396,15 +1474,21 @@ const ApplyDeposits = ({
                     </h3>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Address:</span>
-                      <span style={styles.fieldValue}>{selectedDeposit.address || 'N/A'}</span>
+                      <span style={styles.fieldValue}>
+                        {memberData[selectedDeposit.id]?.address || selectedDeposit.address || 'N/A'}
+                      </span>
                     </div>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Current Balance:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedDeposit.currentBalance || 0)}</span>
+                      <span style={styles.fieldValue}>
+                        {formatCurrency(memberData[selectedDeposit.id]?.currentBalance || 0)}
+                      </span>
                     </div>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Investment:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedDeposit.investment || 0)}</span>
+                      <span style={styles.fieldValue}>
+                        {formatCurrency(memberData[selectedDeposit.id]?.investment || 0)}
+                      </span>
                     </div>
                   </div>
                 </div>
