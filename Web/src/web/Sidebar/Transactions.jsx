@@ -2,71 +2,383 @@ import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
   FaDownload, 
+  FaFilter, 
   FaChevronLeft, 
   FaChevronRight,
-  FaCheckCircle,
+  FaEye,
+  FaMoneyBillWave,
+  FaPiggyBank,
+  FaHandHoldingUsd,
+  FaCreditCard,
+  FaUserPlus,
+  FaSort,
+  FaSortUp,
+  FaSortDown,
+  FaFileAlt,
+  FaUser,
+  FaUserCheck,
+  FaUserTimes,
   FaTimes
 } from 'react-icons/fa';
-import { FiAlertCircle } from 'react-icons/fi';
-import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
 import { database } from '../../../../Database/firebaseConfig';
 
 const styles = {
-  tableContainer: {
+  safeAreaView: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    minHeight: '100vh',
+    padding: '0'
+  },
+  mainContainer: {
+    padding: '24px',
+    maxWidth: '1400px',
+    margin: '0 auto',
+    position: 'relative'
+  },
+  headerSection: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '32px',
+    paddingBottom: '16px',
+    borderBottom: '1px solid #e2e8f0'
+  },
+  headerText: {
+    fontSize: '32px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0'
+  },
+  headerSubtitle: {
+    fontSize: '16px',
+    color: '#64748b',
+    marginTop: '4px'
+  },
+  controlsSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+  },
+  controlsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+    width: '100%'
+  },
+  tabContainer: {
+    display: 'flex',
+    backgroundColor: 'transparent',
+    borderRadius: '12px',
+    padding: '4px',
+    gap: '4px',
+    flexWrap: 'wrap',
+    flex: '1',
+    minWidth: '0'
+  },
+  tabButton: {
+    padding: '12px 20px',
     borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.2s ease',
+    outline: 'none',
+    background: 'transparent',
+    color: '#64748b',
+    whiteSpace: 'nowrap'
+  },
+  activeTabButton: {
+    backgroundColor: '#fff',
+    color: '#1e40af',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  },
+  tabIcon: {
+    fontSize: '16px'
+  },
+  searchDownloadContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    position: 'relative',
+    zIndex: '10',
+    flexShrink: '0'
+  },
+  filterContainer: {
+    position: 'relative'
+  },
+  filterButton: {
+    padding: '10px 16px',
+    backgroundColor: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151',
+    transition: 'all 0.2s ease',
+    whiteSpace: 'nowrap'
+  },
+  filterButtonHover: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  },
+  filterDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: '0',
+    backgroundColor: '#fff',
+    border: '1px solid #e5e7eb',
+    borderRadius: '8px',
+    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
+    minWidth: '180px',
+    zIndex: '100',
+    marginTop: '4px'
+  },
+  filterOption: {
+    padding: '12px 16px',
+    border: 'none',
+    backgroundColor: 'transparent',
+    width: '100%',
+    textAlign: 'left',
+    cursor: 'pointer',
+    fontSize: '14px',
+    color: '#374151',
+    transition: 'background-color 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  activeFilterOption: {
+    backgroundColor: '#eff6ff',
+    color: '#1e40af',
+    fontWeight: '600'
+  },
+  searchContainer: {
+    position: 'relative',
+    width: '280px'
+  },
+  searchInput: {
+    width: '100%',
+    padding: '10px 16px 10px 40px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    transition: 'all 0.2s ease',
+    boxSizing: 'border-box'
+  },
+  searchInputFocus: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  },
+  searchIcon: {
+    position: 'absolute',
+    left: '12px',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: '#9ca3af',
+    zIndex: '1'
+  },
+  downloadButton: {
+    padding: '10px 12px',
+    backgroundColor: '#059669',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.2s ease',
+    width: '40px',
+    height: '40px',
+    flexShrink: '0'
+  },
+  downloadButtonHover: {
+    backgroundColor: '#047857'
+  },
+  dataContainer: {
+    backgroundColor: '#fff',
+    borderRadius: '12px',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    overflow: 'hidden',
+    marginBottom: '80px'
+  },
+  tableContainer: {
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #e2e8f0',
+    background: 'white',
+    overflowX: 'auto'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     tableLayout: 'fixed',
-    minWidth: '800px'
+    minWidth: '1000px'
   },
   tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    height: '56px',
+    fontWeight: '600',
+    fontSize: '0.875rem'
   },
   tableHeaderCell: {
-    whiteSpace: 'nowrap'
+    padding: '1rem 0.75rem',
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    fontSize: '0.875rem',
+    fontWeight: '600',
+    cursor: 'pointer',
+    userSelect: 'none',
+    transition: 'background-color 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.1)'
+    }
+  },
+  sortableHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
   },
   tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
+    height: '52px',
+    transition: 'background-color 0.2s ease',
+    borderBottom: '1px solid #f1f5f9',
+    '&:hover': {
+      backgroundColor: '#f8fafc'
     }
   },
   tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
+    padding: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap'
   },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
+  memberInfo: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem'
+  },
+  memberName: {
+    fontWeight: '600',
+    color: '#1f2937'
+  },
+  memberEmail: {
+    fontSize: '0.75rem',
+    color: '#6b7280'
+  },
+  transactionCount: {
+    fontWeight: '600',
+    fontSize: '0.875rem'
+  },
+  viewButton: {
+    background: 'transparent',
+    color: '#2563eb',
+    border: '1px solid #2563eb',
+    borderRadius: '6px',
+    padding: '0.5rem 1rem',
+    fontSize: '0.75rem',
     fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
+      background: '#2563eb',
+      color: 'white',
+      transform: 'translateY(-1px)'
     }
   },
-  centeredModal: {
+  paginationContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '8px 16px',
+    backgroundColor: '#f8fafc',
+    borderBottom: '1px solid #e2e8f0',
+    flexWrap: 'wrap',
+    gap: '8px',
+    minHeight: '40px'
+  },
+  paginationInfo: {
+    fontSize: '12px',
+    color: '#64748b',
+    whiteSpace: 'nowrap'
+  },
+  paginationControls: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  paginationButton: {
+    padding: '4px 8px',
+    backgroundColor: '#fff',
+    border: '1px solid #d1d5db',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    fontSize: '10px',
+    minWidth: '24px',
+    minHeight: '24px'
+  },
+  paginationButtonDisabled: {
+    backgroundColor: '#f3f4f6',
+    color: '#9ca3af',
+    cursor: 'not-allowed',
+    borderColor: '#e5e7eb'
+  },
+  loadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px'
+  },
+  spinner: {
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #1e40af',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
+  },
+  noDataContainer: {
+    textAlign: 'center',
+    padding: '60px 20px',
+    color: '#64748b'
+  },
+  noDataIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+    color: '#d1d5db'
+  },
+  noDataText: {
+    fontSize: '16px',
+    margin: 0
+  },
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -76,77 +388,140 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
-  },
-  modalCardSmall: {
-    width: '300px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
+    zIndex: 1000,
     padding: '20px',
-    position: 'relative',
+    overflowY: 'auto'
+  },
+  modalCard: {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    width: '90%',
+    maxWidth: '1000px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
+    flexDirection: 'column'
   },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
+  modalHeader: {
+    padding: '24px',
+    borderBottom: '1px solid #e2e8f0',
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
+    flexShrink: 0
   },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
+  modalTitle: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: 0
   },
   closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
+    background: 'none',
     border: 'none',
+    fontSize: '20px',
+    color: '#64748b',
+    cursor: 'pointer',
     padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
+    borderRadius: '4px',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  closeButtonHover: {
+    backgroundColor: '#f1f5f9',
+    color: '#374151'
+  },
+  modalContent: {
+    padding: '24px',
+    overflowY: 'auto',
+    flex: 1
+  },
+  modalFilters: {
+    display: 'flex',
+    gap: '1rem',
+    marginBottom: '1.5rem',
+    flexWrap: 'wrap'
+  },
+  transactionGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  transactionCard: {
+    background: 'white',
+    borderRadius: '12px',
+    padding: '1.5rem',
+    border: '1px solid #e2e8f0',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      borderColor: '#2563eb',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.1)'
     }
+  },
+  transactionHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '1rem'
+  },
+  transactionType: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    fontWeight: '600',
+    fontSize: '1rem'
+  },
+  typeIcon: {
+    fontSize: '1.25rem'
+  },
+  typeDeposit: {
+    color: '#059669'
+  },
+  typeLoan: {
+    color: '#dc2626'
+  },
+  typePayment: {
+    color: '#7c3aed'
+  },
+  typeWithdrawal: {
+    color: '#d97706'
+  },
+  typeRegistration: {
+    color: '#0369a1'
+  },
+  transactionDate: {
+    fontSize: '0.875rem',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  transactionDetails: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '1rem'
+  },
+  detailItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.25rem'
+  },
+  detailLabel: {
+    fontSize: '0.75rem',
+    color: '#6b7280',
+    fontWeight: '500',
+    textTransform: 'uppercase'
+  },
+  detailValue: {
+    fontSize: '0.875rem',
+    color: '#1f2937',
+    fontWeight: '600'
+  },
+  amountValue: {
+    fontSize: '1rem',
+    fontWeight: '700'
   }
 };
 
@@ -158,218 +533,59 @@ const Transactions = () => {
   const [currentPage, setCurrentPage] = useState(0);
   const [selectedMember, setSelectedMember] = useState(null);
   const [memberModalVisible, setMemberModalVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [successVisible, setSuccessVisible] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [isHovered, setIsHovered] = useState({});
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('All');
+  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
+  const [activeTransactionFilter, setActiveTransactionFilter] = useState('all');
   const pageSize = 10;
+
+  // Tab configuration
+  const tabs = [
+    { 
+      key: 'all', 
+      label: 'All Transactions', 
+      icon: FaFileAlt,
+      color: '#1e40af'
+    },
+    { 
+      key: 'deposits', 
+      label: 'Deposits', 
+      icon: FaPiggyBank,
+      color: '#059669'
+    },
+    { 
+      key: 'loans', 
+      label: 'Loans', 
+      icon: FaHandHoldingUsd,
+      color: '#dc2626'
+    },
+    { 
+      key: 'payments', 
+      label: 'Payments', 
+      icon: FaCreditCard,
+      color: '#7c3aed'
+    },
+    { 
+      key: 'withdrawals', 
+      label: 'Withdrawals', 
+      icon: FaMoneyBillWave,
+      color: '#d97706'
+    }
+  ];
 
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
-      .safe-area-view {
-        flex: 1;
-        background-color: #F5F5F5;
-        height: 100%;
-        width: 100%;
-        overflow: auto;
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
-      .main-container {
-        flex: 1;
+      .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
-      .header-text {
-        font-weight: bold;
-        font-size: 40px;
-        margin-bottom: 10px;
-        margin-left: 25px;
-        margin-right: 25px;
-        margin-top: 100px;
-      }
-      .top-controls {
-        display: flex;
-        justify-content: flex-end;
-        margin: 0 25px;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .search-download-container {
-        display: flex;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .search-bar {
-        display: flex;
-        border: 1px solid #ccc;
-        border-radius: 25px;
-        background-color: #fff;
-        padding: 0 10px;
-        align-items: center;
-        height: 40px;
-        width: 250px;
-      }
-      .search-input {
-        height: 36px;
-        width: 100%;
-        font-size: 16px;
-        padding-left: 8px;
-        border: none;
-        outline: none;
-        background: transparent;
-      }
-      .search-icon {
-        padding: 4px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #666;
-      }
-      .download-icon {
-        padding: 6px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        color: #2D5783;
-      }
-      .pagination-container {
-        display: flex;
-        justify-content: flex-end;
-        margin: 0 25px;
-        margin-top: 10px;
-        align-items: center;
-      }
-      .pagination-info {
-        font-size: 12px;
-        margin-right: 10px;
-        color: #333;
-      }
-      .pagination-button {
-        padding: 0;
-        background-color: #2D5783;
-        border-radius: 5px;
-        margin: 0 3px;
-        color: white;
-        border: none;
-        cursor: pointer;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      .pagination-button svg {
-        font-size: 10px;
-        display: block;
-        margin: 0 auto;
-      }
-      .disabled-button {
-        background-color: #ccc;
-        cursor: not-allowed;
-      }
-      .data-container {
-        flex: 1;
-        margin: 0 25px;
-        margin-top: 10px;
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-      .no-match-text {
-        text-align: center;
-        margin-top: 20px;
-        font-size: 16px;
-        color: #666;
-      }
-      .loading-container {
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        height: 100vh;
-      }
-      .modal-container {
-        width: 500px;
-        height: 650px;
-        background-color: #fff;
-        border-radius: 10px;
-        padding: 20px;
-        position: relative;
-        overflow-x: hidden;
-      }
-      @media (max-width: 800px) {
-        .modal-container {
-            width: 90%;
-            max-width: 90%;
-            height: auto;
-            max-height: 90vh;
-        }
-      }
-      .modal-title {
-        font-size: 20px;
-        font-weight: bold;
-        margin-bottom: 16px;
-        color: #2D5783;
-        text-align: center;
-      }
-      .modal-content {
-        padding-bottom: 20px;
-        height: calc(100% - 100px);
-        display: flex;
-        flex-direction: column;
-      }
-      .transaction-type-buttons {
-        display: flex;
-        justify-content: space-around;
-        margin-bottom: 20px;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .type-button {
-        padding: 8px 16px;
-        border-radius: 20px;
-        border: none;
-        background-color: #f0f0f0;
-        cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-      }
-      .active-type {
-        background-color: #2D5783;
-        color: white;
-      }
-      .transactions-list {
-        flex: 1;
-        overflow-y: auto;
-      }
-      .transaction-item {
-        background-color: white;
-        border-radius: 8px;
-        padding: 15px;
-        margin-bottom: 10px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-      }
-      .transaction-header {
-        display: flex;
-        justify-content: space-between;
-        margin-bottom: 8px;
-      }
-      .transaction-type {
-        font-weight: bold;
-        color: #2D5783;
-      }
-      .transaction-date {
-        color: #666;
-        font-size: 12px;
-      }
-      .transaction-detail {
-        margin-bottom: 5px;
-        font-size: 14px;
-      }
-      .transaction-amount {
-        font-weight: bold;
-        color: #333;
+      .hover-lift:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
       }
     `;
     document.head.appendChild(styleElement);
@@ -475,25 +691,81 @@ const Transactions = () => {
     }).format(amount || 0);
   };
 
+  const formatDate = (dateString) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  };
+
+  const getTransactionIcon = (type) => {
+    switch (type) {
+      case 'Deposits': return FaPiggyBank;
+      case 'Loans': return FaHandHoldingUsd;
+      case 'Payments': return FaCreditCard;
+      case 'Withdrawals': return FaMoneyBillWave;
+      case 'Registrations': return FaUserPlus;
+      default: return FaMoneyBillWave;
+    }
+  };
+
+  const getTransactionTypeColor = (type) => {
+    switch (type) {
+      case 'Deposits': return styles.typeDeposit;
+      case 'Loans': return styles.typeLoan;
+      case 'Payments': return styles.typePayment;
+      case 'Withdrawals': return styles.typeWithdrawal;
+      case 'Registrations': return styles.typeRegistration;
+      default: return {};
+    }
+  };
+
   const handleDownload = async () => {
     try {
       if (filteredMembers.length === 0) {
-        setErrorMessage('No data to export');
-        setErrorModalVisible(true);
+        console.log('No data to download');
         return;
       }
 
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Transactions');
 
-      const headers = ['Member ID', 'Name', 'Transaction Count'];
-      worksheet.addRow(headers);
+      worksheet.columns = [
+        { header: 'Member ID', key: 'memberId', width: 20 },
+        { header: 'Name', key: 'name', width: 30 },
+        { header: 'Email', key: 'email', width: 30 },
+        { header: 'Transaction Count', key: 'transactionCount', width: 20 },
+        { header: 'Total Amount', key: 'totalAmount', width: 20 }
+      ];
+
+      worksheet.getRow(1).font = { bold: true };
+      worksheet.getRow(1).fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF1e3a8a' }
+      };
+      worksheet.getRow(1).font = { color: { argb: 'FFFFFFFF' }, bold: true };
 
       filteredMembers.forEach(memberId => {
         const member = members[memberId];
         const name = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
+        const email = member?.email || 'N/A';
         const transactionCount = transactions[memberId]?.length || 0;
-        worksheet.addRow([memberId, name, transactionCount]);
+        const totalAmount = transactions[memberId]?.reduce((sum, tx) => {
+          const amount = tx.amountToBeDeposited || tx.loanAmount || tx.amount || tx.amountWithdrawn || tx.amountToBePaid || 0;
+          return sum + (parseFloat(amount) || 0);
+        }, 0) || 0;
+
+        worksheet.addRow({
+          memberId,
+          name,
+          email,
+          transactionCount,
+          totalAmount: formatCurrency(totalAmount)
+        });
       });
 
       const buffer = await workbook.xlsx.writeBuffer();
@@ -503,128 +775,336 @@ const Transactions = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = 'Transactions.xlsx';
+      link.download = `Transactions_Export_${new Date().toISOString().split('T')[0]}.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-      
-      setSuccessMessage('Data exported successfully!');
-      setSuccessVisible(true);
     } catch (error) {
       console.error('Error downloading data:', error);
-      setErrorMessage('Failed to export data');
-      setErrorModalVisible(true);
     }
   };
 
-  const filteredMembers = Object.keys(transactions).filter(memberId => {
-    const member = members[memberId];
-    if (!member) return false;
+  const handleSort = (key) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
-    const searchLower = searchQuery.toLowerCase();
-    const name = `${member.firstName} ${member.middleName || ''} ${member.lastName}`.toLowerCase();
-    
-    return (
-      memberId.toLowerCase().includes(searchLower) ||
-      name.includes(searchLower)
-    );
-  });
+  const getSortIcon = (key) => {
+    if (sortConfig.key !== key) return FaSort;
+    return sortConfig.direction === 'asc' ? FaSortUp : FaSortDown;
+  };
+
+  const handleSearch = (text) => {
+    setSearchQuery(text);
+    setCurrentPage(0);
+  };
+
+  const handleTabSwitch = (section) => {
+    setActiveTransactionFilter(section);
+    setCurrentPage(0);
+  };
+
+  const handleMouseEnter = (element) => {
+    setIsHovered(prev => ({ ...prev, [element]: true }));
+  };
+
+  const handleMouseLeave = (element) => {
+    setIsHovered(prev => ({ ...prev, [element]: false }));
+  };
+
+  // Filter members based on active tab and search query
+  const filteredMembers = Object.keys(transactions)
+    .filter(memberId => {
+      const member = members[memberId];
+      if (!member) return false;
+
+      const searchLower = searchQuery.toLowerCase();
+      const name = `${member.firstName} ${member.middleName || ''} ${member.lastName}`.toLowerCase();
+      const email = member.email?.toLowerCase() || '';
+      
+      const searchMatch = memberId.toLowerCase().includes(searchLower) ||
+        name.includes(searchLower) ||
+        email.includes(searchLower);
+
+      if (!searchMatch) return false;
+
+      // Filter by transaction type tab
+      if (activeTransactionFilter !== 'all') {
+        const memberTransactions = transactions[memberId] || [];
+        const hasMatchingTransaction = memberTransactions.some(tx => {
+          const transactionType = tx.type.toLowerCase();
+          switch (activeTransactionFilter) {
+            case 'deposits': return transactionType === 'deposits';
+            case 'loans': return transactionType === 'loans';
+            case 'payments': return transactionType === 'payments';
+            case 'withdrawals': return transactionType === 'withdrawals';
+            default: return true;
+          }
+        });
+        return hasMatchingTransaction;
+      }
+
+      return true;
+    })
+    .sort((a, b) => {
+      const memberA = members[a];
+      const memberB = members[b];
+      
+      if (sortConfig.key === 'name') {
+        const nameA = `${memberA?.firstName} ${memberA?.lastName}`.toLowerCase();
+        const nameB = `${memberB?.firstName} ${memberB?.lastName}`.toLowerCase();
+        return sortConfig.direction === 'asc' ? nameA.localeCompare(nameB) : nameB.localeCompare(nameA);
+      }
+      
+      if (sortConfig.key === 'transactions') {
+        const countA = transactions[a]?.length || 0;
+        const countB = transactions[b]?.length || 0;
+        return sortConfig.direction === 'asc' ? countA - countB : countB - countA;
+      }
+      
+      return 0;
+    });
 
   const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
   const paginatedData = filteredMembers.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
   if (loading) {
     return (
-      <div className="loading-container">
+      <div style={styles.loadingContainer}>
         <div style={styles.spinner}></div>
       </div>
     );
   }
 
   return (
-    <div className="safe-area-view">
-      <div className="main-container">
-        <h2 className="header-text">Transactions</h2>
-
-        <div className="top-controls">
-          <div className="search-download-container">
-            <div className="search-bar">
-              <input
-                className="search-input"
-                placeholder="Search..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <button className="search-icon">
-                <FaSearch />
-              </button>
-            </div>
-            <button onClick={handleDownload} className="download-icon">
-              <FaDownload />
-            </button>
+    <div style={styles.safeAreaView}>
+      <div style={styles.mainContainer}>
+        {/* Header Section */}
+        <div style={styles.headerSection}>
+          <div>
+            <h1 style={styles.headerText}>Transaction Management</h1>
+            <p style={styles.headerSubtitle}>
+              Monitor and manage all member transactions in one place
+            </p>
           </div>
         </div>
 
-        {filteredMembers.length > 0 && (
-          <div className="pagination-container">
-            <span className="pagination-info">{`Page ${currentPage + 1} of ${totalPages}`}</span>
-            <button
-              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
-              disabled={currentPage === 0}
-              className={`pagination-button ${currentPage === 0 ? 'disabled-button' : ''}`}
-            >
-              <FaChevronLeft />
-            </button>
-            <button
-              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
-              disabled={currentPage === totalPages - 1}
-              className={`pagination-button ${currentPage === totalPages - 1 ? 'disabled-button' : ''}`}
-            >
-              <FaChevronRight />
-            </button>
-          </div>
-        )}
+        {/* Controls Section */}
+        <div style={styles.controlsSection}>
+          <div style={styles.controlsRow}>
+            {/* Tabs - Left side */}
+            <div style={styles.tabContainer}>
+              {tabs.map((tab) => {
+                const isActive = activeTransactionFilter === tab.key;
+                const IconComponent = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleTabSwitch(tab.key)}
+                    style={{
+                      ...styles.tabButton,
+                      ...(isActive ? styles.activeTabButton : {})
+                    }}
+                    className="hover-lift"
+                  >
+                    <IconComponent style={styles.tabIcon} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-        <div className="data-container">
+            {/* Search and Download - Right side */}
+            <div style={styles.searchDownloadContainer}>
+              <div style={styles.searchContainer}>
+                <FaSearch style={styles.searchIcon} />
+                <input
+                  style={{
+                    ...styles.searchInput,
+                    ...(isHovered.search ? styles.searchInputFocus : {})
+                  }}
+                  placeholder="Search by member ID, name, or email..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => handleMouseEnter('search')}
+                  onBlur={() => handleMouseLeave('search')}
+                />
+              </div>
+
+              <button 
+                style={{
+                  ...styles.downloadButton,
+                  ...(isHovered.download ? styles.downloadButtonHover : {})
+                }}
+                onMouseEnter={() => handleMouseEnter('download')}
+                onMouseLeave={() => handleMouseLeave('download')}
+                onClick={handleDownload}
+                title="Export to Excel"
+              >
+                <FaDownload />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Data Container */}
+        <div style={styles.dataContainer}>
+          {/* Pagination at the top */}
+          {filteredMembers.length > 0 && (
+            <div style={styles.paginationContainer}>
+              <span style={styles.paginationInfo}>
+               {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, filteredMembers.length)} of {filteredMembers.length} 
+              </span>
+              <div style={styles.paginationControls}>
+                <button
+                  onClick={() => setCurrentPage(prev => Math.max(prev - 1, 0))}
+                  disabled={currentPage === 0}
+                  style={{
+                    ...styles.paginationButton,
+                    ...(currentPage === 0 ? styles.paginationButtonDisabled : {})
+                  }}
+                >
+                  <FaChevronLeft />
+                </button>
+
+                <button
+                  onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
+                  disabled={currentPage === totalPages - 1}
+                  style={{
+                    ...styles.paginationButton,
+                    ...(currentPage === totalPages - 1 ? styles.paginationButtonDisabled : {})
+                  }}
+                >
+                  <FaChevronRight />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Table Content */}
           {filteredMembers.length === 0 ? (
-            <span className="no-match-text">No Matches Found</span>
+            <div style={styles.noDataContainer}>
+              <FaFileAlt style={styles.noDataIcon} />
+              <p style={styles.noDataText}>
+                {searchQuery ? 'No transactions match your search' : 'No transaction data available'}
+              </p>
+            </div>
           ) : (
             <div style={styles.tableContainer}>
               <table style={styles.table}>
                 <thead>
                   <tr style={styles.tableHeader}>
-                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Member ID</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '30%' }}>Name</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Transaction Count</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '30%' }}>Action</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>
+                      <div 
+                        style={styles.sortableHeader}
+                        onClick={() => handleSort('name')}
+                      >
+                        Member ID
+                        {React.createElement(getSortIcon('name'))}
+                      </div>
+                    </th>
+                    <th style={{ ...styles.tableHeaderCell, width: '25%' }}>Member Information</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '15%' }}>
+                      <div 
+                        style={styles.sortableHeader}
+                        onClick={() => handleSort('transactions')}
+                      >
+                        Transaction Count
+                        {React.createElement(getSortIcon('transactions'))}
+                      </div>
+                    </th>
+                    <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Latest Transaction</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '25%' }}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {paginatedData.map((memberId) => {
                     const member = members[memberId];
-                    const name = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
-                    const transactionCount = transactions[memberId]?.length || 0;
+                    const memberTransactions = transactions[memberId] || [];
+                    
+                    // Filter transactions by active tab
+                    const filteredTransactions = activeTransactionFilter === 'all' 
+                      ? memberTransactions 
+                      : memberTransactions.filter(tx => {
+                          const transactionType = tx.type.toLowerCase();
+                          switch (activeTransactionFilter) {
+                            case 'deposits': return transactionType === 'deposits';
+                            case 'loans': return transactionType === 'loans';
+                            case 'payments': return transactionType === 'payments';
+                            case 'withdrawals': return transactionType === 'withdrawals';
+                            default: return true;
+                          }
+                        });
+
+                    const latestTransaction = filteredTransactions
+                      .sort((a, b) => {
+                        const dateA = a.dateApproved || a.dateApplied || '';
+                        const dateB = b.dateApproved || b.dateApplied || '';
+                        return dateB.localeCompare(dateA);
+                      })[0];
 
                     return (
                       <tr key={memberId} style={styles.tableRow}>
-                        <td style={styles.tableCell}>{memberId}</td>
-                        <td style={styles.tableCell}>{name}</td>
-                        <td style={styles.tableCell}>{transactionCount}</td>
                         <td style={styles.tableCell}>
-                          <span 
-                            style={styles.viewText} 
+                          <strong>#{memberId}</strong>
+                        </td>
+                        <td style={styles.tableCell}>
+                          <div style={styles.memberInfo}>
+                            <div style={styles.memberName}>
+                              {member?.firstName} {member?.lastName}
+                            </div>
+                            <div style={styles.memberEmail}>
+                              {member?.email || 'No email'}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={styles.tableCell}>
+                          <span style={styles.transactionCount}>
+                            {filteredTransactions.length} transactions
+                          </span>
+                        </td>
+                        <td style={styles.tableCell}>
+                          {latestTransaction ? (
+                            <div style={styles.memberInfo}>
+                              <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                                {latestTransaction.type}
+                              </div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: '500' }}>
+                                {formatCurrency(
+                                  latestTransaction.amountToBeDeposited || 
+                                  latestTransaction.loanAmount || 
+                                  latestTransaction.amount || 
+                                  latestTransaction.amountWithdrawn || 
+                                  latestTransaction.amountToBePaid
+                                )}
+                              </div>
+                              <div style={{ fontSize: '0.625rem', color: '#9ca3af' }}>
+                                {formatDate(latestTransaction.dateApproved || latestTransaction.dateApplied)}
+                              </div>
+                            </div>
+                          ) : (
+                            <span style={{ color: '#9ca3af', fontSize: '0.75rem' }}>No transactions</span>
+                          )}
+                        </td>
+                        <td style={styles.tableCell}>
+                          <button 
+                            style={styles.viewButton}
                             onClick={() => {
                               setSelectedMember({
                                 id: memberId,
-                                name,
-                                transactions: transactions[memberId] || []
+                                name: `${member?.firstName} ${member?.lastName}`,
+                                email: member?.email,
+                                transactions: memberTransactions
                               });
                               setMemberModalVisible(true);
                             }}
                           >
-                            View
-                          </span>
+                            <FaEye />
+                            View Details
+                          </button>
                         </td>
                       </tr>
                     );
@@ -637,144 +1117,125 @@ const Transactions = () => {
 
         {/* Member Transactions Modal */}
         {memberModalVisible && selectedMember && (
-          <div style={styles.centeredModal}>
-            <div className="modal-container">
-              <button 
-                onClick={() => setMemberModalVisible(false)} 
-                style={styles.closeButton}
-                aria-label="Close modal"
-              >
-                <AiOutlineClose />
-              </button>
-              <h3 className="modal-title">{selectedMember.name}'s Transactions</h3>
+          <div style={styles.modalOverlay} onClick={() => setMemberModalVisible(false)}>
+            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>
+                  {selectedMember.name}'s Transactions
+                </h2>
+                <button 
+                  onClick={() => setMemberModalVisible(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closeModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeModal')}
+                  onMouseLeave={() => handleMouseLeave('closeModal')}
+                >
+                  <FaTimes />
+                </button>
+              </div>
               
-              <div className="modal-content">
-                <div className="transaction-type-buttons">
-                  {['All', 'Deposits', 'Loans', 'Payments', 'Withdrawals'].map(type => (
-                    <button
-                      key={type}
-                      className={`type-button ${transactionTypeFilter === type ? 'active-type' : ''}`}
-                      onClick={() => setTransactionTypeFilter(type)}
-                    >
-                      {type}
-                    </button>
-                  ))}
+              <div style={styles.modalContent}>
+                <div style={styles.modalFilters}>
+                  <select 
+                    style={{
+                      ...styles.filterButton,
+                      border: '1px solid #d1d5db',
+                      padding: '10px 12px',
+                      minWidth: '140px'
+                    }}
+                    value={transactionTypeFilter}
+                    onChange={(e) => setTransactionTypeFilter(e.target.value)}
+                  >
+                    <option value="All">All Types</option>
+                    <option value="Deposits">Deposits</option>
+                    <option value="Loans">Loans</option>
+                    <option value="Payments">Payments</option>
+                    <option value="Withdrawals">Withdrawals</option>
+                    <option value="Registrations">Registrations</option>
+                  </select>
                 </div>
 
-                <div className="transactions-list">
+                <div style={styles.transactionGrid}>
                   {selectedMember.transactions
                     .filter(tx => transactionTypeFilter === 'All' || tx.type === transactionTypeFilter)
                     .sort((a, b) => {
-                      // Sort by dateApproved or dateApplied in descending order
                       const dateA = a.dateApproved || a.dateApplied || '';
                       const dateB = b.dateApproved || b.dateApplied || '';
                       return dateB.localeCompare(dateA);
                     })
-                    .map((transaction, index) => (
-                      <div key={`${transaction.transactionId}-${index}`} className="transaction-item">
-                        <div className="transaction-header">
-                          <span className="transaction-type">{transaction.type}</span>
-                          <span className="transaction-date">
-                            {transaction.dateApproved || transaction.dateApplied || 'No date'}
-                          </span>
-                        </div>
-                        <div className="transaction-detail">
-                          <span>Transaction ID: </span>
-                          <span>{transaction.transactionId}</span>
-                        </div>
-                        <div className="transaction-detail">
-                          <span>Status: </span>
-                          <span style={{
-                            color: transaction.status === 'approved' || transaction.status === 'completed' ? 'green' : 
-                                  transaction.status === 'rejected' || transaction.status === 'failed' ? 'red' : 
-                                  '#666'
-                          }}>
-                            {transaction.status || 'Pending'}
-                          </span>
-                        </div>
-                        <div className="transaction-detail">
-                          <span>Amount: </span>
-                          <span className="transaction-amount">
-                            {formatCurrency(
-                              transaction.amountToBeDeposited || 
-                              transaction.loanAmount || 
-                              transaction.amount || 
-                              transaction.amountWithdrawn || 
-                              transaction.amountToBePaid
+                    .map((transaction, index) => {
+                      const IconComponent = getTransactionIcon(transaction.type);
+                      const amount = transaction.amountToBeDeposited || 
+                                   transaction.loanAmount || 
+                                   transaction.amount || 
+                                   transaction.amountWithdrawn || 
+                                   transaction.amountToBePaid;
+
+                      return (
+                        <div key={`${transaction.transactionId}-${index}`} style={styles.transactionCard}>
+                          <div style={styles.transactionHeader}>
+                            <div style={styles.transactionType}>
+                              <IconComponent style={{ ...styles.typeIcon, ...getTransactionTypeColor(transaction.type) }} />
+                              {transaction.type}
+                            </div>
+                            <div style={styles.transactionDate}>
+                              {formatDate(transaction.dateApproved || transaction.dateApplied)}
+                            </div>
+                          </div>
+
+                          <div style={styles.transactionDetails}>
+                            <div style={styles.detailItem}>
+                              <span style={styles.detailLabel}>Transaction ID</span>
+                              <span style={styles.detailValue}>{transaction.transactionId}</span>
+                            </div>
+                            
+                            <div style={styles.detailItem}>
+                              <span style={styles.detailLabel}>Amount</span>
+                              <span style={{ ...styles.detailValue, ...styles.amountValue }}>
+                                {formatCurrency(amount)}
+                              </span>
+                            </div>
+
+                            {transaction.interestRate && (
+                              <div style={styles.detailItem}>
+                                <span style={styles.detailLabel}>Interest Rate</span>
+                                <span style={styles.detailValue}>{transaction.interestRate}%</span>
+                              </div>
                             )}
-                          </span>
+
+                            {transaction.term && (
+                              <div style={styles.detailItem}>
+                                <span style={styles.detailLabel}>Term</span>
+                                <span style={styles.detailValue}>{transaction.term} months</span>
+                              </div>
+                            )}
+
+                            {transaction.rejectionReason && (
+                              <div style={styles.detailItem}>
+                                <span style={styles.detailLabel}>Rejection Reason</span>
+                                <span style={{ ...styles.detailValue, color: '#dc2626' }}>
+                                  {transaction.rejectionReason}
+                                </span>
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        {transaction.interestRate && (
-                          <div className="transaction-detail">
-                            <span>Interest Rate: </span>
-                            <span>{transaction.interestRate}%</span>
-                          </div>
-                        )}
-                        {transaction.term && (
-                          <div className="transaction-detail">
-                            <span>Term: </span>
-                            <span>{transaction.term} months</span>
-                          </div>
-                        )}
-                        {transaction.rejectionReason && (
-                          <div className="transaction-detail">
-                            <span>Reason: </span>
-                            <span style={{color: 'red'}}>{transaction.rejectionReason}</span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                      );
+                    })}
+
+                  {selectedMember.transactions.filter(tx => 
+                    transactionTypeFilter === 'All' || tx.type === transactionTypeFilter
+                  ).length === 0 && (
+                    <div style={styles.noDataContainer}>
+                      <FaFilter style={styles.noDataIcon} />
+                      <p style={styles.noDataText}>No transactions match the selected filters</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Success Modal */}
-        {successVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-              <p style={styles.modalText}>{successMessage}</p>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={() => setSuccessVisible(false)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Error Modal */}
-        {errorModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-              <p style={styles.modalText}>{errorMessage}</p>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={() => setErrorModalVisible(false)}
-                autoFocus
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Processing Spinner */}
-        {isProcessing && (
-          <div style={styles.centeredModal}>
-            <div style={styles.spinner}></div>
           </div>
         )}
       </div>

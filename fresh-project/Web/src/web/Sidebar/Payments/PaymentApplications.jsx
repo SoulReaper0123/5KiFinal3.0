@@ -1,0 +1,2196 @@
+import React, { useState } from 'react';
+import { database } from '../../../../../Database/firebaseConfig';
+import { ApprovePayments, RejectPayments } from '../../../../../Server/api';
+import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
+import Tesseract from 'tesseract.js';
+
+const styles = {
+  container: {
+    flex: 1,
+  },
+  loadingView: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%'
+  },
+  tableContainer: {
+    borderRadius: '8px',
+    overflow: 'auto',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed',
+    minWidth: '800px'
+  },
+  tableHeader: {
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    height: '50px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '16px'
+  },
+  tableHeaderCell: {
+    whiteSpace: 'nowrap'
+  },
+  tableRow: {
+    height: '50px',
+    '&:nth-child(even)': {
+      backgroundColor: '#f5f5f5'
+    },
+    '&:nth-child(odd)': {
+      backgroundColor: '#ddd'
+    }
+  },
+  tableCell: {
+    textAlign: 'center',
+    fontSize: '14px',
+    borderBottom: '1px solid #ddd',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  statusApproved: {
+    color: 'green'
+  },
+  statusRejected: {
+    color: 'red'
+  },
+  noDataMessage: {
+    textAlign: 'center',
+    marginTop: '50px',
+    fontSize: '16px',
+    color: 'gray'
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCard: {
+    width: '40%',
+    maxWidth: '900px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '80vh',
+    height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalCardSingleColumn: {
+    width: '40%',
+    maxWidth: '600px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '90vh',
+    height: 'auto',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalCardSmall: {
+    width: '250px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    textAlign: 'center'
+  },
+  modalContent: {
+    paddingBottom: '12px',
+    overflowY: 'auto',
+    flex: 1
+  },
+  columns: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '30px'
+  },
+  leftColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  rightColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  modalDetailText: {
+    fontSize: '13px',
+    marginBottom: '6px',
+    color: '#333',
+    wordBreak: 'break-word',
+    lineHeight: '1.3'
+  },
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    marginBottom: '12px',
+    gap: '10px'
+  },
+  imageBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start'
+  },
+  imageLabel: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#333',
+    width: '100%',
+    textAlign: 'left',
+    marginLeft: 0,
+    paddingLeft: 0
+  },
+  imageThumbnail: {
+    width: '90%',
+    height: '120px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    objectFit: 'cover',
+    cursor: 'pointer',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    cursor: 'pointer',
+    fontSize: '18px',
+    color: 'grey',
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: '4px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  bottomButtons: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: '16px',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #eee'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  approveButton: {
+    backgroundColor: '#4CAF50',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#3e8e41'
+    }
+  },
+  rejectButton: {
+    backgroundColor: '#f44336',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+    opacity: '0.7'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '16px',
+    textAlign: 'center',
+    color: '#333',
+    lineHeight: '1.4'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
+  },
+  viewText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  modalHeader: {
+    borderBottom: '1px solid #eee',
+    paddingBottom: '12px',
+    marginBottom: '12px'
+  },
+  compactField: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '6px',
+    gap: '8px'
+  },
+  fieldLabel: {
+    fontWeight: 'bold',
+    color: '#555',
+    fontSize: '13px',
+    minWidth: '100px'
+  },
+  fieldValue: {
+    textAlign: 'right',
+    flex: 1,
+    wordBreak: 'break-word',
+    color: '#333',
+    fontSize: '13px'
+  },
+imageViewerModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000
+  },
+  imageViewerContent: {
+    position: 'relative',
+    width: '100%',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  largeImage: {
+    width: '90%',
+    maxWidth: '1100px',
+    maxHeight: '82vh',
+    objectFit: 'contain',
+    borderRadius: '4px'
+  },
+  imageViewerLabel: {
+    color: 'white',
+    fontSize: '18px',
+    marginTop: '16px',
+    textAlign: 'center'
+  },
+  imageViewerClose: {
+    position: 'fixed',
+    top: '20px',
+    right: '28px',
+    color: 'white',
+    fontSize: '28px',
+    cursor: 'pointer',
+    padding: '8px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    zIndex: 2200,
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  imageViewerNav: {
+    position: 'fixed',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '28px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '50%',
+    border: 'none',
+    outline: 'none',
+    zIndex: 2200
+  },
+  prevButton: {
+    left: '28px'
+  },
+  nextButton: {
+    right: '28px'
+  },
+  // Compact info modal displayed inside the image viewer
+  infoModalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3000
+  },
+  infoModalCard: {
+    width: '340px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
+    textAlign: 'center'
+  },
+  infoTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: '12px'
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '6px 0'
+  },
+  infoLabel: {
+    fontWeight: '600',
+    color: '#555',
+    fontSize: '13px'
+  },
+  infoValue: {
+    color: '#333',
+    fontSize: '13px',
+    maxWidth: '60%',
+    wordBreak: 'break-word',
+    textAlign: 'right'
+  },
+  infoCloseButton: {
+    marginTop: '14px',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold'
+  },
+  rejectionModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1001
+  },
+  rejectionModalContent: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    width: '400px',
+    maxWidth: '90%',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+  },
+  rejectionTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  reasonOption: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '10px',
+    padding: '8px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#f5f5f5'
+    }
+  },
+  reasonRadio: {
+    marginRight: '10px'
+  },
+  reasonText: {
+    flex: 1
+  },
+  customReasonInput: {
+    width: '100%',
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    marginTop: '8px'
+  },
+  rejectionButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: '20px',
+    gap: '10px'
+  },
+  cancelButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    backgroundColor: 'white',
+    cursor: 'pointer'
+  },
+  confirmRejectButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: '#f44336',
+    color: 'white',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  actionText: {
+    fontSize: '14px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    color: '#2D5783',
+    textDecoration: 'none',
+    margin: '0 5px',
+    transition: 'color 0.2s ease, text-decoration 0.2s ease',
+    outline: 'none'
+  },
+  approveHover: {
+    color: '#4CAF50',
+    textDecoration: 'underline'
+  },
+  rejectHover: {
+    color: '#f44336',
+    textDecoration: 'underline'
+  },
+  noDocumentsMessage: {
+    textAlign: 'center',
+    margin: '20px 0',
+    color: '#666',
+    fontStyle: 'italic'
+  },
+  sectionTitle: {
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    margin: '12px 0 8px 0',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #eee'
+  }
+};
+
+const rejectionReasons = [
+  "Invalid proof of payment",
+  "Incorrect amount",
+  "Unclear image",
+  "Suspicious activity",
+  "Other"
+];
+
+const PaymentApplications = ({ 
+  payments, 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  refreshData 
+}) => {
+  const [currentAction, setCurrentAction] = useState(null);
+  const [selectedPayment, setSelectedPayment] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [availableImages, setAvailableImages] = useState([]);
+  const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
+  const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [hoverStates, setHoverStates] = useState({});
+  const [pendingApiCall, setPendingApiCall] = useState(null);
+  const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
+  const showInfoModal = (title, fields) => setInfoModal({ visible: true, title, fields });
+  const closeInfoModal = () => setInfoModal({ visible: false, title: '', fields: [] });
+
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+    }).format(amount);
+
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    
+    return `${hours}:${minutes}:${seconds} ${ampm}`;
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  const handleHover = (transactionId, type, isHovering) => {
+    setHoverStates(prev => ({
+      ...prev,
+      [transactionId]: {
+        ...prev[transactionId],
+        [type]: isHovering ? styles[`${type}Hover`] : {}
+      }
+    }));
+  };
+
+  const openModal = (payment) => {
+    setSelectedPayment(payment);
+    setModalVisible(true);
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setErrorModalVisible(false);
+  };
+
+  const handleApproveClick = () => {
+    setShowApproveConfirmation(true);
+  };
+
+  const handleRejectClick = () => {
+    setShowRejectionModal(true);
+  };
+
+  const confirmApprove = async () => {
+    setShowApproveConfirmation(false);
+    await processAction(selectedPayment, 'approve');
+  };
+
+  const handleReasonSelect = (reason) => {
+    setSelectedReason(reason);
+    if (reason !== "Other (please specify)") {
+      setCustomReason('');
+    }
+  };
+
+  const confirmRejection = () => {
+    if (!selectedReason) {
+      setErrorMessage('Please select a rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    if (selectedReason === "Other (please specify)" && !customReason.trim()) {
+      setErrorMessage('Please specify the rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    setShowRejectionModal(false);
+    setShowRejectConfirmation(true);
+  };
+
+  const confirmRejectFinal = async () => {
+    setShowRejectConfirmation(false);
+    await processAction(selectedPayment, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
+  };
+
+  const processAction = async (payment, action, rejectionReason = '') => {
+    setActionInProgress(true);
+    setIsProcessing(true);
+    setCurrentAction(action);
+
+    try {
+      if (action === 'approve') {
+        await processDatabaseApprove(payment);
+        setSuccessMessage('Payment approved successfully!');
+        
+        const approveData = {
+          ...payment,
+          dateApproved: formatDate(new Date()),
+          timeApproved: formatTime(new Date())
+        };
+        
+        setSelectedPayment(prev => ({
+          ...prev,
+          dateApproved: approveData.dateApproved,
+          timeApproved: approveData.timeApproved,
+          status: 'approved'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
+      } else {
+        await processDatabaseReject(payment, rejectionReason);
+        setSuccessMessage('Payment rejected successfully!');
+        
+        const rejectData = {
+          ...payment,
+          dateRejected: formatDate(new Date()),
+          timeRejected: formatTime(new Date()),
+          rejectionReason
+        };
+        
+        setSelectedPayment(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          timeRejected: rejectData.timeRejected,
+          rejectionReason,
+          status: 'rejected'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
+      }
+      
+      setSuccessMessageModalVisible(true);
+    } catch (error) {
+      console.error('Error processing action:', error);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+      setActionInProgress(false);
+    }
+  };
+
+  const processDatabaseApprove = async (payment) => {
+    try {
+      const { id, transactionId, amountToBePaid } = payment;
+      
+      // 1. Verify member details
+      const memberRef = database.ref(`Members/${id}`);
+      const memberSnap = await memberRef.once('value');
+      const memberData = memberSnap.val();
+
+      if (!memberData || 
+          memberData.email !== payment.email ||
+          memberData.firstName !== payment.firstName || 
+          memberData.lastName !== payment.lastName) {
+        throw new Error('Member details do not match our records');
+      }
+
+      // 2. Load Settings (Funds, Yields, Savings, Penalty)
+      const fundsRef = database.ref('Settings/Funds');
+      const yieldsRef = database.ref('Settings/Yields');
+      const yieldsHistoryRef = database.ref('Settings/YieldsHistory');
+      const savingsRef = database.ref('Settings/Savings');
+      const penaltyValueRef = database.ref('Settings/PenaltyValue');
+
+      // 3. Find current loan (if any)
+      const memberLoansRef = database.ref(`Loans/CurrentLoans/${id}`);
+
+      let currentLoanData = null;
+      let currentLoanKey = null;
+      let isLoanPayment = false;
+      let interestAmount = 0;
+      let loanAmount = 0;
+      let dueDateStr = '';
+      let approvedLoanData = null;
+
+      // Prefer the loan explicitly selected in the application
+      const preferredLoanKey = payment.selectedLoanId;
+      if (preferredLoanKey) {
+        const specificLoanSnap = await database.ref(`Loans/CurrentLoans/${id}/${preferredLoanKey}`).once('value');
+        if (specificLoanSnap.exists()) {
+          currentLoanData = specificLoanSnap.val();
+          currentLoanKey = preferredLoanKey;
+          isLoanPayment = true;
+          loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+          dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+          console.log('Current loan (selected by member) found:', { key: currentLoanKey, loanAmount, currentDueDate: dueDateStr });
+        }
+      }
+
+      // Fallback: pick the first loan if none explicitly selected or not found
+      if (!currentLoanData) {
+        const memberLoansSnap = await memberLoansRef.once('value');
+        if (memberLoansSnap.exists()) {
+          console.log('Found member loans, processing...');
+          memberLoansSnap.forEach((loanSnap) => {
+            if (!currentLoanData) {
+              currentLoanData = loanSnap.val();
+              currentLoanKey = loanSnap.key;
+              isLoanPayment = true;
+              loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+              dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+              console.log('Current loan found:', { key: currentLoanKey, loanAmount, currentDueDate: dueDateStr });
+            }
+          });
+        } else {
+          console.log('No current loans found for member:', id);
+        }
+      }
+
+      // 4. Fetch the original interest and term from ApprovedLoans (not from CurrentLoans)
+      if (currentLoanKey) {
+        const approvedLoanRef = database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`);
+        const approvedLoanSnap = await approvedLoanRef.once('value');
+        
+        if (approvedLoanSnap.exists()) {
+          approvedLoanData = approvedLoanSnap.val();
+          interestAmount = parseFloat(approvedLoanData.interest) || 0;
+          console.log('Original interest from ApprovedLoans:', interestAmount);
+          console.log('Original term from ApprovedLoans:', approvedLoanData.term);
+        } else {
+          console.log('Warning: ApprovedLoan data not found, using 0 interest');
+          interestAmount = 0;
+        }
+      }
+
+      // Generate a new transaction ID for approved/transactions records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Database references for Payment and Logs
+      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${originalTransactionId}`);
+      const approvedRef = database.ref(`Payments/ApprovedPayments/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${id}/${newTransactionId}`);
+
+      // 4. Fetch current values
+      const [paymentSnap, fundsSnap, savingsSnap, penaltySnap] = await Promise.all([
+        paymentRef.once('value'),
+        fundsRef.once('value'),
+        savingsRef.once('value'),
+        penaltyValueRef.once('value')
+      ]);
+
+      if (!paymentSnap.exists()) throw new Error('Payment data not found');
+
+      const paymentData = paymentSnap.val();
+      const paymentAmount = parseFloat(amountToBePaid) || 0;
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+      const currentSavings = parseFloat(savingsSnap.val()) || 0;
+      const memberBalance = parseFloat(memberData.balance || 0);
+      const penaltyPerDay = parseFloat(penaltySnap.val()) || 0;
+
+      // 5. Compute overdue penalty (days * penaltyPerDay)
+      const parseToStartOfDay = (d) => {
+        const dt = new Date(d);
+        return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      };
+
+      // Prefer penalty provided in payment application; fallback to computed by overdue days (interest-based)
+      const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
+
+      let overdueDays = 0;
+      let penaltyDue = 0;
+      if (penaltyFromApp > 0) {
+        penaltyDue = Math.round((penaltyFromApp + Number.EPSILON) * 100) / 100;
+      } else if (isLoanPayment && dueDateStr) {
+        const todayStart = parseToStartOfDay(new Date());
+        const dueDateParsed = parseToStartOfDay(new Date(dueDateStr));
+        if (!isNaN(dueDateParsed.getTime()) && todayStart > dueDateParsed) {
+          const ms = todayStart.getTime() - dueDateParsed.getTime();
+          overdueDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
+        }
+        // Overdue penalty = monthly interest * (days_lapsed / 30)
+        const interestForPenalty = parseFloat(interestAmount) || 0;
+        penaltyDue = Math.max(0, Math.round(((interestForPenalty * (overdueDays / 30)) + Number.EPSILON) * 100) / 100);
+      }
+
+      // Include any previously accrued penalties from the loan record
+      const existingAccruedPenalty = parseFloat(currentLoanData?.penaltyAccrued) || 0;
+      penaltyDue = Math.round(((penaltyDue + existingAccruedPenalty) + Number.EPSILON) * 100) / 100;
+
+      const penaltyPaid = Math.min(paymentAmount, penaltyDue);
+
+      // Amount left for interest/principal after penalty
+      const remainingAfterPenalty = paymentAmount - penaltyPaid;
+
+      // 6. Split remaining into interest then principal
+      let interestPaid = 0;
+      let principalPaid = 0;
+      let excessPayment = 0;
+      let newMemberBalance = memberBalance;
+
+      console.log('Payment processing debug:');
+      console.log('isLoanPayment:', isLoanPayment);
+      console.log('currentLoanData exists:', !!currentLoanData);
+      console.log('currentLoanKey:', currentLoanKey);
+      console.log('loanAmount:', loanAmount);
+      console.log('paymentAmount:', paymentAmount);
+      
+      if (isLoanPayment && currentLoanData) {
+        interestPaid = Math.min(remainingAfterPenalty, interestAmount);
+        const afterInterest = remainingAfterPenalty - interestPaid;
+        principalPaid = Math.min(afterInterest, loanAmount);
+
+        // Remaining beyond loan principal becomes excess
+        const remainingAfterPrincipal = afterInterest - principalPaid;
+        excessPayment = Math.max(0, remainingAfterPrincipal);
+
+        // Update or clear the loan
+        const remainingLoan = loanAmount - (principalPaid + excessPayment);
+        console.log('remainingLoan after payment (after applying principal + excess):', remainingLoan);
+        
+        // Track remainingBalance (principal + total interest not yet paid) and cumulative amountPaid (principal + interest only)
+        const prevRemainingBalance = parseFloat(
+          (currentLoanData && currentLoanData.remainingBalance) ?? (approvedLoanData && approvedLoanData.totalTermPayment) ?? 0
+        ) || 0;
+        const prevAmountPaid = parseFloat(currentLoanData?.amountPaid) || 0;
+        const amountPaidThisApproval = (interestPaid + principalPaid);
+        const newAmountPaid = Math.ceil((prevAmountPaid + amountPaidThisApproval) * 100) / 100;
+        const newRemainingBalance = Math.max(0, Math.ceil((prevRemainingBalance - amountPaidThisApproval) * 100) / 100);
+
+        if (newRemainingBalance <= 0) {
+          // Fully settled: archive as paid, remove from Current/Approved, and log transaction
+          console.log('Loan fully settled - archiving to PaidLoans and logging paid transaction');
+
+          const nowPaid = new Date();
+          const datePaid = formatDate(nowPaid);
+          const timePaid = formatTime(nowPaid);
+          const paidTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+          // Try to read original loan transaction to get canonical fields like loanAmount
+          let originalLoanTxn = null;
+          try {
+            const origTxnSnap = await database.ref(`Transactions/Loans/${id}/${currentLoanKey}`).once('value');
+            if (origTxnSnap.exists()) originalLoanTxn = origTxnSnap.val();
+          } catch (e) {
+            console.warn('Could not read original loan transaction for', currentLoanKey, e);
+          }
+
+          const loanAmountFromTxn = parseFloat(originalLoanTxn?.loanAmount ?? approvedLoanData?.loanAmount ?? currentLoanData?.loanAmount) || 0;
+
+          const paidRecord = {
+            ...(approvedLoanData || currentLoanData || {}),
+            transactionId: paidTransactionId,
+            originalTransactionId: currentLoanKey,
+            status: 'paid',
+            datePaid,
+            timePaid,
+            timestamp: nowPaid.getTime(),
+            loanAmount: Math.ceil(loanAmountFromTxn * 100) / 100
+          };
+
+          // Write to Loans/PaidLoans and Transactions/Loans (paid event)
+          const paidLoansRef = database.ref(`Loans/PaidLoans/${id}/${paidTransactionId}`);
+          const paidTxnRef = database.ref(`Transactions/Loans/${id}/${paidTransactionId}`);
+          await Promise.all([
+            paidLoansRef.set(paidRecord),
+            paidTxnRef.set(paidRecord)
+          ]);
+
+          // Remove from CurrentLoans and member mirror
+          const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
+          await Promise.all([
+            memberLoansRef.child(currentLoanKey).remove(),
+            memberLoanRef.remove()
+          ]);
+
+          // Note: Borrowed savings have been gradually deducted during payments
+          // No need to return borrowed amount here as it's been handled incrementally
+          const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
+          if (borrowedFromSavings > 0) {
+            console.log(`Loan fully paid. Borrowed amount (${formatCurrency(borrowedFromSavings)}) was gradually deducted during payments.`);
+          }
+
+          // Remove from ApprovedLoans (both possible paths), specific key only
+          try { await database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).remove(); } catch (_) {}
+          try { await database.ref(`ApprovedLoans/${id}/${currentLoanKey}`).remove(); } catch (_) {}
+
+        } else {
+          // STEP 1: UPDATE CURRENTLOANS FIRST (in specific order)
+          console.log('=== STEP 1: Updating CurrentLoans ===');
+          
+          const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
+          const currentMonthlyPayment = parseFloat(currentLoanData.monthlyPayment) || 0;
+          const currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
+          
+          // Calculate excess/shortage relative to scheduled payment
+          const scheduledPayment = currentTotalMonthlyPayment + penaltyDue;
+          const excessBeyondScheduled = Math.max(0, paymentAmount - scheduledPayment);
+          // Shortage should consider only interest+principal (exclude penalty from next cycle)
+          const shortageBeyondScheduled = Math.max(0, currentTotalMonthlyPayment - remainingAfterPenalty);
+          
+          // Calculate next monthly principal by adjusting for excess/shortage
+          const originalTerm = parseFloat(approvedLoanData?.term) || 1;
+          const remainingTerm = Math.max(1, originalTerm - paymentsMade);
+          
+          // If this is the last payment term, calculate based on remaining principal portion only
+          let newMonthlyPayment;
+          if (remainingTerm === 1) {
+            // Last payment: monthly principal portion equals remaining principal
+            newMonthlyPayment = Math.max(0, remainingLoan);
+          } else {
+            // Normal payment: decrease by excess, increase by shortage
+            newMonthlyPayment = Math.max(0, currentMonthlyPayment - excessBeyondScheduled + shortageBeyondScheduled);
+          }
+          
+          // New total monthly payment = new monthly principal + scheduled interest
+          const newTotalMonthlyPayment = newMonthlyPayment + interestAmount + Math.max(0, penaltyDue - penaltyPaid);
+          
+          console.log('Payment calculation details:', {
+            originalTerm,
+            paymentsMade,
+            remainingTerm,
+            remainingLoan,
+            currentMonthlyPayment,
+            excessBeyondScheduled,
+            shortageBeyondScheduled,
+            newMonthlyPayment,
+            interestAmount,
+            carriedPenaltyToNext: Math.max(0, penaltyDue - penaltyPaid),
+            newTotalMonthlyPayment,
+            isLastPayment: remainingTerm === 1,
+            prevRemainingBalance,
+            newRemainingBalance,
+            newAmountPaid
+          });
+
+          // Add 30 days to the current due date, not today's date
+          let newDueDateObj;
+          if (dueDateStr) {
+            // Parse the current due date and add 30 days to it
+            newDueDateObj = new Date(dueDateStr);
+            newDueDateObj.setDate(newDueDateObj.getDate() + 30);
+          } else {
+            // Fallback: if no current due date, use today + 30 days
+            newDueDateObj = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+          }
+          
+          const newDueDate = formatDate(newDueDateObj);
+          
+          console.log('Current dueDate:', dueDateStr);
+          console.log('New dueDate (adding 30 days):', newDueDate);
+          console.log('Loan path:', `Loans/CurrentLoans/${id}/${currentLoanKey}`);
+          
+          // Update CurrentLoans in the specific order: loanAmount, dueDate, monthlyPayment, totalMonthlyPayment, amountPaid, remainingBalance
+          const loanUpdates = {};
+          loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100; // remaining principal after applying principal + excess
+          loanUpdates['dueDate'] = newDueDate;
+          loanUpdates['monthlyPayment'] = Math.ceil(newMonthlyPayment * 100) / 100;
+          loanUpdates['totalMonthlyPayment'] = Math.ceil(newTotalMonthlyPayment * 100) / 100;
+          loanUpdates['paymentsMade'] = paymentsMade;
+          loanUpdates['amountPaid'] = newAmountPaid; // principal + interest paid so far
+          loanUpdates['remainingBalance'] = newRemainingBalance; // total term outstanding (principal + scheduled interest not yet paid)
+          loanUpdates['penaltyAccrued'] = Math.max(0, penaltyDue - penaltyPaid); // carry remaining penalty forward
+          
+          // Also update mirrored copy under Members/{id}/loans/{loanId}
+          const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
+          await Promise.all([
+            memberLoansRef.child(currentLoanKey).update(loanUpdates),
+            memberLoanRef.update(loanUpdates)
+          ]);
+          console.log('CurrentLoans and Members loans updated with new dueDate and remainingBalance:', newDueDate, newRemainingBalance);
+        }
+
+        // Principal and any excess increase member's balance
+        newMemberBalance = memberBalance + principalPaid + excessPayment;
+      }
+
+      // STEP 2: UPDATE MEMBERS AND FUNDS AFTER CURRENTLOANS
+      console.log('=== STEP 2: Updating Members and Funds ===');
+      
+      // Calculate how much of the principal should go back to member vs savings
+      const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
+      const originalLoanAmount = parseFloat(approvedLoanData?.amount) || 0;
+      
+      console.log('=== Savings Calculation Debug ===');
+      console.log('borrowedFromSavings:', borrowedFromSavings);
+      console.log('originalLoanAmount:', originalLoanAmount);
+      console.log('memberBalance:', memberBalance);
+      console.log('principalPaid:', principalPaid);
+      console.log('excessPayment:', excessPayment);
+      
+      // Validate values to prevent division by zero or invalid calculations
+      let memberContributionRatio = 1; // Default: all goes to member
+      if (originalLoanAmount > 0 && borrowedFromSavings > 0 && borrowedFromSavings < originalLoanAmount) {
+        memberContributionRatio = (originalLoanAmount - borrowedFromSavings) / originalLoanAmount;
+      }
+      
+      // Ensure ratio is valid (between 0 and 1)
+      if (isNaN(memberContributionRatio) || memberContributionRatio < 0 || memberContributionRatio > 1) {
+        console.log('Invalid ratio detected, using fallback ratio = 1');
+        memberContributionRatio = 1;
+      }
+      
+      console.log('memberContributionRatio:', memberContributionRatio);
+      
+      // STEP 1: Return any borrowed amount back to savings when principal is paid
+      // borrowedFromSavings is already declared above from approvedLoanData
+      
+      let savingsAfterBorrowedReturn = currentSavings;
+      if (borrowedFromSavings > 0) {
+        // Calculate how much of the borrowed amount to return based on payment progress
+        const totalLoanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+        
+        // Return proportional borrowed amount based on principal payment
+        const borrowedToReturn = borrowedFromSavings * (principalPaid / totalLoanAmount);
+        
+        console.log(`=== Borrowed Savings Return Analysis ===`);
+        console.log(`Total borrowed from savings: ${formatCurrency(borrowedFromSavings)}`);
+        console.log(`Total loan amount: ${formatCurrency(totalLoanAmount)}`);
+        console.log(`Principal paid this payment: ${formatCurrency(principalPaid)}`);
+        console.log(`Proportional borrowed to return: ${formatCurrency(borrowedToReturn)}`);
+        console.log(`Current savings available: ${formatCurrency(currentSavings)}`);
+        
+        if (borrowedToReturn > 0) {
+          savingsAfterBorrowedReturn = Math.ceil((currentSavings + borrowedToReturn) * 100) / 100;
+          await savingsRef.set(savingsAfterBorrowedReturn);
+          console.log(`✅ Borrowed savings returned: ${formatCurrency(borrowedToReturn)}`);
+          console.log(`Savings: ${formatCurrency(currentSavings)} → ${formatCurrency(savingsAfterBorrowedReturn)}`);
+          
+          // Update daily SavingsHistory by adding the borrowed amount back
+          const now = new Date();
+          const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+          const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+          const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+          const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+          const newDaySavings = Math.ceil((currentDaySavings + borrowedToReturn) * 100) / 100;
+          await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+          console.log(`Savings history updated for ${dateKey}`);
+        } else {
+          console.log(`ℹ️ No borrowed amount to return this payment`);
+        }
+      } else {
+        console.log(`ℹ️ No borrowed savings for this loan`);
+      }
+      
+      // STEP 2: Now proceed with normal member balance allocation
+      // Add principal amount minus borrowed portion + excess to member balance
+      // The borrowed portion is returned to savings separately above
+      const principalToMember = principalPaid - borrowedFromSavings;
+      const memberBalanceToSet = Math.ceil((memberBalance + principalToMember + excessPayment) * 100) / 100;
+      
+      console.log('=== Member Balance Update Debug ===');
+      console.log('principalPaid:', principalPaid);
+      console.log('borrowedFromSavings:', borrowedFromSavings);
+      console.log('principalToMember (after deducting borrowed):', principalToMember);
+      console.log('excessPayment:', excessPayment);
+      console.log('memberBalance before:', memberBalance);
+      console.log('memberBalanceToSet:', memberBalanceToSet);
+      
+      // Validate final balance to prevent invalid values
+      if (isNaN(memberBalanceToSet) || !isFinite(memberBalanceToSet)) {
+        console.error('Invalid member balance calculation, using fallback');
+        const fallbackBalance = Math.ceil((memberBalance + principalPaid + excessPayment) * 100) / 100;
+        await memberRef.update({ balance: fallbackBalance });
+        console.log(`Member balance updated (fallback): ${formatCurrency(fallbackBalance)}`);
+      } else {
+        await memberRef.update({ balance: memberBalanceToSet });
+        console.log(`Member balance updated: principal to member (${formatCurrency(principalToMember)}) + excess (${formatCurrency(excessPayment)})`);
+      }
+
+      // Update Savings with penalty only, and Yields with interest
+      const now = new Date();
+      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+      // 2a) Add penalties to Savings and SavingsHistory (daily aggregate)
+      if (penaltyPaid > 0) {
+        const newSavingsAmount = Math.ceil((savingsAfterBorrowedReturn + penaltyPaid) * 100) / 100;
+        await savingsRef.set(newSavingsAmount);
+        console.log('Savings (penalties) updated');
+
+        // Update daily SavingsHistory by adding to the existing value for the date
+        const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+        const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const newDaySavings = Math.ceil((currentDaySavings + penaltyPaid) * 100) / 100;
+        await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+        console.log('Savings history updated');
+      }
+
+      // 2b) Add interest to Yields and YieldsHistory
+      if (interestPaid > 0) {
+        const currentYieldsSnap = await yieldsRef.once('value');
+        const currentYields = parseFloat(currentYieldsSnap.val()) || 0;
+        const newYieldsAmount = Math.ceil((currentYields + interestPaid) * 100) / 100;
+        await yieldsRef.set(newYieldsAmount);
+        console.log('Yields (interest) updated');
+
+        // Update daily YieldsHistory by adding to the existing value for the date
+        const currentDayYieldsSnap = await yieldsHistoryRef.child(dateKey).once('value');
+        const currentDayYields = parseFloat(currentDayYieldsSnap.val()) || 0;
+        const newDayYields = Math.ceil((currentDayYields + interestPaid) * 100) / 100;
+        const yieldsHistoryUpdate = {};
+        yieldsHistoryUpdate[dateKey] = newDayYields;
+        await yieldsHistoryRef.update(yieldsHistoryUpdate);
+        console.log('Yields history updated');
+      }
+
+      // Update Funds with principal amount minus borrowed portion + excess
+      // The borrowed portion is returned to savings separately above
+      const principalToFunds = principalPaid - borrowedFromSavings;
+      const fundsIncrease = principalToFunds + excessPayment;
+      
+      console.log('=== Funds Update Debug ===');
+      console.log('principalPaid:', principalPaid);
+      console.log('borrowedFromSavings:', borrowedFromSavings);
+      console.log('principalToFunds (after deducting borrowed):', principalToFunds);
+      console.log('excessPayment:', excessPayment);
+      console.log('fundsIncrease (principal + excess):', fundsIncrease);
+      
+      if (fundsIncrease > 0) {
+        const newFundsAmount = Math.ceil((currentFunds + fundsIncrease) * 100) / 100;
+        await fundsRef.set(newFundsAmount);
+        console.log(`Funds updated: ${formatCurrency(currentFunds)} + ${formatCurrency(fundsIncrease)} = ${formatCurrency(newFundsAmount)}`);
+        
+        // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD to match SavingsHistory)
+        const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+        await fundsHistoryRef.set(newFundsAmount);
+        console.log('Funds history updated');
+      }
+
+      // 10. Write approved/transaction records
+      const approvedData = {
+        ...paymentData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
+        dateApproved: formatDate(now),
+        timeApproved: formatTime(now),
+        timestamp: now.getTime(),
+        status: 'approved',
+        // breakdown
+        penaltyPerDay,
+        overdueDays,
+        penaltyDue,
+        penaltyPaid,
+        interestScheduled: interestAmount,
+        interestPaid,
+        principalPaid,
+        excessPayment,
+        isLoanPayment,
+        appliedToLoan: currentLoanKey
+      };
+
+      await approvedRef.set(approvedData);
+      await transactionRef.set(approvedData);
+      await paymentRef.remove();
+
+    } catch (err) {
+      console.error('Approval DB error:', err);
+      throw new Error(err.message || 'Failed to approve payment');
+    }
+  };
+
+  const processDatabaseReject = async (payment, rejectionReason) => {
+    try {
+      const { id, transactionId } = payment;
+      const now = new Date();
+      const rejectionDate = formatDate(now);
+      const rejectionTime = formatTime(now);
+
+      // Generate a new transaction ID for rejected/transactions records
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const paymentRef = database.ref(`Payments/PaymentApplications/${id}/${originalTransactionId}`);
+      const rejectedRef = database.ref(`Payments/RejectedPayments/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Payments/${id}/${newTransactionId}`);
+
+      const paymentSnap = await paymentRef.once('value');
+      if (!paymentSnap.exists()) {
+        throw new Error('Payment data not found.');
+      }
+
+      const rejectedPayment = { 
+        ...paymentSnap.val(), 
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
+        dateRejected: rejectionDate,
+        timeRejected: rejectionTime,
+        timestamp: now.getTime(),
+        status: 'rejected',
+        rejectionReason: rejectionReason || 'Rejected by admin'
+      };
+
+      await rejectedRef.set(rejectedPayment);
+      await transactionRef.set(rejectedPayment);
+      await paymentRef.remove();
+
+      return newTransactionId;
+
+    } catch (err) {
+      console.error('Rejection DB error:', err);
+      throw new Error(err.message || 'Failed to reject payment');
+    }
+  };
+
+  const callApiApprove = async (payment) => {
+    try {
+      const now = new Date();
+      const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
+      const memberData = memberSnap.val();
+
+      // Calculate interest and principal if this is a loan payment
+      let interestAmount = 0;
+      let principalAmount = parseFloat(payment.amountToBePaid);
+      let excessPayment = 0;
+      let isLoanPayment = false;
+
+      // Check if this is a loan payment (use selectedLoanId if provided)
+      const loanRef = database.ref(`Loans/CurrentLoans/${payment.id}/${payment.selectedLoanId || payment.transactionId}`);
+      const loanSnap = await loanRef.once('value');
+      
+      if (loanSnap.exists()) {
+        isLoanPayment = true;
+        const loanData = loanSnap.val();
+        interestAmount = parseFloat(loanData.interest) || 0;
+        principalAmount = parseFloat(payment.amountToBePaid) - interestAmount;
+        
+        // Handle overpayment
+        const remainingLoan = parseFloat(loanData.loanAmount) - principalAmount;
+        if (remainingLoan < 0) {
+          excessPayment = Math.abs(remainingLoan);
+          principalAmount = parseFloat(loanData.loanAmount);
+        }
+      }
+
+      const response = await ApprovePayments({
+        memberId: payment.id,
+        transactionId: payment.transactionId,
+        amount: payment.amountToBePaid,
+        paymentMethod: payment.paymentOption,
+        dateApproved: payment.dateApproved || formatDate(now),
+        timeApproved: payment.timeApproved || formatTime(now),
+        email: payment.email,
+        firstName: memberData.firstName,
+        lastName: memberData.lastName,
+        status: 'approved',
+        interestPaid: interestAmount.toFixed(2),
+        principalPaid: principalAmount.toFixed(2),
+        excessPayment: excessPayment.toFixed(2),
+        isLoanPayment: isLoanPayment
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to send approval email');
+      }
+      return response;
+    } catch (err) {
+      console.error('API approve error:', err);
+      throw err;
+    }
+  };
+
+  const callApiReject = async (payment) => {
+    try {
+      const now = new Date();
+      const memberSnap = await database.ref(`Members/${payment.id}`).once('value');
+      const memberData = memberSnap.val();
+
+      let rejectionMessage = '';
+      
+      // Custom rejection messages based on reason
+      if (payment.rejectionReason.includes('Invalid proof')) {
+        rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed because the proof of payment you provided could not be validated. Please ensure you upload a clear, valid proof of payment document when resubmitting.`;
+      } 
+      else if (payment.rejectionReason.includes('Incorrect amount')) {
+        rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed because the amount does not match our records. Please verify the correct payment amount and resubmit your payment.`;
+      }
+      else if (payment.rejectionReason.includes('Unclear image')) {
+        rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed because the image of your proof of payment was unclear or unreadable. Please ensure your proof of payment is clearly visible when resubmitting.`;
+      }
+      else {
+        rejectionMessage = `We regret to inform you that your payment of ₱${payment.amountToBePaid} submitted on ${payment.dateApplied} could not be processed.${payment.rejectionReason ? `\n\nReason: ${payment.rejectionReason}` : ''}`;
+      }
+
+      const response = await RejectPayments({
+        memberId: payment.id,
+        transactionId: payment.transactionId,
+        amount: payment.amountToBePaid,
+        paymentMethod: payment.paymentOption,
+        dateRejected: payment.dateRejected || formatDate(now),
+        timeRejected: payment.timeRejected || formatTime(now),
+        email: payment.email,
+        firstName: memberData.firstName,
+        lastName: memberData.lastName,
+        status: 'rejected',
+        rejectionReason: payment.rejectionReason || 'Rejected by admin',
+        rejectionMessage: rejectionMessage
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to send rejection email');
+      }
+      return response;
+    } catch (err) {
+      console.error('API reject error:', err);
+      throw err;
+    }
+  };
+
+  const handleSuccessOk = async () => {
+    setSuccessMessageModalVisible(false);
+    closeModal();
+    setSelectedPayment(null);
+    setCurrentAction(null);
+    
+    // Execute pending API call
+    if (pendingApiCall) {
+      try {
+        if (pendingApiCall.type === 'approve') {
+          await callApiApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await callApiReject(pendingApiCall.data);
+        }
+      } catch (error) {
+        console.error('Error calling API:', error);
+      }
+      setPendingApiCall(null);
+    }
+    
+    refreshData();
+  };
+
+const openImageViewer = (url, label) => {
+    setCurrentImage({ url, label });
+    setImageViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+  };
+
+  // OCR helpers/state for payment proof
+  const [validationStatus, setValidationStatus] = useState({});
+  const getValidationText = (label) => {
+    const status = validationStatus[label];
+    if (!status) return null;
+    const color = status.status === 'valid' ? '#4CAF50'
+      : (status.status === 'invalid' || status.status === 'error') ? '#f44336'
+      : status.status === 'partial' ? '#ff9800'
+      : status.status === 'verifying' ? '#2196F3'
+      : '#fff';
+    return (
+      <div style={{ 
+        marginTop: 8, 
+        fontSize: 13, 
+        color: color,
+        textAlign: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        maxWidth: '300px',
+        wordWrap: 'break-word'
+      }}>
+        {status.message}
+      </div>
+    );
+  };
+
+  // Copy of Registrations CORS-safe image loader for OCR
+  const loadImageWithCORS = async (imageUrl) => {
+    return new Promise((resolve, reject) => {
+      const createCanvasFromImage = (img) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = img.width || img.naturalWidth;
+        canvas.height = img.height || img.naturalHeight;
+        try {
+          ctx.drawImage(img, 0, 0);
+          return canvas;
+        } catch (error) {
+          return img;
+        }
+      };
+      const tryLoadImage = (corsMode, attempt = 1) => {
+        const newImg = new Image();
+        if (corsMode) newImg.crossOrigin = corsMode;
+        newImg.onload = () => {
+          if (imageUrl.includes('firebasestorage.googleapis.com')) {
+            try { resolve(createCanvasFromImage(newImg)); } catch { resolve(newImg); }
+          } else {
+            resolve(newImg);
+          }
+        };
+        newImg.onerror = () => {
+          if (attempt === 1) {
+            tryLoadImage('use-credentials', 2);
+          } else if (attempt === 2) {
+            tryLoadImage(null, 3);
+          } else if (attempt === 3) {
+            try {
+              const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+              const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
+              const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+              const proxied = new Image();
+              proxied.crossOrigin = 'anonymous';
+              proxied.onload = () => resolve(proxied);
+              proxied.onerror = () => resolve(newImg);
+              proxied.src = proxyUrl;
+            } catch {
+              resolve(newImg);
+            }
+          }
+        };
+        newImg.src = imageUrl;
+      };
+      tryLoadImage('anonymous', 1);
+    });
+  };
+
+  // Simple preprocessing to improve OCR contrast/clarity
+  const preprocessForOCR = (img, scale = 2, binary = false) => {
+    try {
+      const srcW = img.width || img.naturalWidth || 0;
+      const srcH = img.height || img.naturalHeight || 0;
+      if (!srcW || !srcH) return img;
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = Math.round(srcW * scale);
+      canvas.height = Math.round(srcH * scale);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const data = imageData.data;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i + 1], b = data[i + 2];
+        let v = 0.299 * r + 0.587 * g + 0.114 * b;
+        v = Math.min(255, Math.max(0, (v - 128) * 1.15 + 128));
+        if (binary) v = v > 150 ? 255 : 0;
+        data[i] = data[i + 1] = data[i + 2] = v;
+      }
+      ctx.putImageData(imageData, 0, 0);
+      return canvas;
+    } catch {
+      return img;
+    }
+  };
+
+  const parsePaymentText = (raw) => {
+    const text = (raw || '').replace(/\s+/g, ' ').replace(/[|]/g, ' ').trim();
+
+    const amountPatterns = [
+      /(?:amount|amt|paid)\s*[:\-]?\s*(?:php|₱)?\s*([\d.,]+)\b/i,
+      /(?:php|₱)\s*([\d.,]+)\b/i
+    ];
+    const refPatterns = [
+      // Ref with digits and spaces (e.g., "Ref No. 2012 120 513868")
+      /(ref(?:erence)?\s*(?:no\.?|#)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
+      // Common labelled refs
+      /(ref(?:erence)?\s*(?:no\.?|#)?|gcash\s*ref(?:erence)?|txn\s*id|transaction\s*(?:id|no\.?))\s*[:\-]?\s*([A-Z0-9\-]{6,})/i,
+      /\b(?:ref(?:erence)?\s*(?:no\.?|#)?)\s*([A-Z0-9\-]{6,})\b/i,
+      /\b([A-Z0-9]{10,})\b/
+    ];
+
+    // Date and time extraction similar to Registrations payment proof, with more variations
+    const month = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+    const timePart = '(?:\\d{1,2}[:.;\\s]\\d{2}(?:[:.;\\s]\\d{2})?\\s*(?:am|pm)?)';
+    const datePatterns = [
+      new RegExp(`\\b${month}\\s+\\d{1,2},?\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{1,2}\\s+${month}\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b${month}\\s+\\d{1,2}\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{4}-\\d{2}-\\d{2}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{1,2}\/\\d{1,2}\/\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b(?:date\\s*&\\s*time|date\\s+and\\s+time|transaction\\s*date|date|time)\\s*[:\\-]?\\s*(${month}\\s+\\d{1,2},?\\s+\\d{2,4}(?:\\s+${timePart})?|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}(?:\\s+${timePart})?|\\d{4}-\\d{2}-\\d{2}(?:\\s+${timePart})?)`, 'i')
+    ];
+
+    let amount = null;
+    for (const re of amountPatterns) {
+      const m = text.match(re);
+      if (m && m[1]) {
+        amount = m[1].replace(/,/g, '');
+        const dotCount = (amount.match(/\./g) || []).length;
+        const commaCount = (amount.match(/,/g) || []).length;
+        if (commaCount && !dotCount) amount = amount.replace(/,/g, '');
+        if (commaCount && dotCount) amount = amount.replace(/,/g, '');
+        break;
+      }
+    }
+
+    let refNo = null;
+    for (const re of refPatterns) {
+      const m = text.match(re);
+      if (m) {
+        refNo = (m[2] || m[1] || '').toString().trim();
+        // Clean groups of digits with spaces into a unified format: keep spaces
+        refNo = refNo.replace(/\s{2,}/g, ' ').trim();
+        break;
+      }
+    }
+    // Fallback: capture up to ~20 chars after "Ref" token if still empty
+    if (!refNo) {
+      const fallback = text.match(/ref(?:erence)?\s*(?:no\.?|#)?\s*[:\-]?\s*([A-Z0-9\s\-]{8,30})/i);
+      if (fallback && fallback[1]) {
+        refNo = fallback[1].replace(/[^A-Z0-9\s\-]/gi, '').replace(/\s{2,}/g, ' ').trim();
+      }
+    }
+    if (!refNo) {
+      // Plain spaced-digit sequences: e.g., 8030 493 146060
+      const spacedDigits = text.match(/\b\d{3,6}(?:\s+\d{3,6}){1,5}\b/);
+      if (spacedDigits) {
+        refNo = spacedDigits[0].replace(/\s{2,}/g, ' ').trim();
+      }
+    }
+
+    let dateTime = null;
+    for (const re of datePatterns) {
+      const m = text.match(re);
+      if (m) { dateTime = (m[1] || m[0]).trim(); break; }
+    }
+    if (!dateTime) {
+      const dateToken = text.match(new RegExp(`\\b(?:${month})\\s+\\d{1,2},?\\s+\\d{2,4}\\b|\\b\\d{1,2}\/\\d{1,2}\/\\d{2,4}\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b`, 'i'));
+      const timeToken = text.match(/\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\b/i);
+      if (dateToken && timeToken) dateTime = `${dateToken[0]} ${timeToken[0]}`.trim();
+    }
+
+    return { amount, refNo, dateTime };
+  };
+
+  const verifyPaymentOCR = async (imageUrl, label) => {
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Extracting payment details...' }
+    }));
+
+    try {
+      const baseImg = await loadImageWithCORS(imageUrl);
+      const preprocessed = preprocessForOCR(baseImg, 2, false);
+      const { data: { text, confidence } } = await Tesseract.recognize(preprocessed, 'eng');
+      const parsed = parsePaymentText(text);
+      const foundAny = parsed.amount || parsed.refNo;
+
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: {
+          status: foundAny ? 'valid' : (confidence > 30 ? 'partial' : 'manual'),
+          message: foundAny
+            ? `Amount: ${parsed.amount || 'N/A'}, Ref No: ${parsed.refNo || 'N/A'}${parsed.dateTime ? `, Date: ${parsed.dateTime}` : ''}`
+            : 'Text detected but could not find Amount/Ref No'
+        }
+      }));
+
+      if (foundAny) {
+        showInfoModal('Verification Success', [
+          { label: 'Amount', value: parsed.amount || 'N/A' },
+          { label: 'Reference No', value: parsed.refNo || 'N/A' },
+          { label: 'Date/Time', value: parsed.dateTime || 'N/A' }
+        ]);
+      } else {
+        showInfoModal('Verification Failed', [
+          { label: 'Reason', value: 'Could not detect Amount and Reference No.' }
+        ]);
+      }
+    } catch (e) {
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Payment OCR failed' }
+      }));
+    }
+  };
+
+  const hasDocuments = (payment) => {
+    return payment.proofOfPaymentUrl;
+  };
+
+  if (!payments.length) {
+    // Show only the text, no container box
+    return (
+      <p style={styles.noDataMessage}>No payment applications available.</p>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.tableContainer}>
+        <table style={styles.table}>
+          <thead>
+            <tr style={styles.tableHeader}>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Method</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {payments.map((item, index) => (
+              <tr key={index} style={styles.tableRow}>
+                <td style={styles.tableCell}>{item.id}</td>
+                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
+                <td style={styles.tableCell}>{item.transactionId}</td>
+                <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid)}</td>
+                <td style={styles.tableCell}>{item.paymentOption}</td>
+                <td style={{
+                  ...styles.tableCell,
+                  ...(item.status === 'approved' ? styles.statusApproved : {}),
+                  ...(item.status === 'rejected' ? styles.statusRejected : {})
+                }}>
+                  {item.status || 'pending'}
+                </td>
+                <td style={styles.tableCell}>
+                  <span 
+                    style={styles.viewText} 
+                    onClick={() => openModal(item)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    View
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modalVisible && selectedPayment && (
+        <div style={styles.centeredModal}>
+          <div style={hasDocuments(selectedPayment) ? styles.modalCard : styles.modalCardSingleColumn}>
+            <button 
+              style={styles.closeButton} 
+              onClick={closeModal}
+              aria-label="Close modal"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Payment Application Details</h2>
+            </div>
+            <div style={styles.modalContent}>
+              {hasDocuments(selectedPayment) ? (
+                <div style={styles.columns}>
+                  <div style={styles.leftColumn}>
+                    <div style={styles.sectionTitle}>Member Information</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Member ID:</span>
+                      <span style={styles.fieldValue}>{selectedPayment.id || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Name:</span>
+                      <span style={styles.fieldValue}>{`${selectedPayment.firstName || ''} ${selectedPayment.lastName || ''}`}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Email:</span>
+                      <span style={styles.fieldValue}>{selectedPayment.email || 'N/A'}</span>
+                    </div>
+
+                    <div style={styles.sectionTitle}>Payment Details</div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Transaction ID:</span>
+                      <span style={styles.fieldValue}>{selectedPayment.transactionId || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Amount:</span>
+                      <span style={styles.fieldValue}>{formatCurrency(selectedPayment.amountToBePaid)}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Penalty:</span>
+                      <span style={styles.fieldValue}>{formatCurrency((selectedPayment.penaltyPaid != null ? selectedPayment.penaltyPaid : (selectedPayment.penalty != null ? selectedPayment.penalty : 0)))}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Payment Method:</span>
+                      <span style={styles.fieldValue}>{selectedPayment.paymentOption || 'N/A'}</span>
+                    </div>
+                    <div style={styles.compactField}>
+                      <span style={styles.fieldLabel}>Date Applied:</span>
+                      <span style={styles.fieldValue}>{selectedPayment.dateApplied || 'N/A'}</span>
+                    </div>
+
+                    {selectedPayment.dateApproved && (
+                      <>
+                        <div style={styles.sectionTitle}>Approval Information</div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Date Approved:</span>
+                          <span style={styles.fieldValue}>{selectedPayment.dateApproved}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Time Approved:</span>
+                          <span style={styles.fieldValue}>{selectedPayment.timeApproved}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Penalty Paid:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedPayment.penaltyPaid || selectedPayment.penalty || 0)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Interest Paid:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedPayment.interestPaid || 0)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Principal Paid:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedPayment.principalPaid || selectedPayment.amountToBePaid)}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Excess Payment:</span>
+                          <span style={styles.fieldValue}>{formatCurrency(selectedPayment.excessPayment || 0)}</span>
+                        </div>
+                      </>
+                    )}
+
+                    {selectedPayment.dateRejected && (
+                      <>
+                        <div style={styles.sectionTitle}>Rejection Information</div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Date Rejected:</span>
+                          <span style={styles.fieldValue}>{selectedPayment.dateRejected}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Time Rejected:</span>
+                          <span style={styles.fieldValue}>{selectedPayment.timeRejected}</span>
+                        </div>
+                        <div style={styles.compactField}>
+                          <span style={styles.fieldLabel}>Rejection Reason:</span>
+                          <span style={styles.fieldValue}>{selectedPayment.rejectionReason || 'N/A'}</span>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  <div style={styles.rightColumn}>
+                    <div style={styles.sectionTitle}>Proof of Payment</div>
+                    <div style={styles.imageGrid}>
+                      <div style={styles.imageBlock}>
+                        <span style={styles.imageLabel}>Proof of Payment</span>
+                        <img
+                          src={selectedPayment.proofOfPaymentUrl}
+                          alt="Proof of Payment"
+                          style={styles.imageThumbnail}
+                          onClick={() => openImageViewer(selectedPayment.proofOfPaymentUrl, 'Proof of Payment')}
+                        />
+
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.leftColumn}>
+                  <div style={styles.sectionTitle}>Member Information</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Member ID:</span>
+                    <span style={styles.fieldValue}>{selectedPayment.id || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Name:</span>
+                    <span style={styles.fieldValue}>{`${selectedPayment.firstName || ''} ${selectedPayment.lastName || ''}`}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Email:</span>
+                    <span style={styles.fieldValue}>{selectedPayment.email || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.sectionTitle}>Payment Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Transaction ID:</span>
+                    <span style={styles.fieldValue}>{selectedPayment.transactionId || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Amount:</span>
+                    <span style={styles.fieldValue}>{formatCurrency(selectedPayment.amountToBePaid)}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Payment Method:</span>
+                    <span style={styles.fieldValue}>{selectedPayment.paymentOption || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Applied:</span>
+                    <span style={styles.fieldValue}>{selectedPayment.dateApplied || 'N/A'}</span>
+                  </div>
+
+                  {selectedPayment.dateApproved && (
+                    <>
+                      <div style={styles.sectionTitle}>Approval Information</div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Date Approved:</span>
+                        <span style={styles.fieldValue}>{selectedPayment.dateApproved}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Time Approved:</span>
+                        <span style={styles.fieldValue}>{selectedPayment.timeApproved}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Interest Paid:</span>
+                        <span style={styles.fieldValue}>{formatCurrency(selectedPayment.interestPaid || 0)}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Principal Paid:</span>
+                        <span style={styles.fieldValue}>{formatCurrency(selectedPayment.principalPaid || selectedPayment.amountToBePaid)}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Excess Payment:</span>
+                        <span style={styles.fieldValue}>{formatCurrency(selectedPayment.excessPayment || 0)}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedPayment.dateRejected && (
+                    <>
+                      <div style={styles.sectionTitle}>Rejection Information</div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Date Rejected:</span>
+                        <span style={styles.fieldValue}>{selectedPayment.dateRejected}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Time Rejected:</span>
+                        <span style={styles.fieldValue}>{selectedPayment.timeRejected}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Rejection Reason:</span>
+                        <span style={styles.fieldValue}>{selectedPayment.rejectionReason || 'N/A'}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            {selectedPayment?.status !== 'approved' && selectedPayment?.status !== 'rejected' && (
+              <div style={styles.bottomButtons}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.approveButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={handleApproveClick}
+                  disabled={isProcessing}
+                  onFocus={(e) => e.target.style.outline = 'none'}
+                >
+                  Approve
+                </button>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.rejectButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={handleRejectClick}
+                  disabled={isProcessing}
+                  onFocus={(e) => e.target.style.outline = 'none'}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Approve Confirmation Modal */}
+      {showApproveConfirmation && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to approve this payment?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmApprove}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowApproveConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Confirmation Modal */}
+      {showRejectConfirmation && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to reject this payment?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmRejectFinal}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowRejectConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRejectionModal && (
+        <div style={styles.rejectionModal}>
+          <div style={styles.rejectionModalContent}>
+            <h2 style={styles.rejectionTitle}>Select Rejection Reason</h2>
+            {rejectionReasons.map((reason) => (
+              <div 
+                key={reason} 
+                style={styles.reasonOption}
+                onClick={() => handleReasonSelect(reason)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                  <input
+                    type="radio"
+                    name="rejectionReason"
+                    checked={selectedReason === reason}
+                    onChange={() => handleReasonSelect(reason)}
+                    style={styles.reasonRadio}
+                  />
+                  <span style={styles.reasonText}>{reason}</span>
+                  {reason === "Other" && selectedReason === reason && (
+                    <input
+                      type="text"
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Please specify reason"
+                      style={{ ...styles.customReasonInput, marginTop: 0, maxWidth: '60%' }}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+            <div style={styles.rejectionButtons}>
+              <button 
+                style={styles.cancelButton}
+                onClick={() => setShowRejectionModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.confirmRejectButton}
+                onClick={confirmRejection}
+              >
+                Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {errorModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle 
+              style={{ ...styles.confirmIcon, color: '#f44336' }} 
+            />
+            <p style={styles.modalText}>{errorMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setErrorModalVisible(false)}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Modal */}
+      {isProcessing && (
+        <div style={styles.centeredModal}>
+          <div style={styles.spinner}></div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {successMessageModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            {currentAction === 'approve' ? (
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+            ) : (
+              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
+            )}
+            <p style={styles.modalText}>{successMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={handleSuccessOk}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+  {/* Image Viewer Modal */}
+      {imageViewerVisible && (
+        <div style={styles.imageViewerModal}>
+          <div style={styles.imageViewerContent}>
+            <img
+              src={currentImage.url}
+              alt={currentImage.label}
+              style={styles.largeImage}
+            />
+            <button 
+              style={styles.imageViewerClose} 
+              onClick={closeImageViewer}
+              aria-label="Close image viewer"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+            {currentImage?.label === 'Proof of Payment' && (
+              <div style={{ 
+                position: 'fixed', 
+                bottom: '20px', 
+                left: '50%', 
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                padding: '15px 20px',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                zIndex: 2001
+              }}>
+                <button
+                  style={{ 
+                    ...styles.actionButton, 
+                    backgroundColor: '#2D5783', 
+                    color: '#fff',
+                    minWidth: '100px',
+                    padding: '10px 20px'
+                  }}
+                  onClick={() => verifyPaymentOCR(currentImage.url, 'Payment Proof')}
+                >
+                  {validationStatus['Payment Proof']?.status === 'verifying' ? (
+                    <>
+                      <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify Payment'
+                  )}
+                </button>
+              </div>
+            )}
+
+            {infoModal.visible && (
+              <div style={styles.infoModalOverlay}>
+                <div style={styles.infoModalCard}>
+                  <div style={styles.infoTitle}>{infoModal.title}</div>
+                  {infoModal.fields.map((f, i) => (
+                    <div key={i} style={styles.infoRow}>
+                      <span style={styles.infoLabel}>{f.label}</span>
+                      <span style={styles.infoValue}>{f.value || 'N/A'}</span>
+                    </div>
+                  ))}
+                  <button
+                    style={styles.infoCloseButton}
+                    onClick={closeInfoModal}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default PaymentApplications;

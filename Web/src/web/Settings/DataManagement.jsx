@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FaDownload, FaTrashAlt, FaCheckCircle, FaTimes, FaEdit, FaSave } from 'react-icons/fa';
+import { FaDownload, FaTrashAlt, FaCheckCircle, FaTimes, FaEdit, FaSave, FaArchive, FaDatabase, FaHistory, FaFileExport } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import ExcelJS from 'exceljs';
 import { database } from '../../../../Database/firebaseConfig';
@@ -454,13 +454,13 @@ const DataManagement = () => {
       {confirmationModalVisible && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
             <p style={styles.modalText}>Are you sure you want to save these settings changes?</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#2D5783',
+                  backgroundColor: '#1e3a8a',
                   color: '#fff'
                 }} 
                 onClick={confirmSave}
@@ -489,15 +489,15 @@ const DataManagement = () => {
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
             {isError ? (
-              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
+              <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
             ) : (
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
             )}
             <p style={styles.modalText}>{successMessage}</p>
             <button 
               style={{
                 ...styles.actionButton,
-                backgroundColor: '#2D5783',
+                backgroundColor: '#1e3a8a',
                 color: '#fff'
               }}
               onClick={() => setShowSuccessModal(false)}
@@ -509,8 +509,11 @@ const DataManagement = () => {
         </div>
       )}
 
-      {/* Sidebar */}
+      {/* Enhanced Sidebar */}
       <div style={styles.sidebar}>
+        <div style={styles.sidebarHeader}>
+          <h3 style={styles.sidebarTitle}>Data Management</h3>
+        </div>
         <button
           style={{
             ...styles.sidebarButton,
@@ -518,6 +521,7 @@ const DataManagement = () => {
           }}
           onClick={() => handleSectionChange('archiving')}
         >
+          <FaArchive style={styles.sidebarIcon} />
           <span style={styles.sidebarButtonText}>Data Archiving</span>
         </button>
 
@@ -528,236 +532,288 @@ const DataManagement = () => {
           }}
           onClick={() => handleSectionChange('archived')}
         >
+          <FaHistory style={styles.sidebarIcon} />
           <span style={styles.sidebarButtonText}>Archived Data</span>
         </button>
       </div>
 
-      {/* Main Content Area */}
+      {/* Enhanced Main Content Area */}
       <div style={styles.contentArea}>
-        <h2 style={styles.contentTitle}>
-          {activeSection === 'archiving' && 'Data Archiving Settings'}
-          {activeSection === 'archived' && 'Archived Data Management'}
-        </h2>
+        <div style={styles.contentHeader}>
+          <h2 style={styles.contentTitle}>
+            {activeSection === 'archiving' && 'Data Archiving Configuration'}
+            {activeSection === 'archived' && 'Archived Data Management'}
+          </h2>
+          <div style={styles.contentSubtitle}>
+            {activeSection === 'archiving' && 'Configure automatic data archiving schedules and settings'}
+            {activeSection === 'archived' && 'Manage and export previously archived financial data'}
+          </div>
+        </div>
 
-        {/* Data Archiving Section */}
+        {/* Enhanced Data Archiving Section */}
         {activeSection === 'archiving' && (
           <div style={styles.section}>
-
-            <div style={styles.formRow}>
-              <span style={styles.label}>Enable Automatic Archiving</span>
-              <label style={styles.switch}>
-                <input 
-                  type="checkbox" 
-                  checked={autoArchive} 
-                  onChange={(e) => setAutoArchive(e.target.checked)} 
-                  disabled={!editMode}
-                  style={styles.switchInput}
-                />
-                <span style={{
-                  ...styles.slider,
-                  ...(autoArchive ? styles.sliderChecked : {})
-                }}>
-                  <span style={{
-                    ...styles.sliderBefore,
-                    ...(autoArchive ? styles.sliderBeforeChecked : {})
-                  }}></span>
-                </span>
-              </label>
-            </div>
-
-            <div style={styles.formRow}>
-              <span style={styles.label}>Archive Every</span>
-              <input
-                type="number"
-                placeholder="Days"
-                style={styles.input}
-                value={archiveInterval}
-                onChange={(e) => setArchiveInterval(e.target.value)}
-                disabled={!editMode}
-                min="0"
-              />
-              <span style={styles.label}>days (0 = archive now)</span>
-            </div>
-
-            {lastArchiveDate && (
-              <div style={styles.formRow}>
-                <span style={styles.label}>Last Archive:</span>
-                <span style={styles.label}>
-                  {new Date(lastArchiveDate).toLocaleDateString('en-US', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric' 
-                  })}
-                </span>
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaDatabase style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Archiving Configuration</h3>
+                </div>
               </div>
-            )}
 
-            <button 
-              style={{
-                ...styles.saveButton,
-                ...(editMode ? styles.saveBtnSaveMode : {})
-              }}
-              onClick={editMode ? handleSave : () => setEditMode(true)}
-              disabled={loading}
-            >
-              <span style={styles.saveButtonText}>
-                {editMode ? <FaSave style={{ marginRight: '8px' }} /> : <FaEdit style={{ marginRight: '8px' }} />}
-                {loading ? 'Processing...' : (editMode ? 'Save Settings' : 'Edit Settings')}
-              </span>
-            </button>
+              <div style={styles.cardContent}>
+                <div style={styles.configItem}>
+                  <div style={styles.configLabel}>
+                    <span style={styles.configLabelText}>Enable Automatic Archiving</span>
+                    <span style={styles.configLabelDescription}>
+                      Automatically archive financial data at regular intervals
+                    </span>
+                  </div>
+                  <label style={styles.switch}>
+                    <input 
+                      type="checkbox" 
+                      checked={autoArchive} 
+                      onChange={(e) => setAutoArchive(e.target.checked)} 
+                      disabled={!editMode}
+                      style={styles.switchInput}
+                    />
+                    <span style={{
+                      ...styles.slider,
+                      ...(autoArchive ? styles.sliderChecked : {})
+                    }}>
+                      <span style={{
+                        ...styles.sliderBefore,
+                        ...(autoArchive ? styles.sliderBeforeChecked : {})
+                      }}></span>
+                    </span>
+                  </label>
+                </div>
+
+                <div style={styles.configItem}>
+                  <div style={styles.configLabel}>
+                    <span style={styles.configLabelText}>Archive Frequency</span>
+                    <span style={styles.configLabelDescription}>
+                      Set how often to automatically archive data (0 = archive immediately)
+                    </span>
+                  </div>
+                  <div style={styles.inputWithSuffix}>
+                    <input
+                      type="number"
+                      placeholder="Days"
+                      style={styles.configInput}
+                      value={archiveInterval}
+                      onChange={(e) => setArchiveInterval(e.target.value)}
+                      disabled={!editMode}
+                      min="0"
+                    />
+                    <span style={styles.inputSuffix}>days</span>
+                  </div>
+                </div>
+
+                {lastArchiveDate && (
+                  <div style={styles.configItem}>
+                    <div style={styles.configLabel}>
+                      <span style={styles.configLabelText}>Last Archive</span>
+                      <span style={styles.configLabelDescription}>
+                        Date of the most recent automatic archive
+                      </span>
+                    </div>
+                    <div style={styles.lastArchiveDate}>
+                      {new Date(lastArchiveDate).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                <div style={styles.actionSection}>
+                  <button 
+                    style={{
+                      ...styles.primaryButton,
+                      ...(editMode ? styles.saveButtonActive : {})
+                    }}
+                    onClick={editMode ? handleSave : () => setEditMode(true)}
+                    disabled={loading}
+                  >
+                    <span style={styles.buttonContent}>
+                      {editMode ? <FaSave style={{ marginRight: '8px' }} /> : <FaEdit style={{ marginRight: '8px' }} />}
+                      {loading ? 'Processing...' : (editMode ? 'Save Configuration' : 'Edit Configuration')}
+                    </span>
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
         )}
 
-        {/* Archived Data Section */}
+        {/* Enhanced Archived Data Section */}
         {activeSection === 'archived' && (
           <div style={styles.section}>
-            <div style={styles.sectionHeader}>
-              <button 
-                style={styles.exportButton}
-                onClick={() => {
-                  // Export list of archives
-                  const workbook = new ExcelJS.Workbook();
-                  const worksheet = workbook.addWorksheet('Archive_List');
-                  
-                  worksheet.addRow([
-                    'Archive ID', 
-                    'Date', 
-                    'Type', 
-                    'Status', 
-                    'Approved Deposits', 
-                    'Pending Deposits',
-                    'Approved Loans', 
-                    'Pending Loans',
-                    'Approved Registrations', 
-                    'Pending Registrations',
-                    'Approved Payments',
-                    'Pending Payments',
-                    'Approved Withdrawals',
-                    'Pending Withdrawals',
-                    'Members'
-                  ]);
-                  
-                  archivedData.forEach(item => {
-                    // Handle both old and new data structures
-                    const hasOldStructure = item.counts?.deposits !== undefined;
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaHistory style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Archive History</h3>
+                </div>
+                <button 
+                  style={styles.exportButton}
+                  onClick={() => {
+                    // Export list of archives
+                    const workbook = new ExcelJS.Workbook();
+                    const worksheet = workbook.addWorksheet('Archive_List');
                     
                     worksheet.addRow([
-                      item.id,
-                      item.date,
-                      item.type,
-                      item.status,
-                      hasOldStructure ? item.counts?.deposits || 0 : item.counts?.approvedDeposits || 0,
-                      hasOldStructure ? 0 : item.counts?.pendingDeposits || 0,
-                      hasOldStructure ? item.counts?.loans || 0 : item.counts?.approvedLoans || 0,
-                      hasOldStructure ? 0 : item.counts?.pendingLoans || 0,
-                      hasOldStructure ? item.counts?.registrations || 0 : item.counts?.approvedRegistrations || 0,
-                      hasOldStructure ? 0 : item.counts?.pendingRegistrations || 0,
-                      hasOldStructure ? 0 : item.counts?.approvedPayments || 0,
-                      hasOldStructure ? 0 : item.counts?.pendingPayments || 0,
-                      hasOldStructure ? 0 : item.counts?.approvedWithdrawals || 0,
-                      hasOldStructure ? 0 : item.counts?.pendingWithdrawals || 0,
-                      item.counts?.members || 0
+                      'Archive ID', 
+                      'Date', 
+                      'Type', 
+                      'Status', 
+                      'Approved Deposits', 
+                      'Pending Deposits',
+                      'Approved Loans', 
+                      'Pending Loans',
+                      'Approved Registrations', 
+                      'Pending Registrations',
+                      'Approved Payments',
+                      'Pending Payments',
+                      'Approved Withdrawals',
+                      'Pending Withdrawals',
+                      'Members'
                     ]);
-                  });
-                  
-                  // Format the worksheet - safely
-                  worksheet.columns.forEach(column => {
-                    if (column && column.key) {
-                      const columnValues = worksheet.getColumn(column.key).values || [];
-                      if (columnValues.length > 0) {
-                        column.width = Math.max(
-                          15,
-                          ...columnValues
-                            .filter(value => value !== null && value !== undefined)
-                            .map(value => String(value).length)
-                        );
-                      } else {
-                        column.width = 15; // Default width if no values
-                      }
-                    }
-                  });
-
-                  workbook.xlsx.writeBuffer().then(buffer => {
-                    const blob = new Blob([buffer], { 
-                      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+                    
+                    archivedData.forEach(item => {
+                      // Handle both old and new data structures
+                      const hasOldStructure = item.counts?.deposits !== undefined;
+                      
+                      worksheet.addRow([
+                        item.id,
+                        item.date,
+                        item.type,
+                        item.status,
+                        hasOldStructure ? item.counts?.deposits || 0 : item.counts?.approvedDeposits || 0,
+                        hasOldStructure ? 0 : item.counts?.pendingDeposits || 0,
+                        hasOldStructure ? item.counts?.loans || 0 : item.counts?.approvedLoans || 0,
+                        hasOldStructure ? 0 : item.counts?.pendingLoans || 0,
+                        hasOldStructure ? item.counts?.registrations || 0 : item.counts?.approvedRegistrations || 0,
+                        hasOldStructure ? 0 : item.counts?.pendingRegistrations || 0,
+                        hasOldStructure ? 0 : item.counts?.approvedPayments || 0,
+                        hasOldStructure ? 0 : item.counts?.pendingPayments || 0,
+                        hasOldStructure ? 0 : item.counts?.approvedWithdrawals || 0,
+                        hasOldStructure ? 0 : item.counts?.pendingWithdrawals || 0,
+                        item.counts?.members || 0
+                      ]);
                     });
-                    const url = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `archive_list_${Date.now()}.xlsx`;
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(url);
-                  });
-                }}
-              >
-                <FaDownload style={styles.exportIcon} />
-              </button>
-            </div>
+                    
+                    // Format the worksheet - safely
+                    worksheet.columns.forEach(column => {
+                      if (column && column.key) {
+                        const columnValues = worksheet.getColumn(column.key).values || [];
+                        if (columnValues.length > 0) {
+                          column.width = Math.max(
+                            15,
+                            ...columnValues
+                              .filter(value => value !== null && value !== undefined)
+                              .map(value => String(value).length)
+                          );
+                        } else {
+                          column.width = 15; // Default width if no values
+                        }
+                      }
+                    });
 
-            <div style={styles.tableHeader}>
-              <span style={styles.tableHeaderText}>Data type</span>
-              <span style={styles.tableHeaderText}>Date Archived</span>
-              <span style={styles.tableHeaderText}>Status</span>
-              <span style={styles.tableHeaderText}>Counts</span>
-              <span style={styles.tableHeaderText}>Actions</span>
-            </div>
+                    workbook.xlsx.writeBuffer().then(buffer => {
+                      const blob = new Blob([buffer], { 
+                        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+                      });
+                      const url = window.URL.createObjectURL(blob);
+                      const link = document.createElement('a');
+                      link.href = url;
+                      link.download = `archive_list_${Date.now()}.xlsx`;
+                      document.body.appendChild(link);
+                      link.click();
+                      document.body.removeChild(link);
+                      window.URL.revokeObjectURL(url);
+                    });
+                  }}
+                >
+                  <FaFileExport style={styles.exportIcon} />
+                  Export Archive List
+                </button>
+              </div>
 
-            {archivedData.length === 0 ? (
-              <div style={styles.noDataMessage}>No archived data found</div>
-            ) : (
-              archivedData.map(item => (
-                <div key={item.id} style={styles.tableRow}>
-                  <span style={styles.tableCell}>{item.type || 'Full Archive'}</span>
-                  <span style={styles.tableCell}>
-                    {new Date(item.date).toLocaleDateString('en-US', { 
-                      year: 'numeric', 
-                      month: 'long', 
-                      day: 'numeric' 
-                    })}
-                  </span>
-                  <span style={{...styles.tableCell, ...styles.archivedStatus}}>{item.status}</span>
-                  <span style={styles.tableCell}>
-                    {item.counts ? (
-                      <>
-                        <div>Deposits: {
-                          // Handle both old and new data structure
-                          item.counts.deposits !== undefined ? 
-                            item.counts.deposits : 
-                            (item.counts.approvedDeposits || 0) + (item.counts.pendingDeposits || 0)
-                        }</div>
-                        <div>Loans: {
-                          item.counts.loans !== undefined ? 
-                            item.counts.loans : 
-                            (item.counts.approvedLoans || 0) + (item.counts.pendingLoans || 0)
-                        }</div>
-                        <div>Registrations: {
-                          item.counts.registrations !== undefined ? 
-                            item.counts.registrations : 
-                            (item.counts.approvedRegistrations || 0) + (item.counts.pendingRegistrations || 0)
-                        }</div>
-                        <div>Payments: {
-                          (item.counts.approvedPayments || 0) + (item.counts.pendingPayments || 0)
-                        }</div>
-                        <div>Withdrawals: {
-                          (item.counts.approvedWithdrawals || 0) + (item.counts.pendingWithdrawals || 0)
-                        }</div>
-                        <div>Members: {item.counts.members || 0}</div>
-                      </>
-                    ) : 'N/A'}
-                  </span>
-                  <div style={styles.actions}>
-                    <button 
-                      style={styles.deleteButton}
-                      onClick={() => handleDeleteArchive(item.id)}
-                    >
-                      <FaTrashAlt style={styles.actionIcon} />
-                    </button>
-                  </div>
+              {/* Enhanced Table Header */}
+              <div style={styles.tableHeader}>
+                <span style={styles.tableHeaderText}>Archive Type</span>
+                <span style={styles.tableHeaderText}>Date Archived</span>
+                <span style={styles.tableHeaderText}>Status</span>
+                <span style={styles.tableHeaderText}>Data Summary</span>
+                <span style={styles.tableHeaderText}>Actions</span>
+              </div>
+
+              {archivedData.length === 0 ? (
+                <div style={styles.noDataMessage}>
+                  <FaDatabase style={styles.noDataIcon} />
+                  <p style={styles.noDataText}>No archived data found</p>
+                  <p style={styles.noDataSubtext}>Archived data will appear here once automatic or manual archiving is performed.</p>
                 </div>
-              ))
-            )}
+              ) : (
+                archivedData.map(item => (
+                  <div key={item.id} style={styles.tableRow}>
+                    <div style={styles.tableCell}>
+                      <span style={styles.archiveType}>{item.type || 'Full Archive'}</span>
+                    </div>
+                    <div style={styles.tableCell}>
+                      <span style={styles.archiveDate}>
+                        {new Date(item.date).toLocaleDateString('en-US', { 
+                          year: 'numeric', 
+                          month: 'short', 
+                          day: 'numeric' 
+                        })}
+                      </span>
+                    </div>
+                    <div style={styles.tableCell}>
+                      <span style={styles.statusBadge}>{item.status}</span>
+                    </div>
+                    <div style={styles.tableCell}>
+                      <div style={styles.dataSummary}>
+                        <div style={styles.summaryItem}>
+                          <span style={styles.summaryLabel}>Deposits:</span>
+                          <span style={styles.summaryValue}>
+                            {item.counts.deposits !== undefined ? 
+                              item.counts.deposits : 
+                              (item.counts.approvedDeposits || 0) + (item.counts.pendingDeposits || 0)}
+                          </span>
+                        </div>
+                        <div style={styles.summaryItem}>
+                          <span style={styles.summaryLabel}>Loans:</span>
+                          <span style={styles.summaryValue}>
+                            {item.counts.loans !== undefined ? 
+                              item.counts.loans : 
+                              (item.counts.approvedLoans || 0) + (item.counts.pendingLoans || 0)}
+                          </span>
+                        </div>
+                        <div style={styles.summaryItem}>
+                          <span style={styles.summaryLabel}>Members:</span>
+                          <span style={styles.summaryValue}>{item.counts.members || 0}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div style={styles.tableCell}>
+                      <div style={styles.actions}>
+                        <button 
+                          style={styles.deleteButton}
+                          onClick={() => handleDeleteArchive(item.id)}
+                          title="Delete Archive"
+                        >
+                          <FaTrashAlt style={styles.actionIcon} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -769,73 +825,149 @@ const styles = {
   container: {
     display: 'flex',
     minHeight: '100vh',
-    backgroundColor: '#f5f7fa',
+    backgroundColor: '#f8fafc',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
   sidebar: {
-    width: '250px',
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRight: '1px solid #e0e0e0',
-    boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
+    width: '280px',
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRight: '1px solid #e2e8f0',
+    boxShadow: '4px 0 20px rgba(0,0,0,0.04)',
+  },
+  sidebarHeader: {
+    marginBottom: '32px',
+    paddingBottom: '16px',
+    borderBottom: '2px solid #f1f5f9'
+  },
+  sidebarTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0'
   },
   sidebarButton: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
     width: '100%',
-    padding: '12px 15px',
+    padding: '16px 20px',
     border: 'none',
     backgroundColor: 'transparent',
     textAlign: 'left',
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#555',
-    borderRadius: '4px',
-    transition: 'all 0.2s',
+    fontSize: '15px',
+    color: '#64748b',
+    borderRadius: '12px',
+    transition: 'all 0.3s ease',
+    gap: '12px',
+    marginBottom: '8px'
   },
   sidebarButtonActive: {
     backgroundColor: '#f0f7ff',
-    color: '#2D5783',
-    fontWeight: '500',
-    borderLeft: '3px solid #2D5783',
+    color: '#1e40af',
+    fontWeight: '600',
+    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.15)',
+  },
+  sidebarIcon: {
+    fontSize: '18px',
+    opacity: '0.8'
   },
   sidebarButtonText: {
-    fontSize: '14px',
+    fontSize: '15px',
+    fontWeight: '500'
   },
   contentArea: {
     flex: 1,
-    padding: '30px',
-    backgroundColor: '#fff',
+    padding: '32px',
+    backgroundColor: '#f8fafc',
     minWidth: 0,
     overflow: 'auto',
   },
+  contentHeader: {
+    marginBottom: '32px'
+  },
   contentTitle: {
-    fontSize: '24px',
-    fontWeight: '600',
-    marginBottom: '30px',
-    color: '#2D5783',
-    borderBottom: '2px solid #f0f7ff',
-    paddingBottom: '15px',
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0 0 8px 0',
+    letterSpacing: '-0.025em'
+  },
+  contentSubtitle: {
+    fontSize: '16px',
+    color: '#64748b',
+    fontWeight: '400'
   },
   section: {
-    marginBottom: '30px',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
   },
-  sectionTitle: {
-    fontSize: '18px',
-    fontWeight: '600',
-    marginBottom: '20px',
-    color: '#2D5783',
-    borderBottom: '1px solid #eee',
-    paddingBottom: '10px',
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '32px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+    border: '1px solid #f1f5f9',
   },
-  formRow: {
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '24px',
+    paddingBottom: '20px',
+    borderBottom: '2px solid #f8fafc'
+  },
+  cardTitle: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '15px',
+    gap: '12px'
+  },
+  cardIcon: {
+    fontSize: '24px',
+    color: '#1e40af'
+  },
+  cardTitleText: {
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: '0'
+  },
+  cardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
+  },
+  configItem: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '20px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0'
+  },
+  configLabel: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    flex: '1'
+  },
+  configLabelText: {
+    fontSize: '15px',
+    color: '#374151',
+    fontWeight: '600'
+  },
+  configLabelDescription: {
+    fontSize: '13px',
+    color: '#6b7280',
+    fontWeight: '400'
   },
   switch: {
     position: 'relative',
     display: 'inline-block',
-    width: '50px',
-    height: '24px',
+    width: '60px',
+    height: '28px',
   },
   switchInput: {
     opacity: '0',
@@ -849,18 +981,18 @@ const styles = {
     left: '0',
     right: '0',
     bottom: '0',
-    backgroundColor: '#ccc',
+    backgroundColor: '#d1d5db',
     transition: '.4s',
-    borderRadius: '24px',
+    borderRadius: '28px',
   },
   sliderChecked: {
-    backgroundColor: '#4CAF50',
+    backgroundColor: '#10b981',
   },
   sliderBefore: {
     position: 'absolute',
     content: '""',
-    height: '16px',
-    width: '16px',
+    height: '20px',
+    width: '20px',
     left: '4px',
     bottom: '4px',
     backgroundColor: 'white',
@@ -869,132 +1001,189 @@ const styles = {
     transform: 'translateX(0px)',
   },
   sliderBeforeChecked: {
-    transform: 'translateX(26px)',
+    transform: 'translateX(32px)',
   },
-  label: {
-    fontSize: '14px',
-    color: '#555',
-    marginLeft: '10px',
+  inputWithSuffix: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px'
   },
-  input: {
-    border: '1px solid #ddd',
-    borderRadius: '6px',
+  configInput: {
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
     padding: '10px 12px',
     fontSize: '14px',
-    width: '80px',
-    marginLeft: '10px',
-    transition: 'border-color 0.2s',
+    width: '100px',
+    transition: 'all 0.3s ease',
+    textAlign: 'center'
   },
-  saveButton: {
-    backgroundColor: '#2D5783',
+  inputSuffix: {
+    fontSize: '14px',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  lastArchiveDate: {
+    fontSize: '14px',
+    color: '#374151',
+    fontWeight: '600',
+    backgroundColor: '#ffffff',
+    padding: '10px 16px',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb'
+  },
+  actionSection: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '16px'
+  },
+  primaryButton: {
+    backgroundColor: '#1e40af',
     color: 'white',
-    padding: '12px 24px',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '10px',
+    padding: '14px 32px',
     cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    marginTop: '20px',
-    transition: 'all 0.2s',
-  },
-  saveButtonText: {
-    color: 'white',
+    fontSize: '15px',
+    fontWeight: '600',
     display: 'flex',
     alignItems: 'center',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.3)'
   },
-  saveBtnSaveMode: {
-    backgroundColor: '#28a745',
+  saveButtonActive: {
+    backgroundColor: '#10b981'
   },
-  searchRow: {
+  buttonContent: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '15px',
-  },
-  searchInput: {
-    flex: 1,
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    padding: '10px 12px',
-    fontSize: '14px',
+    gap: '8px'
   },
   exportButton: {
-    marginLeft: '10px',
-    backgroundColor: '#f8f9fa',
-    padding: '10px',
+    backgroundColor: '#1e40af',
+    color: 'white',
     border: 'none',
-    borderRadius: '6px',
+    borderRadius: '10px',
+    padding: '12px 20px',
     cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s',
+    gap: '8px',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.3)'
   },
   exportIcon: {
-    fontSize: '16px',
-    color: '#555',
+    fontSize: '16px'
   },
   tableHeader: {
-    display: 'flex',
-    marginBottom: '10px',
-    padding: '10px 0',
-    borderBottom: '1px solid #eee',
-    fontWeight: '600',
+    display: 'grid',
+    gridTemplateColumns: '1.5fr 1fr 1fr 2fr 0.5fr',
+    gap: '16px',
+    marginBottom: '16px',
+    padding: '16px 20px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '10px',
+    border: '1px solid #e2e8f0',
+    fontWeight: '600'
   },
   tableHeaderText: {
     fontSize: '14px',
-    flex: 1,
-    color: '#333',
+    color: '#374151',
+    textAlign: 'left'
   },
   tableRow: {
-    display: 'flex',
+    display: 'grid',
+    gridTemplateColumns: '1.5fr 1fr 1fr 2fr 0.5fr',
+    gap: '16px',
     alignItems: 'center',
-    padding: '12px 0',
-    borderBottom: '1px solid #f5f5f5',
+    padding: '20px',
+    borderBottom: '1px solid #f1f5f9',
+    transition: 'all 0.3s ease'
   },
   tableCell: {
-    fontSize: '14px',
-    flex: 1,
-    color: '#333',
+    display: 'flex',
+    alignItems: 'center'
   },
-  archivedStatus: {
-    color: '#28a745',
-    fontWeight: '500',
+  archiveType: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#1e293b'
+  },
+  archiveDate: {
+    fontSize: '14px',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  statusBadge: {
+    backgroundColor: '#10b981',
+    color: 'white',
+    padding: '6px 12px',
+    borderRadius: '20px',
+    fontSize: '12px',
+    fontWeight: '600'
+  },
+  dataSummary: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px'
+  },
+  summaryItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  summaryLabel: {
+    fontSize: '12px',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  summaryValue: {
+    fontSize: '12px',
+    color: '#374151',
+    fontWeight: '600'
   },
   actions: {
     display: 'flex',
-    flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
     gap: '8px',
   },
-  restoreButton: {
-    backgroundColor: '#17a2b8',
-    padding: '8px',
-    border: 'none',
-    borderRadius: '4px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   deleteButton: {
-    backgroundColor: '#dc3545',
-    padding: '8px',
+    backgroundColor: '#ef4444',
+    color: 'white',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '6px',
+    padding: '8px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    transition: 'all 0.3s ease'
   },
   actionIcon: {
-    color: 'white',
-    fontSize: '14px',
+    fontSize: '14px'
   },
   noDataMessage: {
     textAlign: 'center',
-    padding: '20px',
-    color: '#6c757d',
+    padding: '60px 20px',
+    color: '#9ca3af',
+  },
+  noDataIcon: {
+    fontSize: '48px',
+    marginBottom: '16px',
+    opacity: '0.5'
+  },
+  noDataText: {
+    fontSize: '16px',
+    fontWeight: '600',
+    marginBottom: '8px'
+  },
+  noDataSubtext: {
     fontSize: '14px',
+    maxWidth: '400px',
+    margin: '0 auto',
+    lineHeight: '1.5'
   },
   errorContainer: {
     display: 'flex',
@@ -1006,23 +1195,27 @@ const styles = {
     textAlign: 'center',
   },
   errorHeading: {
-    fontSize: '18px',
-    color: '#dc3545',
-    marginBottom: '10px',
+    fontSize: '20px',
+    color: '#ef4444',
+    marginBottom: '12px',
+    fontWeight: '600'
   },
   errorText: {
-    fontSize: '14px',
-    color: '#6c757d',
-    marginBottom: '20px',
+    fontSize: '15px',
+    color: '#6b7280',
+    marginBottom: '24px',
+    maxWidth: '400px'
   },
   retryButton: {
-    backgroundColor: '#2D5783',
+    backgroundColor: '#1e40af',
     color: 'white',
-    padding: '10px 20px',
+    padding: '12px 24px',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.3s ease'
   },
   loadingContainer: {
     display: 'flex',
@@ -1031,16 +1224,12 @@ const styles = {
     height: '100vh',
   },
   spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    width: '36px',
-    height: '36px',
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #1e40af',
     borderRadius: '50%',
-    borderLeftColor: '#2D5783',
+    width: '40px',
+    height: '40px',
     animation: 'spin 1s linear infinite',
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' },
   },
   modalOverlay: {
     position: 'fixed',
@@ -1056,46 +1245,51 @@ const styles = {
   },
   modalContent: {
     backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '8px',
-    width: '400px',
+    padding: '32px',
+    borderRadius: '16px',
+    width: '420px',
     maxWidth: '90%',
-    boxShadow: '0 4px 8px rgba(0, 0, 0, 0.2)',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+    border: '1px solid #e2e8f0'
   },
   modalTitle: {
     fontSize: '18px',
     fontWeight: '600',
-    marginBottom: '15px',
-    color: '#2D5783',
+    marginBottom: '16px',
+    color: '#1e293b',
   },
   modalText: {
-    fontSize: '14px',
-    color: '#333',
-    marginBottom: '20px',
-    lineHeight: '1.5',
+    fontSize: '15px',
+    color: '#6b7280',
+    marginBottom: '24px',
+    lineHeight: '1.6',
   },
   modalButtons: {
     display: 'flex',
     justifyContent: 'flex-end',
-    gap: '10px',
+    gap: '12px',
   },
   cancelButton: {
-    backgroundColor: '#6c757d',
-    color: 'white',
-    padding: '8px 16px',
-    border: 'none',
-    borderRadius: '4px',
+    backgroundColor: '#f8fafc',
+    color: '#374151',
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    padding: '10px 20px',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.3s ease'
   },
   confirmButton: {
-    backgroundColor: '#2D5783',
+    backgroundColor: '#1e40af',
     color: 'white',
-    padding: '8px 16px',
     border: 'none',
-    borderRadius: '4px',
+    borderRadius: '8px',
+    padding: '10px 20px',
     cursor: 'pointer',
     fontSize: '14px',
+    fontWeight: '600',
+    transition: 'all 0.3s ease'
   },
   centeredModal: {
     position: 'fixed',
@@ -1110,36 +1304,37 @@ const styles = {
     zIndex: 1000
   },
   modalCardSmall: {
-    width: '250px',
+    width: '320px',
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
+    borderRadius: '16px',
+    padding: '32px',
     position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    textAlign: 'center',
+    border: '1px solid #e2e8f0'
   },
   confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
+    marginBottom: '16px',
+    fontSize: '40px'
   },
   actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
+    padding: '12px 20px',
+    borderRadius: '8px',
     border: 'none',
     cursor: 'pointer',
-    fontWeight: 'bold',
+    fontWeight: '600',
     fontSize: '14px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
+    transition: 'all 0.3s ease',
+    minWidth: '80px',
     outline: 'none'
-  },
+  }
 };
 
 export default DataManagement;

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { getDatabase, ref, onValue, update } from 'firebase/database';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
-import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle } from 'react-icons/fa';
+import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle, FaPiggyBank, FaPercentage, FaCalendarAlt, FaFileContract, FaShieldAlt, FaInfoCircle, FaPhone, FaMoneyBillWave, FaBusinessTime } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { FaEdit, FaSave } from 'react-icons/fa';
 
@@ -34,77 +34,180 @@ const SystemSettings = () => {
 
       .confirm-modal-card {
         background-color: white;
-        border-radius: 10px;
-        padding: 30px;
+        border-radius: 16px;
+        padding: 32px;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
         width: 90%;
-        max-width: 400px;
+        max-width: 420px;
+        border: 1px solid #e2e8f0;
       }
 
       .small-modal-card {
         background-color: white;
-        border-radius: 10px;
-        padding: 30px;
+        border-radius: 16px;
+        padding: 32px;
         text-align: center;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
         width: 90%;
-        max-width: 350px;
+        max-width: 380px;
+        border: 1px solid #e2e8f0;
       }
 
       .confirm-icon {
-        font-size: 48px;
-        color: #2D5783;
-        margin-bottom: 20px;
+        font-size: 56px;
+        color: #1e3a8a;
+        margin-bottom: 24px;
       }
 
       .modal-text {
         font-size: 16px;
-        color: #333;
-        margin-bottom: 25px;
-        line-height: 1.5;
+        color: #374151;
+        margin-bottom: 28px;
+        line-height: 1.6;
+        font-weight: 500;
       }
 
       .bottom-buttons {
         display: flex;
-        gap: 15px;
+        gap: 16px;
         justify-content: center;
       }
 
       .confirm-btn {
-        background-color: #2D5783;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
         color: white;
         border: none;
-        border-radius: 5px;
-        padding: 12px 24px;
+        border-radius: 10px;
+        padding: 14px 28px;
         cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        min-width: 80px;
-        transition: all 0.2s;
+        font-size: 15px;
+        font-weight: 600;
+        min-width: 100px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
       }
 
       .confirm-btn:hover {
-        background-color: #1a3d66;
-        transform: translateY(-1px);
+        background: linear-gradient(135deg, #3730a3 0%, #1e3a8a 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
       }
 
       .cancel-btn {
-        background-color: #f1f5f9;
-        color: #555;
-        border: none;
-        border-radius: 5px;
-        padding: 12px 24px;
+        background-color: #f8fafc;
+        color: #64748b;
+        border: 2px solid #e2e8f0;
+        border-radius: 10px;
+        padding: 14px 28px;
         cursor: pointer;
-        font-size: 14px;
-        font-weight: 500;
-        min-width: 80px;
-        transition: all 0.2s;
+        font-size: 15px;
+        font-weight: 600;
+        min-width: 100px;
+        transition: all 0.3s ease;
       }
 
       .cancel-btn:hover {
-        background-color: #e2e8f0;
-        transform: translateY(-1px);
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+        transform: translateY(-2px);
+      }
+
+      .enhanced-modal {
+        background-color: white;
+        border-radius: 16px;
+        padding: 32px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+        width: 90%;
+        max-width: 600px;
+        border: 1px solid #e2e8f0;
+        max-height: 80vh;
+        overflow: auto;
+      }
+
+      .enhanced-modal-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin-bottom: 20px;
+        color: #1e293b;
+        text-align: center;
+      }
+
+      .enhanced-modal-input {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 15px;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+        transition: all 0.3s ease;
+      }
+
+      .enhanced-modal-input:focus {
+        border-color: #1e40af;
+        box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+      }
+
+      .enhanced-modal-textarea {
+        width: 100%;
+        padding: 14px 16px;
+        border: 2px solid #e5e7eb;
+        border-radius: 10px;
+        font-size: 15px;
+        margin-bottom: 20px;
+        box-sizing: border-box;
+        transition: all 0.3s ease;
+        min-height: 200px;
+        resize: vertical;
+        font-family: inherit;
+      }
+
+      .enhanced-modal-textarea:focus {
+        border-color: #1e40af;
+        box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+      }
+
+      .enhanced-modal-buttons {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 24px;
+      }
+
+      .enhanced-modal-btn {
+        padding: 14px 24px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 15px;
+        transition: all 0.3s ease;
+        min-width: 120px;
+      }
+
+      .enhanced-modal-btn-primary {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+      }
+
+      .enhanced-modal-btn-primary:hover {
+        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+      }
+
+      .enhanced-modal-btn-secondary {
+        background-color: #f8fafc;
+        color: #64748b;
+        border: 2px solid #e2e8f0;
+      }
+
+      .enhanced-modal-btn-secondary:hover {
+        background-color: #f1f5f9;
+        border-color: #cbd5e1;
+        transform: translateY(-2px);
       }
     `;
     document.head.appendChild(styleElement);
@@ -115,17 +218,16 @@ const SystemSettings = () => {
       }
     };
   }, []);
+
   const [settings, setSettings] = useState({
     Funds: '',
     Savings: '',
-    InterestRate: {}, // Global (legacy) map term -> rate%
-    InterestRateByType: {}, // New: { [loanType]: { [term]: rate% } }
+    InterestRate: {},
+    InterestRateByType: {},
     LoanReminderDays: '7',
     DividendDate: '',
-    // Dividend Distribution Percentages
     MembersDividendPercentage: '60',
     FiveKiEarningsPercentage: '40',
-    // Members Dividend Breakdown
     InvestmentSharePercentage: '60',
     PatronageSharePercentage: '25',
     ActiveMonthsPercentage: '15',
@@ -152,7 +254,6 @@ const SystemSettings = () => {
       title: 'Contact Us',
       content: ''
     },
-    // Deprecated: LoanTermsMapping removed. Valid months are the keys of InterestRateByType[loanType].
   });
 
   const [newTerm, setNewTerm] = useState('');
@@ -163,7 +264,6 @@ const SystemSettings = () => {
   const [addLoanTypeModalVisible, setAddLoanTypeModalVisible] = useState(false);
   const [deleteLoanTypeModalVisible, setDeleteLoanTypeModalVisible] = useState(false);
   const [loanTypeToDelete, setLoanTypeToDelete] = useState('');
-  // Deprecated global content edit mode (replaced by per-card edit modes)
   const [editMode, setEditMode] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
@@ -177,28 +277,20 @@ const SystemSettings = () => {
   const [fundsActionModal, setFundsActionModal] = useState(null);
   const [actionAmount, setActionAmount] = useState('');
   const [messageModal, setMessageModal] = useState({ visible: false, title: '', message: '', isError: false });
-  // Snapshot of last saved settings (from DB) to support Cancel in per-section editing
   const [savedSettingsSnapshot, setSavedSettingsSnapshot] = useState(null);
-  // Per-section edit flags
   const [editAccounts, setEditAccounts] = useState(false);
   const [editDividend, setEditDividend] = useState(false);
   const [editLoanReminder, setEditLoanReminder] = useState(false);
   const [editProcessingFee, setEditProcessingFee] = useState(false);
-  // Content Management per-card edit flags - now using modals
   const [editTermsModal, setEditTermsModal] = useState(false);
   const [editPrivacyModal, setEditPrivacyModal] = useState(false);
   const [editAboutModal, setEditAboutModal] = useState(false);
   const [editContactModal, setEditContactModal] = useState(false);
-  // Loan & Dividend header-level edit for Loan Reminder + Processing Fee
   const [editLoanAndFee, setEditLoanAndFee] = useState(false);
-  // Edit mode toggle for Types of Loans section
   const [editLoanTypes, setEditLoanTypes] = useState(false);
-  // General Settings edit modes
   const [editOrientationCode, setEditOrientationCode] = useState(false);
   const [editGeneralSettings, setEditGeneralSettings] = useState(false);
-  // Savings addition amount (separate from total savings)
   const [savingsAddAmount, setSavingsAddAmount] = useState('');
-  // Add to Savings modal
   const [addToSavingsModalVisible, setAddToSavingsModalVisible] = useState(false);
 
   // Add Loan Type wizard state
@@ -220,7 +312,10 @@ const SystemSettings = () => {
   // Helper function to format peso amounts with at least 2 decimal places
   const formatPesoAmount = (amount) => {
     const num = parseFloat(amount) || 0;
-    return num.toFixed(2);
+    return num.toLocaleString('en-PH', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
   };
 
   useEffect(() => {
@@ -234,7 +329,6 @@ const SystemSettings = () => {
           InterestRate: Object.fromEntries(
             Object.entries(data.InterestRate || {}).map(([key, val]) => [key, val.toString()])
           ),
-          // Build per-type interest view from canonical structure only
           InterestRateByType: (() => {
             const source = (data && typeof data.LoanTypes === 'object' && !Array.isArray(data.LoanTypes)) ? data.LoanTypes : {};
             return Object.fromEntries(
@@ -243,24 +337,19 @@ const SystemSettings = () => {
           })(),
           LoanReminderDays: (data.LoanReminderDays ?? 7).toString(),
           DividendDate: data.DividendDate || '',
-          // Dividend Distribution Percentages
           MembersDividendPercentage: data.MembersDividendPercentage?.toString() || '60',
           FiveKiEarningsPercentage: data.FiveKiEarningsPercentage?.toString() || '40',
-          // Members Dividend Breakdown
           InvestmentSharePercentage: data.InvestmentSharePercentage?.toString() || '60',
           PatronageSharePercentage: data.PatronageSharePercentage?.toString() || '25',
           ActiveMonthsPercentage: data.ActiveMonthsPercentage?.toString() || '15',
-
           ProcessingFee: data.ProcessingFee?.toString() || '',
           RegistrationMinimumFee: data.RegistrationMinimumFee?.toString() || '5000',
-          // For UI, maintain an array of loan type names derived from new structure when available
           LoanTypes: (() => {
             if (data && typeof data.LoanTypes === 'object' && !Array.isArray(data.LoanTypes)) {
               return Object.keys(data.LoanTypes);
             }
             return data.LoanTypes || ['Regular Loan', 'Quick Cash'];
           })(),
-          // LoanTermsMapping deprecated; ignore DB value
           LoanPercentage: data.LoanPercentage?.toString() || '80',
           OrientationCode: data.OrientationCode || generateOrientationCode(),
           Accounts: data.Accounts || {
@@ -332,7 +421,6 @@ const SystemSettings = () => {
     setSettings({ ...settings, [key]: clean });
   };
 
-  // Legacy global interest change (kept for backward compatibility if needed)
   const handleInterestChange = (term, value) => {
     const clean = value.replace(/[^0-9.]/g, '');
     if (clean.split('.').length > 2) return;
@@ -342,7 +430,6 @@ const SystemSettings = () => {
     }));
   };
 
-  // New: change per-loan-type rate
   const handleTypeInterestChange = (loanType, term, value) => {
     const clean = String(value).replace(/[^0-9.]/g, '');
     if (clean.split('.').length > 2) return;
@@ -412,7 +499,6 @@ const SystemSettings = () => {
       return;
     }
 
-    // Remove this term only for the selected loan type (local UI state only)
     const updatedByType = { ...(settings.InterestRateByType || {}) };
     const typeMap = { ...(updatedByType[lt] || {}) };
     delete typeMap[t];
@@ -423,12 +509,10 @@ const SystemSettings = () => {
       InterestRateByType: updatedByType,
     }));
     setDeleteModalVisible(false);
-    // Persist happens via section Save (canonical LoanTypes only)
     showMessage('Success', `Deleted ${t} month term for ${lt} only.`);
   };
 
   // Loan Types management functions
-  // Wizard helpers
   const addWizardRow = () => setWizardRows((rows) => [...rows, { term: '', rate: '' }]);
   const removeWizardRow = (idx) => setWizardRows((rows) => rows.filter((_, i) => i !== idx));
   const updateWizardRow = (idx, key, value) => setWizardRows((rows) => rows.map((r, i) => i === idx ? { ...r, [key]: value } : r));
@@ -440,7 +524,6 @@ const SystemSettings = () => {
     setEditingOriginalLoanType('');
   };
   const openEditLoanType = (loanType) => {
-    // Pre-fill wizard with existing terms/rates for the type and open in edit mode
     setWizardLoanTypeName(loanType);
     const map = settings.InterestRateByType?.[loanType] || {};
     const rows = Object.keys(map)
@@ -473,7 +556,6 @@ const SystemSettings = () => {
     if (err) { setWizardError(err); return; }
     const name = wizardLoanTypeName.trim();
 
-    // Build per-type rates from rows
     const newInterestByType = { ...(settings.InterestRateByType || {}) };
     const typeMap = {};
     for (const r of wizardRows) {
@@ -484,27 +566,21 @@ const SystemSettings = () => {
     let newLoanTypes = [...(settings.LoanTypes || [])];
 
     if (isEditingLoanType) {
-      // If the name changed, rename the key and update LoanTypes list
       const original = editingOriginalLoanType;
       if (name !== original) {
-        // Rename key in InterestRateByType
         delete newInterestByType[original];
         newInterestByType[name] = typeMap;
-        // Update LoanTypes: replace original with name
         newLoanTypes = newLoanTypes.map((lt) => (lt === original ? name : lt));
       } else {
-        // Update existing map
         newInterestByType[name] = typeMap;
       }
     } else {
-      // Adding new type
       newLoanTypes = [...newLoanTypes, name];
       newInterestByType[name] = typeMap;
     }
 
     try {
       setActionInProgress(true);
-      // Persist immediately when saving in the wizard
       const parsedByType = {};
       Object.entries(newInterestByType).forEach(([lt, map]) => {
         parsedByType[lt] = {};
@@ -519,11 +595,9 @@ const SystemSettings = () => {
       await update(ref(db, 'Settings'), {
         LoanTypes: loanTypesNested
       });
-      // Reflect changes in local state
       setSettings(prev => ({
         ...prev,
         LoanTypes: newLoanTypes,
-        // Stop tracking legacy map locally as source of truth
       }));
       setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanTypes: loanTypesNested }));
       setAddLoanTypeWizardVisible(false);
@@ -575,11 +649,9 @@ const SystemSettings = () => {
     try {
       setActionInProgress(true);
       const newLoanTypes = settings.LoanTypes.filter(type => type !== loanTypeToDelete);
-      // Remove also from InterestRateByType
       const newInterestByType = { ...(settings.InterestRateByType || {}) };
       delete newInterestByType[loanTypeToDelete];
 
-      // Build canonical nested map
       const parsedByType = {};
       Object.entries(newInterestByType).forEach(([lt, map]) => {
         parsedByType[lt] = {};
@@ -619,14 +691,12 @@ const SystemSettings = () => {
     try {
       const settingsRef = ref(db, 'Settings/');
 
-      // Normalize global interest (legacy)
       const parsedInterest = {};
       for (let key in settings.InterestRate) {
         const val = parseFloat(settings.InterestRate[key]);
         if (!isNaN(val)) parsedInterest[key] = val;
       }
 
-      // Normalize per-type interest
       const parsedByType = {};
       Object.entries(settings.InterestRateByType || {}).forEach(([lt, map]) => {
         parsedByType[lt] = {};
@@ -636,13 +706,11 @@ const SystemSettings = () => {
         });
       });
 
-      // Helper function to safely parse float values
       const safeParseFloat = (value, defaultValue = 0) => {
         const parsed = parseFloat(value);
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
-      // Validate that dividend totals equal 100%
       const distTotal = safeParseFloat(settings.MembersDividendPercentage, 0) + safeParseFloat(settings.FiveKiEarningsPercentage, 0);
       const breakdownTotal = safeParseFloat(settings.InvestmentSharePercentage, 0) + safeParseFloat(settings.PatronageSharePercentage, 0) + safeParseFloat(settings.ActiveMonthsPercentage, 0);
       if (distTotal !== 100) {
@@ -652,7 +720,6 @@ const SystemSettings = () => {
         throw new Error('Members Dividend Breakdown must total 100%.');
       }
 
-      // Build canonical nested map under LoanTypes: { [loanType]: { [term]: rate } }
       const loanTypesNested = Object.fromEntries(
         Object.entries(parsedByType).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), Number(v)]))])
       );
@@ -662,22 +729,17 @@ const SystemSettings = () => {
         Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
         Savings: parseFloat(parseFloat(settings.Savings || 0).toFixed(2)),
         InterestRate: parsedInterest,
-        // Keep legacy path during transition; canonical is now LoanTypes nested map
         InterestRateByType: parsedByType,
         LoanReminderDays: parseInt(settings.LoanReminderDays || 7, 10),
         DividendDate: settings.DividendDate,
-        // Dividend Distribution Percentages
         MembersDividendPercentage: safeParseFloat(settings.MembersDividendPercentage, 60),
         FiveKiEarningsPercentage: safeParseFloat(settings.FiveKiEarningsPercentage, 40),
-        // Members Dividend Breakdown
         InvestmentSharePercentage: safeParseFloat(settings.InvestmentSharePercentage, 60),
         PatronageSharePercentage: safeParseFloat(settings.PatronageSharePercentage, 25),
         ActiveMonthsPercentage: safeParseFloat(settings.ActiveMonthsPercentage, 15),
         ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
         RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 5000).toFixed(2)),
-        // NEW: Replace array with nested map
         LoanTypes: loanTypesNested,
-        // LoanTermsMapping removed per new design; valid months come from InterestRateByType keys
         OrientationCode: settings.OrientationCode,
         Accounts: settings.Accounts,
         TermsAndConditions: settings.TermsAndConditions,
@@ -782,8 +844,11 @@ const SystemSettings = () => {
 
   return (
     <div style={styles.container}>
-      {/* Sidebar Navigation */}
+      {/* Enhanced Sidebar Navigation */}
       <div style={styles.sidebar}>
+        <div style={styles.sidebarHeader}>
+          <h3 style={styles.sidebarTitle}>Configuration</h3>
+        </div>
         <div style={styles.sidebarMenu}>
           <button
             style={{
@@ -792,7 +857,8 @@ const SystemSettings = () => {
             }}
             onClick={() => handleSectionChange('general')}
           >
-            General Settings
+            <FaPiggyBank style={styles.sidebarIcon} />
+            <span style={styles.sidebarButtonText}>Financial Settings</span>
           </button>
           <button
             style={{
@@ -801,7 +867,8 @@ const SystemSettings = () => {
             }}
             onClick={() => handleSectionChange('loan')}
           >
-            Loan & Dividend
+            <FaBusinessTime style={styles.sidebarIcon} />
+            <span style={styles.sidebarButtonText}>Loan & Dividend</span>
           </button>
           <button
             style={{
@@ -810,233 +877,253 @@ const SystemSettings = () => {
             }}
             onClick={() => handleSectionChange('content')}
           >
-            Content Management
+            <FaFileContract style={styles.sidebarIcon} />
+            <span style={styles.sidebarButtonText}>Content Management</span>
           </button>
         </div>
       </div>
 
-      {/* Main Content Area */}
+      {/* Enhanced Main Content Area */}
       <div style={styles.contentArea}>
-        <h2 style={styles.contentTitle}>
-          {activeSection === 'general' && 'General Settings'}
-          {activeSection === 'loan' && 'Loan & Dividend Settings'}
-          {activeSection === 'content' && 'Content Management'}
-        </h2>
+        <div style={styles.contentHeader}>
+          <h2 style={styles.contentTitle}>
+            {activeSection === 'general' && 'Financial Settings'}
+            {activeSection === 'loan' && 'Loan & Dividend Configuration'}
+            {activeSection === 'content' && 'Content Management'}
+          </h2>
+          <div style={styles.contentSubtitle}>
+            {activeSection === 'general' && 'Manage financial accounts, registration fees, and system parameters'}
+            {activeSection === 'loan' && 'Configure loan types, interest rates, and dividend distribution'}
+            {activeSection === 'content' && 'Manage legal documents and informational content'}
+          </div>
+        </div>
 
-        {/* General Settings Section */}
+        {/* Enhanced General Settings Section */}
         {activeSection === 'general' && (
           <div style={styles.section}>
-            {/* General Settings Header with Edit/Save */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={styles.subSectionTitle}>Financial Settings</h3>
-              {!editGeneralSettings ? (
-                <button style={styles.headerIconBtn} title="Edit Financial Settings" onClick={() => setEditGeneralSettings(true)}>
-                  <FaEdit />
-                </button>
-              ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                    title="Save Financial Settings"
-                    onClick={async () => {
-                      try {
-                        setActionInProgress(true);
-                        
-                        const updateData = {
-                          RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 0).toFixed(2))
-                        };
-                        
-                        await update(ref(db, 'Settings'), updateData);
-                        
-                        setSavedSettingsSnapshot(prev => ({ 
-                          ...(prev || {}), 
-                          RegistrationMinimumFee: settings.RegistrationMinimumFee
+            {/* Financial Settings Card */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaMoneyBillWave style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Financial Configuration</h3>
+                </div>
+                {!editGeneralSettings ? (
+                  <button style={styles.headerIconBtn} title="Edit Financial Settings" onClick={() => setEditGeneralSettings(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
+                      title="Save Financial Settings"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          
+                          const updateData = {
+                            RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 0).toFixed(2))
+                          };
+                          
+                          await update(ref(db, 'Settings'), updateData);
+                          
+                          setSavedSettingsSnapshot(prev => ({ 
+                            ...(prev || {}), 
+                            RegistrationMinimumFee: settings.RegistrationMinimumFee
+                          }));
+                          
+                          setEditGeneralSettings(false);
+                          showMessage('Success', 'Financial settings updated successfully!');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save financial settings', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        setSettings(prev => ({
+                          ...prev,
+                          RegistrationMinimumFee: savedSettingsSnapshot?.RegistrationMinimumFee ?? prev.RegistrationMinimumFee,
                         }));
-                        
                         setEditGeneralSettings(false);
-                        showMessage('Success', 'Financial settings updated successfully!');
-                      } catch (e) {
-                        showMessage('Error', e.message || 'Failed to save financial settings', true);
-                      } finally {
-                        setActionInProgress(false);
-                      }
-                    }}
-                  >
-                    <FaSave />
-                  </button>
-                  <button
-                    style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                    title="Cancel"
-                    onClick={() => {
-                      setSettings(prev => ({
-                        ...prev,
-                        RegistrationMinimumFee: savedSettingsSnapshot?.RegistrationMinimumFee ?? prev.RegistrationMinimumFee,
-                      }));
-                      setEditGeneralSettings(false);
-                    }}
-                  >
-                    <FaTimes />
-                  </button>
-                </div>
-              )}
-            </div>
-
-            {/* Minimum Registration Fee */}
-            <div style={styles.inputRow}>
-              <label style={styles.label}>Minimum Registration Fee</label>
-              {!editGeneralSettings ? (
-                <span style={styles.staticText}>₱{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 'bold' }}>₱</span>
-                  <input
-                    style={styles.input}
-                    value={settings.RegistrationMinimumFee}
-                    onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
-                    type="text"
-                    placeholder="0.00"
-                  />
-                </div>
-              )}
-            </div>
-            
-            {/* Available Funds - Read Only */}
-            <div style={styles.inputRow}>
-              <label style={styles.label}>Available Funds</label>
-              <span style={styles.staticText}>₱{formatPesoAmount(settings.Funds)}</span>
-            </div>
-
-            {/* Savings */}
-            <div style={styles.inputRow}>
-              <label style={styles.label}>Current Savings</label>
-              <span style={styles.staticText}>₱{formatPesoAmount(settings.Savings)}</span>
-            </div>
-
-            {/* Add to Savings Button - Only visible in edit mode */}
-            {editGeneralSettings && (
-              <div style={{ display: 'flex', justifyContent: 'center', marginTop: 20 }}>
-                <button
-                  style={{
-                    backgroundColor: '#2D5783',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '12px 24px',
-                    cursor: 'pointer',
-                    fontSize: '14px',
-                    fontWeight: '500',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '8px',
-                    transition: 'all 0.2s',
-                  }}
-                  onClick={() => {
-                    setSavingsAddAmount('');
-                    setAddToSavingsModalVisible(true);
-                  }}
-                  onMouseOver={(e) => {
-                    e.target.style.backgroundColor = '#1a3d66';
-                    e.target.style.transform = 'translateY(-1px)';
-                  }}
-                  onMouseOut={(e) => {
-                    e.target.style.backgroundColor = '#2D5783';
-                    e.target.style.transform = 'translateY(0)';
-                  }}
-                >
-                  <FaPlus />
-                  Add to Savings
-                </button>
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
 
+              <div style={styles.cardContent}>
+                {/* Minimum Registration Fee */}
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>
+                    <span style={styles.labelText}>Minimum Registration Fee</span>
+                    <span style={styles.labelDescription}>Initial deposit required for new members</span>
+                  </label>
+                  {!editGeneralSettings ? (
+                    <div style={styles.amountDisplay}>
+                      <span style={styles.amountSymbol}>₱</span>
+                      <span style={styles.amountValue}>{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
+                    </div>
+                  ) : (
+                    <div style={styles.amountInputContainer}>
+                      <span style={styles.amountSymbol}>₱</span>
+                      <input
+                        style={styles.amountInput}
+                        value={settings.RegistrationMinimumFee}
+                        onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
+                        type="text"
+                        placeholder="0.00"
+                      />
+                    </div>
+                  )}
+                </div>
+                
+                {/* Available Funds */}
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>
+                    <span style={styles.labelText}>Available Funds</span>
+                    <span style={styles.labelDescription}>Total funds available for lending</span>
+                  </label>
+                  <div style={styles.amountDisplay}>
+                    <span style={styles.amountSymbol}>₱</span>
+                    <span style={styles.amountValue}>{formatPesoAmount(settings.Funds)}</span>
+                  </div>
+                </div>
 
+                {/* Savings */}
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>
+                    <span style={styles.labelText}>Current Savings</span>
+                    <span style={styles.labelDescription}>Total savings pool</span>
+                  </label>
+                  <div style={styles.amountDisplay}>
+                    <span style={styles.amountSymbol}>₱</span>
+                    <span style={styles.amountValue}>{formatPesoAmount(settings.Savings)}</span>
+                  </div>
+                </div>
 
-            <div style={styles.divider}></div>
+                {/* Add to Savings Button */}
+                {editGeneralSettings && (
+                  <div style={styles.actionButtonContainer}>
+                    <button
+                      style={styles.primaryButton}
+                      onClick={() => {
+                        setSavingsAddAmount('');
+                        setAddToSavingsModalVisible(true);
+                      }}
+                    >
+                      <FaPlus />
+                      Add to Savings
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Accounts Section */}
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={styles.contentTitle}>Accounts</h3>
-              {!editAccounts ? (
-                <button style={styles.headerIconBtn} title="Edit Accounts" onClick={() => setEditAccounts(true)}>
-                  <FaEdit />
-                </button>
-              ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                    title="Save Accounts"
-                    onClick={async () => {
-                      try {
-                        setActionInProgress(true);
-                        const settingsRef = ref(db, 'Settings/Accounts');
-                        await update(settingsRef, settings.Accounts);
-                        setSavedSettingsSnapshot(prev => ({ ...(prev || {}), Accounts: settings.Accounts }));
-                        setEditAccounts(false);
-                        showMessage('Success', 'Accounts updated successfully!');
-                      } catch (e) {
-                        showMessage('Error', e.message || 'Failed to save Accounts', true);
-                      } finally {
-                        setActionInProgress(false);
-                      }
-                    }}
-                  >
-                    <FaSave />
-                  </button>
-                  <button
-                    style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                    title="Cancel"
-                    onClick={() => {
-                      if (savedSettingsSnapshot?.Accounts) {
-                        setSettings(prev => ({ ...prev, Accounts: savedSettingsSnapshot.Accounts }));
-                      }
-                      setEditAccounts(false);
-                    }}
-                  >
-                    <FaTimes />
-                  </button>
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaPiggyBank style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Bank Accounts</h3>
                 </div>
-              )}
-            </div>
-            <div style={styles.accountRow}>
-              <div style={styles.accountCard}>
-                <h3 style={styles.accountTitle}>Bank Account</h3>
-                <InputRow
-                  label="Account Name"
-                  value={settings.Accounts.Bank.accountName}
-                  onChange={(text) => handleAccountChange('Bank', 'accountName', text)}
-                  editable={editAccounts}
-                />
-                <InputRow
-                  label="Account Number"
-                  value={settings.Accounts.Bank.accountNumber}
-                  onChange={(text) => handleAccountChange('Bank', 'accountNumber', text)}
-                  editable={editAccounts}
-                />
+                {!editAccounts ? (
+                  <button style={styles.headerIconBtn} title="Edit Accounts" onClick={() => setEditAccounts(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
+                      title="Save Accounts"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          const settingsRef = ref(db, 'Settings/Accounts');
+                          await update(settingsRef, settings.Accounts);
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), Accounts: settings.Accounts }));
+                          setEditAccounts(false);
+                          showMessage('Success', 'Accounts updated successfully!');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save Accounts', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        if (savedSettingsSnapshot?.Accounts) {
+                          setSettings(prev => ({ ...prev, Accounts: savedSettingsSnapshot.Accounts }));
+                        }
+                        setEditAccounts(false);
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
               </div>
-              
-              <div style={styles.accountCard}>
-                <h3 style={styles.accountTitle}>GCash Account</h3>
-                <InputRow
-                  label="Account Name"
-                  value={settings.Accounts.GCash.accountName}
-                  onChange={(text) => handleAccountChange('GCash', 'accountName', text)}
-                  editable={editAccounts}
-                />
-                <InputRow
-                  label="Account Number"
-                  value={settings.Accounts.GCash.accountNumber}
-                  onChange={(text) => handleAccountChange('GCash', 'accountNumber', text)}
-                  editable={editAccounts}
-                />
+              <div style={styles.accountGrid}>
+                <div style={styles.accountCard}>
+                  <div style={styles.accountCardHeader}>
+                    <div style={styles.accountType}>Bank Account</div>
+                    <div style={styles.accountBadge}>Traditional</div>
+                  </div>
+                  <InputRow
+                    label="Account Name"
+                    value={settings.Accounts.Bank.accountName}
+                    onChange={(text) => handleAccountChange('Bank', 'accountName', text)}
+                    editable={editAccounts}
+                  />
+                  <InputRow
+                    label="Account Number"
+                    value={settings.Accounts.Bank.accountNumber}
+                    onChange={(text) => handleAccountChange('Bank', 'accountNumber', text)}
+                    editable={editAccounts}
+                  />
+                </div>
+                
+                <div style={styles.accountCard}>
+                  <div style={styles.accountCardHeader}>
+                    <div style={styles.accountType}>GCash Account</div>
+                    <div style={{...styles.accountBadge, backgroundColor: '#06d6a0'}}>Digital</div>
+                  </div>
+                  <InputRow
+                    label="Account Name"
+                    value={settings.Accounts.GCash.accountName}
+                    onChange={(text) => handleAccountChange('GCash', 'accountName', text)}
+                    editable={editAccounts}
+                  />
+                  <InputRow
+                    label="Account Number"
+                    value={settings.Accounts.GCash.accountNumber}
+                    onChange={(text) => handleAccountChange('GCash', 'accountNumber', text)}
+                    editable={editAccounts}
+                  />
+                </div>
               </div>
             </div>
 
-            <div style={styles.divider}></div>
-
-            {/* Orientation Code */}
-            <div style={styles.orientationCodeContainer}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <h3 style={styles.accountTitle}>Orientation Attendance Code</h3>
+            {/* Orientation Code Section */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaShieldAlt style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Orientation Security</h3>
+                </div>
                 {!editOrientationCode ? (
                   <button style={styles.headerIconBtn} title="Edit Orientation Code" onClick={() => setEditOrientationCode(true)}>
                     <FaEdit />
@@ -1044,7 +1131,7 @@ const SystemSettings = () => {
                 ) : (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
                       title="Save Orientation Code"
                       onClick={async () => {
                         try {
@@ -1068,7 +1155,7 @@ const SystemSettings = () => {
                       <FaSave />
                     </button>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
                       title="Cancel"
                       onClick={() => {
                         setSettings(prev => ({
@@ -1083,134 +1170,157 @@ const SystemSettings = () => {
                   </div>
                 )}
               </div>
-              <div style={styles.orientationCodeRow}>
-                <div style={styles.orientationCodeValue}>
-                  {settings.OrientationCode || 'Not set'}
+              <div style={styles.orientationContent}>
+                <div style={styles.orientationCodeDisplay}>
+                  <div style={styles.orientationCodeValue}>
+                    {settings.OrientationCode || 'Not set'}
+                  </div>
+                  <div style={styles.orientationActions}>
+                    {settings.OrientationCode && (
+                      <button 
+                        style={styles.iconButton}
+                        onClick={() => copyToClipboard(settings.OrientationCode)}
+                        aria-label="Copy orientation code"
+                      >
+                        <FaCopy />
+                      </button>
+                    )}
+                    {editOrientationCode && (
+                      <button 
+                        style={styles.iconButton}
+                        onClick={handleGenerateOrientationCode}
+                        aria-label="Generate new orientation code"
+                        title="Generate New Code"
+                      >
+                        <FaRedo />
+                      </button>
+                    )}
+                    {orientationCopied && <span style={styles.copiedText}>Copied!</span>}
+                  </div>
                 </div>
-                {settings.OrientationCode && (
-                  <button 
-                    style={styles.copyBtn}
-                    onClick={() => copyToClipboard(settings.OrientationCode)}
-                    aria-label="Copy orientation code"
-                  >
-                    <FaCopy style={styles.buttonIcon} />
-                  </button>
-                )}
-                {editOrientationCode && (
-                  <button 
-                    style={{ ...styles.copyBtn, backgroundColor: '#2196F3' }}
-                    onClick={handleGenerateOrientationCode}
-                    aria-label="Generate new orientation code"
-                    title="Generate New Code"
-                  >
-                    <FaRedo style={styles.buttonIcon} />
-                  </button>
-                )}
-                {orientationCopied && <span style={styles.copiedText}>Copied!</span>}
+                <p style={styles.orientationDescription}>
+                  This secure code is used for member registration during orientation sessions. 
+                  Share this code exclusively with authorized attendees.
+                </p>
               </div>
-              <p style={styles.orientationCodeDescription}>
-                This code is used for registration when attending the orientation. Share this code with attendees.
-                {editOrientationCode && <span style={{ color: '#2196F3', fontWeight: 'bold' }}> Click the refresh button to generate a new code.</span>}
-              </p>
             </div>
           </div>
         )}
 
-        {/* Loan & Dividend Section */}
+        {/* Enhanced Loan & Dividend Section */}
         {activeSection === 'loan' && (
           <div style={styles.section}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-              <h3 style={styles.subSectionTitle}>Loan Reminder and Processing Fee</h3>
-              {!editLoanAndFee ? (
-                <button style={styles.headerIconBtn} title="Edit Loan Reminder & Processing Fee" onClick={() => setEditLoanAndFee(true)}>
-                  <FaEdit />
-                </button>
-              ) : (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button
-                    style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
-                    title="Save"
-                    onClick={async () => {
-                      try {
-                        setActionInProgress(true);
-                        await update(ref(db, 'Settings'), {
-                          LoanReminderDays: parseInt(settings.LoanReminderDays || 0, 10),
-                          ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2))
-                        });
-                        setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanReminderDays: settings.LoanReminderDays, ProcessingFee: settings.ProcessingFee }));
+            {/* Loan Settings Card */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaBusinessTime style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Loan Parameters</h3>
+                </div>
+                {!editLoanAndFee ? (
+                  <button style={styles.headerIconBtn} title="Edit Loan Reminder & Processing Fee" onClick={() => setEditLoanAndFee(true)}>
+                    <FaEdit />
+                  </button>
+                ) : (
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
+                      title="Save"
+                      onClick={async () => {
+                        try {
+                          setActionInProgress(true);
+                          await update(ref(db, 'Settings'), {
+                            LoanReminderDays: parseInt(settings.LoanReminderDays || 0, 10),
+                            ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2))
+                          });
+                          setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanReminderDays: settings.LoanReminderDays, ProcessingFee: settings.ProcessingFee }));
+                          setEditLoanAndFee(false);
+                          showMessage('Success', 'Loan Reminder and Processing Fee updated');
+                        } catch (e) {
+                          showMessage('Error', e.message || 'Failed to save', true);
+                        } finally {
+                          setActionInProgress(false);
+                        }
+                      }}
+                    >
+                      <FaSave />
+                    </button>
+                    <button
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
+                      title="Cancel"
+                      onClick={() => {
+                        setSettings(prev => ({
+                          ...prev,
+                          LoanReminderDays: savedSettingsSnapshot?.LoanReminderDays ?? prev.LoanReminderDays,
+                          ProcessingFee: savedSettingsSnapshot?.ProcessingFee ?? prev.ProcessingFee,
+                        }));
                         setEditLoanAndFee(false);
-                        showMessage('Success', 'Loan Reminder and Processing Fee updated');
-                      } catch (e) {
-                        showMessage('Error', e.message || 'Failed to save', true);
-                      } finally {
-                        setActionInProgress(false);
-                      }
-                    }}
-                  >
-                    <FaSave />
-                  </button>
-                  <button
-                    style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
-                    title="Cancel"
-                    onClick={() => {
-                      setSettings(prev => ({
-                        ...prev,
-                        LoanReminderDays: savedSettingsSnapshot?.LoanReminderDays ?? prev.LoanReminderDays,
-                        ProcessingFee: savedSettingsSnapshot?.ProcessingFee ?? prev.ProcessingFee,
-                      }));
-                      setEditLoanAndFee(false);
-                    }}
-                  >
-                    <FaTimes />
-                  </button>
+                      }}
+                    >
+                      <FaTimes />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <div style={styles.cardContent}>
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>
+                    <span style={styles.labelText}>Loan Reminder Period</span>
+                    <span style={styles.labelDescription}>Days before payment due date to send reminders</span>
+                  </label>
+                  {!editLoanAndFee ? (
+                    <div style={styles.valueDisplay}>
+                      <span style={styles.valueText}>{settings.LoanReminderDays} days</span>
+                    </div>
+                  ) : (
+                    <div style={styles.valueInputContainer}>
+                      <input
+                        style={styles.valueInput}
+                        value={settings.LoanReminderDays}
+                        onChange={(e) => setSettings({ ...settings, LoanReminderDays: e.target.value.replace(/[^0-9]/g, '') })}
+                        type="number"
+                        min="1"
+                        max="30"
+                      />
+                      <span style={styles.valueSuffix}>days</span>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            <div style={styles.inputRow}>
-              <label style={styles.label}>Loan Reminder (days)</label>
-              {!editLoanAndFee ? (
-                <>
-                  <span style={styles.staticText}>{settings.LoanReminderDays} days</span>
-                </>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    style={styles.input}
-                    value={settings.LoanReminderDays}
-                    onChange={(e) => setSettings({ ...settings, LoanReminderDays: e.target.value.replace(/[^0-9]/g, '') })}
-                    type="number"
-                  />
-                </div>
-              )}
-            </div>
-            
 
-
-            <div style={styles.rateRow}>
-              <span style={styles.termText}>Processing Fee</span>
-              {!editLoanAndFee ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={styles.staticText}>₱{formatPesoAmount(settings.ProcessingFee)}</span>
+                <div style={styles.inputRow}>
+                  <label style={styles.label}>
+                    <span style={styles.labelText}>Processing Fee</span>
+                    <span style={styles.labelDescription}>Fixed fee charged for loan processing</span>
+                  </label>
+                  {!editLoanAndFee ? (
+                    <div style={styles.amountDisplay}>
+                      <span style={styles.amountSymbol}>₱</span>
+                      <span style={styles.amountValue}>{formatPesoAmount(settings.ProcessingFee)}</span>
+                    </div>
+                  ) : (
+                    <div style={styles.amountInputContainer}>
+                      <span style={styles.amountSymbol}>₱</span>
+                      <input
+                        style={styles.amountInput}
+                        value={settings.ProcessingFee}
+                        onChange={(e) => handleInputChange('ProcessingFee', e.target.value)}
+                        type="number"
+                        min="0"
+                        step="0.01"
+                      />
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <input
-                    style={styles.input}
-                    value={settings.ProcessingFee}
-                    onChange={(e) => handleInputChange('ProcessingFee', e.target.value)}
-                    type="number"
-                    min="0"
-                    step="0.01"
-                  />
-                </div>
-              )}
+              </div>
             </div>
 
-
-
-            <div style={styles.loanTypesSection}>
-              <h3 style={{ ...styles.subSectionTitle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <span>Types of Loans</span>
+            {/* Loan Types Section */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaPercentage style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Loan Products</h3>
+                </div>
                 {!editLoanTypes ? (
                   <button
                     style={styles.headerIconBtn}
@@ -1222,12 +1332,11 @@ const SystemSettings = () => {
                 ) : (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
                       title="Save Types of Loan"
                       onClick={async () => {
                         try {
                           setActionInProgress(true);
-                          // Build canonical nested map from current InterestRateByType
                           const parsedByType = {};
                           Object.entries(settings.InterestRateByType || {}).forEach(([lt, map]) => {
                             parsedByType[lt] = {};
@@ -1255,10 +1364,9 @@ const SystemSettings = () => {
                       <FaSave />
                     </button>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
                       title="Cancel"
                       onClick={() => {
-                        // Revert UI state to last saved snapshot
                         if (savedSettingsSnapshot) {
                           setSettings(prev => ({
                             ...prev,
@@ -1287,62 +1395,57 @@ const SystemSettings = () => {
                     </button>
                   </div>
                 )}
-              </h3>
-              {settings.LoanTypes.map((loanType, index) => (
-                <div key={index} style={styles.loanTypeRow}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                    <span style={styles.loanTypeText}>{loanType}</span>
-                    <div style={{ fontSize: 13, color: '#555' }}>
+              </div>
+              <div style={styles.loanTypesGrid}>
+                {settings.LoanTypes.map((loanType, index) => (
+                  <div key={index} style={styles.loanTypeCard}>
+                    <div style={styles.loanTypeHeader}>
+                      <span style={styles.loanTypeName}>{loanType}</span>
+                      {editLoanTypes && (
+                        <div style={styles.loanTypeActions}>
+                          <button 
+                            style={styles.smallIconButton}
+                            title="Edit terms & rates"
+                            onClick={() => openEditLoanType(loanType)}
+                          >
+                            <FaEdit />
+                          </button>
+                          <button 
+                            style={{...styles.smallIconButton, backgroundColor: '#ef4444'}}
+                            title="Delete loan type"
+                            onClick={() => requestDeleteLoanType(loanType)}
+                          >
+                            <FaTrashAlt />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    <div style={styles.termsGrid}>
                       {(settings.InterestRateByType?.[loanType] && Object.keys(settings.InterestRateByType[loanType]).length > 0)
                         ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                              {Object.keys(settings.InterestRateByType[loanType])
-                                .sort((a,b)=>Number(a)-Number(b))
-                                .map((m) => (
-                                  <span key={m} style={{
-                                    padding: '4px 8px',
-                                    border: '1px solid #ddd',
-                                    borderRadius: 6,
-                                    background: '#fafafa'
-                                  }}>
-                                    {m} mo — {String(settings.InterestRateByType[loanType][m])}%
-                                  </span>
-                                ))}
-                            </div>
+                            Object.keys(settings.InterestRateByType[loanType])
+                              .sort((a,b)=>Number(a)-Number(b))
+                              .map((m) => (
+                                <div key={m} style={styles.termChip}>
+                                  <span style={styles.termMonths}>{m} mo</span>
+                                  <span style={styles.termRate}>{String(settings.InterestRateByType[loanType][m])}%</span>
+                                </div>
+                              ))
                           )
-                        : (<span style={{ color: '#888' }}>No terms set</span>)}
+                        : (<span style={styles.noTerms}>No terms configured</span>)}
                     </div>
                   </div>
-                  {editLoanTypes && (
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        style={styles.editLoanTypeBtn}
-                        title="Edit terms & rates"
-                        onClick={() => openEditLoanType(loanType)}
-                      >
-                        <FaEdit style={styles.buttonIcon} />
-                      </button>
-                      <button 
-                        style={styles.deleteLoanTypeBtn}
-                        title="Delete loan type"
-                        onClick={() => requestDeleteLoanType(loanType)}
-                      >
-                        <FaTrashAlt style={styles.buttonIcon} />
-                      </button>
-                    </div>
-                  )}
+                ))}
+              </div>
+            </div>
+
+            {/* Dividend Settings Card */}
+            <div style={styles.card}>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaMoneyBillWave style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Dividend Configuration</h3>
                 </div>
-              ))}
-
-            </div>
-
-            <div style={styles.interestRatesSection}>
-              {/* Removed: legacy per-loan-type editor and term assignment UI. Now handled via Edit modal in Types of Loans list. */}
-            </div>
-
-            <div style={styles.dividendSection}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={styles.subSectionTitle}>Dividend Settings</h3>
                 {!editDividend ? (
                   <button style={styles.headerIconBtn} title="Edit Dividend Settings" onClick={() => setEditDividend(true)}>
                     <FaEdit />
@@ -1350,7 +1453,7 @@ const SystemSettings = () => {
                 ) : (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
                       title="Save"
                       onClick={async () => {
                         try {
@@ -1377,7 +1480,7 @@ const SystemSettings = () => {
                       <FaSave />
                     </button>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#f44336', color: '#fff' }}
+                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
                       title="Cancel"
                       onClick={() => {
                         if (savedSettingsSnapshot) {
@@ -1400,169 +1503,201 @@ const SystemSettings = () => {
                 )}
               </div>
               
-              {/* Dividend Distribution Percentages */}
-              <div style={styles.dividendDistributionSection}>
-                <h4 style={styles.subSectionTitle}>Dividend Distribution</h4>
-                <div style={styles.rateRow}>
-                  <span style={styles.termText}>Members Dividend</span>
-                  {editDividend ? (
-                    <div style={styles.editRateRow}>
-                      <input
-                        style={styles.miniInput}
-                        value={settings.MembersDividendPercentage}
-                        onChange={(e) => handleInputChange('MembersDividendPercentage', e.target.value)}
-                        type="number"
-                        placeholder="60"
-                      />
-                      <span style={styles.percentSymbol}>%</span>
+              <div style={styles.dividendContent}>
+                {/* Dividend Distribution */}
+                <div style={styles.dividendSection}>
+                  <h4 style={styles.sectionSubtitle}>Distribution Allocation</h4>
+                  <div style={styles.percentageRow}>
+                    <div style={styles.percentageItem}>
+                      <span style={styles.percentageLabel}>Members Dividend</span>
+                      {editDividend ? (
+                        <div style={styles.percentageInputContainer}>
+                          <input
+                            style={styles.percentageInput}
+                            value={settings.MembersDividendPercentage}
+                            onChange={(e) => handleInputChange('MembersDividendPercentage', e.target.value)}
+                            type="number"
+                            min="0"
+                            max="100"
+                          />
+                          <span style={styles.percentageSymbol}>%</span>
+                        </div>
+                      ) : (
+                        <div style={styles.percentageDisplay}>
+                          <span style={styles.percentageValue}>{settings.MembersDividendPercentage}%</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span style={styles.staticText}>{settings.MembersDividendPercentage}%</span>
-                  )}
-                </div>
-                <div style={styles.rateRow}>
-                  <span style={styles.termText}>5Ki Earnings</span>
-                  {editDividend ? (
-                    <div style={styles.editRateRow}>
-                      <input
-                        style={styles.miniInput}
-                        value={settings.FiveKiEarningsPercentage}
-                        onChange={(e) => handleInputChange('FiveKiEarningsPercentage', e.target.value)}
-                        type="number"
-                        placeholder="40"
-                      />
-                      <span style={styles.percentSymbol}>%</span>
+                    <div style={styles.percentageItem}>
+                      <span style={styles.percentageLabel}>5Ki Earnings</span>
+                      {editDividend ? (
+                        <div style={styles.percentageInputContainer}>
+                          <input
+                            style={styles.percentageInput}
+                            value={settings.FiveKiEarningsPercentage}
+                            onChange={(e) => handleInputChange('FiveKiEarningsPercentage', e.target.value)}
+                            type="number"
+                            min="0"
+                            max="100"
+                          />
+                          <span style={styles.percentageSymbol}>%</span>
+                        </div>
+                      ) : (
+                        <div style={styles.percentageDisplay}>
+                          <span style={styles.percentageValue}>{settings.FiveKiEarningsPercentage}%</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span style={styles.staticText}>{settings.FiveKiEarningsPercentage}%</span>
-                  )}
-                </div>
-                
-                {/* Validation message for distribution percentages */}
-                {editDividend && (
-                  <div style={{
-                    ...styles.validationMessage,
-                    color: (parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? '#28a745' : '#dc3545'
-                  }}>
-                    Total: {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)).toFixed(1)}% 
-                    {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? ' ✓' : ' (Must equal 100%)'}
                   </div>
-                )}
-              </div>
+                  
+                  {editDividend && (
+                    <div style={{
+                      ...styles.validationMessage,
+                      color: (parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? '#10b981' : '#ef4444'
+                    }}>
+                      Total: {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)).toFixed(1)}% 
+                      {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? ' ✓ Balanced' : ' - Must equal 100%'}
+                    </div>
+                  )}
+                </div>
 
-              {/* Members Dividend Breakdown */}
-              <div style={styles.dividendBreakdownSection}>
-                <h4 style={styles.subSectionTitle}>Members Dividend Breakdown</h4>
-                <div style={styles.rateRow}>
-                  <span style={styles.termText}>Investment Share</span>
-                  {editDividend ? (
-                    <div style={styles.editRateRow}>
-                      <input
-                        style={styles.miniInput}
-                        value={settings.InvestmentSharePercentage}
-                        onChange={(e) => handleInputChange('InvestmentSharePercentage', e.target.value)}
-                        type="number"
-                        placeholder="60"
-                      />
-                      <span style={styles.percentSymbol}>%</span>
+                {/* Members Dividend Breakdown */}
+                <div style={styles.dividendSection}>
+                  <h4 style={styles.sectionSubtitle}>Members Dividend Breakdown</h4>
+                  <div style={styles.breakdownGrid}>
+                    <div style={styles.breakdownItem}>
+                      <span style={styles.breakdownLabel}>Investment Share</span>
+                      {editDividend ? (
+                        <div style={styles.percentageInputContainer}>
+                          <input
+                            style={styles.percentageInput}
+                            value={settings.InvestmentSharePercentage}
+                            onChange={(e) => handleInputChange('InvestmentSharePercentage', e.target.value)}
+                            type="number"
+                            min="0"
+                            max="100"
+                          />
+                          <span style={styles.percentageSymbol}>%</span>
+                        </div>
+                      ) : (
+                        <div style={styles.percentageDisplay}>
+                          <span style={styles.percentageValue}>{settings.InvestmentSharePercentage}%</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span style={styles.staticText}>{settings.InvestmentSharePercentage}%</span>
-                  )}
-                </div>
-                <div style={styles.rateRow}>
-                  <span style={styles.termText}>Patronage Share</span>
-                  {editDividend ? (
-                    <div style={styles.editRateRow}>
-                      <input
-                        style={styles.miniInput}
-                        value={settings.PatronageSharePercentage}
-                        onChange={(e) => handleInputChange('PatronageSharePercentage', e.target.value)}
-                        type="number"
-                        placeholder="25"
-                      />
-                      <span style={styles.percentSymbol}>%</span>
+                    <div style={styles.breakdownItem}>
+                      <span style={styles.breakdownLabel}>Patronage Share</span>
+                      {editDividend ? (
+                        <div style={styles.percentageInputContainer}>
+                          <input
+                            style={styles.percentageInput}
+                            value={settings.PatronageSharePercentage}
+                            onChange={(e) => handleInputChange('PatronageSharePercentage', e.target.value)}
+                            type="number"
+                            min="0"
+                            max="100"
+                          />
+                          <span style={styles.percentageSymbol}>%</span>
+                        </div>
+                      ) : (
+                        <div style={styles.percentageDisplay}>
+                          <span style={styles.percentageValue}>{settings.PatronageSharePercentage}%</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span style={styles.staticText}>{settings.PatronageSharePercentage}%</span>
-                  )}
-                </div>
-                <div style={styles.rateRow}>
-                  <span style={styles.termText}>Active Months</span>
-                  {editDividend ? (
-                    <div style={styles.editRateRow}>
-                      <input
-                        style={styles.miniInput}
-                        value={settings.ActiveMonthsPercentage}
-                        onChange={(e) => handleInputChange('ActiveMonthsPercentage', e.target.value)}
-                        type="number"
-                        placeholder="15"
-                      />
-                      <span style={styles.percentSymbol}>%</span>
+                    <div style={styles.breakdownItem}>
+                      <span style={styles.breakdownLabel}>Active Months</span>
+                      {editDividend ? (
+                        <div style={styles.percentageInputContainer}>
+                          <input
+                            style={styles.percentageInput}
+                            value={settings.ActiveMonthsPercentage}
+                            onChange={(e) => handleInputChange('ActiveMonthsPercentage', e.target.value)}
+                            type="number"
+                            min="0"
+                            max="100"
+                          />
+                          <span style={styles.percentageSymbol}>%</span>
+                        </div>
+                      ) : (
+                        <div style={styles.percentageDisplay}>
+                          <span style={styles.percentageValue}>{settings.ActiveMonthsPercentage}%</span>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <span style={styles.staticText}>{settings.ActiveMonthsPercentage}%</span>
-                  )}
-                </div>
-                
-                {/* Validation message for breakdown percentages */}
-                {editDividend && (
-                  <div style={{
-                    ...styles.validationMessage,
-                    color: (parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? '#28a745' : '#dc3545'
-                  }}>
-                    Total: {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)).toFixed(1)}% 
-                    {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? ' ✓' : ' (Must equal 100%)'}
                   </div>
-                )}
-              </div>
-
-              <label style={styles.label}>Dividend Date</label>
-              {editDividend ? (
-                <>
-                  <button 
-                    style={styles.dateButton}
-                    onClick={() => setShowCalendar(!showCalendar)}
-                  >
-                    {settings.DividendDate
-                      ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                        })
-                      : 'Select a date'}
-                  </button>
-                  {showCalendar && (
-                    <div style={styles.calendarContainer}>
-                      <Calendar
-                        onChange={handleDateChange}
-                        value={settings.DividendDate ? new Date(settings.DividendDate) : new Date()}
-                      />
+                  
+                  {editDividend && (
+                    <div style={{
+                      ...styles.validationMessage,
+                      color: (parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? '#10b981' : '#ef4444'
+                    }}>
+                      Total: {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)).toFixed(1)}% 
+                      {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? ' ✓ Balanced' : ' - Must equal 100%'}
                     </div>
                   )}
-                </>
-              ) : (
-                <span style={styles.staticText}>
-                  {settings.DividendDate
-                    ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
-                        year: 'numeric',
-                        month: 'long',
-                        day: 'numeric',
-                      })
-                    : 'Not set'}
-                </span>
-              )}
+                </div>
+
+                {/* Dividend Date */}
+                <div style={styles.dateSection}>
+                  <label style={styles.label}>
+                    <span style={styles.labelText}>Dividend Distribution Date</span>
+                    <span style={styles.labelDescription}>Annual date for dividend distribution</span>
+                  </label>
+                  {editDividend ? (
+                    <>
+                      <button 
+                        style={styles.dateButton}
+                        onClick={() => setShowCalendar(!showCalendar)}
+                      >
+                        <FaCalendarAlt style={{ marginRight: 8 }} />
+                        {settings.DividendDate
+                          ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : 'Select distribution date'}
+                      </button>
+                      {showCalendar && (
+                        <div style={styles.calendarContainer}>
+                          <Calendar
+                            onChange={handleDateChange}
+                            value={settings.DividendDate ? new Date(settings.DividendDate) : new Date()}
+                          />
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={styles.dateDisplay}>
+                      <FaCalendarAlt style={{ marginRight: 8, color: '#6b7280' }} />
+                      <span style={styles.dateText}>
+                        {settings.DividendDate
+                          ? new Date(settings.DividendDate).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                            })
+                          : 'Not scheduled'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Content Management Section */}
+        {/* Enhanced Content Management Section */}
         {activeSection === 'content' && (
           <div style={styles.section}>
             {/* Terms and Conditions */}
             <div style={styles.contentCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={styles.accountTitle}>Terms and Conditions</h3>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaFileContract style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Terms and Conditions</h3>
+                </div>
                 <button 
                   style={styles.headerIconBtn} 
                   title="Edit Terms and Conditions" 
@@ -1577,22 +1712,23 @@ const SystemSettings = () => {
                   <FaEdit />
                 </button>
               </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Title</label>
-                <div style={styles.staticText}>{settings.TermsAndConditions.title}</div>
-              </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Content</label>
-                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
-                  {settings.TermsAndConditions.content}
+              <div style={styles.contentPreview}>
+                <div style={styles.contentPreviewHeader}>
+                  <h4 style={styles.contentPreviewTitle}>{settings.TermsAndConditions.title}</h4>
+                </div>
+                <div style={styles.contentPreviewText}>
+                  {settings.TermsAndConditions.content || 'No content available. Click edit to add terms and conditions.'}
                 </div>
               </div>
             </div>
 
             {/* Privacy Policy */}
             <div style={styles.contentCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={styles.accountTitle}>Privacy Policy</h3>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaShieldAlt style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Privacy Policy</h3>
+                </div>
                 <button 
                   style={styles.headerIconBtn} 
                   title="Edit Privacy Policy" 
@@ -1607,22 +1743,23 @@ const SystemSettings = () => {
                   <FaEdit />
                 </button>
               </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Title</label>
-                <div style={styles.staticText}>{settings.PrivacyPolicy.title}</div>
-              </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Content</label>
-                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
-                  {settings.PrivacyPolicy.content}
+              <div style={styles.contentPreview}>
+                <div style={styles.contentPreviewHeader}>
+                  <h4 style={styles.contentPreviewTitle}>{settings.PrivacyPolicy.title}</h4>
+                </div>
+                <div style={styles.contentPreviewText}>
+                  {settings.PrivacyPolicy.content || 'No content available. Click edit to add privacy policy.'}
                 </div>
               </div>
             </div>
 
             {/* About Us */}
             <div style={styles.contentCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={styles.accountTitle}>About Us</h3>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaInfoCircle style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>About Us</h3>
+                </div>
                 <button 
                   style={styles.headerIconBtn} 
                   title="Edit About Us" 
@@ -1637,22 +1774,23 @@ const SystemSettings = () => {
                   <FaEdit />
                 </button>
               </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Title</label>
-                <div style={styles.staticText}>{settings.AboutUs.title}</div>
-              </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Content</label>
-                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
-                  {settings.AboutUs.content}
+              <div style={styles.contentPreview}>
+                <div style={styles.contentPreviewHeader}>
+                  <h4 style={styles.contentPreviewTitle}>{settings.AboutUs.title}</h4>
+                </div>
+                <div style={styles.contentPreviewText}>
+                  {settings.AboutUs.content || 'No content available. Click edit to add about us information.'}
                 </div>
               </div>
             </div>
 
             {/* Contact Us */}
             <div style={styles.contentCard}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h3 style={styles.accountTitle}>Contact Us</h3>
+              <div style={styles.cardHeader}>
+                <div style={styles.cardTitle}>
+                  <FaPhone style={styles.cardIcon} />
+                  <h3 style={styles.cardTitleText}>Contact Us</h3>
+                </div>
                 <button 
                   style={styles.headerIconBtn} 
                   title="Edit Contact Us" 
@@ -1667,41 +1805,27 @@ const SystemSettings = () => {
                   <FaEdit />
                 </button>
               </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Title</label>
-                <div style={styles.staticText}>{settings.ContactUs.title}</div>
-              </div>
-              <div style={styles.inputRow}>
-                <label style={styles.label}>Content</label>
-                <div style={{ ...styles.contentText, flex: 1, maxHeight: '100px', overflow: 'auto' }}>
-                  {settings.ContactUs.content}
+              <div style={styles.contentPreview}>
+                <div style={styles.contentPreviewHeader}>
+                  <h4 style={styles.contentPreviewTitle}>{settings.ContactUs.title}</h4>
+                </div>
+                <div style={styles.contentPreviewText}>
+                  {settings.ContactUs.content || 'No content available. Click edit to add contact information.'}
                 </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Removed global Save/Edit Button and confirmation modal in favor of per-section editing */}
-
-        {/* Add Interest Term Modal */}
+        {/* All existing modals remain the same */}
         {addModalVisible && (
           <div className="centered-modal">
             <div className="confirm-modal-card">
               <FiAlertCircle className="confirm-icon" />
               <p className="modal-text">Add {newTerm} months at {newRate}% interest?</p>
               <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
-                  onClick={confirmAddTerm}
-                >
-                  Yes
-                </button>
-                <button
-                  className="cancel-btn"
-                  onClick={() => setAddModalVisible(false)}
-                >
-                  No
-                </button>
+                <button className="confirm-btn" onClick={confirmAddTerm}>Yes</button>
+                <button className="cancel-btn" onClick={() => setAddModalVisible(false)}>No</button>
               </div>
             </div>
           </div>
@@ -1714,18 +1838,8 @@ const SystemSettings = () => {
               <FiAlertCircle className="confirm-icon" />
               <p className="modal-text">Delete the {termToDelete} month term for {(editingOriginalLoanType || wizardLoanTypeName)} only? Other loan types will keep this term.</p>
               <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
-                  onClick={confirmDeleteTerm}
-                >
-                  Yes
-                </button>
-                <button
-                  className="cancel-btn"
-                  onClick={() => setDeleteModalVisible(false)}
-                >
-                  No
-                </button>
+                <button className="confirm-btn" onClick={confirmDeleteTerm}>Yes</button>
+                <button className="cancel-btn" onClick={() => setDeleteModalVisible(false)}>No</button>
               </div>
             </div>
           </div>
@@ -1756,18 +1870,8 @@ const SystemSettings = () => {
                 step="0.01"
               />
               <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
-                  onClick={confirmAddSavings}
-                >
-                  Add
-                </button>
-                <button
-                  className="cancel-btn"
-                  onClick={() => setSavingsModalVisible(false)}
-                >
-                  Cancel
-                </button>
+                <button className="confirm-btn" onClick={confirmAddSavings}>Add</button>
+                <button className="cancel-btn" onClick={() => setSavingsModalVisible(false)}>Cancel</button>
               </div>
             </div>
           </div>
@@ -1805,58 +1909,60 @@ const SystemSettings = () => {
                 step="0.01"
               />
               <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
-                  onClick={confirmFundsAction}
-                >
+                <button className="confirm-btn" onClick={confirmFundsAction}>
                   {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
                 </button>
-                <button
-                  className="cancel-btn"
-                  onClick={() => setFundsActionModal(null)}
-                >
-                  Cancel
-                </button>
+                <button className="cancel-btn" onClick={() => setFundsActionModal(null)}>Cancel</button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Add Loan Type Wizard Modal */}
+        {/* Enhanced Add Loan Type Wizard Modal */}
         {addLoanTypeWizardVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalContent}>
-              <h3 style={styles.modalTitle}>{isEditingLoanType ? 'Edit Loan Type' : 'Add Loan Type'}</h3>
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Loan Type Name</label>
+          <div className="centered-modal">
+            <div className="enhanced-modal">
+              <h3 className="enhanced-modal-title">{isEditingLoanType ? 'Edit Loan Type' : 'Add Loan Type'}</h3>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Loan Type Name</label>
                 <input
-                  style={styles.modalInput}
+                  className="enhanced-modal-input"
                   placeholder="e.g., Emergency Loan"
                   value={wizardLoanTypeName}
                   onChange={(e) => setWizardLoanTypeName(e.target.value)}
                 />
               </div>
 
-              <div style={{ marginBottom: 12 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Terms and Interest Rates</label>
+              <div style={{ marginBottom: 20 }}>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Terms and Interest Rates</label>
                 {wizardRows.map((row, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+                  <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
                     <input
-                      style={{ ...styles.modalInput, flex: 1 }}
+                      className="enhanced-modal-input"
                       placeholder="Months (e.g., 6)"
                       type="number"
                       value={row.term}
                       onChange={(e) => updateWizardRow(idx, 'term', e.target.value)}
                     />
                     <input
-                      style={{ ...styles.modalInput, flex: 1 }}
+                      className="enhanced-modal-input"
                       placeholder="Interest Rate % (e.g., 3.5)"
                       type="number"
                       value={row.rate}
                       onChange={(e) => updateWizardRow(idx, 'rate', e.target.value)}
                     />
                     <button
-                      style={{ ...styles.modalBtn, ...styles.modalBtnError, maxWidth: 100 }}
+                      style={{ 
+                        padding: '12px 16px', 
+                        backgroundColor: '#ef4444', 
+                        color: 'white', 
+                        border: 'none', 
+                        borderRadius: '8px', 
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'all 0.3s ease',
+                        minWidth: '100px'
+                      }}
                       onClick={() => removeWizardRow(idx)}
                       disabled={wizardRows.length === 1}
                     >
@@ -1865,7 +1971,18 @@ const SystemSettings = () => {
                   </div>
                 ))}
                 <button
-                  style={{ ...styles.modalBtn, ...styles.modalBtnConfirm, marginTop: 6 }}
+                  style={{ 
+                    padding: '12px 20px', 
+                    backgroundColor: '#1e40af', 
+                    color: 'white', 
+                    border: 'none', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer',
+                    fontWeight: '600',
+                    transition: 'all 0.3s ease',
+                    width: '100%',
+                    marginTop: '8px'
+                  }}
                   onClick={addWizardRow}
                 >
                   + Add Row
@@ -1873,21 +1990,31 @@ const SystemSettings = () => {
               </div>
 
               {wizardError && (
-                <div style={{ color: '#f44336', marginBottom: 12, fontSize: 13 }}>{wizardError}</div>
+                <div style={{ 
+                  color: '#ef4444', 
+                  marginBottom: 16, 
+                  fontSize: 14, 
+                  backgroundColor: '#fef2f2',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  border: '1px solid #fecaca'
+                }}>
+                  {wizardError}
+                </div>
               )}
 
-              <div style={styles.modalButtons}>
+              <div className="enhanced-modal-buttons">
                 <button
-                  style={{ ...styles.modalBtn, ...styles.modalBtnCancel }}
+                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
                   onClick={() => { setAddLoanTypeWizardVisible(false); resetWizard(); }}
                 >
                   Cancel
                 </button>
                 <button
-                  style={{ ...styles.modalBtn, ...styles.modalBtnSuccess }}
+                  className="enhanced-modal-btn enhanced-modal-btn-primary"
                   onClick={confirmWizardAdd}
                 >
-                  {isEditingLoanType ? 'Save' : 'Add Loan Type'}
+                  {isEditingLoanType ? 'Save Changes' : 'Add Loan Type'}
                 </button>
               </div>
             </div>
@@ -1901,18 +2028,8 @@ const SystemSettings = () => {
               <FiAlertCircle className="confirm-icon" />
               <p className="modal-text">Add "{newLoanType}" as a new loan type?</p>
               <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
-                  onClick={confirmAddLoanType}
-                >
-                  Yes
-                </button>
-                <button
-                  className="cancel-btn"
-                  onClick={() => setAddLoanTypeModalVisible(false)}
-                >
-                  No
-                </button>
+                <button className="confirm-btn" onClick={confirmAddLoanType}>Yes</button>
+                <button className="cancel-btn" onClick={() => setAddLoanTypeModalVisible(false)}>No</button>
               </div>
             </div>
           </div>
@@ -1925,18 +2042,8 @@ const SystemSettings = () => {
               <FiAlertCircle className="confirm-icon" />
               <p className="modal-text">Are you sure you want to delete "{loanTypeToDelete}" loan type?</p>
               <div className="bottom-buttons">
-                <button
-                  className="confirm-btn"
-                  onClick={confirmDeleteLoanType}
-                >
-                  Yes
-                </button>
-                <button
-                  className="cancel-btn"
-                  onClick={() => setDeleteLoanTypeModalVisible(false)}
-                >
-                  No
-                </button>
+                <button className="confirm-btn" onClick={confirmDeleteLoanType}>Yes</button>
+                <button className="cancel-btn" onClick={() => setDeleteLoanTypeModalVisible(false)}>No</button>
               </div>
             </div>
           </div>
@@ -1944,22 +2051,17 @@ const SystemSettings = () => {
 
         {/* Message Modal */}
         {messageModal.visible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
+          <div className="centered-modal">
+            <div className="small-modal-card">
               {messageModal.isError ? (
-                <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
+                <FiAlertCircle style={{ fontSize: '48px', color: '#ef4444', marginBottom: '20px' }} />
               ) : (
-                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+                <FaCheckCircle style={{ fontSize: '48px', color: '#10b981', marginBottom: '20px' }} />
               )}
-              <p style={styles.modalText}>{messageModal.message}</p>
+              <p className="modal-text">{messageModal.message}</p>
               <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }}
+                className="confirm-btn"
                 onClick={() => setMessageModal({ ...messageModal, visible: false })}
-                onFocus={(e) => e.target.style.outline = 'none'}
               >
                 OK
               </button>
@@ -1967,32 +2069,32 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* Terms and Conditions Edit Modal */}
+        {/* Enhanced Terms and Conditions Edit Modal */}
         {editTermsModal && (
-          <div style={styles.centeredModal}>
-            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
-              <h3 style={styles.modalTitle}>Edit Terms and Conditions</h3>
+          <div className="centered-modal">
+            <div className="enhanced-modal">
+              <h3 className="enhanced-modal-title">Edit Terms and Conditions</h3>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
                 <input
-                  style={styles.modalInput}
+                  className="enhanced-modal-input"
                   value={tempTermsContent.title}
                   onChange={(e) => setTempTermsContent(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Enter title"
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
                 <textarea
-                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  className="enhanced-modal-textarea"
                   value={tempTermsContent.content}
                   onChange={(e) => setTempTermsContent(prev => ({ ...prev, content: e.target.value }))}
                   placeholder="Enter content"
                 />
               </div>
-              <div style={styles.modalButtons}>
+              <div className="enhanced-modal-buttons">
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-primary"
                   onClick={async () => {
                     try {
                       setActionInProgress(true);
@@ -2013,10 +2115,10 @@ const SystemSettings = () => {
                   }}
                   disabled={actionInProgress}
                 >
-                  {actionInProgress ? 'Saving...' : 'Save'}
+                  {actionInProgress ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
                   onClick={() => setEditTermsModal(false)}
                 >
                   Cancel
@@ -2026,32 +2128,32 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* Privacy Policy Edit Modal */}
+        {/* Enhanced Privacy Policy Edit Modal */}
         {editPrivacyModal && (
-          <div style={styles.centeredModal}>
-            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
-              <h3 style={styles.modalTitle}>Edit Privacy Policy</h3>
+          <div className="centered-modal">
+            <div className="enhanced-modal">
+              <h3 className="enhanced-modal-title">Edit Privacy Policy</h3>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
                 <input
-                  style={styles.modalInput}
+                  className="enhanced-modal-input"
                   value={tempPrivacyContent.title}
                   onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Enter title"
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
                 <textarea
-                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  className="enhanced-modal-textarea"
                   value={tempPrivacyContent.content}
                   onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, content: e.target.value }))}
                   placeholder="Enter content"
                 />
               </div>
-              <div style={styles.modalButtons}>
+              <div className="enhanced-modal-buttons">
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-primary"
                   onClick={async () => {
                     try {
                       setActionInProgress(true);
@@ -2072,10 +2174,10 @@ const SystemSettings = () => {
                   }}
                   disabled={actionInProgress}
                 >
-                  {actionInProgress ? 'Saving...' : 'Save'}
+                  {actionInProgress ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
                   onClick={() => setEditPrivacyModal(false)}
                 >
                   Cancel
@@ -2085,32 +2187,32 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* About Us Edit Modal */}
+        {/* Enhanced About Us Edit Modal */}
         {editAboutModal && (
-          <div style={styles.centeredModal}>
-            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
-              <h3 style={styles.modalTitle}>Edit About Us</h3>
+          <div className="centered-modal">
+            <div className="enhanced-modal">
+              <h3 className="enhanced-modal-title">Edit About Us</h3>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
                 <input
-                  style={styles.modalInput}
+                  className="enhanced-modal-input"
                   value={tempAboutContent.title}
                   onChange={(e) => setTempAboutContent(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Enter title"
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
                 <textarea
-                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  className="enhanced-modal-textarea"
                   value={tempAboutContent.content}
                   onChange={(e) => setTempAboutContent(prev => ({ ...prev, content: e.target.value }))}
                   placeholder="Enter content"
                 />
               </div>
-              <div style={styles.modalButtons}>
+              <div className="enhanced-modal-buttons">
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-primary"
                   onClick={async () => {
                     try {
                       setActionInProgress(true);
@@ -2131,10 +2233,10 @@ const SystemSettings = () => {
                   }}
                   disabled={actionInProgress}
                 >
-                  {actionInProgress ? 'Saving...' : 'Save'}
+                  {actionInProgress ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
                   onClick={() => setEditAboutModal(false)}
                 >
                   Cancel
@@ -2144,32 +2246,32 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* Contact Us Edit Modal */}
+        {/* Enhanced Contact Us Edit Modal */}
         {editContactModal && (
-          <div style={styles.centeredModal}>
-            <div style={{ ...styles.modalContent, width: '600px', maxHeight: '80vh', overflow: 'auto' }}>
-              <h3 style={styles.modalTitle}>Edit Contact Us</h3>
+          <div className="centered-modal">
+            <div className="enhanced-modal">
+              <h3 className="enhanced-modal-title">Edit Contact Us</h3>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Title</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
                 <input
-                  style={styles.modalInput}
+                  className="enhanced-modal-input"
                   value={tempContactContent.title}
                   onChange={(e) => setTempContactContent(prev => ({ ...prev, title: e.target.value }))}
                   placeholder="Enter title"
                 />
               </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Content</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
                 <textarea
-                  style={{ ...styles.modalInput, minHeight: '200px', resize: 'vertical' }}
+                  className="enhanced-modal-textarea"
                   value={tempContactContent.content}
                   onChange={(e) => setTempContactContent(prev => ({ ...prev, content: e.target.value }))}
                   placeholder="Enter content"
                 />
               </div>
-              <div style={styles.modalButtons}>
+              <div className="enhanced-modal-buttons">
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#4CAF50', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-primary"
                   onClick={async () => {
                     try {
                       setActionInProgress(true);
@@ -2190,10 +2292,10 @@ const SystemSettings = () => {
                   }}
                   disabled={actionInProgress}
                 >
-                  {actionInProgress ? 'Saving...' : 'Save'}
+                  {actionInProgress ? 'Saving...' : 'Save Changes'}
                 </button>
                 <button
-                  style={{ ...styles.modalButton, backgroundColor: '#f44336', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
                   onClick={() => setEditContactModal(false)}
                 >
                   Cancel
@@ -2203,21 +2305,20 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* Add to Savings Modal */}
+        {/* Enhanced Add to Savings Modal */}
         {addToSavingsModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={{ ...styles.modalContent, width: '400px' }}>
-              <h3 style={styles.modalTitle}>Add to Savings</h3>
+          <div className="centered-modal">
+            <div className="enhanced-modal" style={{ maxWidth: '400px' }}>
+              <h3 className="enhanced-modal-title">Add to Savings</h3>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6 }}>Amount</label>
+                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Amount</label>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 'bold' }}>₱</span>
+                  <span style={{ fontSize: 16, fontWeight: 'bold', color: '#059669' }}>₱</span>
                   <input
-                    style={styles.modalInput}
+                    className="enhanced-modal-input"
                     value={savingsAddAmount}
                     onChange={(e) => {
                       const value = e.target.value;
-                      // Allow only numbers and decimal point
                       if (value === '' || /^\d*\.?\d*$/.test(value)) {
                         setSavingsAddAmount(value);
                       }
@@ -2228,14 +2329,14 @@ const SystemSettings = () => {
                   />
                 </div>
                 {savingsAddAmount && parseFloat(savingsAddAmount) > 0 && (
-                  <div style={{ fontSize: 12, color: '#666', marginTop: 8, textAlign: 'center' }}>
+                  <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
                     Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) + parseFloat(savingsAddAmount)).toFixed(2))}
                   </div>
                 )}
               </div>
-              <div style={styles.modalButtons}>
+              <div className="enhanced-modal-buttons">
                 <button
-                  style={{ ...styles.modalBtn, backgroundColor: '#4CAF50', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-primary"
                   onClick={async () => {
                     try {
                       const addAmount = parseFloat(savingsAddAmount || 0);
@@ -2246,7 +2347,6 @@ const SystemSettings = () => {
 
                       setActionInProgress(true);
                       
-                      // Calculate new savings total
                       const currentSavings = parseFloat(settings.Savings || 0);
                       const newSavingsTotal = currentSavings + addAmount;
                       
@@ -2256,14 +2356,12 @@ const SystemSettings = () => {
                       
                       await update(ref(db, 'Settings'), updateData);
                       
-                      // Update local state
                       setSettings(prev => ({ ...prev, Savings: newSavingsTotal.toString() }));
                       setSavedSettingsSnapshot(prev => ({ 
                         ...(prev || {}), 
                         Savings: newSavingsTotal.toString()
                       }));
                       
-                      // Reset and close modal
                       setSavingsAddAmount('');
                       setAddToSavingsModalVisible(false);
                       showMessage('Success', `₱${formatPesoAmount(addAmount)} added to savings successfully!`);
@@ -2278,7 +2376,7 @@ const SystemSettings = () => {
                   {actionInProgress ? 'Adding...' : 'Add to Savings'}
                 </button>
                 <button
-                  style={{ ...styles.modalBtn, backgroundColor: '#f44336', color: '#fff' }}
+                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
                   onClick={() => {
                     setSavingsAddAmount('');
                     setAddToSavingsModalVisible(false);
@@ -2297,7 +2395,9 @@ const SystemSettings = () => {
 
 const InputRow = ({ label, value, onChange, editable, suffix }) => (
   <div style={styles.inputRow}>
-    <label style={styles.label}>{label}</label>
+    <label style={styles.label}>
+      <span style={styles.labelText}>{label}</span>
+    </label>
     {editable ? (
       <div style={{ flex: 1, display: 'flex', alignItems: 'center', gap: '8px' }}>
         <input 
@@ -2320,611 +2420,599 @@ const styles = {
   container: {
     display: 'flex',
     minHeight: '100vh',
-    backgroundColor: '#f5f7fa',
+    backgroundColor: '#f8fafc',
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
   sidebar: {
-    width: '250px',
-    minWidth: '250px',
+    width: '280px',
+    minWidth: '280px',
     flexShrink: 0,
-    backgroundColor: '#fff',
-    padding: '20px',
-    borderRight: '1px solid #e0e0e0',
-    boxShadow: '2px 0 5px rgba(0,0,0,0.05)',
+    backgroundColor: '#ffffff',
+    padding: '24px',
+    borderRight: '1px solid #e2e8f0',
+    boxShadow: '4px 0 20px rgba(0,0,0,0.04)',
+  },
+  sidebarHeader: {
+    marginBottom: '32px',
+    paddingBottom: '16px',
+    borderBottom: '2px solid #f1f5f9'
+  },
+  sidebarTitle: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0'
   },
   sidebarMenu: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '5px',
+    gap: '8px',
   },
   sidebarButton: {
-    display: 'block',
+    display: 'flex',
+    alignItems: 'center',
     width: '100%',
-    padding: '12px 15px',
+    padding: '16px 20px',
     border: 'none',
     backgroundColor: 'transparent',
     textAlign: 'left',
     cursor: 'pointer',
-    fontSize: '14px',
-    color: '#555',
-    borderRadius: '4px',
-    transition: 'all 0.2s',
-    whiteSpace: 'nowrap',
+    fontSize: '15px',
+    color: '#64748b',
+    borderRadius: '12px',
+    transition: 'all 0.3s ease',
+    gap: '12px'
   },
   sidebarButtonActive: {
     backgroundColor: '#f0f7ff',
-    color: '#2D5783',
-    fontWeight: '500',
-    borderLeft: '3px solid #2D5783',
+    color: '#1e40af',
+    fontWeight: '600',
+    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.15)',
+  },
+  sidebarIcon: {
+    fontSize: '18px',
+    opacity: '0.8'
+  },
+  sidebarButtonText: {
+    fontSize: '15px',
+    fontWeight: '500'
   },
   contentArea: {
     flex: 1,
-    padding: '30px',
-    backgroundColor: '#fff',
+    padding: '32px',
+    backgroundColor: '#f8fafc',
     minWidth: 0,
     overflow: 'auto',
   },
-
-  section: {
-    marginBottom: '30px',
+  contentHeader: {
+    marginBottom: '32px'
   },
-  divider: {
-    height: '1px',
-    backgroundColor: '#eee',
-    margin: '20px 0',
+  contentTitle: {
+    fontSize: '28px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: '0 0 8px 0',
+    letterSpacing: '-0.025em'
   },
-  accountRow: {
-    display: 'flex',
-    gap: '20px',
-    marginBottom: '20px',
-    flexWrap: 'wrap',
-  },
-  accountCard: {
-    flex: 1,
-    minWidth: '300px',
-    padding: '20px',
-    border: '1px solid #eee',
-    borderRadius: '8px',
-    backgroundColor: '#f9f9f9',
-  },
-  contentCard: {
-    padding: '20px',
-    border: '1px solid #eee',
-    borderRadius: '8px',
-    backgroundColor: '#f9f9f9',
-    marginBottom: '20px',
-  },
-  accountTitle: {
+  contentSubtitle: {
     fontSize: '16px',
-    fontWeight: '600',
-    marginBottom: '15px',
-    color: '#2D5783',
+    color: '#64748b',
+    fontWeight: '400'
   },
-
+  section: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '24px'
+  },
+  card: {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '32px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+    border: '1px solid #f1f5f9',
+    transition: 'all 0.3s ease'
+  },
+  cardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '24px',
+    paddingBottom: '20px',
+    borderBottom: '2px solid #f8fafc'
+  },
+  cardTitle: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  cardIcon: {
+    fontSize: '24px',
+    color: '#1e40af'
+  },
+  cardTitleText: {
+    fontSize: '20px',
+    fontWeight: '600',
+    color: '#1e293b',
+    margin: '0'
+  },
+  cardContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px'
+  },
   inputRow: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '15px',
+    justifyContent: 'space-between',
+    gap: '20px'
   },
   label: {
-    fontSize: '14px',
-    color: '#555',
-    width: '200px',
-    fontWeight: '500',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '4px',
+    flex: '1'
   },
-  input: {
-    flex: 1,
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    padding: '10px 12px',
-    fontSize: '14px',
-    transition: 'border-color 0.2s',
+  labelText: {
+    fontSize: '15px',
+    color: '#374151',
+    fontWeight: '600'
   },
-  staticInput: {
-    flex: 1,
-    border: '1px solid #eee',
-    borderRadius: '6px',
-    padding: '10px 12px',
-    fontSize: '14px',
-    backgroundColor: '#f9f9f9',
-    color: '#555',
+  labelDescription: {
+    fontSize: '13px',
+    color: '#6b7280',
+    fontWeight: '400'
   },
-  staticText: {
-    fontSize: '14px',
-    color: '#333',
-  },
-  orientationCodeContainer: {
-    marginTop: '20px',
-    padding: '20px',
-    backgroundColor: '#f0f9ff',
-    borderRadius: '8px',
-    border: '1px solid #bae6fd',
-  },
-  orientationCodeRow: {
+  amountDisplay: {
     display: 'flex',
     alignItems: 'center',
-    gap: '10px',
+    gap: '8px',
+    backgroundColor: '#f8fafc',
+    padding: '12px 16px',
+    borderRadius: '10px',
+    minWidth: '150px',
+    justifyContent: 'flex-end'
   },
-  orientationCodeValue: {
+  amountSymbol: {
     fontSize: '16px',
     fontWeight: '600',
-    color: '#075985',
-    backgroundColor: '#e0f2fe',
-    padding: '10px 15px',
-    borderRadius: '6px',
+    color: '#059669'
   },
-  copyBtn: {
-    backgroundColor: '#dbeafe',
-    color: '#2563eb',
+  amountValue: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#059669'
+  },
+  amountInputContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    backgroundColor: '#ffffff',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    minWidth: '150px',
+    transition: 'all 0.3s ease'
+  },
+  amountInput: {
     border: 'none',
+    outline: 'none',
+    fontSize: '16px',
+    fontWeight: '500',
+    color: '#374151',
+    width: '100%',
+    textAlign: 'right',
+    backgroundColor: 'transparent'
+  },
+  valueDisplay: {
+    backgroundColor: '#f8fafc',
+    padding: '12px 16px',
+    borderRadius: '10px',
+    minWidth: '120px',
+    textAlign: 'center'
+  },
+  valueText: {
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#374151'
+  },
+  valueInputContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    backgroundColor: '#ffffff',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    padding: '10px 14px',
+    minWidth: '120px'
+  },
+  valueInput: {
+    border: 'none',
+    outline: 'none',
+    fontSize: '15px',
+    fontWeight: '500',
+    color: '#374151',
+    width: '60px',
+    textAlign: 'center',
+    backgroundColor: 'transparent'
+  },
+  valueSuffix: {
+    fontSize: '14px',
+    color: '#6b7280',
+    fontWeight: '500'
+  },
+  actionButtonContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '16px'
+  },
+  primaryButton: {
+    backgroundColor: '#1e40af',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    padding: '14px 24px',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 12px rgba(30, 64, 175, 0.3)'
+  },
+  accountGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
+    gap: '24px'
+  },
+  accountCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: '12px',
+    padding: '24px',
+    border: '1px solid #e2e8f0'
+  },
+  accountCardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '20px'
+  },
+  accountType: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1e293b'
+  },
+  accountBadge: {
+    backgroundColor: '#1e40af',
+    color: 'white',
+    padding: '4px 8px',
     borderRadius: '6px',
-    padding: '8px',
+    fontSize: '12px',
+    fontWeight: '600'
+  },
+  orientationContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px'
+  },
+  orientationCodeDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f0f7ff',
+    padding: '20px',
+    borderRadius: '12px',
+    border: '2px solid #dbeafe'
+  },
+  orientationCodeValue: {
+    fontSize: '18px',
+    fontWeight: '700',
+    color: '#1e40af',
+    fontFamily: 'monospace',
+    letterSpacing: '1px'
+  },
+  orientationActions: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  iconButton: {
+    backgroundColor: '#1e40af',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    padding: '10px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
-    transition: 'all 0.2s',
+    transition: 'all 0.3s ease'
+  },
+  smallIconButton: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '6px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.3s ease',
+    fontSize: '12px'
   },
   copiedText: {
     fontSize: '13px',
     color: '#10b981',
-    marginLeft: '10px',
-    fontWeight: '500',
+    fontWeight: '600'
   },
-  orientationCodeDescription: {
-    fontSize: '13px',
-    color: '#64748b',
-    marginTop: '10px',
-    lineHeight: '1.5',
-  },
-  generateBtn: {
-    backgroundColor: '#2D5783',
-    color: 'white',
-    padding: '12px 16px',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '500',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'all 0.2s',
-    marginTop: '15px',
-  },
-  savingsInputContainer: {
-    flex: 1,
-    display: 'flex',
-    alignItems: 'center',
-    gap: '10px',
-  },
-  fundsActions: {
-    display: 'flex',
-    gap: '15px',
-    marginTop: '20px',
-  },
-  actionBtn: {
-    padding: '12px 16px',
-    borderRadius: '6px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '500',
+  orientationDescription: {
     fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'all 0.2s',
+    color: '#6b7280',
+    lineHeight: '1.6',
+    textAlign: 'center'
   },
-  actionBtnAddFunds: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
+  loanTypesGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+    gap: '20px'
   },
-  actionBtnWithdrawFunds: {
-    backgroundColor: '#f44336',
-    color: 'white',
+  loanTypeCard: {
+    backgroundColor: '#f8fafc',
+    borderRadius: '12px',
+    padding: '20px',
+    border: '1px solid #e2e8f0',
+    transition: 'all 0.3s ease'
   },
-  buttonIcon: {
-    fontSize: '14px',
-  },
-  switch: {
-    position: 'relative',
-    display: 'inline-block',
-    width: '50px',
-    height: '24px',
-  },
-  switchInput: {
-    opacity: '0',
-    width: '0',
-    height: '0',
-  },
-  slider: {
-    position: 'absolute',
-    cursor: 'pointer',
-    top: '0',
-    left: '0',
-    right: '0',
-    bottom: '0',
-    backgroundColor: '#ccc',
-    transition: '.4s',
-    borderRadius: '24px',
-  },
-  sliderChecked: {
-    backgroundColor: '#4CAF50',
-  },
-  sliderBefore: {
-    position: 'absolute',
-    content: '""',
-    height: '16px',
-    width: '16px',
-    left: '4px',
-    bottom: '4px',
-    backgroundColor: 'white',
-    transition: '.4s',
-    borderRadius: '50%',
-    transform: 'translateX(0px)',
-  },
-  sliderBeforeChecked: {
-    transform: 'translateX(26px)',
-  },
-  loanTypesSection: {
-    marginTop: '30px',
-    paddingTop: '20px',
-    borderTop: '1px solid #eee',
-  },
-  loanTypeRow: {
+  loanTypeHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '10px 0',
-    borderBottom: '1px solid #f0f0f0',
+    marginBottom: '16px'
   },
-  loanTypeText: {
+  loanTypeName: {
     fontSize: '16px',
-    color: '#333',
+    fontWeight: '600',
+    color: '#1e293b'
   },
-  deleteLoanTypeBtn: {
-    background: '#dc3545',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    padding: '5px 10px',
-    cursor: 'pointer',
+  loanTypeActions: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
+    gap: '6px'
   },
-  addLoanTypeBtn: {
-    background: '#28a745',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    padding: '8px 12px',
-    cursor: 'pointer',
+  termsGrid: {
     display: 'flex',
-    alignItems: 'center',
-    gap: '5px',
+    flexWrap: 'wrap',
+    gap: '8px'
   },
-  interestRatesSection: {
-    marginTop: '30px',
-    paddingTop: '20px',
-    borderTop: '1px solid #eee',
-  },
-  rateRow: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: '12px',
-    padding: '12px',
-    backgroundColor: '#f8fafc',
-    borderRadius: '8px',
-    transition: 'background-color 0.2s',
-  },
-  termText: {
-    fontSize: '14px',
-    color: '#334155',
-    fontWeight: '500',
-  },
-  editRateRow: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-  },
-  miniInput: {
-    width: '80px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    padding: '8px 10px',
-    fontSize: '14px',
-    textAlign: 'center',
-  },
-  deleteTermBtn: {
-    background: 'none',
-    border: 'none',
-    color: '#ef4444',
-    cursor: 'pointer',
-    fontSize: '14px',
-    padding: '6px',
-    borderRadius: '4px',
-    transition: 'background-color 0.2s',
-  },
-  addTermBtn: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
-    padding: '12px 16px',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontWeight: '500',
+  termChip: {
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
-    transition: 'background-color 0.2s',
-  },
-  dividendSection: {
-    marginTop: '30px',
-    paddingTop: '20px',
-    borderTop: '1px solid #eee',
-  },
-  dividendDistributionSection: {
-    marginBottom: '25px',
-    padding: '20px',
-    backgroundColor: '#f8fafc',
+    backgroundColor: '#ffffff',
+    padding: '8px 12px',
     borderRadius: '8px',
-    border: '1px solid #e2e8f0',
+    border: '1px solid #e5e7eb'
   },
-  dividendBreakdownSection: {
-    marginBottom: '25px',
-    padding: '20px',
-    backgroundColor: '#f1f5f9',
-    borderRadius: '8px',
-    border: '1px solid #e2e8f0',
+  termMonths: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#374151'
   },
-  inputGroup: {
-    flex: 1,
+  termRate: {
+    fontSize: '13px',
+    fontWeight: '600',
+    color: '#059669'
+  },
+  noTerms: {
+    fontSize: '14px',
+    color: '#9ca3af',
+    fontStyle: 'italic'
+  },
+  dividendContent: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '8px',
+    gap: '32px'
+  },
+  dividendSection: {
+    backgroundColor: '#f8fafc',
+    padding: '24px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0'
+  },
+  sectionSubtitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '20px'
+  },
+  percentageRow: {
+    display: 'flex',
+    gap: '20px',
+    marginBottom: '16px'
+  },
+  percentageItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flex: '1',
+    padding: '16px',
+    backgroundColor: '#ffffff',
+    borderRadius: '10px',
+    border: '1px solid #e5e7eb'
+  },
+  percentageLabel: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151'
+  },
+  percentageInputContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  percentageInput: {
+    width: '60px',
+    border: '1px solid #d1d5db',
+    borderRadius: '6px',
+    padding: '6px 8px',
+    fontSize: '14px',
+    textAlign: 'center'
+  },
+  percentageSymbol: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151'
+  },
+  percentageDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '4px'
+  },
+  percentageValue: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#059669'
+  },
+  breakdownGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+    gap: '16px',
+    marginBottom: '16px'
+  },
+  breakdownItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '16px',
+    backgroundColor: '#ffffff',
+    borderRadius: '10px',
+    border: '1px solid #e5e7eb'
+  },
+  breakdownLabel: {
+    fontSize: '14px',
+    fontWeight: '500',
+    color: '#374151'
   },
   validationMessage: {
-    fontSize: '12px',
-    fontWeight: '500',
-    marginTop: '10px',
-    padding: '8px 12px',
-    borderRadius: '4px',
-    backgroundColor: '#f8f9fa',
-    border: '1px solid #dee2e6',
+    fontSize: '13px',
+    fontWeight: '600',
+    padding: '10px 12px',
+    borderRadius: '8px',
+    backgroundColor: '#f3f4f6',
+    textAlign: 'center',
+    border: '1px solid #e5e7eb'
   },
-  percentSymbol: {
-    fontSize: '14px',
-    color: '#334155',
-    fontWeight: '500',
-    marginLeft: '4px',
+  dateSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '12px'
   },
   dateButton: {
-    color: '#2D5783',
-    marginBottom: '10px',
-    background: 'none',
-    border: 'none',
+    backgroundColor: '#ffffff',
+    color: '#374151',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    padding: '14px 16px',
     cursor: 'pointer',
-    fontSize: '14px',
-    textAlign: 'left',
-    padding: '8px 0',
+    fontSize: '15px',
     fontWeight: '500',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    transition: 'color 0.2s',
+    transition: 'all 0.3s ease',
+    width: 'fit-content'
+  },
+  dateDisplay: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: '14px 16px',
+    borderRadius: '10px',
+    width: 'fit-content'
+  },
+  dateText: {
+    fontSize: '15px',
+    fontWeight: '500',
+    color: '#374151'
   },
   calendarContainer: {
     marginTop: '10px',
-    border: '1px solid #eee',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
-  },
-  contentSection: {
-    marginBottom: '30px',
-    paddingBottom: '20px',
-    borderBottom: '1px solid #eee',
-  },
-  editSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '20px',
-  },
-  inputContainer: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '8px',
-  },
-  textarea: {
-    border: '1px solid #ddd',
-    borderRadius: '8px',
-    padding: '12px',
-    fontSize: '14px',
-    backgroundColor: '#fff',
-    minHeight: '200px',
-    resize: 'vertical',
-    width: '100%',
-    lineHeight: '1.5',
-  },
-  textContent: {
-    whiteSpace: 'pre-line',
-    marginBottom: '20px',
-  },
-  contentTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    marginBottom: '15px',
-    color: '#2D5783',
-  },
-  contentText: {
-    fontSize: '14px',
-    lineHeight: '1.6',
-    color: '#333',
-    whiteSpace: 'pre-line',
-  },
-  saveBtn: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    padding: '10px 20px',
-    backgroundColor: '#2D5783',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '500',
-    transition: 'all 0.2s',
-    margin: '20px 0',
-  },
-  saveBtnSaveMode: {
-    backgroundColor: '#4CAF50',
-  },
-  modalOverlay: {
-    position: 'fixed',
-    top: '0',
-    left: '0',
-    right: '0',
-    bottom: '0',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: '1000',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: '24px',
+    border: '1px solid #e5e7eb',
     borderRadius: '12px',
-    width: '90%',
-    maxWidth: '400px',
-    boxShadow: '0 10px 25px rgba(0, 0, 0, 0.1)',
+    overflow: 'hidden',
+    boxShadow: '0 8px 25px rgba(0, 0, 0, 0.1)',
+    width: 'fit-content'
   },
-  modalTitle: {
+  contentCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: '16px',
+    padding: '32px',
+    boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+    border: '1px solid #f1f5f9'
+  },
+  contentPreview: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px'
+  },
+  contentPreviewHeader: {
+    paddingBottom: '12px',
+    borderBottom: '2px solid #f8fafc'
+  },
+  contentPreviewTitle: {
     fontSize: '18px',
     fontWeight: '600',
-    marginBottom: '15px',
-    color: '#2D5783',
-    textAlign: 'center',
+    color: '#1e293b',
+    margin: '0'
   },
-  modalText: {
+  contentPreviewText: {
     fontSize: '14px',
-    marginBottom: '20px',
-    color: '#555',
-    textAlign: 'center',
-    lineHeight: '1.5',
+    lineHeight: '1.7',
+    color: '#6b7280',
+    maxHeight: '120px',
+    overflow: 'auto',
+    padding: '16px',
+    backgroundColor: '#f8fafc',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb'
   },
-  modalInput: {
-    width: '100%',
-    padding: '12px',
-    border: '1px solid #ddd',
-    borderRadius: '6px',
-    fontSize: '14px',
-    marginBottom: '20px',
-    boxSizing: 'border-box',
-  },
-  modalButtons: {
-    display: 'flex',
-    justifyContent: 'center',
-    gap: '15px',
-  },
-  modalBtn: {
-    padding: '12px 24px',
-    borderRadius: '6px',
+  headerIconBtn: {
+    backgroundColor: '#3b82f6',
+    color: 'white',
     border: 'none',
+    borderRadius: '8px',
+    padding: '10px',
     cursor: 'pointer',
-    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    transition: 'all 0.3s ease',
+    fontSize: '14px'
+  },
+  input: {
+    flex: 1,
+    border: '2px solid #e5e7eb',
+    borderRadius: '8px',
+    padding: '12px 16px',
     fontSize: '14px',
-    flex: '1',
-    transition: 'all 0.2s',
+    transition: 'all 0.3s ease',
+    backgroundColor: '#ffffff'
   },
-  modalBtnCancel: {
-    backgroundColor: '#f1f5f9',
-    color: '#555',
-  },
-  modalBtnConfirm: {
-    backgroundColor: '#2D5783',
-    color: 'white',
-  },
-  modalBtnSuccess: {
-    backgroundColor: '#4CAF50',
-    color: 'white',
-  },
-  modalBtnError: {
-    backgroundColor: '#f44336',
-    color: 'white',
+  staticText: {
+    fontSize: '14px',
+    color: '#374151',
+    fontWeight: '500'
   },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100vh',
+    height: '200px'
   },
   spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    width: '36px',
-    height: '36px',
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #1e40af',
     borderRadius: '50%',
-    borderLeftColor: '#2D5783',
-    animation: 'spin 1s linear infinite',
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' },
-  },
-  subSectionTitle: {
-    fontSize: '16px',
-    fontWeight: '600',
-    marginBottom: '15px',
-    color: '#2D5783',
-  },
-  centeredModal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000
-  },
-  modalCardSmall: {
-    width: '250px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
+  }
 };
 
 export default SystemSettings;

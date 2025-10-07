@@ -1,0 +1,82 @@
+# -----------------------------
+# Node modules (all projects)
+# -----------------------------
+node_modules/
+Web/node_modules/
+App/node_modules/
+
+# -----------------------------
+# Logs and debug files
+# -----------------------------
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -----------------------------
+# Environment files
+# -----------------------------
+.env
+Web/.env
+App/.env
+
+# -----------------------------
+# Build and cache folders
+# -----------------------------
+dist/
+build/
+Web/dist/
+Web/build/
+App/android/app/build/
+App/ios/build/
+App/.expo/
+App/.expo-shared/
+App/.gradle/
+App/ios/Pods/
+App/ios/DerivedData/
+
+# -----------------------------
+# React Native specific
+# -----------------------------
+*.keystore
+*.gradle
+*.iml
+*.hprof
+*.lock
+.expo/
+*.apk
+*.aab
+
+# -----------------------------
+# Metro bundler & cache
+# -----------------------------
+*.packager
+*.vscode
+App/.metro-cache/
+App/.bundle/
+
+# -----------------------------
+# macOS and Windows junk files
+# -----------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -----------------------------
+# IDE and editor files
+# -----------------------------
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# -----------------------------
+# Miscellaneous
+# -----------------------------
+*.tmp
+*.log
+*.bak
+*.pid

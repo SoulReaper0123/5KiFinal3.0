@@ -1,63 +1,105 @@
 import React, { useState, useEffect } from 'react';
-import { FaTimes, FaChevronLeft, FaChevronRight, FaCheckCircle, FaExclamationCircle } from 'react-icons/fa';
+import { 
+  FaTimes, 
+  FaChevronLeft, 
+  FaChevronRight, 
+  FaCheckCircle, 
+  FaExclamationCircle,
+  FaEye,
+  FaUser,
+  FaMoneyBillWave,
+  FaPiggyBank,
+  FaHandHoldingUsd,
+  FaIdCard,
+  FaCalendarAlt,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
+  FaVenusMars,
+  FaHeart,
+  FaBirthdayCake
+} from 'react-icons/fa';
 import { database } from '../../../../../Database/firebaseConfig';
 
 const styles = {
   container: {
     flex: 1,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
-  loadingView: {
+  loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100%'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  spinner: {
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #2563eb',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
   },
   tableContainer: {
-    borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #e2e8f0',
+    background: 'white'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     tableLayout: 'fixed',
-    minWidth: '800px'
+    minWidth: '1000px'
   },
   tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    height: '56px',
+    fontWeight: '600',
+    fontSize: '0.875rem'
   },
   tableHeaderCell: {
-    whiteSpace: 'nowrap'
+    padding: '1rem 0.75rem',
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    fontSize: '0.875rem',
+    fontWeight: '600'
   },
   tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
+    height: '52px',
+    transition: 'background-color 0.2s ease',
+    borderBottom: '1px solid #f1f5f9',
+    '&:hover': {
+      backgroundColor: '#f8fafc'
     }
   },
   tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
+    padding: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap'
   },
-  noDataMessage: {
-    textAlign: 'center',
-    marginTop: '50px',
-    fontSize: '16px',
-    color: 'gray'
+  noDataContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#6b7280'
   },
-  centeredModal: {
+  noDataIcon: {
+    fontSize: '3rem',
+    opacity: '0.5'
+  },
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -67,159 +109,293 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
+    zIndex: 1000,
+    padding: '2rem'
   },
   modalCard: {
-    width: '40%',
-    maxWidth: '800px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    background: 'white',
+    borderRadius: '16px',
+    width: '90%',
+    maxWidth: '900px',
     maxHeight: '90vh',
-    height: '80vh',
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
     display: 'flex',
     flexDirection: 'column'
   },
-  modalCardSmall: {
-    width: '250px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
+  modalHeader: {
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    padding: '1.5rem 2rem',
     display: 'flex',
-    flexDirection: 'column',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
-  },
-  modalContent: {
-    paddingBottom: '12px',
-    overflowY: 'auto',
-    flex: 1
-  },
-  columns: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '30px'
-  },
-  leftColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  rightColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
+    flexShrink: 0
   },
   modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
-    textAlign: 'center'
-  },
-  modalDetailText: {
-    fontSize: '13px',
-    marginBottom: '6px',
-    color: '#333',
-    wordBreak: 'break-word',
-    lineHeight: '1.3'
-  },
-  imageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    marginBottom: '12px',
-    gap: '10px'
-  },
-  imageBlock: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
     display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start'
-  },
-  imageLabel: {
-    fontSize: '13px',
-    fontWeight: 'bold',
-    color: '#333',
-    width: '100%',
-    textAlign: 'left',
-    marginLeft: 0,
-    paddingLeft: 0
-  },
-  imageThumbnail: {
-    width: '90%',
-    height: '120px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    objectFit: 'cover',
-    cursor: 'pointer',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    alignItems: 'center',
+    gap: '0.75rem'
   },
   closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
+    background: 'rgba(255,255,255,0.2)',
     border: 'none',
-    padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
+    borderRadius: '8px',
+    color: 'white',
     cursor: 'pointer',
-    fontWeight: '500',
+    padding: '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
+      background: 'rgba(255,255,255,0.3)',
+      transform: 'rotate(90deg)'
     }
   },
-  statusActive: {
-    color: 'green'
+  modalContent: {
+    padding: '2rem',
+    overflowY: 'auto',
+    flex: 1,
+    minHeight: 0
   },
-  statusInactive: {
-    color: 'red'
+  columnsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '2rem',
+    marginBottom: '1.5rem'
   },
-  modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-    marginBottom: '12px'
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
   },
-  compactField: {
+  section: {
+    background: '#f8fafc',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  sectionTitle: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#1e3a8a',
+    marginBottom: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingBottom: '0.5rem',
+    borderBottom: '2px solid #e2e8f0'
+  },
+  fieldGroup: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: '6px',
-    gap: '8px'
+    marginBottom: '0.75rem',
+    padding: '0.5rem 0'
   },
   fieldLabel: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '13px',
-    minWidth: '100px'
+    fontWeight: '500',
+    color: '#64748b',
+    fontSize: '0.875rem',
+    minWidth: '120px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
   },
   fieldValue: {
     textAlign: 'right',
     flex: 1,
     wordBreak: 'break-word',
-    color: '#333',
-    fontSize: '13px'
+    color: '#1f2937',
+    fontSize: '0.875rem',
+    fontWeight: '500'
+  },
+  financialValue: {
+    fontWeight: '600',
+    fontSize: '0.875rem'
+  },
+  savingsAmount: {
+    color: '#059669'
+  },
+  loansAmount: {
+    color: '#dc2626'
+  },
+  investmentAmount: {
+    color: '#7c3aed'
+  },
+  statusBadge: {
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    textTransform: 'uppercase'
+  },
+  statusActive: {
+    background: '#d1fae5',
+    color: '#065f46'
+  },
+  statusInactive: {
+    background: '#fee2e2',
+    color: '#991b1b'
+  },
+  roleBadge: {
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    textTransform: 'capitalize'
+  },
+  roleAdmin: {
+    background: '#fee2e2',
+    color: '#991b1b'
+  },
+  roleCoadmin: {
+    background: '#ffedd5',
+    color: '#9a3412'
+  },
+  roleMember: {
+    background: '#d1fae5',
+    color: '#065f46'
+  },
+  documentsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '1rem',
+    marginTop: '1rem'
+  },
+  documentCard: {
+    background: 'white',
+    borderRadius: '8px',
+    padding: '1rem',
+    border: '1px solid #e2e8f0',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    '&:hover': {
+      borderColor: '#2563eb',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.1)'
+    }
+  },
+  documentImage: {
+    width: '100%',
+    height: '120px',
+    borderRadius: '6px',
+    objectFit: 'cover',
+    marginBottom: '0.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  documentLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#374151'
+  },
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '1rem',
+    padding: '1.5rem 2rem',
+    borderTop: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    flexShrink: 0
+  },
+  actionButton: {
+    padding: '0.75rem 2rem',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px',
+    justifyContent: 'center'
+  },
+  activateButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  deactivateButton: {
+    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
+  },
+  viewButton: {
+    background: 'transparent',
+    color: '#2563eb',
+    border: '1px solid #2563eb',
+    borderRadius: '6px',
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: '#2563eb',
+      color: 'white'
+    }
+  },
+  alertModal: {
+    background: 'white',
+    borderRadius: '12px',
+    padding: '2rem',
+    maxWidth: '400px',
+    width: '90%',
+    textAlign: 'center',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)'
+  },
+  alertIcon: {
+    fontSize: '3rem',
+    marginBottom: '1rem'
+  },
+  successIcon: {
+    color: '#10b981'
+  },
+  errorIcon: {
+    color: '#dc2626'
+  },
+  warningIcon: {
+    color: '#f59e0b'
+  },
+  alertTitle: {
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    marginBottom: '0.5rem',
+    color: '#1f2937'
+  },
+  alertMessage: {
+    color: '#6b7280',
+    marginBottom: '2rem',
+    lineHeight: '1.5'
+  },
+  alertActions: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '1rem'
   },
   imageViewerModal: {
     position: 'fixed',
@@ -231,7 +407,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2000
+    zIndex: 2000,
+    padding: '2rem'
   },
   imageViewerContent: {
     position: 'relative',
@@ -245,138 +422,93 @@ const styles = {
     maxWidth: '100%',
     maxHeight: '70vh',
     objectFit: 'contain',
-    borderRadius: '4px'
+    borderRadius: '8px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   },
   imageViewerLabel: {
     color: 'white',
-    fontSize: '18px',
-    marginTop: '16px',
-    textAlign: 'center'
-  },
-  imageViewerClose: {
-    position: 'absolute',
-    top: '-40px',
-    right: '80px',
-    color: 'white',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '8px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    fontSize: '1.125rem',
+    marginTop: '1rem',
+    textAlign: 'center',
+    fontWeight: '500'
   },
   imageViewerNav: {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '2rem',
     cursor: 'pointer',
-    padding: '16px',
-    backgroundColor: 'transparent',
+    padding: '1rem',
+    background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    outline: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      color: '#2D5783'
-    },
-    '&:focus': {
-      outline: 'none'
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'translateY(-50%) scale(1.1)'
     }
   },
   prevButton: {
-    left: '50px'
+    left: '2rem'
   },
-  nextButton: { 
-    right: '50px'
+  nextButton: {
+    right: '2rem'
   },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'left',
-    width: '100%'
-  },
-  savingsAmount: {
-    color: 'green'
-  },
-  loansAmount: {
-    color: '#2D5783' // Same blue as table header
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
+  imageViewerClose: {
+    position: 'absolute',
+    top: '2rem',
+    right: '2rem',
+    color: 'white',
+    fontSize: '1.5rem',
     cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
+    padding: '0.5rem',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'scale(1.1)'
+    }
+  },
+  financialCard: {
+    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+    border: '1px solid #bae6fd',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
+  },
+  financialItem: {
     display: 'flex',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
+    padding: '0.5rem 0'
   },
-  activateButton: {
-    backgroundColor: '#4CAF50',
-    color: '#FFF',
+  financialLabel: {
+    fontSize: '0.875rem',
+    color: '#0369a1',
+    fontWeight: '500'
+  },
+  financialValue: {
+    fontSize: '1rem',
+    fontWeight: '600'
+  },
+  primaryButton: {
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
     '&:hover': {
-      backgroundColor: '#3e8e41'
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
     }
   },
-  deactivateButton: {
-    backgroundColor: '#f44336',
-    color: '#FFF',
+  secondaryButton: {
+    background: '#6b7280',
+    color: 'white',
     '&:hover': {
-      backgroundColor: '#d32f2f'
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
     }
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-    opacity: '0.7'
-  },
-  bottomButtons: {
-    display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: '16px',
-    gap: '12px',
-    paddingTop: '12px',
-    borderTop: '1px solid #eee'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
   }
 };
 
@@ -394,7 +526,22 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
   const [successMessage, setSuccessMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [loansTotals, setLoansTotals] = useState({}); // memberId -> total current loans
+  const [loansTotals, setLoansTotals] = useState({});
+
+  useEffect(() => {
+    const styleElement = document.createElement('style');
+    styleElement.innerHTML = `
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+      }
+    `;
+    document.head.appendChild(styleElement);
+
+    return () => {
+      document.head.removeChild(styleElement);
+    };
+  }, []);
 
   useEffect(() => {
     const fetchLoansTotals = async () => {
@@ -494,21 +641,20 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
     try {
       const newStatus = selectedMember.status === 'active' ? 'inactive' : 'active';
       
-      // Update in Firebase Realtime Database
       await database.ref(`Members/${selectedMember.id}/status`).set(newStatus);
       
       setSuccessMessage(`Member successfully ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
       setSuccessMessageModalVisible(true);
       
-      // Update local state
       setSelectedMember(prev => ({
         ...prev,
         status: newStatus
       }));
 
-      // Refresh the member list
       refreshData();
     } catch (error) {
+      setErrorMessage('Failed to update member status');
+      setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
       setActionInProgress(false);
@@ -520,8 +666,10 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
   };
 
   if (!members || members.length === 0) return (
-    // Show only the text, no container box
-    <p style={styles.noDataMessage}>No member data available.</p>
+    <div style={styles.noDataContainer}>
+      <FaUser style={styles.noDataIcon} />
+      <div>No member data available</div>
+    </div>
   );
 
   return (
@@ -530,62 +678,76 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Investment</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Savings</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
+              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Investment</th>
+              <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Savings</th>
+              <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Loans</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Role</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {members.map((member, index) => (
               <tr key={index} style={styles.tableRow}>
-                <td style={styles.tableCell}>{member.id || 'N/A'}</td>
-                <td style={styles.tableCell}>{member.firstName + " "+ member.lastName || 'N/A'}</td>
+                <td style={styles.tableCell}>
+                  <strong>#{member.id || 'N/A'}</strong>
+                </td>
+                <td style={styles.tableCell}>
+                  <div style={{ fontWeight: '500' }}>
+                    {member.firstName} {member.lastName}
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: '#6b7280' }}>
+                    {member.email}
+                  </div>
+                </td>
                 <td style={{
                   ...styles.tableCell,
-                  ...styles.savingsAmount
+                  ...styles.financialValue,
+                  ...styles.investmentAmount
                 }}>
                   ₱{formatNumber(member.investment)}
                 </td>
                 <td style={{
                   ...styles.tableCell,
+                  ...styles.financialValue,
                   ...styles.savingsAmount
                 }}>
                   ₱{formatNumber(member.balance)}
                 </td>
                 <td style={{
                   ...styles.tableCell,
+                  ...styles.financialValue,
                   ...styles.loansAmount
                 }}>
                   ₱{formatNumber(loansTotals[member.id] || 0)}
                 </td>
-                <td style={{
-                  ...styles.tableCell,
-                  ...(member.status === 'active' ? styles.statusActive : styles.statusInactive)
-                }}>
-                  {member.status || 'N/A'}
-                </td>
-                <td style={{
-                  ...styles.tableCell,
-                  fontWeight: 'bold',
-                  color: member.role === 'admin' ? '#d32f2f' : 
-                         member.role === 'coadmin' ? '#f57c00' : '#2e7d32',
-                  textTransform: 'capitalize'
-                }}>
-                  {member.role || 'Member'}
+                <td style={styles.tableCell}>
+                  <span style={{
+                    ...styles.statusBadge,
+                    ...(member.status === 'active' ? styles.statusActive : styles.statusInactive)
+                  }}>
+                    {member.status || 'N/A'}
+                  </span>
                 </td>
                 <td style={styles.tableCell}>
-                  <span 
-                    style={styles.viewText} 
-                    onClick={() => openModal(member)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
-                  >
-                    View
+                  <span style={{
+                    ...styles.roleBadge,
+                    ...(member.role === 'admin' ? styles.roleAdmin : 
+                         member.role === 'coadmin' ? styles.roleCoadmin : styles.roleMember)
+                  }}>
+                    {member.role || 'Member'}
                   </span>
+                </td>
+                <td style={styles.tableCell}>
+                  <button 
+                    style={styles.viewButton}
+                    onClick={() => openModal(member)}
+                  >
+                    <FaEye />
+                    View
+                  </button>
                 </td>
               </tr>
             ))}
@@ -593,175 +755,241 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
         </table>
       </div>
 
-      {modalVisible && (
-        <div style={styles.centeredModal}>
+      {/* Member Details Modal */}
+      {modalVisible && selectedMember && (
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
-            <button 
-              style={styles.closeButton} 
-              onClick={closeModal}
-              aria-label="Close modal"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Member Details</h2>
+              <h2 style={styles.modalTitle}>
+                <FaUser />
+                Member Details - #{selectedMember.id}
+              </h2>
+              <button 
+                style={styles.closeButton}
+                onClick={closeModal}
+              >
+                <FaTimes />
+              </button>
             </div>
+            
             <div style={styles.modalContent}>
-              <div style={styles.columns}>
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Personal Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.id || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>First Name:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.firstName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Middle Name:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.middleName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Last Name:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.lastName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.phoneNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Gender:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.gender || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Civil Status:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.civilStatus || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date of Birth:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.dateOfBirth || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Age:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.age || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Birth Place:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.placeOfBirth || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Address:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.address || 'N/A'}</span>
+              <div style={styles.columnsContainer}>
+                {/* Left Column - Personal Information */}
+                <div style={styles.column}>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaUser />
+                      Personal Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUser />
+                        Full Name:
+                      </span>
+                      <span style={styles.fieldValue}>
+                        {selectedMember.firstName} {selectedMember.middleName} {selectedMember.lastName}
+                      </span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaEnvelope />
+                        Email:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.email}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaPhone />
+                        Contact:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.phoneNumber}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaVenusMars />
+                        Gender:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.gender}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaHeart />
+                        Civil Status:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.civilStatus}</span>
+                    </div>
                   </div>
 
-                  <div style={styles.sectionTitle}>Financial Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Savings Balance:</span>
-                    <span style={{
-                      ...styles.fieldValue,
-                      ...styles.savingsAmount
-                    }}>
-                      ₱{formatNumber(selectedMember?.balance)}
-                    </span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Total Loans:</span>
-                    <span style={{
-                      ...styles.fieldValue,
-                      ...styles.loansAmount
-                    }}>
-                      ₱{formatNumber(selectedMember?.loans)}
-                    </span>
-                  </div>
-
-                  <div style={styles.sectionTitle}>Membership Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Status:</span>
-                    <span style={{
-                      ...styles.fieldValue,
-                      ...(selectedMember?.status === 'active' ? styles.statusActive : styles.statusInactive)
-                    }}>
-                      {selectedMember?.status || 'N/A'}
-                    </span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Role:</span>
-                    <span style={{
-                      ...styles.fieldValue,
-                      fontWeight: 'bold',
-                      color: selectedMember?.role === 'admin' ? '#d32f2f' : 
-                             selectedMember?.role === 'coadmin' ? '#f57c00' : '#2e7d32',
-                      textTransform: 'capitalize'
-                    }}>
-                      {selectedMember?.role || 'Member'}
-                    </span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Added:</span>
-                    <span style={styles.fieldValue}>{selectedMember?.dateApproved || selectedMember?.dateAdded || 'N/A'}</span>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaCalendarAlt />
+                      Background Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaBirthdayCake />
+                        Date of Birth:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.dateOfBirth}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Age:</span>
+                      <span style={styles.fieldValue}>{selectedMember.age}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaMapMarkerAlt />
+                        Birth Place:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.placeOfBirth}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaMapMarkerAlt />
+                        Address:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedMember.address}</span>
+                    </div>
                   </div>
                 </div>
-                <div style={styles.rightColumn}>
-                  <div style={styles.sectionTitle}>Submitted Documents</div>
-                  <div style={styles.imageGrid}>
-                    {selectedMember?.validIdFront && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Valid ID Front</p>
-                        <img
-                          src={selectedMember.validIdFront}
-                          alt="Valid ID Front"
-                          style={styles.imageThumbnail}
+
+                {/* Right Column - Financial & Documents */}
+                <div style={styles.column}>
+                  <div style={styles.financialCard}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaMoneyBillWave />
+                      Financial Summary
+                    </h3>
+                    <div style={styles.financialItem}>
+                      <span style={styles.financialLabel}>Total Investment:</span>
+                      <span style={{ ...styles.financialValue, ...styles.investmentAmount }}>
+                        ₱{formatNumber(selectedMember.investment)}
+                      </span>
+                    </div>
+                    <div style={styles.financialItem}>
+                      <span style={styles.financialLabel}>Savings Balance:</span>
+                      <span style={{ ...styles.financialValue, ...styles.savingsAmount }}>
+                        ₱{formatNumber(selectedMember.balance)}
+                      </span>
+                    </div>
+                    <div style={styles.financialItem}>
+                      <span style={styles.financialLabel}>Active Loans:</span>
+                      <span style={{ ...styles.financialValue, ...styles.loansAmount }}>
+                        ₱{formatNumber(loansTotals[selectedMember.id] || 0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaIdCard />
+                      Membership Details
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Status:</span>
+                      <span style={{
+                        ...styles.statusBadge,
+                        ...(selectedMember.status === 'active' ? styles.statusActive : styles.statusInactive)
+                      }}>
+                        {selectedMember.status}
+                      </span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Role:</span>
+                      <span style={{
+                        ...styles.roleBadge,
+                        ...(selectedMember.role === 'admin' ? styles.roleAdmin : 
+                             selectedMember.role === 'coadmin' ? styles.roleCoadmin : styles.roleMember)
+                      }}>
+                        {selectedMember.role || 'Member'}
+                      </span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Date Joined:</span>
+                      <span style={styles.fieldValue}>
+                        {selectedMember.dateApproved || selectedMember.dateAdded}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaIdCard />
+                      Submitted Documents
+                    </h3>
+                    <div style={styles.documentsGrid}>
+                      {selectedMember.validIdFront && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedMember.validIdFront, 'Valid ID Front', 0)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                    {selectedMember?.validIdBack && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Valid ID Back</p>
-                        <img
-                          src={selectedMember.validIdBack}
-                          alt="Valid ID Back"
-                          style={styles.imageThumbnail}
+                        >
+                          <img
+                            src={selectedMember.validIdFront}
+                            alt="Valid ID Front"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Valid ID Front</div>
+                        </div>
+                      )}
+                      {selectedMember.validIdBack && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedMember.validIdBack, 'Valid ID Back', 1)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
-                    {selectedMember?.selfie && (
-                      <div style={styles.imageBlock}>
-                        <p style={styles.imageLabel}>Selfie</p>
-                        <img
-                          src={selectedMember.selfie}
-                          alt="Selfie"
-                          style={styles.imageThumbnail}
+                        >
+                          <img
+                            src={selectedMember.validIdBack}
+                            alt="Valid ID Back"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Valid ID Back</div>
+                        </div>
+                      )}
+                      {selectedMember.selfie && (
+                        <div 
+                          style={styles.documentCard}
                           onClick={() => openImageViewer(selectedMember.selfie, 'Selfie', 2)}
-                          onFocus={(e) => e.target.style.outline = 'none'}
-                        />
-                      </div>
-                    )}
+                        >
+                          <img
+                            src={selectedMember.selfie}
+                            alt="Selfie"
+                            style={styles.documentImage}
+                          />
+                          <div style={styles.documentLabel}>Selfie</div>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-            <div style={styles.bottomButtons}>
+
+            <div style={styles.modalActions}>
               <button
                 style={{
                   ...styles.actionButton,
-                  ...(selectedMember?.status === 'active' ? styles.deactivateButton : styles.activateButton),
+                  ...(selectedMember.status === 'active' ? styles.deactivateButton : styles.activateButton),
                   ...(isProcessing ? styles.disabledButton : {})
                 }}
                 onClick={toggleStatus}
                 disabled={isProcessing}
-                onFocus={(e) => e.target.style.outline = 'none'}
               >
-                {selectedMember?.status === 'active' ? 'Deactivate' : 'Activate'}
+                {isProcessing ? (
+                  <>
+                    <div style={{ 
+                      width: '16px', 
+                      height: '16px', 
+                      border: '2px solid transparent', 
+                      borderTop: '2px solid white', 
+                      borderRadius: '50%', 
+                      animation: 'spin 1s linear infinite' 
+                    }} />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    {selectedMember.status === 'active' ? 'Deactivate Member' : 'Activate Member'}
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -770,34 +998,34 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
 
       {/* Status Change Confirmation Modal */}
       {showStatusConfirmation && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>
-              Are you sure you want to {selectedMember?.status === 'active' ? 'deactivate' : 'activate'} this member?
+        <div style={styles.modalOverlay}>
+          <div style={styles.alertModal}>
+            <FaExclamationCircle style={{ ...styles.alertIcon, ...styles.warningIcon }} />
+            <h3 style={styles.alertTitle}>Confirm Status Change</h3>
+            <p style={styles.alertMessage}>
+              Are you sure you want to {selectedMember?.status === 'active' ? 'deactivate' : 'activate'} this member? 
+              {selectedMember?.status === 'active' && ' The member will lose access to their account.'}
             </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
+            <div style={styles.alertActions}>
+              <button
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={confirmStatusChange}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
-                }} 
+                  ...styles.secondaryButton
+                }}
                 onClick={cancelStatusChange}
                 disabled={actionInProgress}
               >
-                No
+                Cancel
+              </button>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...(selectedMember?.status === 'active' ? styles.deactivateButton : styles.activateButton)
+                }}
+                onClick={confirmStatusChange}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Confirm'}
               </button>
             </div>
           </div>
@@ -806,50 +1034,45 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
 
       {/* Success Message Modal */}
       {successMessageModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={closeModal}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              OK
-            </button>
+        <div style={styles.modalOverlay}>
+          <div style={styles.alertModal}>
+            <FaCheckCircle style={{ ...styles.alertIcon, ...styles.successIcon }} />
+            <h3 style={styles.alertTitle}>Success</h3>
+            <p style={styles.alertMessage}>{successMessage}</p>
+            <div style={styles.alertActions}>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton
+                }}
+                onClick={closeModal}
+              >
+                Continue
+              </button>
+            </div>
           </div>
         </div>
       )}
 
       {/* Error Message Modal */}
       {errorModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-            <p style={styles.modalText}>{errorMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={() => setErrorModalVisible(false)}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              OK
-            </button>
+        <div style={styles.modalOverlay}>
+          <div style={styles.alertModal}>
+            <FaExclamationCircle style={{ ...styles.alertIcon, ...styles.errorIcon }} />
+            <h3 style={styles.alertTitle}>Error</h3>
+            <p style={styles.alertMessage}>{errorMessage}</p>
+            <div style={styles.alertActions}>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton
+                }}
+                onClick={() => setErrorModalVisible(false)}
+              >
+                Try Again
+              </button>
+            </div>
           </div>
-        </div>
-      )}
-
-      {/* Loading Spinner */}
-      {isProcessing && (
-        <div style={styles.centeredModal}>
-          <div style={styles.spinner}></div>
         </div>
       )}
 
@@ -860,7 +1083,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
             <button 
               style={{ ...styles.imageViewerNav, ...styles.prevButton }}
               onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaChevronLeft />
             </button>
@@ -872,15 +1094,12 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
             <button 
               style={{ ...styles.imageViewerNav, ...styles.nextButton }}
               onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaChevronRight />
             </button>
             <button 
-              style={styles.imageViewerClose} 
+              style={styles.imageViewerClose}
               onClick={closeImageViewer}
-              aria-label="Close image viewer"
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaTimes />
             </button>

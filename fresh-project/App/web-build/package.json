@@ -1,0 +1,16 @@
+{
+  "name": "5ki-web",
+  "version": "1.0.0",
+  "description": "5KI Financial Services Web Application",
+  "main": "index.html",
+  "scripts": {
+    "start": "serve -s . -l 3000",
+    "dev": "serve -s . -l 3000"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
+  },
+  "keywords": ["financial", "services", "5ki", "mobile-app"],
+  "author": "5KI Team",
+  "license": "MIT"
+}

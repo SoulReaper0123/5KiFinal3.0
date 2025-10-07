@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: 5ki-web-app
+    env: static
+    buildCommand: npm install
+    staticPublishPath: .
+    routes:
+      - type: redirect
+        source: /api/*
+        destination: https://your-api-endpoint.onrender.com/api/*
+      - type: rewrite
+        source: /*
+        destination: /index.html

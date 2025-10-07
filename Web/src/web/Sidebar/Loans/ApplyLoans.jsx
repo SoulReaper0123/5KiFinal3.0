@@ -1,70 +1,106 @@
 import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApproveLoans, RejectLoans } from '../../../../../Server/api';
-import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
+import { 
+  FaTimes, 
+  FaCheckCircle, 
+  FaExclamationCircle, 
+  FaChevronLeft, 
+  FaChevronRight, 
+  FaSpinner,
+  FaEye,
+  FaUser,
+  FaMoneyBillWave,
+  FaIdCard,
+  FaCalendarAlt,
+  FaPhone,
+  FaEnvelope,
+  FaMapMarkerAlt,
+  FaFileInvoiceDollar,
+  FaHandHoldingUsd,
+  FaClock,
+  FaPercentage
+} from 'react-icons/fa';
 
 const styles = {
   container: {
     flex: 1,
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
-  loadingView: {
+  loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '100%'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  spinner: {
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #2563eb',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
   },
   tableContainer: {
-    borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #e2e8f0',
+    background: 'white'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     tableLayout: 'fixed',
-    minWidth: '800px'
+    minWidth: '1000px'
   },
   tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    color: 'white',
+    height: '56px',
+    fontWeight: '600',
+    fontSize: '0.875rem'
   },
   tableHeaderCell: {
-    whiteSpace: 'nowrap'
+    padding: '1rem 0.75rem',
+    textAlign: 'left',
+    whiteSpace: 'nowrap',
+    fontSize: '0.875rem',
+    fontWeight: '600'
   },
   tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
+    height: '52px',
+    transition: 'background-color 0.2s ease',
+    borderBottom: '1px solid #f1f5f9',
+    '&:hover': {
+      backgroundColor: '#f8fafc'
     }
   },
   tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
+    padding: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    whiteSpace: 'nowrap'
   },
-  statusApproved: {
-    color: 'green'
+  noDataContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#6b7280'
   },
-  statusRejected: {
-    color: 'red'
+  noDataIcon: {
+    fontSize: '3rem',
+    opacity: '0.5'
   },
-  noDataMessage: {
-    textAlign: 'center',
-    marginTop: '50px',
-    fontSize: '16px',
-    color: 'gray'
-  },
-  centeredModal: {
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -74,272 +110,329 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
+    zIndex: 1000,
+    padding: '2rem',
+    backdropFilter: 'blur(4px)'
   },
   modalCard: {
-    width: '40%',
-    maxWidth: '900px',
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '80vh',
-    height: '80vh',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  modalCardSingleColumn: {
-    width: '40%',
-    maxWidth: '600px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
-    height: 'auto',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  modalCardSmall: {
-    width: '250px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    textAlign: 'center'
-  },
-  modalContent: {
-    paddingBottom: '12px',
-    overflowY: 'auto',
-    flex: 1
-  },
-  columns: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '30px'
-  },
-  leftColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  rightColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  sectionTitle: {
-    fontSize: '14px',
-    fontWeight: 'bold',
-    color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee',
-    textAlign: 'left',
-    width: '100%'
-  },
-  modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
-    textAlign: 'center'
-  },
-  modalDetailText: {
-    fontSize: '13px',
-    marginBottom: '6px',
-    color: '#333',
-    wordBreak: 'break-word',
-    lineHeight: '1.3'
-  },
-  imageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    marginBottom: '12px',
-    gap: '10px'
-  },
-  imageBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start'
-  },
-  imageLabel: {
-    fontSize: '13px',
-    fontWeight: 'bold',
-    color: '#333',
-    width: '100%',
-    textAlign: 'left',
-    marginLeft: 0,
-    paddingLeft: 0
-  },
-  imageThumbnail: {
+    borderRadius: '16px',
     width: '90%',
-    height: '120px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    objectFit: 'cover',
-    cursor: 'pointer',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  bottomButtons: {
+    maxWidth: '900px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
     display: 'flex',
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: '16px',
-    gap: '12px',
-    paddingTop: '12px',
-    borderTop: '1px solid #eee'
-  },
-  actionButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '14px',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '6px',
-    transition: 'all 0.2s',
-    minWidth: '100px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  approveButton: {
-    backgroundColor: '#4CAF50',
-    color: '#FFF',
-    '&:hover': {
-      backgroundColor: '#3e8e41'
-    }
-  },
-  rejectButton: {
-    backgroundColor: '#f44336',
-    color: '#FFF',
-    '&:hover': {
-      backgroundColor: '#d32f2f'
-    }
-  },
-  disabledButton: {
-    backgroundColor: '#ccc',
-    cursor: 'not-allowed',
-    opacity: '0.7'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '16px',
-    textAlign: 'center',
-    color: '#333',
-    lineHeight: '1.4'
-  },
-  confirmIcon: {
-    marginBottom: '12px',
-    fontSize: '32px'
-  },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
-  },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    flexDirection: 'column',
+    border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-    marginBottom: '12px'
+    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    color: 'white',
+    padding: '1.5rem 2rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #E5E7EB'
   },
-  compactField: {
+  modalTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem'
+  },
+  closeButton: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    color: 'white',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    '&:hover': {
+      background: 'rgba(255, 255, 255, 0.2)',
+      transform: 'rotate(90deg)'
+    }
+  },
+  modalContent: {
+    padding: '2rem',
+    overflowY: 'auto',
+    flex: 1,
+    minHeight: 0
+  },
+  columnsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '2rem',
+    marginBottom: '1.5rem'
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  section: {
+    background: '#f8fafc',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  sectionTitle: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#1e3a8a',
+    marginBottom: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingBottom: '0.5rem',
+    borderBottom: '2px solid #e2e8f0'
+  },
+  fieldGroup: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: '6px',
-    gap: '8px'
+    marginBottom: '0.75rem',
+    padding: '0.5rem 0'
   },
   fieldLabel: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '13px',
-    minWidth: '100px'
+    fontWeight: '500',
+    color: '#64748b',
+    fontSize: '0.875rem',
+    minWidth: '120px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
   },
   fieldValue: {
     textAlign: 'right',
     flex: 1,
     wordBreak: 'break-word',
-    color: '#333',
-    fontSize: '13px'
+    color: '#1f2937',
+    fontSize: '0.875rem',
+    fontWeight: '500'
+  },
+  statusBadge: {
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    textTransform: 'uppercase'
+  },
+  statusApproved: {
+    background: '#d1fae5',
+    color: '#065f46'
+  },
+  statusRejected: {
+    background: '#fee2e2',
+    color: '#991b1b'
+  },
+  statusPending: {
+    background: '#fef3c7',
+    color: '#92400e'
+  },
+  documentsGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    gap: '1rem',
+    marginTop: '1rem'
+  },
+  documentCard: {
+    background: 'white',
+    borderRadius: '8px',
+    padding: '1rem',
+    border: '1px solid #e2e8f0',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    '&:hover': {
+      borderColor: '#2563eb',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.1)'
+    }
+  },
+  documentImage: {
+    width: '100%',
+    height: '120px',
+    borderRadius: '6px',
+    objectFit: 'cover',
+    marginBottom: '0.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  documentLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#374151'
+  },
+  modalActions: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '1rem',
+    padding: '1.5rem 2rem',
+    borderTop: '1px solid #e5e7eb',
+    background: '#f8fafc',
+    flexShrink: 0
+  },
+  actionButton: {
+    padding: '0.75rem 2rem',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
+  },
+  approveButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  rejectButton: {
+    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
+  },
+  viewButton: {
+    background: 'transparent',
+    color: '#2563eb',
+    border: '1px solid #2563eb',
+    borderRadius: '6px',
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.25rem',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: '#2563eb',
+      color: 'white'
+    }
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  imageViewerModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000,
+    padding: '2rem'
+  },
+  imageViewerContent: {
+    position: 'relative',
+    width: '90%',
+    maxWidth: '800px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center'
   },
   largeImage: {
     maxWidth: '100%',
     maxHeight: '70vh',
     objectFit: 'contain',
-    borderRadius: '4px'
+    borderRadius: '8px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   },
   imageViewerLabel: {
     color: 'white',
-    fontSize: '18px',
-    marginTop: '16px',
-    textAlign: 'center'
+    fontSize: '1.125rem',
+    marginTop: '1rem',
+    textAlign: 'center',
+    fontWeight: '500'
+  },
+  imageViewerNav: {
+    position: 'absolute',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '2rem',
+    cursor: 'pointer',
+    padding: '1rem',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'translateY(-50%) scale(1.1)'
+    }
+  },
+  prevButton: {
+    left: '2rem'
+  },
+  nextButton: {
+    right: '2rem'
   },
   imageViewerClose: {
     position: 'absolute',
-    top: '-40px',
-    right: '80px',
+    top: '2rem',
+    right: '2rem',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '1.5rem',
     cursor: 'pointer',
-    padding: '8px',
-    backgroundColor: 'transparent',
+    padding: '0.5rem',
+    background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'scale(1.1)'
     }
   },
   rejectionModal: {
@@ -356,92 +449,233 @@ const styles = {
   },
   rejectionModalContent: {
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
+    borderRadius: '12px',
+    padding: '2rem',
     width: '400px',
     maxWidth: '90%',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)',
+    border: '1px solid #F1F5F9'
   },
   rejectionTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
+    fontSize: '1.25rem',
+    fontWeight: '700',
+    marginBottom: '1rem',
+    color: '#1e3a8a',
     textAlign: 'center'
   },
   reasonOption: {
     display: 'flex',
     alignItems: 'center',
-    marginBottom: '10px',
-    padding: '8px',
-    borderRadius: '4px',
+    marginBottom: '0.75rem',
+    padding: '0.75rem',
+    borderRadius: '6px',
     cursor: 'pointer',
+    transition: 'background-color 0.2s ease',
     '&:hover': {
-      backgroundColor: '#f5f5f5'
+      backgroundColor: '#f8fafc'
     }
   },
   reasonRadio: {
-    marginRight: '10px'
+    marginRight: '0.75rem'
   },
   reasonText: {
-    flex: 1
+    flex: 1,
+    fontSize: '0.875rem',
+    color: '#374151'
   },
   customReasonInput: {
     width: '100%',
-    padding: '8px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    marginTop: '8px'
+    padding: '0.5rem 0.75rem',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
+    fontSize: '0.875rem',
+    marginTop: '0.5rem',
+    '&:focus': {
+      outline: 'none',
+      borderColor: '#3b82f6',
+      boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+    }
   },
   rejectionButtons: {
     display: 'flex',
     justifyContent: 'flex-end',
-    marginTop: '20px',
-    gap: '10px'
+    marginTop: '1.5rem',
+    gap: '0.75rem'
   },
   cancelButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
+    padding: '0.5rem 1rem',
+    borderRadius: '6px',
+    border: '1px solid #d1d5db',
     backgroundColor: 'white',
-    cursor: 'pointer'
-  },
-  confirmRejectButton: {
-    padding: '8px 16px',
-    borderRadius: '4px',
-    border: 'none',
-    backgroundColor: '#f44336',
-    color: 'white',
     cursor: 'pointer',
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      backgroundColor: '#d32f2f'
+      backgroundColor: '#f9fafb'
     }
   },
-  actionText: {
-    fontSize: '14px',
+  confirmRejectButton: {
+    padding: '0.5rem 1rem',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: '#ef4444',
+    color: 'white',
     cursor: 'pointer',
+    fontSize: '0.875rem',
     fontWeight: '500',
-    color: '#2D5783',
-    textDecoration: 'none',
-    margin: '0 5px',
-    transition: 'color 0.2s ease, text-decoration 0.2s ease',
-    outline: 'none'
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      backgroundColor: '#dc2626'
+    }
   },
-  approveHover: {
-    color: '#4CAF50',
-    textDecoration: 'underline'
+  financialCard: {
+    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+    border: '1px solid #bae6fd',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
   },
-  rejectHover: {
-    color: '#f44336',
-    textDecoration: 'underline'
+  financialItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem 0'
   },
-  noDocumentsMessage: {
+  financialLabel: {
+    fontSize: '0.875rem',
+    color: '#0369a1',
+    fontWeight: '500'
+  },
+  financialValue: {
+    fontSize: '1rem',
+    fontWeight: '600'
+  },
+  primaryButton: {
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+    }
+  },
+  secondaryButton: {
+    background: '#6b7280',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+    }
+  },
+  infoModalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3000
+  },
+  infoModalCard: {
+    width: '340px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
     textAlign: 'center',
-    margin: '20px 0',
-    color: '#666',
-    fontStyle: 'italic'
+    border: '1px solid #F1F5F9'
+  },
+  infoTitle: {
+    fontSize: '1.125rem',
+    fontWeight: '700',
+    color: '#1e3a8a',
+    marginBottom: '1rem'
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '0.75rem',
+    margin: '0.5rem 0'
+  },
+  infoLabel: {
+    fontWeight: '600',
+    color: '#555',
+    fontSize: '0.875rem'
+  },
+  infoValue: {
+    color: '#333',
+    fontSize: '0.875rem',
+    maxWidth: '60%',
+    wordBreak: 'break-word',
+    textAlign: 'right'
+  },
+  infoCloseButton: {
+    marginTop: '1rem',
+    padding: '0.5rem 1rem',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: '#1e3a8a',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      backgroundColor: '#1e40af'
+    }
+  },
+  savingsConfirmModal: {
+    width: '400px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '2rem',
+    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  savingsInfoBox: {
+    backgroundColor: '#fff3cd',
+    border: '1px solid #ffeaa7',
+    borderRadius: '8px',
+    padding: '15px',
+    marginBottom: '15px',
+    textAlign: 'left'
+  },
+  savingsInfoTitle: {
+    fontSize: '14px',
+    color: '#856404',
+    fontWeight: '600',
+    marginBottom: '10px'
+  },
+  savingsInfoText: {
+    fontSize: '13px',
+    color: '#856404',
+    lineHeight: '1.5'
   }
 };
+
+// Add keyframes for spinner animation
+const spinKeyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the keyframes into the document head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = spinKeyframes;
+  if (!document.head.querySelector('style[data-spin-keyframes]')) {
+    styleSheet.setAttribute('data-spin-keyframes', 'true');
+    document.head.appendChild(styleSheet);
+  }
+}
 
 const rejectionReasons = [
   "No deposit transactions made on account",
@@ -476,13 +710,10 @@ const ApplyLoans = ({
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
-  const [hoverStates, setHoverStates] = useState({});
   const [pendingApiCall, setPendingApiCall] = useState(null);
   const [justCompletedAction, setJustCompletedAction] = useState(false);
-  // New: member financials for modal display
   const [memberBalance, setMemberBalance] = useState(null);
   const [existingLoanInfo, setExistingLoanInfo] = useState({ hasExisting: false, outstanding: 0 });
-  // Savings confirmation modal states
   const [showSavingsConfirmModal, setShowSavingsConfirmModal] = useState(false);
   const [savingsShortfall, setSavingsShortfall] = useState({ needed: 0, available: 0, remaining: 0 });
   const [pendingLoanForSavings, setPendingLoanForSavings] = useState(null);
@@ -514,27 +745,15 @@ const ApplyLoans = ({
     });
   };
 
-  const handleHover = (transactionId, type, isHovering) => {
-    setHoverStates(prev => ({
-      ...prev,
-      [transactionId]: {
-        ...prev[transactionId],
-        [type]: isHovering ? styles[`${type}Hover`] : {}
-      }
-    }));
-  };
-
   const openModal = async (loan) => {
     setSelectedLoan(loan);
     setModalVisible(true);
 
     try {
-      // Fetch current balance
       const balanceSnap = await database.ref(`Members/${loan.id}/balance`).once('value');
       const balance = parseFloat(balanceSnap.val()) || 0;
       setMemberBalance(balance);
 
-      // Fetch existing current loans and compute outstanding
       const currentLoansSnap = await database.ref(`Loans/CurrentLoans/${loan.id}`).once('value');
       let hasExisting = false;
       let outstanding = 0;
@@ -542,13 +761,11 @@ const ApplyLoans = ({
       if (currentLoansSnap.exists()) {
         hasExisting = true;
         const loansObj = currentLoansSnap.val() || {};
-        // Sum remaining balances across all current loans for this member
         Object.values(loansObj).forEach(l => {
           const totalTermPayment = parseFloat(l.totalTermPayment) || 0;
-          const amountPaid = parseFloat(l.amountPaid) || 0; // fallback if tracked
-          const paymentsMade = parseFloat(l.paymentsMade) || 0; // number of payments made
+          const amountPaid = parseFloat(l.amountPaid) || 0;
+          const paymentsMade = parseFloat(l.paymentsMade) || 0;
           const perMonth = parseFloat(l.totalMonthlyPayment) || 0;
-          // Compute remaining: prefer totalTermPayment - amountPaid, fallback to perMonth*(term - paymentsMade)
           let remaining = totalTermPayment - amountPaid;
           if (!isFinite(remaining) || remaining <= 0) {
             const term = parseFloat(l.term) || 0;
@@ -586,7 +803,7 @@ const ApplyLoans = ({
 
   const handleReasonSelect = (reason) => {
     setSelectedReason(reason);
-    if (reason !== "Other (please specify)") {
+    if (reason !== "Other") {
       setCustomReason('');
     }
   };
@@ -598,7 +815,7 @@ const ApplyLoans = ({
       return;
     }
 
-    if (selectedReason === "Other (please specify)" && !customReason.trim()) {
+    if (selectedReason === "Other" && !customReason.trim()) {
       setErrorMessage('Please specify the rejection reason');
       setErrorModalVisible(true);
       return;
@@ -610,10 +827,9 @@ const ApplyLoans = ({
 
   const confirmRejectFinal = async () => {
     setShowRejectConfirmation(false);
-    await processAction(selectedLoan, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
+    await processAction(selectedLoan, 'reject', selectedReason === "Other" ? customReason : selectedReason);
   };
 
-  // Handle savings confirmation
   const handleSavingsConfirm = async () => {
     if (!pendingLoanForSavings) return;
     
@@ -622,12 +838,9 @@ const ApplyLoans = ({
     setActionInProgress(true);
     
     try {
-      // Check if this is a member balance shortfall or funds shortfall
       if (savingsShortfall.memberBalance !== undefined) {
-        // Member balance shortfall - use the specific member balance shortfall approval process
         await processDatabaseApproveWithMemberBalanceShortfall(pendingLoanForSavings, savingsShortfall.needed);
       } else {
-        // Funds shortfall - use the specific savings approval process
         await processDatabaseApproveWithSavings(pendingLoanForSavings, savingsShortfall.needed);
       }
       
@@ -646,7 +859,6 @@ const ApplyLoans = ({
         status: 'approved'
       }));
 
-      // Store API call data for later execution
       setPendingApiCall({
         type: 'approve',
         data: approveData
@@ -695,7 +907,6 @@ const ApplyLoans = ({
           status: 'approved'
         }));
 
-        // Store API call data for later execution
         setPendingApiCall({
           type: 'approve',
           data: approveData
@@ -719,7 +930,6 @@ const ApplyLoans = ({
           status: 'rejected'
         }));
 
-        // Store API call data for later execution
         setPendingApiCall({
           type: 'reject',
           data: rejectData
@@ -731,11 +941,9 @@ const ApplyLoans = ({
     } catch (error) {
       console.error('Error processing action:', error);
       
-      // Check if this is a member balance savings confirmation error
       if (error.message === 'MEMBER_BALANCE_SAVINGS_NEEDED') {
         console.log('Member balance savings error caught:', error);
         if (error.savingsData) {
-          // Show member balance savings confirmation modal
           setSavingsShortfall({
             needed: error.savingsData.needed,
             available: error.savingsData.available,
@@ -747,7 +955,7 @@ const ApplyLoans = ({
           setShowSavingsConfirmModal(true);
           setIsProcessing(false);
           setActionInProgress(false);
-          return; // Don't show error modal
+          return;
         } else {
           console.error('MEMBER_BALANCE_SAVINGS_NEEDED error missing savingsData:', error);
           setErrorMessage('Error processing member balance validation. Please try again.');
@@ -758,9 +966,7 @@ const ApplyLoans = ({
         }
       }
       
-      // Check if this is a funds savings confirmation error
       if (error.message === 'SAVINGS_CONFIRMATION_NEEDED' && error.savingsData) {
-        // Show funds savings confirmation modal
         setSavingsShortfall({
           needed: error.savingsData.needed,
           available: error.savingsData.available,
@@ -770,7 +976,7 @@ const ApplyLoans = ({
         setShowSavingsConfirmModal(true);
         setIsProcessing(false);
         setActionInProgress(false);
-        return; // Don't show error modal
+        return;
       }
       
       setErrorMessage(error.message || 'An error occurred. Please try again.');
@@ -781,198 +987,346 @@ const ApplyLoans = ({
     }
   };
 
-const processDatabaseApprove = async (loan) => {
-  try {
-    const { id, transactionId, term, loanAmount } = loan;
+  const processDatabaseApprove = async (loan) => {
+    try {
+      const { id, transactionId, term, loanAmount } = loan;
 
-    const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
-    const memberBalanceRef = database.ref(`Members/${id}/balance`);
-    
-    // Check strictly against member's balance (no percentage rule)
-    const [loanSnap, memberBalanceSnap] = await Promise.all([
-      loanRef.once('value'),
-      memberBalanceRef.once('value')
-    ]);
-
-    if (!loanSnap.exists()) {
-      throw new Error('Loan data not found.');
-    }
-
-    const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
-    const requestedAmount = parseFloat(loanAmount);
-
-    // Check if loan amount exceeds member's balance
-    let savingsToUse = 0;
-    if (requestedAmount > memberBalance) {
-      // Calculate shortfall that needs to be covered by savings
-      const shortfall = requestedAmount - memberBalance;
+      const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
+      const memberBalanceRef = database.ref(`Members/${id}/balance`);
       
-      // Check if savings can cover the shortfall
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsSnap = await savingsRef.once('value');
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      
-      if (shortfall > currentSavings) {
-        throw new Error(`Insufficient funds to approve this loan. Member balance: ${formatCurrency(memberBalance)}, Shortfall: ${formatCurrency(shortfall)}, Available savings: ${formatCurrency(currentSavings)}`);
+      const [loanSnap, memberBalanceSnap] = await Promise.all([
+        loanRef.once('value'),
+        memberBalanceRef.once('value')
+      ]);
+
+      if (!loanSnap.exists()) {
+        throw new Error('Loan data not found.');
       }
-      
-      // Show confirmation modal for using savings to cover member balance shortfall
-      const remainingSavings = currentSavings - shortfall;
-      const savingsError = new Error('MEMBER_BALANCE_SAVINGS_NEEDED');
-      savingsError.savingsData = {
-        needed: shortfall,
-        available: currentSavings,
-        remaining: remainingSavings,
-        loanData: loan,
-        memberBalance: memberBalance,
-        loanAmount: requestedAmount
+
+      const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
+      const requestedAmount = parseFloat(loanAmount);
+
+      let savingsToUse = 0;
+      if (requestedAmount > memberBalance) {
+        const shortfall = requestedAmount - memberBalance;
+        
+        const savingsRef = database.ref('Settings/Savings');
+        const savingsSnap = await savingsRef.once('value');
+        const currentSavings = parseFloat(savingsSnap.val()) || 0;
+        
+        if (shortfall > currentSavings) {
+          throw new Error(`Insufficient funds to approve this loan. Member balance: ${formatCurrency(memberBalance)}, Shortfall: ${formatCurrency(shortfall)}, Available savings: ${formatCurrency(currentSavings)}`);
+        }
+        
+        const savingsError = new Error('MEMBER_BALANCE_SAVINGS_NEEDED');
+        savingsError.savingsData = {
+          needed: shortfall,
+          available: currentSavings,
+          remaining: currentSavings - shortfall,
+          loanData: loan,
+          memberBalance: memberBalance,
+          loanAmount: requestedAmount
+        };
+        console.log('Throwing MEMBER_BALANCE_SAVINGS_NEEDED error with data:', savingsError.savingsData);
+        throw savingsError;
+      }
+
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
+      const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
+      const fundsRef = database.ref('Settings/Funds');
+      const loanData = loanSnap.val();
+
+      const loanTypeKey = String(loanData.loanType || '').trim();
+      const termKeyRaw = String(loanData.term ?? '').trim();
+      const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
+      const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
+      const processingFeeRef = database.ref('Settings/ProcessingFee');
+
+      const [fundsSnap, feeSnap] = await Promise.all([
+        fundsRef.once('value'),
+        processingFeeRef.once('value'),
+      ]);
+
+      let interestRateRaw = null;
+      for (const tKey of termKeys) {
+        const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
+        const val = snap.val();
+        if (val !== null && val !== undefined && val !== '') {
+          interestRateRaw = val;
+          break;
+        }
+      }
+      if (interestRateRaw === null) {
+        throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
+      }
+
+      const interestRatePercentage = parseFloat(interestRateRaw);
+      const interestRateDecimal = interestRatePercentage / 100;
+      const amount = parseFloat(loanData.loanAmount);
+      const termMonths = parseInt(loanData.term);
+      const currentFunds = parseFloat(fundsSnap.val());
+      const processingFee = parseFloat(feeSnap.val());
+
+      if (amount > currentFunds) {
+        const savingsRef = database.ref('Settings/Savings');
+        const savingsSnap = await savingsRef.once('value');
+        const currentSavings = parseFloat(savingsSnap.val()) || 0;
+        const totalAvailable = currentFunds + currentSavings;
+        
+        if (amount > totalAvailable) {
+          throw new Error(`Insufficient funds to approve this loan. Available: ${formatCurrency(currentFunds)} (Funds) + ${formatCurrency(currentSavings)} (Savings) = ${formatCurrency(totalAvailable)}. Required: ${formatCurrency(amount)}`);
+        }
+        
+        const shortfallAmount = amount - currentFunds;
+        const remainingSavings = currentSavings - shortfallAmount;
+        
+        const savingsError = new Error('SAVINGS_CONFIRMATION_NEEDED');
+        savingsError.savingsData = {
+          needed: shortfallAmount,
+          available: currentSavings,
+          remaining: remainingSavings,
+          loanData: loan
+        };
+        throw savingsError;
+      }
+
+      const interestPerTerm = amount * interestRateDecimal;
+      const totalInterest = interestPerTerm * termMonths;
+      const totalTermPayment = amount + totalInterest;
+      const totalMonthlyPayment = totalTermPayment / termMonths;
+      const monthlyPrincipal = amount / termMonths;
+      const releaseAmount = amount - processingFee;
+
+      const now = new Date();
+      const dueDate = new Date(now);
+      dueDate.setDate(now.getDate() + 30);
+
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+      const formattedDueDate = formatDate(dueDate);
+
+      const approvedData = {
+        ...loanData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
+        interestRate: interestRatePercentage,
+        interest: Math.round(interestPerTerm * 100) / 100,
+        totalInterest: Math.round(totalInterest * 100) / 100,
+        monthlyPayment: Math.round(monthlyPrincipal * 100) / 100,
+        totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100,
+        totalTermPayment: Math.round(totalTermPayment * 100) / 100,
+        releaseAmount: Math.round(releaseAmount * 100) / 100,
+        processingFee: processingFee,
+        dateApproved: approvalDate,
+        timeApproved: approvalTime,
+        timestamp: now.getTime(),
+        dueDate: formattedDueDate,
+        status: 'approved',
+        paymentsMade: 0,
+        amountPaid: 0,
+        remainingBalance: Math.round(totalTermPayment * 100) / 100,
+        borrowedFromSavings: 0
       };
-      console.log('Throwing MEMBER_BALANCE_SAVINGS_NEEDED error with data:', savingsError.savingsData);
-      throw savingsError;
-    }
 
-    // Continue with approval process
-    const originalTransactionId = transactionId;
-    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
-    const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
-    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
-    const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
-    const fundsRef = database.ref('Settings/Funds');
-    const loanData = loanSnap.val();
-
-    // Fetch per-loan-type interest rate and processing fee
-    const loanTypeKey = String(loanData.loanType || '').trim();
-    const termKeyRaw = String(loanData.term ?? '').trim();
-    const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
-    const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
-    const processingFeeRef = database.ref('Settings/ProcessingFee');
-
-    const [fundsSnap, feeSnap] = await Promise.all([
-      fundsRef.once('value'),
-      processingFeeRef.once('value'),
-    ]);
-
-    // Resolve interest rate using canonical structure only: Settings/LoanTypes/{type}/{term}
-    let interestRateRaw = null;
-    for (const tKey of termKeys) {
-      const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
-      const val = snap.val();
-      if (val !== null && val !== undefined && val !== '') {
-        interestRateRaw = val;
-        break;
-      }
-    }
-    if (interestRateRaw === null) {
-      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
-    }
-
-    const interestRatePercentage = parseFloat(interestRateRaw);
-    const interestRateDecimal = interestRatePercentage / 100; // Convert to decimal
-    const amount = parseFloat(loanData.loanAmount);
-    const termMonths = parseInt(loanData.term);
-    const currentFunds = parseFloat(fundsSnap.val());
-    const processingFee = parseFloat(feeSnap.val());
-
-    // Check if funds are sufficient, if not check savings
-    if (amount > currentFunds) {
-      // Get current savings to check if combined funds + savings can cover the loan
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsSnap = await savingsRef.once('value');
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const totalAvailable = currentFunds + currentSavings;
+      await approvedRef.set(approvedData);
+      await transactionRef.set(approvedData);
+      await currentLoanRef.set(approvedData);
+      await memberLoanRef.set(approvedData);
       
-      if (amount > totalAvailable) {
-        throw new Error(`Insufficient funds to approve this loan. Available: ${formatCurrency(currentFunds)} (Funds) + ${formatCurrency(currentSavings)} (Savings) = ${formatCurrency(totalAvailable)}. Required: ${formatCurrency(amount)}`);
+      if (savingsToUse > 0) {
+        const fundsToUse = Math.min(currentFunds, amount);
+        const newFundsAmount = currentFunds - fundsToUse;
+        await fundsRef.set(newFundsAmount);
+        
+        const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        await fundsHistoryRef.set(newFundsAmount);
+        
+        const dateKey = now.toISOString().split('T')[0];
+        const savingsRef = database.ref('Settings/Savings');
+        const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+
+        const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
+          savingsRef.once('value'),
+          savingsHistoryRef.child(dateKey).once('value')
+        ]);
+
+        const currentSavings = parseFloat(savingsSnap.val()) || 0;
+        const newSavingsAmount = Math.ceil((currentSavings - savingsToUse + processingFee) * 100) / 100;
+        await savingsRef.set(newSavingsAmount);
+        
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const netSavingsChange = processingFee - savingsToUse;
+        const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
+        await savingsHistoryRef.child(dateKey).set(newDaySavings);
+      } else {
+        const newFundsAmount = currentFunds - amount;
+        await fundsRef.set(newFundsAmount);
+        
+        const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        await fundsHistoryRef.set(newFundsAmount);
+        
+        const dateKey = now.toISOString().split('T')[0];
+        const savingsRef = database.ref('Settings/Savings');
+        const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+
+        const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
+          savingsRef.once('value'),
+          savingsHistoryRef.child(dateKey).once('value')
+        ]);
+
+        const currentSavings = parseFloat(savingsSnap.val()) || 0;
+        const newSavingsAmount = Math.ceil((currentSavings + processingFee) * 100) / 100;
+        await savingsRef.set(newSavingsAmount);
+        
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
+        await savingsHistoryRef.child(dateKey).set(newDaySavings);
       }
       
-      // If we reach here, we have enough combined funds + savings
-      // But we need user confirmation to use savings
-      const shortfallAmount = amount - currentFunds;
-      const remainingSavings = currentSavings - shortfallAmount;
+      const memberRef = database.ref(`Members/${id}/balance`);
+      const currentBalanceSnap = await memberRef.once('value');
+      const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
+      const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - amount) * 100) / 100);
+      await memberRef.set(updatedMemberBalance);
+      console.log('Member balance deducted for loan approval');
+
+      await loanRef.remove();
+
+    } catch (err) {
+      console.error('Approval DB error:', err);
+      if (err.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && err.savingsData) {
+        throw err;
+      }
+      if (err.message === 'SAVINGS_CONFIRMATION_NEEDED' && err.savingsData) {
+        throw err;
+      }
+      throw new Error(err.message || 'Failed to approve loan');
+    }
+  };
+
+  const processDatabaseApproveWithSavings = async (loan, savingsToUse) => {
+    try {
+      const { id, transactionId, term, loanAmount } = loan;
+
+      const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
+      const memberBalanceRef = database.ref(`Members/${id}/balance`);
       
-      // Throw a special error that will be caught and handled differently
-      const savingsError = new Error('SAVINGS_CONFIRMATION_NEEDED');
-      savingsError.savingsData = {
-        needed: shortfallAmount,
-        available: currentSavings,
-        remaining: remainingSavings,
-        loanData: loan
+      const [loanSnap, memberBalanceSnap] = await Promise.all([
+        loanRef.once('value'),
+        memberBalanceRef.once('value')
+      ]);
+
+      if (!loanSnap.exists()) {
+        throw new Error('Loan data not found.');
+      }
+
+      const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
+      const requestedAmount = parseFloat(loanAmount);
+
+      if (requestedAmount > memberBalance) {
+        throw new Error(`Loan amount exceeds member's balance. Maximum allowed: ${formatCurrency(memberBalance)}`);
+      }
+
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
+      const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
+      const fundsRef = database.ref('Settings/Funds');
+      const loanData = loanSnap.val();
+
+      const loanTypeKey = String(loanData.loanType || '').trim();
+      const termKeyRaw = String(loanData.term ?? '').trim();
+      const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
+      const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
+      const processingFeeRef = database.ref('Settings/ProcessingFee');
+
+      const [fundsSnap, feeSnap] = await Promise.all([
+        fundsRef.once('value'),
+        processingFeeRef.once('value'),
+      ]);
+
+      let interestRateRaw = null;
+      for (const tKey of termKeys) {
+        const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
+        const val = snap.val();
+        if (val !== null && val !== undefined && val !== '') {
+          interestRateRaw = val;
+          break;
+        }
+      }
+      if (interestRateRaw === null) {
+        throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
+      }
+
+      const interestRatePercentage = parseFloat(interestRateRaw);
+      const interestRateDecimal = interestRatePercentage / 100;
+      const amount = parseFloat(loanData.loanAmount);
+      const termMonths = parseInt(loanData.term);
+      const currentFunds = parseFloat(fundsSnap.val());
+      const processingFee = parseFloat(feeSnap.val());
+
+      const interestPerTerm = amount * interestRateDecimal;
+      const totalInterest = interestPerTerm * termMonths;
+      const totalTermPayment = amount + totalInterest;
+      const totalMonthlyPayment = totalTermPayment / termMonths;
+      const monthlyPrincipal = amount / termMonths;
+      const releaseAmount = amount - processingFee;
+
+      const now = new Date();
+      const dueDate = new Date(now);
+      dueDate.setDate(now.getDate() + 30);
+
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+      const formattedDueDate = formatDate(dueDate);
+
+      const approvedData = {
+        ...loanData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
+        interestRate: interestRatePercentage,
+        interest: Math.round(interestPerTerm * 100) / 100,
+        totalInterest: Math.round(totalInterest * 100) / 100,
+        monthlyPayment: Math.round(monthlyPrincipal * 100) / 100,
+        totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100,
+        totalTermPayment: Math.round(totalTermPayment * 100) / 100,
+        releaseAmount: Math.round(releaseAmount * 100) / 100,
+        processingFee: processingFee,
+        dateApproved: approvalDate,
+        timeApproved: approvalTime,
+        timestamp: now.getTime(),
+        dueDate: formattedDueDate,
+        status: 'approved',
+        paymentsMade: 0,
+        amountPaid: 0,
+        remainingBalance: Math.round(totalTermPayment * 100) / 100,
+        borrowedFromSavings: Math.round(savingsToUse * 100) / 100
       };
-      throw savingsError;
-    }
 
-    // NEW CALCULATION METHOD:
-    // 1. Calculate interest per term: loanAmount * interestRateDecimal
-    const interestPerTerm = amount * interestRateDecimal;
-    
-    // 2. Calculate total interest: interestPerTerm * termMonths
-    const totalInterest = interestPerTerm * termMonths;
-    
-    // 3. Calculate total term payment: loanAmount + totalInterest
-    const totalTermPayment = amount + totalInterest;
-    
-    // 4. Calculate monthly payment: totalTermPayment / termMonths
-    const totalMonthlyPayment = totalTermPayment / termMonths;
-    
-    // 5. Monthly principal remains: amount / termMonths
-    const monthlyPrincipal = amount / termMonths;
-
-    // Release amount after deducting processing fee
-    const releaseAmount = amount - processingFee;
-
-    const now = new Date();
-    const dueDate = new Date(now);
-    dueDate.setDate(now.getDate() + 30);
-
-    const approvalDate = formatDate(now);
-    const approvalTime = formatTime(now);
-    const formattedDueDate = formatDate(dueDate);
-
-    const approvedData = {
-      ...loanData,
-      transactionId: newTransactionId,
-      originalTransactionId: originalTransactionId,
-      interestRate: interestRatePercentage, // Store as percentage (e.g., 1 for 1%)
-      interest: Math.round(interestPerTerm * 100) / 100, // Interest for each term period
-      totalInterest: Math.round(totalInterest * 100) / 100, // Total interest over entire loan
-      monthlyPayment: Math.round(monthlyPrincipal * 100) / 100, // Principal portion of monthly payment
-      totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100, // Total monthly payment (principal + interest)
-      totalTermPayment: Math.round(totalTermPayment * 100) / 100, // Total amount to be repaid
-      releaseAmount: Math.round(releaseAmount * 100) / 100,
-      processingFee: processingFee,
-      dateApproved: approvalDate,
-      timeApproved: approvalTime,
-      timestamp: now.getTime(),
-      dueDate: formattedDueDate,
-      status: 'approved',
-      paymentsMade: 0,
-      amountPaid: 0, // Track total amount paid
-      remainingBalance: Math.round(totalTermPayment * 100) / 100, // Start with full amount
-      borrowedFromSavings: 0 // No savings borrowed for regular approvals
-    };
-
-    // Execute all database operations in sequence
-    await approvedRef.set(approvedData);
-    await transactionRef.set(approvedData);
-    await currentLoanRef.set(approvedData);
-    await memberLoanRef.set(approvedData);
-    
-    // Update funds and savings based on availability
-    if (savingsToUse > 0) {
-      // Use funds first, then savings for shortfall
-      const fundsToUse = Math.min(currentFunds, amount);
+      await approvedRef.set(approvedData);
+      await transactionRef.set(approvedData);
+      await currentLoanRef.set(approvedData);
+      await memberLoanRef.set(approvedData);
+      
+      const fundsToUse = Math.min(currentFunds, amount - savingsToUse);
       const newFundsAmount = currentFunds - fundsToUse;
       await fundsRef.set(newFundsAmount);
       
-      // Log to FundsHistory for dashboard chart
       const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
       const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
       await fundsHistoryRef.set(newFundsAmount);
       
-      // Update Savings - deduct the shortfall amount and add processing fee
-      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const dateKey = now.toISOString().split('T')[0];
       const savingsRef = database.ref('Settings/Savings');
       const savingsHistoryRef = database.ref('Settings/SavingsHistory');
 
@@ -982,27 +1336,153 @@ const processDatabaseApprove = async (loan) => {
       ]);
 
       const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      // Deduct the savings used for loan, then add processing fee
       const newSavingsAmount = Math.ceil((currentSavings - savingsToUse + processingFee) * 100) / 100;
       await savingsRef.set(newSavingsAmount);
-      
-      // Update daily savings history (net change: -savingsToUse + processingFee)
+
       const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
       const netSavingsChange = processingFee - savingsToUse;
       const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
-      await savingsHistoryRef.child(dateKey).set(newDaySavings);
-    } else {
-      // Normal case: sufficient funds available, no savings needed
-      const newFundsAmount = currentFunds - amount;
-      await fundsRef.set(newFundsAmount);
+      const savingsHistoryUpdate = {};
+      savingsHistoryUpdate[dateKey] = newDaySavings;
+      await savingsHistoryRef.update(savingsHistoryUpdate);
       
-      // Log to FundsHistory for dashboard chart
-      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-      await fundsHistoryRef.set(newFundsAmount);
+      const memberRef = database.ref(`Members/${id}/balance`);
+      const currentBalanceSnap = await memberRef.once('value');
+      const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
+      const memberContribution = amount - savingsToUse;
+      const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - memberContribution) * 100) / 100);
+      await memberRef.set(updatedMemberBalance);
+      console.log(`Member balance deducted: ${formatCurrency(memberContribution)}, savings used: ${formatCurrency(savingsToUse)}`);
+
+      await loanRef.remove();
+
+    } catch (err) {
+      console.error('Approval with savings DB error:', err);
+      if (err.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && err.savingsData) {
+        throw err;
+      }
+      if (err.message === 'SAVINGS_CONFIRMATION_NEEDED' && err.savingsData) {
+        throw err;
+      }
+      throw new Error(err.message || 'Failed to approve loan with savings');
+    }
+  };
+
+  const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallAmount) => {
+    try {
+      const { id, transactionId, term, loanAmount } = loan;
+
+      const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
       
-      // Update Savings and SavingsHistory (only add processing fee)
-      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const loanSnap = await loanRef.once('value');
+      if (!loanSnap.exists()) {
+        throw new Error('Loan data not found.');
+      }
+
+      const originalTransactionId = transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
+      const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
+      const fundsRef = database.ref('Settings/Funds');
+      const loanData = loanSnap.val();
+
+      const loanTypeKey = String(loanData.loanType || '').trim();
+      const termKeyRaw = String(loanData.term ?? '').trim();
+      const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
+      const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
+      const processingFeeRef = database.ref('Settings/ProcessingFee');
+
+      const [fundsSnap, feeSnap] = await Promise.all([
+        fundsRef.once('value'),
+        processingFeeRef.once('value'),
+      ]);
+
+      let interestRateRaw = null;
+      for (const tKey of termKeys) {
+        const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
+        const val = snap.val();
+        if (val !== null && val !== undefined && val !== '') {
+          interestRateRaw = val;
+          break;
+        }
+      }
+      if (interestRateRaw === null) {
+        throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
+      }
+
+      const interestRatePercentage = parseFloat(interestRateRaw);
+      const interestRateDecimal = interestRatePercentage / 100;
+      const amount = parseFloat(loanData.loanAmount);
+      const termMonths = parseInt(loanData.term);
+      const currentFunds = parseFloat(fundsSnap.val());
+      const processingFee = parseFloat(feeSnap.val());
+
+      let fundsShortfall = 0;
+      if (amount > currentFunds) {
+        fundsShortfall = amount - currentFunds;
+        
+        const savingsRef = database.ref('Settings/Savings');
+        const savingsSnap = await savingsRef.once('value');
+        const currentSavings = parseFloat(savingsSnap.val()) || 0;
+        
+        const totalSavingsNeeded = shortfallAmount + fundsShortfall;
+        
+        if (totalSavingsNeeded > currentSavings) {
+          throw new Error(`Insufficient savings to approve this loan. Member balance shortfall: ${formatCurrency(shortfallAmount)}, Funds shortfall: ${formatCurrency(fundsShortfall)}, Total needed: ${formatCurrency(totalSavingsNeeded)}, Available savings: ${formatCurrency(currentSavings)}`);
+        }
+        
+        console.log(`Using ${formatCurrency(totalSavingsNeeded)} from savings (${formatCurrency(shortfallAmount)} for member balance + ${formatCurrency(fundsShortfall)} for funds)`);
+      } else {
+        console.log(`Using ${formatCurrency(shortfallAmount)} from savings for member balance shortfall only`);
+      }
+
+      const interestPerTerm = amount * interestRateDecimal;
+      const totalInterest = interestPerTerm * termMonths;
+      const totalTermPayment = amount + totalInterest;
+      const totalMonthlyPayment = totalTermPayment / termMonths;
+      const monthlyPrincipal = amount / termMonths;
+      const releaseAmount = amount - processingFee;
+
+      const now = new Date();
+      const dueDate = new Date(now);
+      dueDate.setDate(now.getDate() + 30);
+
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+      const formattedDueDate = formatDate(dueDate);
+
+      const approvedData = {
+        ...loanData,
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
+        interestRate: interestRatePercentage,
+        interest: Math.round(interestPerTerm * 100) / 100,
+        totalInterest: Math.round(totalInterest * 100) / 100,
+        monthlyPayment: Math.round(monthlyPrincipal * 100) / 100,
+        totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100,
+        totalTermPayment: Math.round(totalTermPayment * 100) / 100,
+        releaseAmount: Math.round(releaseAmount * 100) / 100,
+        processingFee: processingFee,
+        dateApproved: approvalDate,
+        timeApproved: approvalTime,
+        timestamp: now.getTime(),
+        dueDate: formattedDueDate,
+        status: 'approved',
+        paymentsMade: 0,
+        amountPaid: 0,
+        remainingBalance: Math.round(totalTermPayment * 100) / 100,
+        borrowedFromSavings: Math.round(shortfallAmount * 100) / 100
+      };
+
+      await approvedRef.set(approvedData);
+      await transactionRef.set(approvedData);
+      await currentLoanRef.set(approvedData);
+      await memberLoanRef.set(approvedData);
+      
+      const dateKey = now.toISOString().split('T')[0];
       const savingsRef = database.ref('Settings/Savings');
       const savingsHistoryRef = database.ref('Settings/SavingsHistory');
 
@@ -1012,440 +1492,64 @@ const processDatabaseApprove = async (loan) => {
       ]);
 
       const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const newSavingsAmount = Math.ceil((currentSavings + processingFee) * 100) / 100;
-      await savingsRef.set(newSavingsAmount);
       
-      // Increment daily savings history by processing fee
-      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-      const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
-      await savingsHistoryRef.child(dateKey).set(newDaySavings);
-    }
-    
-    // Update member balance: deduct full loan amount as requested
-    const memberRef = database.ref(`Members/${id}/balance`);
-    const currentBalanceSnap = await memberRef.once('value');
-    const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
-    const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - amount) * 100) / 100);
-    await memberRef.set(updatedMemberBalance);
-    console.log('Member balance deducted for loan approval');
+      if (fundsShortfall > 0) {
+        const fundsToUse = currentFunds;
+        const newFundsAmount = 0;
+        await fundsRef.set(newFundsAmount);
+        
+        const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        await fundsHistoryRef.set(newFundsAmount);
+        
+        const totalSavingsToUse = shortfallAmount + fundsShortfall;
+        const newSavingsAmount = Math.ceil((currentSavings - totalSavingsToUse + processingFee) * 100) / 100;
+        await savingsRef.set(newSavingsAmount);
 
-    // Remove from pending loans AFTER all other operations succeed
-    await loanRef.remove();
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const netSavingsChange = processingFee - totalSavingsToUse;
+        const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
+        await savingsHistoryRef.child(dateKey).set(newDaySavings);
+      } else {
+        const newFundsAmount = currentFunds - (amount - shortfallAmount);
+        await fundsRef.set(newFundsAmount);
+        
+        const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+        await fundsHistoryRef.set(newFundsAmount);
+        
+        const newSavingsAmount = Math.ceil((currentSavings - shortfallAmount + processingFee) * 100) / 100;
+        await savingsRef.set(newSavingsAmount);
 
-
-  } catch (err) {
-    console.error('Approval DB error:', err);
-    // If this is a special error with savingsData, preserve it
-    if (err.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && err.savingsData) {
-      throw err; // Re-throw the original error to preserve savingsData
-    }
-    if (err.message === 'SAVINGS_CONFIRMATION_NEEDED' && err.savingsData) {
-      throw err; // Re-throw the original error to preserve savingsData
-    }
-    throw new Error(err.message || 'Failed to approve loan');
-  }
-};
-
-// New function to handle approval with savings deduction
-const processDatabaseApproveWithSavings = async (loan, savingsToUse) => {
-  try {
-    const { id, transactionId, term, loanAmount } = loan;
-
-    const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
-    const memberBalanceRef = database.ref(`Members/${id}/balance`);
-    
-    // Check strictly against member's balance (no percentage rule)
-    const [loanSnap, memberBalanceSnap] = await Promise.all([
-      loanRef.once('value'),
-      memberBalanceRef.once('value')
-    ]);
-
-    if (!loanSnap.exists()) {
-      throw new Error('Loan data not found.');
-    }
-
-    const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
-    const requestedAmount = parseFloat(loanAmount);
-
-    if (requestedAmount > memberBalance) {
-      throw new Error(`Loan amount exceeds member's balance. Maximum allowed: ${formatCurrency(memberBalance)}`);
-    }
-
-    // Continue with approval process
-    const originalTransactionId = transactionId;
-    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
-    const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
-    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
-    const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
-    const fundsRef = database.ref('Settings/Funds');
-    const loanData = loanSnap.val();
-
-    // Fetch per-loan-type interest rate and processing fee
-    const loanTypeKey = String(loanData.loanType || '').trim();
-    const termKeyRaw = String(loanData.term ?? '').trim();
-    const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
-    const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
-    const processingFeeRef = database.ref('Settings/ProcessingFee');
-
-    const [fundsSnap, feeSnap] = await Promise.all([
-      fundsRef.once('value'),
-      processingFeeRef.once('value'),
-    ]);
-
-    // Resolve interest rate using canonical structure only: Settings/LoanTypes/{type}/{term}
-    let interestRateRaw = null;
-    for (const tKey of termKeys) {
-      const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
-      const val = snap.val();
-      if (val !== null && val !== undefined && val !== '') {
-        interestRateRaw = val;
-        break;
-      }
-    }
-    if (interestRateRaw === null) {
-      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
-    }
-
-    const interestRatePercentage = parseFloat(interestRateRaw);
-    const interestRateDecimal = interestRatePercentage / 100; // Convert to decimal
-    const amount = parseFloat(loanData.loanAmount);
-    const termMonths = parseInt(loanData.term);
-    const currentFunds = parseFloat(fundsSnap.val());
-    const processingFee = parseFloat(feeSnap.val());
-
-    // NEW CALCULATION METHOD:
-    // 1. Calculate interest per term: loanAmount * interestRateDecimal
-    const interestPerTerm = amount * interestRateDecimal;
-    
-    // 2. Calculate total interest: interestPerTerm * termMonths
-    const totalInterest = interestPerTerm * termMonths;
-    
-    // 3. Calculate total term payment: loanAmount + totalInterest
-    const totalTermPayment = amount + totalInterest;
-    
-    // 4. Calculate monthly payment: totalTermPayment / termMonths
-    const totalMonthlyPayment = totalTermPayment / termMonths;
-    
-    // 5. Monthly principal remains: amount / termMonths
-    const monthlyPrincipal = amount / termMonths;
-
-    // Release amount after deducting processing fee
-    const releaseAmount = amount - processingFee;
-
-    const now = new Date();
-    const dueDate = new Date(now);
-    dueDate.setDate(now.getDate() + 30);
-
-    const approvalDate = formatDate(now);
-    const approvalTime = formatTime(now);
-    const formattedDueDate = formatDate(dueDate);
-
-    const approvedData = {
-      ...loanData,
-      transactionId: newTransactionId,
-      originalTransactionId: originalTransactionId,
-      interestRate: interestRatePercentage, // Store as percentage (e.g., 1 for 1%)
-      interest: Math.round(interestPerTerm * 100) / 100, // Interest for each term period
-      totalInterest: Math.round(totalInterest * 100) / 100, // Total interest over entire loan
-      monthlyPayment: Math.round(monthlyPrincipal * 100) / 100, // Principal portion of monthly payment
-      totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100, // Total monthly payment (principal + interest)
-      totalTermPayment: Math.round(totalTermPayment * 100) / 100, // Total amount to be repaid
-      releaseAmount: Math.round(releaseAmount * 100) / 100,
-      processingFee: processingFee,
-      dateApproved: approvalDate,
-      timeApproved: approvalTime,
-      timestamp: now.getTime(),
-      dueDate: formattedDueDate,
-      status: 'approved',
-      paymentsMade: 0,
-      amountPaid: 0, // Track total amount paid
-      remainingBalance: Math.round(totalTermPayment * 100) / 100, // Start with full amount
-      borrowedFromSavings: Math.round(savingsToUse * 100) / 100 // Track amount borrowed from savings
-    };
-
-    // Execute all database operations in sequence
-    await approvedRef.set(approvedData);
-    await transactionRef.set(approvedData);
-    await currentLoanRef.set(approvedData);
-    await memberLoanRef.set(approvedData);
-    
-    // Update funds and savings - use funds first, then savings for shortfall
-    const fundsToUse = Math.min(currentFunds, amount - savingsToUse);
-    const newFundsAmount = currentFunds - fundsToUse;
-    await fundsRef.set(newFundsAmount);
-    
-    // Log to FundsHistory for dashboard chart
-    const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-    await fundsHistoryRef.set(newFundsAmount);
-    
-    // Update Savings - deduct the shortfall amount and add processing fee
-    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const savingsRef = database.ref('Settings/Savings');
-    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-
-    const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
-      savingsRef.once('value'),
-      savingsHistoryRef.child(dateKey).once('value')
-    ]);
-
-    const currentSavings = parseFloat(savingsSnap.val()) || 0;
-    // Deduct the savings used for loan, then add processing fee
-    const newSavingsAmount = Math.ceil((currentSavings - savingsToUse + processingFee) * 100) / 100;
-    await savingsRef.set(newSavingsAmount);
-
-    // Update daily savings history (net change: -savingsToUse + processingFee)
-    const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-    const netSavingsChange = processingFee - savingsToUse;
-    const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
-    const savingsHistoryUpdate = {};
-    savingsHistoryUpdate[dateKey] = newDaySavings;
-    await savingsHistoryRef.update(savingsHistoryUpdate);
-    
-    // Update member balance: deduct only the amount not covered by savings
-    const memberRef = database.ref(`Members/${id}/balance`);
-    const currentBalanceSnap = await memberRef.once('value');
-    const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
-    const memberContribution = amount - savingsToUse;
-    const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - memberContribution) * 100) / 100);
-    await memberRef.set(updatedMemberBalance);
-    console.log(`Member balance deducted: ${formatCurrency(memberContribution)}, savings used: ${formatCurrency(savingsToUse)}`);
-
-    // Remove from pending loans AFTER all other operations succeed
-    await loanRef.remove();
-
-  } catch (err) {
-    console.error('Approval with savings DB error:', err);
-    // If this is a special error with savingsData, preserve it
-    if (err.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && err.savingsData) {
-      throw err; // Re-throw the original error to preserve savingsData
-    }
-    if (err.message === 'SAVINGS_CONFIRMATION_NEEDED' && err.savingsData) {
-      throw err; // Re-throw the original error to preserve savingsData
-    }
-    throw new Error(err.message || 'Failed to approve loan with savings');
-  }
-};
-
-const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallAmount) => {
-  try {
-    const { id, transactionId, term, loanAmount } = loan;
-
-    const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
-    
-    // Get loan data
-    const loanSnap = await loanRef.once('value');
-    if (!loanSnap.exists()) {
-      throw new Error('Loan data not found.');
-    }
-
-    // Continue with approval process (skip member balance check since it's already confirmed)
-    const originalTransactionId = transactionId;
-    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
-    const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
-    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
-    const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
-    const fundsRef = database.ref('Settings/Funds');
-    const loanData = loanSnap.val();
-
-    // Fetch per-loan-type interest rate and processing fee
-    const loanTypeKey = String(loanData.loanType || '').trim();
-    const termKeyRaw = String(loanData.term ?? '').trim();
-    const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
-    const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
-    const processingFeeRef = database.ref('Settings/ProcessingFee');
-
-    const [fundsSnap, feeSnap] = await Promise.all([
-      fundsRef.once('value'),
-      processingFeeRef.once('value'),
-    ]);
-
-    // Resolve interest rate using canonical structure only: Settings/LoanTypes/{type}/{term}
-    let interestRateRaw = null;
-    for (const tKey of termKeys) {
-      const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
-      const val = snap.val();
-      if (val !== null && val !== undefined && val !== '') {
-        interestRateRaw = val;
-        break;
-      }
-    }
-    if (interestRateRaw === null) {
-      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
-    }
-
-    const interestRatePercentage = parseFloat(interestRateRaw);
-    const interestRateDecimal = interestRatePercentage / 100; // Convert to decimal
-    const amount = parseFloat(loanData.loanAmount);
-    const termMonths = parseInt(loanData.term);
-    const currentFunds = parseFloat(fundsSnap.val());
-    const processingFee = parseFloat(feeSnap.val());
-
-    // Check if funds are sufficient for the loan amount
-    let fundsShortfall = 0;
-    if (amount > currentFunds) {
-      // Calculate how much additional savings we need for funds shortfall
-      fundsShortfall = amount - currentFunds;
-      
-      // Get current savings to check if combined funds + savings can cover the loan
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsSnap = await savingsRef.once('value');
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      
-      // Total savings needed = member balance shortfall + funds shortfall
-      const totalSavingsNeeded = shortfallAmount + fundsShortfall;
-      
-      if (totalSavingsNeeded > currentSavings) {
-        throw new Error(`Insufficient savings to approve this loan. Member balance shortfall: ${formatCurrency(shortfallAmount)}, Funds shortfall: ${formatCurrency(fundsShortfall)}, Total needed: ${formatCurrency(totalSavingsNeeded)}, Available savings: ${formatCurrency(currentSavings)}`);
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const netSavingsChange = processingFee - shortfallAmount;
+        const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
+        await savingsHistoryRef.child(dateKey).set(newDaySavings);
       }
       
-      console.log(`Using ${formatCurrency(totalSavingsNeeded)} from savings (${formatCurrency(shortfallAmount)} for member balance + ${formatCurrency(fundsShortfall)} for funds)`);
-    } else {
-      console.log(`Using ${formatCurrency(shortfallAmount)} from savings for member balance shortfall only`);
-    }
-
-    // NEW CALCULATION METHOD (matching main processDatabaseApprove):
-    // 1. Calculate interest per term: loanAmount * interestRateDecimal
-    const interestPerTerm = amount * interestRateDecimal;
-    
-    // 2. Calculate total interest: interestPerTerm * termMonths
-    const totalInterest = interestPerTerm * termMonths;
-    
-    // 3. Calculate total term payment: loanAmount + totalInterest
-    const totalTermPayment = amount + totalInterest;
-    
-    // 4. Calculate monthly payment: totalTermPayment / termMonths
-    const totalMonthlyPayment = totalTermPayment / termMonths;
-    
-    // 5. Monthly principal remains: amount / termMonths
-    const monthlyPrincipal = amount / termMonths;
-
-    // Release amount after deducting processing fee
-    const releaseAmount = amount - processingFee;
-
-    const now = new Date();
-    const dueDate = new Date(now);
-    dueDate.setDate(now.getDate() + 30);
-
-    const approvalDate = formatDate(now);
-    const approvalTime = formatTime(now);
-    const formattedDueDate = formatDate(dueDate);
-
-    const approvedData = {
-      ...loanData,
-      transactionId: newTransactionId,
-      originalTransactionId: originalTransactionId,
-      interestRate: interestRatePercentage, // Store as percentage (e.g., 1 for 1%)
-      interest: Math.round(interestPerTerm * 100) / 100, // Interest for each term period
-      totalInterest: Math.round(totalInterest * 100) / 100, // Total interest over entire loan
-      monthlyPayment: Math.round(monthlyPrincipal * 100) / 100, // Principal portion of monthly payment
-      totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100, // Total monthly payment (principal + interest)
-      totalTermPayment: Math.round(totalTermPayment * 100) / 100, // Total amount to be repaid
-      releaseAmount: Math.round(releaseAmount * 100) / 100,
-      processingFee: processingFee,
-      dateApproved: approvalDate,
-      timeApproved: approvalTime,
-      timestamp: now.getTime(),
-      dueDate: formattedDueDate,
-      status: 'approved',
-      paymentsMade: 0,
-      amountPaid: 0, // Track total amount paid
-      remainingBalance: Math.round(totalTermPayment * 100) / 100, // Start with full amount
-      borrowedFromSavings: Math.round(shortfallAmount * 100) / 100 // Track amount borrowed from savings
-    };
-
-    // Save to all required locations
-    await approvedRef.set(approvedData);
-    await transactionRef.set(approvedData);
-    await currentLoanRef.set(approvedData);
-    await memberLoanRef.set(approvedData);
-    
-    // Update funds and savings based on availability
-    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-    const savingsRef = database.ref('Settings/Savings');
-    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-
-    const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
-      savingsRef.once('value'),
-      savingsHistoryRef.child(dateKey).once('value')
-    ]);
-
-    const currentSavings = parseFloat(savingsSnap.val()) || 0;
-    
-    if (fundsShortfall > 0) {
-      // Case: Both funds and member balance shortfall
-      // Use all available funds first
-      const fundsToUse = currentFunds;
-      const newFundsAmount = 0; // Use all funds
-      await fundsRef.set(newFundsAmount);
+      const memberRef = database.ref(`Members/${id}/balance`);
+      const currentBalanceSnap = await memberRef.once('value');
       
-      // Log to FundsHistory for dashboard chart
-      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-      await fundsHistoryRef.set(newFundsAmount);
+      const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
       
-      // Deduct total savings needed (member balance shortfall + funds shortfall), then add processing fee
-      const totalSavingsToUse = shortfallAmount + fundsShortfall;
-      const newSavingsAmount = Math.ceil((currentSavings - totalSavingsToUse + processingFee) * 100) / 100;
-      await savingsRef.set(newSavingsAmount);
+      const memberContribution = Math.min(amount, currentMemberBalance);
+      const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - memberContribution) * 100) / 100);
+      await memberRef.set(updatedMemberBalance);
+      console.log(`Member balance deducted: ${formatCurrency(memberContribution)}, shortfall covered by savings: ${formatCurrency(shortfallAmount)}`);
 
-      // Update daily savings history (net change: -totalSavingsToUse + processingFee)
-      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-      const netSavingsChange = processingFee - totalSavingsToUse;
-      const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
-      await savingsHistoryRef.child(dateKey).set(newDaySavings);
-    } else {
-      // Case: Only member balance shortfall, funds are sufficient
-      const newFundsAmount = currentFunds - (amount - shortfallAmount);
-      await fundsRef.set(newFundsAmount);
-      
-      // Log to FundsHistory for dashboard chart
-      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-      await fundsHistoryRef.set(newFundsAmount);
-      
-      // Deduct only member balance shortfall from savings, then add processing fee
-      const newSavingsAmount = Math.ceil((currentSavings - shortfallAmount + processingFee) * 100) / 100;
-      await savingsRef.set(newSavingsAmount);
+      await loanRef.remove();
 
-      // Update daily savings history (net change: -shortfallAmount + processingFee)
-      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-      const netSavingsChange = processingFee - shortfallAmount;
-      const newDaySavings = Math.ceil((currentDaySavings + netSavingsChange) * 100) / 100;
-      await savingsHistoryRef.child(dateKey).set(newDaySavings);
+    } catch (err) {
+      console.error('Approval with member balance shortfall DB error:', err);
+      if (err.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && err.savingsData) {
+        throw err;
+      }
+      if (err.message === 'SAVINGS_CONFIRMATION_NEEDED' && err.savingsData) {
+        throw err;
+      }
+      throw new Error(err.message || 'Failed to approve loan with member balance shortfall');
     }
-    
-    // Update member balance: deduct only what the member has, shortfall is covered by savings
-    const memberRef = database.ref(`Members/${id}/balance`);
-    const currentBalanceSnap = await memberRef.once('value');
-    
-    const currentMemberBalance = parseFloat(currentBalanceSnap.val()) || 0;
-    
-    // Deduct only the member's available balance, shortfall is covered by savings
-    const memberContribution = Math.min(amount, currentMemberBalance);
-    const updatedMemberBalance = Math.max(0, Math.ceil((currentMemberBalance - memberContribution) * 100) / 100);
-    await memberRef.set(updatedMemberBalance);
-    console.log(`Member balance deducted: ${formatCurrency(memberContribution)}, shortfall covered by savings: ${formatCurrency(shortfallAmount)}`);
-
-    // Remove from pending loans AFTER all other operations succeed
-    await loanRef.remove();
-
-  } catch (err) {
-    console.error('Approval with member balance shortfall DB error:', err);
-    // If this is a special error with savingsData, preserve it
-    if (err.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && err.savingsData) {
-      throw err; // Re-throw the original error to preserve savingsData
-    }
-    if (err.message === 'SAVINGS_CONFIRMATION_NEEDED' && err.savingsData) {
-      throw err; // Re-throw the original error to preserve savingsData
-    }
-    throw new Error(err.message || 'Failed to approve loan with member balance shortfall');
-  }
-};
+  };
 
   const processDatabaseReject = async (loan, rejectionReason) => {
     try {
@@ -1454,7 +1558,6 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
       const rejectionTime = formatTime(now);
       const status = 'rejected';
 
-      // Generate a new transaction ID for rejected/transactions records
       const originalTransactionId = loan.transactionId;
       const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -1462,7 +1565,6 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
       const rejectedRef = database.ref(`Loans/RejectedLoans/${loan.id}/${newTransactionId}`);
       const transactionRef = database.ref(`Transactions/Loans/${loan.id}/${newTransactionId}`);
 
-      // First create a copy of the loan data with rejection info
       const rejectedLoan = { 
         ...loan, 
         transactionId: newTransactionId,
@@ -1474,11 +1576,9 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
         rejectionReason: rejectionReason || 'Rejected by admin'
       };
 
-      // Execute all database operations in sequence
       await rejectedRef.set(rejectedLoan);
       await transactionRef.set(rejectedLoan);
 
-      // Remove from pending loans AFTER saving to rejected
       await loanRef.remove();
 
     } catch (err) {
@@ -1491,7 +1591,6 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
     try {
       const now = new Date();
 
-      // Robust parsing helpers
       const toNumber = (v) => {
         if (v === null || v === undefined) return NaN;
         const s = String(v).replace(/,/g, '').trim();
@@ -1505,7 +1604,6 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
         return Number.isFinite(n) ? n : NaN;
       };
 
-      // Resolve interest rate like processDatabaseApprove: Settings/LoanTypes/{type}/{term}
       const loanTypeKey = String(loan.loanType || '').trim();
       const termKeyRaw = String(loan.term ?? '').trim();
       const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
@@ -1520,7 +1618,6 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
           break;
         }
       }
-      // Backward-compat fallback to old path if needed
       if (interestRateRaw === null) {
         const fallbackSnap = await database.ref(`Settings/InterestRate/${termKeyInt || termKeyRaw}`).once('value');
         const fallbackVal = fallbackSnap.val();
@@ -1535,7 +1632,6 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
       const amount = toNumber(loan.loanAmount);
       const termMonths = toInt(loan.term);
 
-      // Fetch processing fee
       const processingFeeSnap = await database.ref('Settings/ProcessingFee').once('value');
       const processingFee = toNumber(processingFeeSnap.val());
 
@@ -1543,9 +1639,8 @@ const processDatabaseApproveWithMemberBalanceShortfall = async (loan, shortfallA
         throw new Error('Missing or invalid settings/data for email payload calculation.');
       }
 
-      // Calculate all loan details (mirror DB logic semantics)
       const monthlyPrincipal = amount / termMonths;
-      const interestPerTerm = amount * interestRate; // per month interest from rate
+      const interestPerTerm = amount * interestRate;
       const totalInterest = interestPerTerm * termMonths;
       const totalTermPayment = amount + totalInterest;
       const totalMonthlyPayment = totalTermPayment / termMonths;
@@ -1636,7 +1731,6 @@ We recommend settling outstanding balances first before reapplying. Once cleared
     setSelectedLoan(null);
     setCurrentAction(null);
     
-    // Execute pending API call
     if (pendingApiCall) {
       try {
         if (pendingApiCall.type === 'approve') {
@@ -1649,13 +1743,10 @@ We recommend settling outstanding balances first before reapplying. Once cleared
       }
       setPendingApiCall(null);
     }
-    // Do not call refreshData here directly; let useEffect handle it when modal closes
   };
 
-  // Auto-refresh when success modal closes (after approve/reject)
   useEffect(() => {
     if (!successMessageModalVisible && justCompletedAction) {
-      // Give the database a brief moment to settle writes
       const t = setTimeout(() => {
         if (typeof refreshData === 'function') {
           refreshData();
@@ -1669,7 +1760,6 @@ We recommend settling outstanding balances first before reapplying. Once cleared
   const openImageViewer = (url, label, index) => {
     const images = [];
     
-    // Build array of all available images for the selected loan
     if (selectedLoan.proofOfIncomeUrl) {
       images.push({ 
         url: selectedLoan.proofOfIncomeUrl, 
@@ -1716,15 +1806,15 @@ We recommend settling outstanding balances first before reapplying. Once cleared
   };
 
   const hasDocuments = (loan) => {
-    return loan.proofOfIncomeUrl || loan.proofOfIdentityUrl;
+    return loan.proofOfIncomeUrl || loan.proofOfIdentityUrl || loan.proofOfCollateralUrl;
   };
 
-  if (!loans.length) {
-    // Show only the text, no container box
-    return (
-      <p style={styles.noDataMessage}>No loan applications available.</p>
-    );
-  }
+  if (!loans.length) return (
+    <div style={styles.noDataContainer}>
+      <FaHandHoldingUsd style={styles.noDataIcon} />
+      <div>No loan applications available</div>
+    </div>
+  );
 
   return (
     <div style={styles.container}>
@@ -1733,19 +1823,23 @@ We recommend settling outstanding balances first before reapplying. Once cleared
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
+              <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Date Applied</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
             </tr>
           </thead>
           <tbody>
             {loans.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
-                <td style={styles.tableCell}>{`${item.firstName}` + " " + `${item.lastName}`}</td>
+                <td style={styles.tableCell}>
+                  <div style={{ fontWeight: '500' }}>
+                    {item.firstName} {item.lastName}
+                  </div>
+                </td>
                 <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>
                   {formatCurrency(item.loanAmount)}
@@ -1756,21 +1850,23 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                   )}
                 </td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>
-                <td style={{
-                  ...styles.tableCell,
-                  ...(item.status === 'approved' ? styles.statusApproved : {}),
-                  ...(item.status === 'rejected' ? styles.statusRejected : {})
-                }}>
-                  {item.status || 'pending'}
+                <td style={styles.tableCell}>
+                  <span style={{
+                    ...styles.statusBadge,
+                    ...(item.status === 'approved' ? styles.statusApproved : 
+                         item.status === 'rejected' ? styles.statusRejected : styles.statusPending)
+                  }}>
+                    {item.status || 'pending'}
+                  </span>
                 </td>
                 <td style={styles.tableCell}>
-                  <span 
-                    style={styles.viewText} 
+                  <button 
+                    style={styles.viewButton}
                     onClick={() => openModal(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
                   >
+                    <FaEye />
                     View
-                  </span>
+                  </button>
                 </td>
               </tr>
             ))}
@@ -1778,243 +1874,230 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         </table>
       </div>
 
+      {/* Loan Details Modal */}
       {modalVisible && selectedLoan && (
-        <div style={styles.centeredModal}>
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCard}>
-            <button 
-              style={styles.closeButton} 
-              onClick={closeModal}
-              aria-label="Close modal"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Loan Application Details</h2>
+              <h2 style={styles.modalTitle}>
+                <FaHandHoldingUsd />
+                Loan Application Details
+              </h2>
+              <button 
+                style={styles.closeButton}
+                onClick={closeModal}
+              >
+                <FaTimes />
+              </button>
             </div>
+            
             <div style={styles.modalContent}>
-              {hasDocuments(selectedLoan) ? (
-                <div style={styles.columns}>
-                  <div style={styles.leftColumn}>
-                    <div style={styles.sectionTitle}>Member Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Member ID:</span>
+              <div style={styles.columnsContainer}>
+                {/* Left Column - Member & Loan Information */}
+                <div style={styles.column}>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaUser />
+                      Member Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaIdCard />
+                        Member ID:
+                      </span>
                       <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Name:</span>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUser />
+                        Name:
+                      </span>
                       <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Email:</span>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaEnvelope />
+                        Email:
+                      </span>
                       <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Current Balance:</span>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaMoneyBillWave />
+                        Current Balance:
+                      </span>
                       <span style={styles.fieldValue}>{memberBalance !== null ? formatCurrency(memberBalance) : 'Loading...'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Existing Loan:</span>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaFileInvoiceDollar />
+                        Existing Loan:
+                      </span>
                       <span style={styles.fieldValue}>
                         {existingLoanInfo.hasExisting ? `Yes — Outstanding: ${formatCurrency(existingLoanInfo.outstanding)}` : 'No'}
                       </span>
                     </div>
+                  </div>
 
-                    <div style={styles.sectionTitle}>Loan Details</div>
-                    <div style={styles.compactField}>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaHandHoldingUsd />
+                      Loan Details
+                    </h3>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Transaction ID:</span>
                       <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Loan Amount:</span>
                       <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
                     </div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Term:</span>
                       <span style={styles.fieldValue}>{selectedLoan.term} months</span>
                     </div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Disbursement:</span>
                       <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaCalendarAlt />
+                        Date Applied:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column - Financial & Documents */}
+                <div style={styles.column}>
+                  <div style={styles.financialCard}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaMoneyBillWave />
+                      Account Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Account Name:</span>
                       <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Account Number:</span>
                       <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Date Applied:</span>
-                      <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
-                    </div>
-
-                    {/* Collateral Information Section */}
-                    {selectedLoan.requiresCollateral && (
-                      <>
-                        <div style={styles.sectionTitle}>Collateral Details</div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Collateral Required:</span>
-                          <span style={styles.fieldValue}>Yes</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Collateral Type:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.collateralType || 'N/A'}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Collateral Value:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.collateralValue ? formatCurrency(selectedLoan.collateralValue) : 'N/A'}</span>
-                        </div>
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Description:</span>
-                          <span style={styles.fieldValue}>{selectedLoan.collateralDescription || 'N/A'}</span>
-                        </div>
-                      </>
-                    )}
-
-                  </div>
-                  <div style={styles.rightColumn}>
-                    <div style={styles.sectionTitle}>Proof of Documents</div>
-                    <div style={styles.imageGrid}>
-                      {selectedLoan.proofOfIncomeUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Income</p>
-                          <img
-                            src={selectedLoan.proofOfIncomeUrl}
-                            alt="Proof of Income"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                      {selectedLoan.proofOfIdentityUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Identity</p>
-                          <img
-                            src={selectedLoan.proofOfIdentityUrl}
-                            alt="Proof of Identity"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                      {selectedLoan.proofOfCollateralUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Collateral</p>
-                          <img
-                            src={selectedLoan.proofOfCollateralUrl}
-                            alt="Proof of Collateral"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedLoan.proofOfCollateralUrl, 'Proof of Collateral', 2)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                <div style={styles.columns}>
-                  <div style={styles.leftColumn}>
- <div style={styles.sectionTitle}>Member Information</div>
-                    <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.id || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Name:</span>
-                    <span style={styles.fieldValue}>{`${selectedLoan.firstName || ''} ${selectedLoan.lastName || ''}`}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Current Balance:</span>
-                    <span style={styles.fieldValue}>{memberBalance !== null ? formatCurrency(memberBalance) : 'Loading...'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Existing Loan:</span>
-                    <span style={styles.fieldValue}>
-                      {existingLoanInfo.hasExisting ? `Yes — Outstanding: ${formatCurrency(existingLoanInfo.outstanding)}` : 'No'}
-                    </span>
-                  </div>
-                  
-                  </div>
-                  <div style={styles.rightColumn}>
-                  <div style={styles.sectionTitle}>Loan Details</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Transaction ID:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.transactionId || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Loan Amount:</span>
-                    <span style={styles.fieldValue}>{formatCurrency(selectedLoan.loanAmount)}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Term:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.term} months</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Disbursement:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.accountName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Applied:</span>
-                    <span style={styles.fieldValue}>{selectedLoan.dateApplied || 'N/A'}</span>
                   </div>
 
-                  {/* Collateral Information Section */}
+                  {/* Collateral Information */}
                   {selectedLoan.requiresCollateral && (
-                    <>
-                      <div style={styles.sectionTitle}>Collateral Details</div>
-                      <div style={styles.compactField}>
+                    <div style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        <FaIdCard />
+                        Collateral Details
+                      </h3>
+                      <div style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>Collateral Required:</span>
                         <span style={styles.fieldValue}>Yes</span>
                       </div>
-                      <div style={styles.compactField}>
+                      <div style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>Collateral Type:</span>
                         <span style={styles.fieldValue}>{selectedLoan.collateralType || 'N/A'}</span>
                       </div>
-                      <div style={styles.compactField}>
+                      <div style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>Collateral Value:</span>
                         <span style={styles.fieldValue}>{selectedLoan.collateralValue ? formatCurrency(selectedLoan.collateralValue) : 'N/A'}</span>
                       </div>
-                      <div style={styles.compactField}>
+                      <div style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>Description:</span>
                         <span style={styles.fieldValue}>{selectedLoan.collateralDescription || 'N/A'}</span>
                       </div>
-                      {selectedLoan.proofOfCollateralUrl && (
-                        <div style={styles.compactField}>
-                          <span style={styles.fieldLabel}>Proof of Collateral:</span>
-                          <span 
-                            style={{...styles.fieldValue, ...styles.viewText}} 
-                            onClick={() => openImageViewer(selectedLoan.proofOfCollateralUrl, 'Proof of Collateral', 0)}
-                          >
-                            View Image
-                          </span>
-                        </div>
-                      )}
-                    </>
+                    </div>
                   )}
 
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaIdCard />
+                      Application Status
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Status:</span>
+                      <span style={{
+                        ...styles.statusBadge,
+                        ...(selectedLoan.status === 'approved' ? styles.statusApproved : 
+                             selectedLoan.status === 'rejected' ? styles.statusRejected : styles.statusPending)
+                      }}>
+                        {selectedLoan.status || 'pending'}
+                      </span>
+                    </div>
+                    {selectedLoan.dateApproved && (
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Date Approved:</span>
+                        <span style={styles.fieldValue}>{selectedLoan.dateApproved}</span>
+                      </div>
+                    )}
+                    {selectedLoan.dateRejected && (
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Date Rejected:</span>
+                        <span style={styles.fieldValue}>{selectedLoan.dateRejected}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Documents Section */}
+                  {hasDocuments(selectedLoan) && (
+                    <div style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        <FaIdCard />
+                        Submitted Documents
+                      </h3>
+                      <div style={styles.documentsGrid}>
+                        {selectedLoan.proofOfIncomeUrl && (
+                          <div 
+                            style={styles.documentCard}
+                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
+                          >
+                            <img
+                              src={selectedLoan.proofOfIncomeUrl}
+                              alt="Proof of Income"
+                              style={styles.documentImage}
+                            />
+                            <div style={styles.documentLabel}>Proof of Income</div>
+                          </div>
+                        )}
+                        {selectedLoan.proofOfIdentityUrl && (
+                          <div 
+                            style={styles.documentCard}
+                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
+                          >
+                            <img
+                              src={selectedLoan.proofOfIdentityUrl}
+                              alt="Proof of Identity"
+                              style={styles.documentImage}
+                            />
+                            <div style={styles.documentLabel}>Proof of Identity</div>
+                          </div>
+                        )}
+                        {selectedLoan.proofOfCollateralUrl && (
+                          <div 
+                            style={styles.documentCard}
+                            onClick={() => openImageViewer(selectedLoan.proofOfCollateralUrl, 'Proof of Collateral', 2)}
+                          >
+                            <img
+                              src={selectedLoan.proofOfCollateralUrl}
+                              alt="Proof of Collateral"
+                              style={styles.documentImage}
+                            />
+                            <div style={styles.documentLabel}>Proof of Collateral</div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-                </div>
-              )}
+              </div>
             </div>
-            {selectedLoan?.status !== 'approved' && selectedLoan?.status !== 'rejected' && (
-              <div style={styles.bottomButtons}>
+
+            {selectedLoan.status !== 'approved' && selectedLoan.status !== 'rejected' && (
+              <div style={styles.modalActions}>
                 <button
                   style={{
                     ...styles.actionButton,
@@ -2023,7 +2106,6 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                   }}
                   onClick={handleApproveClick}
                   disabled={isProcessing}
-                  onFocus={(e) => e.target.style.outline = 'none'}
                 >
                   Approve
                 </button>
@@ -2035,7 +2117,6 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                   }}
                   onClick={handleRejectClick}
                   disabled={isProcessing}
-                  onFocus={(e) => e.target.style.outline = 'none'}
                 >
                   Reject
                 </button>
@@ -2047,17 +2128,15 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
       {/* Approve Confirmation Modal */}
       {showApproveConfirmation && (
-        <div style={styles.centeredModal}>
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
             <p style={styles.modalText}>Are you sure you want to approve this loan?</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff',
-                  ...(actionInProgress && styles.disabledButton)
+                  ...styles.primaryButton
                 }} 
                 onClick={confirmApprove}
                 disabled={actionInProgress}
@@ -2067,9 +2146,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff',
-                  ...(actionInProgress && styles.disabledButton)
+                  ...styles.secondaryButton
                 }} 
                 onClick={() => setShowApproveConfirmation(false)}
                 disabled={actionInProgress}
@@ -2083,17 +2160,15 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
       {/* Reject Confirmation Modal */}
       {showRejectConfirmation && (
-        <div style={styles.centeredModal}>
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
             <p style={styles.modalText}>Are you sure you want to reject this loan?</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff',
-                  ...(actionInProgress && styles.disabledButton)
+                  ...styles.primaryButton
                 }} 
                 onClick={confirmRejectFinal}
                 disabled={actionInProgress}
@@ -2103,9 +2178,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff',
-                  ...(actionInProgress && styles.disabledButton)
+                  ...styles.secondaryButton
                 }} 
                 onClick={() => setShowRejectConfirmation(false)}
                 disabled={actionInProgress}
@@ -2117,6 +2190,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         </div>
       )}
 
+      {/* Rejection Reason Modal */}
       {showRejectionModal && (
         <div style={styles.rejectionModal}>
           <div style={styles.rejectionModalContent}>
@@ -2142,7 +2216,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
                       value={customReason}
                       onChange={(e) => setCustomReason(e.target.value)}
                       placeholder="Please specify reason"
-                      style={{ ...styles.customReasonInput, marginTop: 0, maxWidth: '60%' }}
+                      style={styles.customReasonInput}
                     />
                   )}
                 </div>
@@ -2150,24 +2224,16 @@ We recommend settling outstanding balances first before reapplying. Once cleared
             ))}
             <div style={styles.rejectionButtons}>
               <button 
-                style={{
-                  ...styles.cancelButton,
-                  ...(actionInProgress && styles.disabledButton)
-                }}
+                style={styles.cancelButton}
                 onClick={() => setShowRejectionModal(false)}
-                disabled={actionInProgress}
               >
                 Cancel
               </button>
               <button 
-                style={{
-                  ...styles.confirmRejectButton,
-                  ...(actionInProgress && styles.disabledButton)
-                }}
+                style={styles.confirmRejectButton}
                 onClick={confirmRejection}
-                disabled={actionInProgress}
               >
-                {actionInProgress ? 'Processing...' : 'Confirm Rejection'}
+                Confirm Rejection
               </button>
             </div>
           </div>
@@ -2176,20 +2242,16 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
       {/* Error Modal */}
       {errorModalVisible && (
-        <div style={styles.centeredModal}>
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
-            <FaExclamationCircle 
-              style={{ ...styles.confirmIcon, color: '#f44336' }} 
-            />
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
             <p style={styles.modalText}>{errorMessage}</p>
             <button 
               style={{
                 ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
+                ...styles.primaryButton
               }} 
               onClick={() => setErrorModalVisible(false)}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               OK
             </button>
@@ -2197,31 +2259,29 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         </div>
       )}
 
-      {/* Processing Modal */}
+      {/* Loading Spinner */}
       {isProcessing && (
-        <div style={styles.centeredModal}>
+        <div style={styles.modalOverlay}>
           <div style={styles.spinner}></div>
         </div>
       )}
 
       {/* Success Modal */}
       {successMessageModalVisible && (
-        <div style={styles.centeredModal}>
+        <div style={styles.modalOverlay}>
           <div style={styles.modalCardSmall}>
             {currentAction === 'approve' ? (
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
             ) : (
-              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
+              <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
             )}
             <p style={styles.modalText}>{successMessage}</p>
             <button 
               style={{
                 ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
+                ...styles.primaryButton
               }} 
               onClick={handleSuccessOk}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               OK
             </button>
@@ -2231,58 +2291,51 @@ We recommend settling outstanding balances first before reapplying. Once cleared
 
       {/* Savings Confirmation Modal */}
       {showSavingsConfirmModal && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+        <div style={styles.modalOverlay}>
+          <div style={styles.savingsConfirmModal}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
             <div style={styles.modalTitle}>
               {savingsShortfall.memberBalance !== undefined ? 'Loan Amount Exceeds Member Balance' : 'Insufficient Funds - Use Savings?'}
             </div>
-            <div style={{ marginBottom: 20, width: '100%' }}>
-              <div style={{ backgroundColor: '#fff3cd', border: '1px solid #ffeaa7', borderRadius: '8px', padding: '15px', marginBottom: '15px' }}>
-                <div style={{ fontSize: '14px', color: '#856404', marginBottom: '10px' }}>
-                  <strong>Current Financial Status:</strong>
-                </div>
-                <div style={{ fontSize: '13px', color: '#856404', lineHeight: '1.5' }}>
-                  {savingsShortfall.memberBalance !== undefined ? (
-                    <>
-                      • Member Current Balance: <strong>{formatCurrency(savingsShortfall.memberBalance)}</strong><br/>
-                      • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
-                      • Amount Exceeding Balance: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
-                      • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
-                      • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
-                    </>
-                  ) : (
-                    <>
-                      • Available Funds: <strong>{formatCurrency(parseFloat(settings?.Funds || 0))}</strong><br/>
-                      • Loan Amount: <strong>{formatCurrency(parseFloat(pendingLoanForSavings?.loanAmount || 0))}</strong><br/>
-                      • Shortfall: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
-                      • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
-                      • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
-                    </>
-                  )}
-                </div>
-              </div>
-              <p style={styles.modalText}>
+            <div style={styles.savingsInfoBox}>
+              <div style={styles.savingsInfoTitle}>Current Financial Status:</div>
+              <div style={styles.savingsInfoText}>
                 {savingsShortfall.memberBalance !== undefined ? (
                   <>
-                    The loan amount exceeds the member's current balance. 
-                    Would you like to deduct the remaining <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings?
+                    • Member Current Balance: <strong>{formatCurrency(savingsShortfall.memberBalance)}</strong><br/>
+                    • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
+                    • Amount Exceeding Balance: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
+                    • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
+                    • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
                   </>
                 ) : (
                   <>
-                    The available funds are insufficient to approve this loan. 
-                    Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall?
+                    • Loan Amount: <strong>{formatCurrency(parseFloat(pendingLoanForSavings?.loanAmount || 0))}</strong><br/>
+                    • Shortfall: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
+                    • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
+                    • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
                   </>
                 )}
-              </p>
+              </div>
             </div>
+            <p style={styles.modalText}>
+              {savingsShortfall.memberBalance !== undefined ? (
+                <>
+                  The loan amount exceeds the member's current balance. 
+                  Would you like to deduct the remaining <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings?
+                </>
+              ) : (
+                <>
+                  The available funds are insufficient to approve this loan. 
+                  Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall?
+                </>
+              )}
+            </p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#4CAF50',
-                  color: '#fff',
-                  ...(actionInProgress && styles.disabledButton)
+                  ...styles.approveButton
                 }}
                 onClick={handleSavingsConfirm}
                 disabled={actionInProgress}
@@ -2292,9 +2345,7 @@ We recommend settling outstanding balances first before reapplying. Once cleared
               <button
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff',
-                  ...(actionInProgress && styles.disabledButton)
+                  ...styles.rejectButton
                 }}
                 onClick={handleSavingsCancel}
                 disabled={actionInProgress}
@@ -2306,113 +2357,34 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         </div>
       )}
 
-      {/* Image Viewer Modal */}
+      {/* Image Viewer */}
       {imageViewerVisible && (
-        <div style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundColor: 'rgba(0,0,0,0.9)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 2000
-        }}>
-          <div style={{
-            position: 'relative',
-            width: '100%',
-            height: '100vh',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center'
-          }}>
+        <div style={styles.imageViewerModal}>
+          <div style={styles.imageViewerContent}>
             <button 
-              style={{
-                position: 'fixed',
-                top: '20px',
-                right: '28px',
-                color: 'white',
-                fontSize: '28px',
-                cursor: 'pointer',
-                padding: '8px',
-                backgroundColor: 'transparent',
-                border: 'none',
-                outline: 'none',
-                zIndex: 2200
-              }}
-              onClick={closeImageViewer}
-              onFocus={(e) => e.target.style.outline = 'none'}
+              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+              onClick={() => navigateImages('prev')}
             >
-              <FaTimes />
+              <FaChevronLeft />
             </button>
-            
-            {availableImages.length > 1 && (
-              <>
-                <button 
-                  style={{
-                    position: 'fixed',
-                    left: '20px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'white',
-                    fontSize: '24px',
-                    cursor: 'pointer',
-                    padding: '12px',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    outline: 'none',
-                    zIndex: 2100
-                  }}
-                  onClick={() => navigateImages('prev')}
-                  onFocus={(e) => e.target.style.outline = 'none'}
-                >
-                  <FaChevronLeft />
-                </button>
-                <button 
-                  style={{
-                    position: 'fixed',
-                    right: '20px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    color: 'white',
-                    fontSize: '24px',
-                    cursor: 'pointer',
-                    padding: '12px',
-                    backgroundColor: 'rgba(0,0,0,0.5)',
-                    border: 'none',
-                    borderRadius: '50%',
-                    outline: 'none',
-                    zIndex: 2100
-                  }}
-                  onClick={() => navigateImages('next')}
-                  onFocus={(e) => e.target.style.outline = 'none'}
-                >
-                  <FaChevronRight />
-                </button>
-              </>
-            )}
-            
             <img
               src={currentImage.url}
               alt={currentImage.label}
-              style={{
-                width: '90%',
-                maxWidth: '1100px',
-                maxHeight: '82vh',
-                objectFit: 'contain',
-                borderRadius: '4px'
-              }}
+              style={styles.largeImage}
             />
-            <p style={{
-              color: 'white',
-              fontSize: '18px',
-              marginTop: '16px',
-              textAlign: 'center'
-            }}>
+            <button 
+              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+              onClick={() => navigateImages('next')}
+            >
+              <FaChevronRight />
+            </button>
+            <button 
+              style={styles.imageViewerClose} 
+              onClick={closeImageViewer}
+            >
+              <FaTimes />
+            </button>
+            <p style={styles.imageViewerLabel}>
               {currentImage.label}
               {availableImages.length > 1 && (
                 <span style={{ fontSize: '14px', opacity: 0.8, marginLeft: '10px' }}>

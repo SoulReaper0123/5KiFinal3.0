@@ -52,7 +52,7 @@ const AdminHome = () => {
   const [logoutModalVisible, setLogoutModalVisible] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDropdownVisible, setIsDropdownVisible] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState(280);
+  const [sidebarWidth, setSidebarWidth] = useState(270);
   const [windowWidth, setWindowWidth] = useState(window.innerWidth);
   const [sectionReloadCounter, setSectionReloadCounter] = useState(0);
   const [pendingCounts, setPendingCounts] = useState({
@@ -69,11 +69,6 @@ const AdminHome = () => {
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
 
-  // Build visible UI context for the AI (display-only snapshot)
-  const buildVisibleContext = () => {
-    return `UI STATE\n- Active Section: ${activeSection}\n- Pending Registrations: ${pendingCounts.registrations}\n- Pending Deposits: ${pendingCounts.deposits}\n- Pending Loans: ${pendingCounts.loans}\n- Pending Payments: ${pendingCounts.payments}\n- Pending Withdrawals: ${pendingCounts.withdraws}\n`;
-  };
-  
   // Chat Management States
   const [chatSessions, setChatSessions] = useState([]);
   const [currentChatId, setCurrentChatId] = useState(null);
@@ -95,61 +90,65 @@ const AdminHome = () => {
   const { logout } = useAuth();
   const isSmallScreen = windowWidth < 1024;
 
-  // Test AI connection (Gemini v1 endpoint) with dynamic model probe
-// Test AI connection (Gemini v1beta endpoint) with dynamic model probe
-const testAI = async () => {
-  const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
-  if (!geminiKey) {
-    console.log('⚠️ No Gemini API key found');
-    return false;
-  }
-
-  const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'; // Changed from v1 to v1beta
-  
-  // Use updated model names that work with v1beta
-  const CANDIDATE_MODELS = [
-    'gemini-1.5-flash-latest',
-    'gemini-1.5-pro-latest',
-    'gemini-pro',
-    'gemini-pro-latest',
-  ];
-
-  const probe = async (model) => {
-    const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${geminiKey}`;
-    try {
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            { role: 'user', parts: [{ text: 'Hello' }] }
-          ]
-        }),
-      });
-      return res.ok ? null : (await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } })));
-    } catch (e) {
-      return { error: { message: e.message } };
-    }
+  // Build visible UI context for the AI (display-only snapshot)
+  const buildVisibleContext = () => {
+    return `UI STATE\n- Active Section: ${activeSection}\n- Pending Registrations: ${pendingCounts.registrations}\n- Pending Deposits: ${pendingCounts.deposits}\n- Pending Loans: ${pendingCounts.loans}\n- Pending Payments: ${pendingCounts.payments}\n- Pending Withdrawals: ${pendingCounts.withdraws}\n`;
   };
 
-  try {
-    for (const m of CANDIDATE_MODELS) {
-      const err = await probe(m);
-      if (!err) {
-        console.log(`✅ Gemini API working with model: ${m}`);
-        return true;
-      } else {
-        console.warn(`Model ${m} not working:`, err?.error?.message || err);
-      }
+  // Test AI connection (Gemini v1beta endpoint) with dynamic model probe
+  const testAI = async () => {
+    const geminiKey = import.meta.env.VITE_GEMINI_API_KEY || '';
+    if (!geminiKey) {
+      console.log('⚠️ No Gemini API key found');
+      return false;
     }
-    console.error('❌ No supported Gemini model found');
-  } catch (e) {
-    console.warn('❌ Gemini test failed:', e.message);
-  }
-  
-  // Even if testing fails, return true to allow the AI to try anyway
-  return true;
-};
+
+    const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+    
+    // Use updated model names that work with v1beta
+    const CANDIDATE_MODELS = [
+      'gemini-1.5-flash-latest',
+      'gemini-1.5-pro-latest',
+      'gemini-pro',
+      'gemini-pro-latest',
+    ];
+
+    const probe = async (model) => {
+      const url = `${GEMINI_API_BASE}/models/${model}:generateContent?key=${geminiKey}`;
+      try {
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [
+              { role: 'user', parts: [{ text: 'Hello' }] }
+            ]
+          }),
+        });
+        return res.ok ? null : (await res.json().catch(() => ({ error: { message: `HTTP ${res.status}` } })));
+      } catch (e) {
+        return { error: { message: e.message } };
+      }
+    };
+
+    try {
+      for (const m of CANDIDATE_MODELS) {
+        const err = await probe(m);
+        if (!err) {
+          console.log(`✅ Gemini API working with model: ${m}`);
+          return true;
+        } else {
+          console.warn(`Model ${m} not working:`, err?.error?.message || err);
+        }
+      }
+      console.error('❌ No supported Gemini model found');
+    } catch (e) {
+      console.warn('❌ Gemini test failed:', e.message);
+    }
+    
+    // Even if testing fails, return true to allow the AI to try anyway
+    return true;
+  };
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -183,6 +182,11 @@ const testAI = async () => {
   useEffect(() => {
     const handleResize = () => {
       setWindowWidth(window.innerWidth);
+      // Auto-collapse on smaller screens
+      if (window.innerWidth < 1280) {
+        setIsCollapsed(true);
+        setSidebarWidth(60);
+      }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -285,25 +289,42 @@ const testAI = async () => {
   };
 
   const toggleSidebar = () => {
-    setSidebarWidth(isCollapsed ? 280 : 60);
+    if (isCollapsed) {
+      setSidebarWidth(270);
+    } else {
+      setSidebarWidth(60);
+    }
     setIsCollapsed(!isCollapsed);
   };
 
   const renderSection = () => {
-    switch (activeSection) {
-      case 'dashboard': return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
-      case 'registrations': return <Register key={`register-${sectionReloadCounter}`} />;
-      case 'members': return <Members key={`members-${sectionReloadCounter}`} />;
-      case 'deposits': return <Deposits key={`deposits-${sectionReloadCounter}`} />;
-      case 'applyLoans': return <Loans key={`loans-${sectionReloadCounter}`} />;
-      case 'payLoans': return <PayLoans key={`payloans-${sectionReloadCounter}`} />;
-      case 'withdraws': return <Withdraws key={`withdraws-${sectionReloadCounter}`} />;
-      case 'transactions': return <Transactions key={`transactions-${sectionReloadCounter}`} />;
-      case 'coadmins': return <CoAdmins key={`coadmins-${sectionReloadCounter}`} />;
-      case 'settings': return <Settings key={`settings-${sectionReloadCounter}`} />;
-      case 'accountSettings': return <AccountSettings key={`acctsettings-${sectionReloadCounter}`} />;
-      default: return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
-    }
+    const SectionComponent = () => {
+      switch (activeSection) {
+        case 'dashboard': return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
+        case 'registrations': return <Register key={`register-${sectionReloadCounter}`} />;
+        case 'members': return <Members key={`members-${sectionReloadCounter}`} />;
+        case 'deposits': return <Deposits key={`deposits-${sectionReloadCounter}`} />;
+        case 'applyLoans': return <Loans key={`loans-${sectionReloadCounter}`} />;
+        case 'payLoans': return <PayLoans key={`payloans-${sectionReloadCounter}`} />;
+        case 'withdraws': return <Withdraws key={`withdraws-${sectionReloadCounter}`} />;
+        case 'transactions': return <Transactions key={`transactions-${sectionReloadCounter}`} />;
+        case 'coadmins': return <CoAdmins key={`coadmins-${sectionReloadCounter}`} />;
+        case 'settings': return <Settings key={`settings-${sectionReloadCounter}`} />;
+        case 'accountSettings': return <AccountSettings key={`acctsettings-${sectionReloadCounter}`} />;
+        default: return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
+      }
+    };
+
+    return (
+      <div style={{
+        width: '100%',
+        minHeight: '100%',
+        overflowX: 'auto',
+        boxSizing: 'border-box'
+      }}>
+        <SectionComponent />
+      </div>
+    );
   };
 
   const isActive = (section) => activeSection === section;
@@ -428,8 +449,6 @@ const testAI = async () => {
     saveChatSessions(updatedSessions);
   };
 
-
-
   const handleAIQuery = async (userMessage) => {
     if (!userMessage.trim()) return;
 
@@ -493,7 +512,7 @@ const testAI = async () => {
     handleAIQuery(aiInput);
   };
 
-  // Styles
+  // Enhanced professional styles for banking admin dashboard
   const styles = {
     container: {
       display: 'flex',
@@ -504,195 +523,223 @@ const testAI = async () => {
       padding: 0,
       overflow: 'hidden',
       position: 'relative',
+      backgroundColor: '#F8FAFC',
+      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
     },
     sidebar: {
       width: `${sidebarWidth}px`,
-      backgroundColor: isCollapsed ? '#F5F5F5' : '#2D5783',
-      padding: '20px 0',
-      transition: 'width 0.3s ease, background-color 0.3s ease',
+      background: 'linear-gradient(180deg, #1E3A8A 0%, #2D5783 100%)',
+      padding: '16px 0',
+      transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       overflow: 'hidden',
       position: 'relative',
       height: '100%',
+      boxShadow: '2px 0 8px rgba(0, 0, 0, 0.1)',
+      flexShrink: 0,
     },
     scrollContainer: {
-      paddingBottom: '20px',
+      paddingBottom: '16px',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       height: '100%',
       overflowY: 'auto',
       justifyContent: 'flex-start',
+      width: '100%',
     },
     toggleButton: {
       position: 'absolute',
-      top: '10px',
-      right: '10px',
+      top: '12px',
+      right: '12px',
       zIndex: 1000,
-      background: 'none',
+      background: 'rgba(255, 255, 255, 0.1)',
       border: 'none',
       cursor: 'pointer',
-      color: isCollapsed ? '#000000' : '#FFFFFF',
-      fontSize: '32px',
-      padding: '0',
-      margin: '0',
-      outline: 'none',
+      color: '#FFFFFF',
+      fontSize: '18px',
+      padding: '6px',
+      borderRadius: '6px',
+      backdropFilter: 'blur(10px)',
+      transition: 'all 0.2s ease',
     },
     adminContainer: {
       alignItems: 'center',
-      marginBottom: '20px',
+      marginBottom: '24px',
       marginTop: '40px',
       display: 'flex',
       flexDirection: 'column',
       width: '100%',
+      padding: '0 16px',
     },
     adminImage: {
-      width: '80px',
-      height: '80px',
-      borderRadius: '40px',
-      marginBottom: '10px',
+      width: '60px',
+      height: '60px',
+      borderRadius: '12px',
+      marginBottom: '12px',
+      border: '2px solid rgba(255, 255, 255, 0.2)',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+    },
+    adminTitle: {
+      color: '#FFFFFF',
+      fontSize: '16px',
+      fontWeight: '600',
+      textAlign: 'center',
+    },
+    adminSubtitle: {
+      color: 'rgba(255, 255, 255, 0.7)',
+      fontSize: '11px',
+      textAlign: 'center',
+      marginTop: '2px',
+    },
+    adminButtonContainer: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: '5px',
+      position: 'relative',
+    },
+    adminProfileButton: {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'rgba(255, 255, 255, 0.1)',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
+      borderRadius: '6px',
+      padding: '6px 12px',
+      cursor: 'pointer',
+      transition: 'all 0.2s ease',
+      gap: '8px',
+    },
+    adminProfileIcon: {
+      backgroundColor: '#3B82F6',
+      borderRadius: '4px',
+      width: '20px',
+      height: '20px',
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      flexShrink: 0,
+    },
+    adminButtonText: {
+      color: '#FFFFFF',
+      fontSize: '11px',
+      fontWeight: '500',
+    },
+    adminDropdownMenu: {
+      position: 'absolute',
+      top: '100%',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      backgroundColor: 'white',
+      borderRadius: '6px',
+      border: '1px solid #E2E8F0',
+      boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)',
+      overflow: 'hidden',
+      zIndex: 1000,
+      marginTop: '4px',
+      minWidth: '100px',
+    },
+    adminDropdownItem: {
+      display: 'flex',
+      alignItems: 'center',
+      padding: '8px 12px',
+      cursor: 'pointer',
+      transition: 'background-color 0.2s ease',
+      borderBottom: '1px solid #F1F5F9',
+    },
+    adminDropdownItemText: {
+      color: '#475569',
+      fontSize: '11px',
+      fontWeight: '500',
+      marginLeft: '6px',
     },
     button: {
       display: 'flex',
       flexDirection: 'row',
       alignItems: 'center',
-      height: '48px',
-      paddingLeft: '30px',
-      paddingRight: '10px',
-      marginBottom: '5px',
+      height: '44px',
+      paddingLeft: '16px',
+      paddingRight: '12px',
+      marginBottom: '6px',
       background: 'none',
       border: 'none',
       cursor: 'pointer',
-      width: '100%',
+      width: 'calc(100% - 12px)',
       backgroundColor: 'transparent',
+      borderRadius: '10px',
+      marginLeft: '6px',
+      marginRight: '6px',
+      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      position: 'relative',
     },
     activeButton: {
-      backgroundColor: '#F5F5F5',
-      borderRadius: '8px',
-      border: 'none',
-      outline: 'none',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      backdropFilter: 'blur(10px)',
+      border: '1px solid rgba(255, 255, 255, 0.2)',
     },
     iconContainer: {
       position: 'relative',
-      width: '40px',
-      height: '40px',
-      marginRight: '16px',
+      width: '32px',
+      height: '32px',
+      marginRight: '12px',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      border: 'none',
-      cursor: 'default',
+      flexShrink: 0,
     },
     icon: {
-      fontSize: '28px',
-      color: '#fff',
-      display: 'inline-block',
-      fontStyle: 'normal',
+      fontSize: '18px',
+      color: 'rgba(255, 255, 255, 0.8)',
+      transition: 'all 0.2s ease',
     },
     activeIcon: {
-      fontSize: '28px',
-      color: '#000',
-      display: 'inline-block',
-      fontStyle: 'normal',
+      fontSize: '18px',
+      color: '#FFFFFF',
     },
     badge: {
       position: 'absolute',
-      top: '-6px',
-      right: '-6px',
+      top: '-4px',
+      right: '-4px',
       minWidth: '18px',
       height: '18px',
       borderRadius: '9px',
-      backgroundColor: '#ff4d4f',
-      color: '#fff',
+      backgroundColor: '#EF4444',
+      color: '#FFFFFF',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontSize: '11px',
-      padding: '0 5px',
+      fontSize: '10px',
+      fontWeight: '600',
+      padding: '0 4px',
       lineHeight: 1,
-      border: '1px solid #fff',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+      border: '2px solid #1E3A8A',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.2)'
     },
     buttonText: {
-      fontSize: '16px',
-      color: '#ffffff',
-      marginRight: '20px',
-      fontWeight: 'normal',
-      cursor: 'pointer',
+      fontSize: '14px',
+      color: 'rgba(255, 255, 255, 0.9)',
+      fontWeight: '500',
+      transition: 'all 0.2s ease',
+      whiteSpace: 'nowrap',
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
     },
     activeButtonText: {
-      color: '#000000',
-      fontWeight: 'normal',
-      marginLeft: '5px',
-      fontSize: '18px',
+      color: '#FFFFFF',
+      fontWeight: '600',
     },
     content: {
       flex: 1,
       overflowY: 'auto',
-      overflowX: 'hidden',
+      overflowX: 'auto',
       height: '100vh',
       padding: '20px',
-      backgroundColor: '#f5f7fa',
-    },
-    dropdownWrapper: {
-      position: 'absolute',
-      top: '40px',
-      right: '50px',
-      zIndex: 900,
-    },
-    dropdownContainer: {
-      backgroundColor: 'white',
-      borderRadius: '25px',
-      border: '1px solid #ddd',
-      boxShadow: '0 2px 5px rgba(0,0,0,0.2)',
-      overflow: 'hidden',
-      width: '100%', 
-    },
-    dropdownButton: {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: '6px 10px',
-      cursor: 'pointer',
-    },
-    profileIconContainer: {
-      backgroundColor: '#f0f0f0',
-      borderRadius: '20px', 
-      width: '35px',
-      height: '35px',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      cursor: 'pointer',
-    },
-    dropdownTextContainer: {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingLeft: '10px',
-      paddingRight: '5px',
-      cursor: 'pointer',
-    },
-    dropdownText: {
-      color: 'black',
-      fontSize: '16px',
-      marginRight: '8px',
-      fontWeight: 'normal',
-    },
-    dropdownMenu: {
-      backgroundColor: 'white',
-      borderTop: '1px solid #eee',
-    },
-    dropdownItem: {
-      display: 'flex',
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: '12px 16px',
-      cursor: 'pointer',
-    },
-    dropdownItemText: {
-      color: '#333',
-      fontSize: '14px',
-      fontWeight: 'normal',
+      backgroundColor: '#F8FAFC',
+      background: 'linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%)',
+      minWidth: 0,
+      width: isCollapsed ? 'calc(100vw - 60px)' : 'calc(100vw - 270px)',
+      boxSizing: 'border-box',
+      transition: 'width 0.3s ease',
     },
     fullOverlay: {
       position: 'fixed',
@@ -701,18 +748,32 @@ const testAI = async () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.85)',
+      backgroundColor: 'rgba(15, 23, 42, 0.95)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      padding: '20px',
+      padding: '16px',
+      backdropFilter: 'blur(8px)',
     },
-    overlayText: {
+    overlayContent: {
+      textAlign: 'center',
+      maxWidth: '400px',
+    },
+    overlayIcon: {
+      fontSize: '48px',
+      color: '#3B82F6',
+      marginBottom: '20px',
+    },
+    overlayTitle: {
       color: '#FFFFFF',
       fontSize: '20px',
-      textAlign: 'center',
-      fontWeight: 'bold',
-      maxWidth: '500px',
+      fontWeight: '700',
+      marginBottom: '12px',
+    },
+    overlayText: {
+      color: 'rgba(255, 255, 255, 0.8)',
+      fontSize: '14px',
+      lineHeight: 1.6,
     },
     centeredModal: {
       position: 'fixed',
@@ -720,53 +781,55 @@ const testAI = async () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(15, 23, 42, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1300
+      zIndex: 1300,
+      backdropFilter: 'blur(4px)',
     },
     modalCardSmall: {
       width: '300px',
       backgroundColor: 'white',
-      borderRadius: '8px',
+      borderRadius: '14px',
       padding: '20px',
       position: 'relative',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-      textAlign: 'center'
+      boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+      textAlign: 'center',
+      border: '1px solid #F1F5F9',
     },
     confirmIcon: {
-      marginBottom: '12px',
-      fontSize: '32px'
+      marginBottom: '14px',
+      fontSize: '28px',
     },
     modalText: {
       fontSize: '14px',
-      marginBottom: '16px',
+      marginBottom: '18px',
       textAlign: 'center',
-      color: '#333',
-      lineHeight: '1.4'
+      color: '#475569',
+      lineHeight: '1.5',
+      fontWeight: '500',
     },
     actionButton: {
       padding: '8px 16px',
-      borderRadius: '4px',
+      borderRadius: '6px',
       border: 'none',
       cursor: 'pointer',
-      fontWeight: 'bold',
-      fontSize: '14px',
+      fontWeight: '600',
+      fontSize: '13px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       gap: '6px',
-      transition: 'all 0.2s',
-      minWidth: '100px',
-      outline: 'none',
+      transition: 'all 0.2s ease',
+      minWidth: '80px',
     },
     spinner: {
-      border: '4px solid rgba(0, 0, 0, 0.1)',
-      borderLeftColor: '#2D5783',
+      border: '3px solid rgba(59, 130, 246, 0.3)',
+      borderTop: '3px solid #3B82F6',
       borderRadius: '50%',
       width: '36px',
       height: '36px',
@@ -778,11 +841,12 @@ const testAI = async () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+      backgroundColor: 'rgba(15, 23, 42, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
-      zIndex: 1100
+      zIndex: 1500,
+      backdropFilter: 'blur(4px)',
     },
     // AI Assistant Styles
     aiAssistantModal: {
@@ -791,40 +855,42 @@ const testAI = async () => {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'rgba(0,0,0,0.5)',
+      backgroundColor: 'rgba(15, 23, 42, 0.8)',
       display: 'flex',
       justifyContent: 'center',
       alignItems: 'center',
       zIndex: 1200,
-      padding: '20px'
+      padding: '16px',
+      backdropFilter: 'blur(4px)',
     },
     aiAssistantContainer: {
       backgroundColor: 'white',
-      borderRadius: '12px',
+      borderRadius: '14px',
       width: '95%',
-      maxWidth: '1200px',
-      height: '85%',
-      maxHeight: '700px',
+      maxWidth: '1000px',
+      height: '80%',
+      maxHeight: '600px',
       display: 'flex',
       flexDirection: 'row',
-      boxShadow: '0 10px 30px rgba(0,0,0,0.3)',
-      overflow: 'hidden'
+      boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
+      overflow: 'hidden',
+      border: '1px solid #E2E8F0',
     },
     aiAssistantHeader: {
-      backgroundColor: '#2D5783',
+      backgroundColor: '#1E3A8A',
       color: 'white',
       padding: '16px 20px',
-      borderRadius: '12px 12px 0 0',
       display: 'flex',
       justifyContent: 'space-between',
-      alignItems: 'center'
+      alignItems: 'center',
+      borderBottom: '1px solid #E5E7EB',
     },
     aiAssistantTitle: {
-      fontSize: '18px',
+      fontSize: '16px',
       fontWeight: '600',
       display: 'flex',
       alignItems: 'center',
-      gap: '10px'
+      gap: '10px',
     },
     aiMessagesContainer: {
       flex: 1,
@@ -832,224 +898,236 @@ const testAI = async () => {
       overflowY: 'auto',
       display: 'flex',
       flexDirection: 'column',
-      gap: '16px'
+      gap: '16px',
+      backgroundColor: '#F8FAFC',
     },
     aiMessage: {
       maxWidth: '80%',
-      padding: '12px 16px',
-      borderRadius: '12px',
-      fontSize: '14px',
-      lineHeight: '1.5'
+      padding: '14px 16px',
+      borderRadius: '14px',
+      fontSize: '13px',
+      lineHeight: '1.6',
+      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
     },
     aiMessageUser: {
-      backgroundColor: '#2D5783',
+      backgroundColor: '#1E3A8A',
       color: 'white',
       alignSelf: 'flex-end',
-      borderBottomRightRadius: '4px'
+      borderBottomRightRadius: '4px',
     },
     aiMessageAI: {
-      backgroundColor: '#f5f5f5',
-      color: '#333',
+      backgroundColor: 'white',
+      color: '#374151',
       alignSelf: 'flex-start',
-      borderBottomLeftRadius: '4px'
+      borderBottomLeftRadius: '4px',
+      border: '1px solid #E5E7EB',
     },
     aiMessageTime: {
-      fontSize: '11px',
+      fontSize: '10px',
       opacity: 0.7,
-      marginTop: '4px'
+      marginTop: '6px',
+      fontWeight: '500',
     },
     aiInputContainer: {
       padding: '16px 20px',
-      borderTop: '1px solid #eee',
+      borderTop: '1px solid #E5E7EB',
       display: 'flex',
-      gap: '12px',
-      alignItems: 'center'
+      gap: '10px',
+      alignItems: 'center',
+      backgroundColor: 'white',
     },
     aiInput: {
       flex: 1,
       padding: '12px 16px',
-      border: '1px solid #ddd',
-      borderRadius: '25px',
-      fontSize: '14px',
+      border: '1px solid #D1D5DB',
+      borderRadius: '10px',
+      fontSize: '13px',
       outline: 'none',
-      resize: 'none'
+      resize: 'none',
+      backgroundColor: '#F9FAFB',
+      transition: 'all 0.2s ease',
     },
     aiSendButton: {
-      backgroundColor: '#2D5783',
+      backgroundColor: '#1E3A8A',
       color: 'white',
       border: 'none',
-      borderRadius: '50%',
-      width: '44px',
-      height: '44px',
+      borderRadius: '10px',
+      width: '42px',
+      height: '42px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      fontSize: '16px',
-      transition: 'all 0.2s'
+      fontSize: '14px',
+      transition: 'all 0.2s ease',
+      boxShadow: '0 2px 4px rgba(30, 58, 138, 0.2)',
     },
     aiLoadingDots: {
       display: 'flex',
-      gap: '4px',
+      gap: '5px',
       alignItems: 'center',
-      padding: '12px 16px'
+      padding: '14px 16px',
     },
     aiLoadingDot: {
-      width: '8px',
-      height: '8px',
+      width: '7px',
+      height: '7px',
       borderRadius: '50%',
-      backgroundColor: '#2D5783',
-      animation: 'pulse 1.5s ease-in-out infinite'
+      backgroundColor: '#1E3A8A',
+      animation: 'pulse 1.5s ease-in-out infinite',
     },
     // Chat Management Styles
     aiSidebar: {
-      width: '280px',
-      backgroundColor: '#f7f7f8',
-      borderRight: '1px solid #e5e5e5',
+      width: '240px',
+      backgroundColor: '#F8FAFC',
+      borderRight: '1px solid #E5E7EB',
       display: 'flex',
       flexDirection: 'column',
-      height: '100%'
+      height: '100%',
     },
     aiSidebarHeader: {
       padding: '16px',
-      borderBottom: '1px solid #e5e5e5',
-      backgroundColor: '#f7f7f8'
+      borderBottom: '1px solid #E5E7EB',
+      backgroundColor: '#F8FAFC',
     },
     newChatButton: {
       width: '100%',
-      padding: '12px 16px',
-      backgroundColor: '#2D5783',
+      padding: '10px 14px',
+      backgroundColor: '#1E3A8A',
       color: 'white',
       border: 'none',
       borderRadius: '8px',
       cursor: 'pointer',
-      fontSize: '14px',
-      fontWeight: '500',
+      fontSize: '13px',
+      fontWeight: '600',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      gap: '8px',
-      transition: 'background-color 0.2s'
+      gap: '6px',
+      transition: 'all 0.2s ease',
+      boxShadow: '0 2px 4px rgba(30, 58, 138, 0.2)',
     },
     aiSidebarContent: {
       flex: 1,
       overflowY: 'auto',
-      padding: '8px'
+      padding: '10px',
     },
     sidebarSectionTitle: {
-      fontSize: '12px',
+      fontSize: '11px',
       fontWeight: '600',
-      color: '#666',
+      color: '#6B7280',
       textTransform: 'uppercase',
       letterSpacing: '0.5px',
-      margin: '16px 8px 8px 8px'
+      margin: '12px 6px 6px 6px',
     },
     chatHistoryItem: {
-      padding: '12px',
-      margin: '2px 0',
+      padding: '10px',
+      margin: '3px 0',
       borderRadius: '8px',
       cursor: 'pointer',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      transition: 'background-color 0.2s',
+      transition: 'all 0.2s ease',
       position: 'relative',
+      border: '1px solid transparent',
     },
     chatHistoryItemActive: {
-      backgroundColor: '#e3f2fd',
-      borderLeft: '3px solid #2D5783'
+      backgroundColor: '#EFF6FF',
+      borderColor: '#3B82F6',
+      borderLeft: '3px solid #3B82F6',
     },
     chatItemContent: {
       flex: 1,
-      minWidth: 0
+      minWidth: 0,
     },
     chatTitle: {
-      fontSize: '14px',
+      fontSize: '13px',
       fontWeight: '500',
-      color: '#333',
-      marginBottom: '4px',
+      color: '#1F2937',
+      marginBottom: '3px',
       overflow: 'hidden',
       textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap'
+      whiteSpace: 'nowrap',
     },
     chatDate: {
-      fontSize: '11px',
-      color: '#666'
+      fontSize: '10px',
+      color: '#6B7280',
+      fontWeight: '500',
     },
     chatDeleteButton: {
       background: 'none',
       border: 'none',
-      color: '#999',
-      fontSize: '12px',
+      color: '#9CA3AF',
+      fontSize: '11px',
       cursor: 'pointer',
-      padding: '4px',
-      borderRadius: '4px',
+      padding: '5px',
+      borderRadius: '5px',
       opacity: 0,
-      transition: 'all 0.2s',
+      transition: 'all 0.2s ease',
       position: 'absolute',
-      right: '8px',
+      right: '6px',
       top: '50%',
-      transform: 'translateY(-50%)'
+      transform: 'translateY(-50%)',
     },
     aiMainContent: {
       flex: 1,
       display: 'flex',
       flexDirection: 'column',
-      height: '100%'
+      height: '100%',
     },
     aiMainHeader: {
-      backgroundColor: '#2D5783',
+      backgroundColor: '#1E3A8A',
       color: 'white',
       padding: '16px 20px',
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      borderBottom: '1px solid #e5e5e5'
     },
     aiMainTitle: {
-      fontSize: '18px',
+      fontSize: '16px',
       fontWeight: '600',
       display: 'flex',
       alignItems: 'center',
-      gap: '10px'
+      gap: '10px',
     },
     aiCloseButton: {
-      background: 'none',
+      background: 'rgba(255, 255, 255, 0.1)',
       border: 'none',
       color: 'white',
-      fontSize: '20px',
+      fontSize: '16px',
       cursor: 'pointer',
-      padding: '4px',
-      borderRadius: '4px',
-      transition: 'background-color 0.2s'
+      padding: '6px',
+      borderRadius: '6px',
+      transition: 'background-color 0.2s ease',
+      backdropFilter: 'blur(10px)',
     },
     // Success Message Styles
     successMessage: {
       position: 'fixed',
       top: '20px',
       right: '20px',
-      backgroundColor: '#4caf50',
+      backgroundColor: '#10B981',
       color: 'white',
       padding: '12px 20px',
       borderRadius: '8px',
-      boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+      boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
       zIndex: 2000,
       display: 'flex',
       alignItems: 'center',
       gap: '8px',
-      fontSize: '14px',
-      fontWeight: '500',
-      animation: 'slideInRight 0.3s ease-out'
+      fontSize: '13px',
+      fontWeight: '600',
     },
-    // Collapsed Sidebar Styles
+    // Collapsed Sidebar Styles - FIXED
     collapsedContainer: {
-      paddingBottom: '20px',
+      paddingBottom: '16px',
       display: 'flex',
       flexDirection: 'column',
       alignItems: 'center',
       height: '100%',
       overflowY: 'auto',
-      paddingTop: '60px'
+      paddingTop: '60px',
+      width: '100%',
     },
     collapsedButton: {
       display: 'flex',
@@ -1057,30 +1135,28 @@ const testAI = async () => {
       alignItems: 'center',
       width: '48px',
       height: '48px',
-      marginBottom: '8px',
+      marginBottom: '10px',
       background: 'none',
       border: 'none',
       cursor: 'pointer',
       position: 'relative',
-      borderRadius: '8px',
-      transition: 'background-color 0.2s ease',
+      borderRadius: '12px',
+      transition: 'all 0.2s ease',
     },
     collapsedIcon: {
-      fontSize: '28px',
-      color: '#00000',
-      display: 'inline-block',
-      fontStyle: 'normal',
-    },
-    collapsedButtonActive: {
-      backgroundColor: 'rgba(255,255,255,0.2)',
-      borderRadius: '8px',
+      fontSize: '22px',
+      color: 'rgba(255, 255, 255, 0.8)',
+      transition: 'all 0.2s ease',
     },
     collapsedIconActive: {
-      fontSize: '28px',
-      color: '#000000',
-      display: 'inline-block',
-      fontStyle: 'normal',
-    }
+      fontSize: '22px',
+      color: '#FFFFFF',
+    },
+    collapsedButtonActive: {
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
+      backdropFilter: 'blur(10px)',
+      transform: 'scale(1.05)',
+    },
   };
 
   return (
@@ -1090,6 +1166,8 @@ const testAI = async () => {
           style={styles.toggleButton} 
           onClick={toggleSidebar}
           aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.2)'}
+          onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
         >
           {isCollapsed ? <GoSidebarCollapse /> : <GoSidebarExpand /> }
         </button>
@@ -1097,7 +1175,53 @@ const testAI = async () => {
         {!isCollapsed && (
           <div style={styles.scrollContainer}>
             <div style={styles.adminContainer}>
-              <img src={logo} alt="Admin" style={styles.adminImage} />
+              <img src={logo} alt="5KI Banking" style={styles.adminImage} />
+              <div style={styles.adminTitle}>5KI Financial Services</div>
+              
+              {/* Profile Icon + Admin Button */}
+              <div style={styles.adminButtonContainer}>
+                <button
+                  style={styles.adminProfileButton}
+                  onClick={toggleDropdown}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
+                >
+                  <div 
+                    style={styles.adminProfileIcon}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAdminIconPress();
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = '#2563EB';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = '#3B82F6';
+                    }}
+                  >
+                    <FaUserCircle size={12} color="#FFFFFF" />
+                  </div>
+                  <span style={styles.adminButtonText}>Admin</span>
+                  {isDropdownVisible ? <FaChevronUp size={8} color="#FFFFFF" /> : <FaChevronDown size={8} color="#FFFFFF" />}
+                </button>
+
+                {isDropdownVisible && (
+                  <div style={styles.adminDropdownMenu}>
+                    <div 
+                      onClick={() => {
+                        setLogoutModalVisible(true);
+                        setIsDropdownVisible(false);
+                      }} 
+                      style={styles.adminDropdownItem}
+                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F8FAFC'}
+                      onMouseLeave={(e) => e.target.style.backgroundColor = 'white'}
+                    >
+                      <FaSignOutAlt size={10} style={{ color: '#EF4444' }} />
+                      <span style={{...styles.adminDropdownItemText, color: '#EF4444'}}>Logout</span>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
 
             <button
@@ -1105,11 +1229,13 @@ const testAI = async () => {
               style={isActive('dashboard') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('dashboard') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('dashboard') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <Analytics02Icon 
                   style={isActive('dashboard') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
               </div>
               <span style={isActive('dashboard') ? styles.activeButtonText : styles.buttonText}>
@@ -1122,11 +1248,13 @@ const testAI = async () => {
               style={isActive('registrations') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('registrations') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('registrations') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <UserGroupIcon 
                   style={isActive('registrations') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
                 {pendingCounts.registrations > 0 && (
                   <span style={styles.badge}>{pendingCounts.registrations}</span>
@@ -1142,11 +1270,13 @@ const testAI = async () => {
               style={isActive('deposits') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('deposits') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('deposits') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <Payment02Icon 
                   style={isActive('deposits') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
                 {pendingCounts.deposits > 0 && (
                   <span style={styles.badge}>{pendingCounts.deposits}</span>
@@ -1162,11 +1292,13 @@ const testAI = async () => {
               style={isActive('applyLoans') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('applyLoans') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('applyLoans') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <MoneyAdd02Icon 
                   style={isActive('applyLoans') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
                 {pendingCounts.loans > 0 && (
                   <span style={styles.badge}>{pendingCounts.loans}</span>
@@ -1182,11 +1314,13 @@ const testAI = async () => {
               style={isActive('payLoans') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('payLoans') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('payLoans') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <Payment01Icon 
                   style={isActive('payLoans') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
                 {pendingCounts.payments > 0 && (
                   <span style={styles.badge}>{pendingCounts.payments}</span>
@@ -1202,11 +1336,13 @@ const testAI = async () => {
               style={isActive('withdraws') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('withdraws') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('withdraws') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <ReverseWithdrawal01Icon 
                   style={isActive('withdraws') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
                 {pendingCounts.withdraws > 0 && (
                   <span style={styles.badge}>{pendingCounts.withdraws}</span>
@@ -1222,11 +1358,13 @@ const testAI = async () => {
               style={isActive('transactions') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('transactions') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('transactions') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <GrTransaction 
                   style={isActive('transactions') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
               </div>
               <span style={isActive('transactions') ? styles.activeButtonText : styles.buttonText}>
@@ -1239,11 +1377,13 @@ const testAI = async () => {
               style={isActive('coadmins') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('coadmins') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('coadmins') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <ManagerIcon 
                   style={isActive('coadmins') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
               </div>
               <span style={isActive('coadmins') ? styles.activeButtonText : styles.buttonText}>
@@ -1256,11 +1396,13 @@ const testAI = async () => {
               style={isActive('settings') ? 
                 {...styles.button, ...styles.activeButton} : 
                 styles.button}
+              onMouseEnter={(e) => !isActive('settings') && (e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.08)')}
+              onMouseLeave={(e) => !isActive('settings') && (e.target.style.backgroundColor = 'transparent')}
             >
               <div style={styles.iconContainer}>
                 <Settings02Icon 
                   style={isActive('settings') ? styles.activeIcon : styles.icon} 
-                  size={28}
+                  size={18}
                 />
               </div>
               <span style={isActive('settings') ? styles.activeButtonText : styles.buttonText}>
@@ -1274,14 +1416,15 @@ const testAI = async () => {
               style={{
                 ...styles.button,
                 marginTop: 'auto',
-                marginBottom: '20px'
+                marginBottom: '16px',
+                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                border: '1px solid rgba(255, 255, 255, 0.2)',
               }}
+              onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.15)'}
+              onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.1)'}
             >
               <div style={styles.iconContainer}>
-                <FaRobot 
-                  style={styles.icon} 
-                  size={28}
-                />
+                <FaRobot style={styles.icon} size={18} />
               </div>
               <span style={styles.buttonText}>
                 AI Assistant
@@ -1290,7 +1433,7 @@ const testAI = async () => {
           </div>
         )}
 
-        {/* Collapsed Sidebar - Show only icons */}
+        {/* Collapsed Sidebar - Show only icons - FIXED */}
         {isCollapsed && (
           <div style={styles.collapsedContainer}>
             <button
@@ -1299,10 +1442,22 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Dashboard"
+              onMouseEnter={(e) => {
+                if (!isActive('dashboard')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('dashboard')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <Analytics02Icon 
                 style={isActive('dashboard') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
             </button>
 
@@ -1312,13 +1467,33 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Membership"
+              onMouseEnter={(e) => {
+                if (!isActive('registrations')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('registrations')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <UserGroupIcon 
                 style={isActive('registrations') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
               {pendingCounts.registrations > 0 && (
-                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.registrations}</span>
+                <span style={{
+                  ...styles.badge, 
+                  top: '-2px', 
+                  right: '-2px',
+                  minWidth: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>{pendingCounts.registrations}</span>
               )}
             </button>
 
@@ -1328,13 +1503,33 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Deposits"
+              onMouseEnter={(e) => {
+                if (!isActive('deposits')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('deposits')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <Payment02Icon 
                 style={isActive('deposits') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
               {pendingCounts.deposits > 0 && (
-                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.deposits}</span>
+                <span style={{
+                  ...styles.badge, 
+                  top: '-2px', 
+                  right: '-2px',
+                  minWidth: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>{pendingCounts.deposits}</span>
               )}
             </button>
 
@@ -1344,13 +1539,33 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Loans"
+              onMouseEnter={(e) => {
+                if (!isActive('applyLoans')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('applyLoans')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <MoneyAdd02Icon 
                 style={isActive('applyLoans') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
               {pendingCounts.loans > 0 && (
-                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.loans}</span>
+                <span style={{
+                  ...styles.badge, 
+                  top: '-2px', 
+                  right: '-2px',
+                  minWidth: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>{pendingCounts.loans}</span>
               )}
             </button>
 
@@ -1360,13 +1575,33 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Payments"
+              onMouseEnter={(e) => {
+                if (!isActive('payLoans')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('payLoans')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <Payment01Icon 
                 style={isActive('payLoans') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
               {pendingCounts.payments > 0 && (
-                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.payments}</span>
+                <span style={{
+                  ...styles.badge, 
+                  top: '-2px', 
+                  right: '-2px',
+                  minWidth: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>{pendingCounts.payments}</span>
               )}
             </button>
 
@@ -1376,13 +1611,33 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Withdrawals"
+              onMouseEnter={(e) => {
+                if (!isActive('withdraws')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('withdraws')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <ReverseWithdrawal01Icon 
                 style={isActive('withdraws') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
               {pendingCounts.withdraws > 0 && (
-                <span style={{...styles.badge, top: '-4px', right: '-4px'}}>{pendingCounts.withdraws}</span>
+                <span style={{
+                  ...styles.badge, 
+                  top: '-2px', 
+                  right: '-2px',
+                  minWidth: '20px',
+                  height: '20px',
+                  fontSize: '11px',
+                  fontWeight: '700'
+                }}>{pendingCounts.withdraws}</span>
               )}
             </button>
 
@@ -1392,10 +1647,22 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Transactions"
+              onMouseEnter={(e) => {
+                if (!isActive('transactions')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('transactions')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <GrTransaction 
                 style={isActive('transactions') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
             </button>
 
@@ -1405,10 +1672,22 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Co-Admins"
+              onMouseEnter={(e) => {
+                if (!isActive('coadmins')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('coadmins')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <ManagerIcon 
                 style={isActive('coadmins') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
             </button>
 
@@ -1418,10 +1697,22 @@ const testAI = async () => {
                 {...styles.collapsedButton, ...styles.collapsedButtonActive} : 
                 styles.collapsedButton}
               title="Settings"
+              onMouseEnter={(e) => {
+                if (!isActive('settings')) {
+                  e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                  e.target.style.transform = 'scale(1.08)';
+                }
+              }}
+              onMouseLeave={(e) => {
+                if (!isActive('settings')) {
+                  e.target.style.backgroundColor = 'transparent';
+                  e.target.style.transform = 'scale(1)';
+                }
+              }}
             >
               <Settings02Icon 
                 style={isActive('settings') ? styles.collapsedIconActive : styles.collapsedIcon} 
-                size={28} 
+                size={22}
               />
             </button>
 
@@ -1431,11 +1722,19 @@ const testAI = async () => {
               style={{
                 ...styles.collapsedButton,
                 marginTop: 'auto',
-                marginBottom: '20px'
+                marginBottom: '16px'
               }}
               title="AI Assistant"
+              onMouseEnter={(e) => {
+                e.target.style.backgroundColor = 'rgba(255, 255, 255, 0.12)';
+                e.target.style.transform = 'scale(1.08)';
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.backgroundColor = 'transparent';
+                e.target.style.transform = 'scale(1)';
+              }}
             >
-              <FaRobot style={styles.collapsedIcon} size={28} />
+              <FaRobot style={styles.collapsedIcon} size={22} />
             </button>
           </div>
         )}
@@ -1445,38 +1744,15 @@ const testAI = async () => {
         {renderSection()}
       </div>
 
-      <div style={styles.dropdownWrapper}>
-        <div style={styles.dropdownContainer}>
-          <div style={styles.dropdownButton}>
-            <div onClick={handleAdminIconPress} style={styles.profileIconContainer}>
-              <FaUserCircle size={36} color="#000" />
-            </div>
-            <div onClick={toggleDropdown} style={styles.dropdownTextContainer}>
-              <span style={styles.dropdownText}>Admin</span>
-              {isDropdownVisible ? <FaChevronUp size={16} /> : <FaChevronDown size={16} />}
-            </div>
-          </div>
-
-          {isDropdownVisible && (
-            <div style={styles.dropdownMenu}>
-              <div 
-                onClick={() => {
-                  setLogoutModalVisible(true);
-                  setIsDropdownVisible(false);
-                }} 
-                style={styles.dropdownItem}
-              >
-                <FaSignOutAlt size={22} style={{ marginRight: '10px' }} />
-                <span style={styles.dropdownItemText}>Logout</span>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
       {isSmallScreen && (
         <div style={styles.fullOverlay}>
-          <span style={styles.overlayText}>Please use a device with a larger screen.</span>
+          <div style={styles.overlayContent}>
+            <div style={styles.overlayIcon}>💻</div>
+            <h2 style={styles.overlayTitle}>Desktop Experience Required</h2>
+            <p style={styles.overlayText}>
+              For optimal functionality and security, please access the Admin Portal from a desktop or tablet device.
+            </p>
+          </div>
         </div>
       )}
 
@@ -1484,28 +1760,33 @@ const testAI = async () => {
       {logoutModalVisible && (
         <div style={styles.centeredModal}>
           <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>Are you sure you want to log out?</p>
+            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#EF4444' }} />
+            <p style={styles.modalText}>Are you sure you want to log out of the Admin Portal?</p>
             <div style={{ display: 'flex', gap: '10px' }}>
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
+                  backgroundColor: '#EF4444',
+                  color: '#fff',
                 }} 
                 onClick={handleLogout}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#DC2626'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#EF4444'}
               >
-                Yes
+                <FaSignOutAlt style={{ marginRight: '4px' }} />
+                Logout
               </button>
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
+                  backgroundColor: '#6B7280',
+                  color: '#fff',
                 }} 
                 onClick={() => setLogoutModalVisible(false)}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#6B7280'}
               >
-                No
+                Cancel
               </button>
             </div>
           </div>
@@ -1523,9 +1804,9 @@ const testAI = async () => {
                   style={styles.newChatButton}
                   onClick={startNewChat}
                   onMouseEnter={(e) => e.target.style.backgroundColor = '#1e4a6b'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = '#2D5783'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = '#1E3A8A'}
                 >
-                  <FaPlus size={14} />
+                  <FaPlus size={12} />
                   New Chat
                 </button>
               </div>
@@ -1537,10 +1818,10 @@ const testAI = async () => {
                 
                 {chatSessions.length === 0 ? (
                   <div style={{ 
-                    padding: '20px', 
+                    padding: '16px', 
                     textAlign: 'center', 
                     color: '#666',
-                    fontSize: '14px'
+                    fontSize: '13px'
                   }}>
                     No chat history yet.
                     <br />
@@ -1584,6 +1865,14 @@ const testAI = async () => {
                           confirmDeleteChat(chat.id);
                         }}
                         title="Delete Chat"
+                        onMouseEnter={(e) => {
+                          e.target.style.backgroundColor = '#FEF2F2';
+                          e.target.style.color = '#EF4444';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.target.style.backgroundColor = 'transparent';
+                          e.target.style.color = '#9CA3AF';
+                        }}
                       >
                         <FaTrash />
                       </button>
@@ -1597,10 +1886,10 @@ const testAI = async () => {
             <div style={styles.aiMainContent}>
               <div style={styles.aiMainHeader}>
                 <div style={styles.aiMainTitle}>
-                  <FaRobot size={20} />
+                  <FaRobot size={18} />
                   AI Assistant
                   {currentChatId && (
-                    <span style={{ fontSize: '14px', opacity: 0.8, marginLeft: '8px' }}>
+                    <span style={{ fontSize: '13px', opacity: 0.8, marginLeft: '6px' }}>
                       - {chatSessions.find(chat => chat.id === currentChatId)?.title || 'Chat'}
                     </span>
                   )}
@@ -1608,8 +1897,8 @@ const testAI = async () => {
                 <button 
                   style={styles.aiCloseButton}
                   onClick={toggleAIAssistant}
-                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.1)'}
-                  onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                  onMouseEnter={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.2)'}
+                  onMouseLeave={(e) => e.target.style.backgroundColor = 'rgba(255,255,255,0.1)'}
                 >
                   <FaTimes />
                 </button>
@@ -1635,7 +1924,7 @@ const testAI = async () => {
                       <div style={{...styles.aiLoadingDot, animationDelay: '0s'}}></div>
                       <div style={{...styles.aiLoadingDot, animationDelay: '0.2s'}}></div>
                       <div style={{...styles.aiLoadingDot, animationDelay: '0.4s'}}></div>
-                      <span style={{ marginLeft: '8px', fontSize: '14px', color: '#666' }}>
+                      <span style={{ marginLeft: '6px', fontSize: '13px', color: '#666' }}>
                         AI is thinking...
                       </span>
                     </div>
@@ -1652,6 +1941,16 @@ const testAI = async () => {
                   placeholder="Ask me anything about your system..."
                   style={styles.aiInput}
                   disabled={aiLoading}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = '#3B82F6';
+                    e.target.style.backgroundColor = 'white';
+                    e.target.style.boxShadow = '0 0 0 3px rgba(59, 130, 246, 0.1)';
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = '#D1D5DB';
+                    e.target.style.backgroundColor = '#F9FAFB';
+                    e.target.style.boxShadow = 'none';
+                  }}
                 />
                 <button 
                   type="submit"
@@ -1668,7 +1967,7 @@ const testAI = async () => {
                   }}
                   onMouseLeave={(e) => {
                     if (!aiLoading && aiInput.trim()) {
-                      e.target.style.backgroundColor = '#2D5783';
+                      e.target.style.backgroundColor = '#1E3A8A';
                     }
                   }}
                 >
@@ -1692,21 +1991,25 @@ const testAI = async () => {
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#f44336',
+                  backgroundColor: '#EF4444',
                   color: '#fff'
                 }} 
                 onClick={deleteChat}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#DC2626'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#EF4444'}
               >
-                <FaTrash style={{ marginRight: '6px' }} />
+                <FaTrash style={{ marginRight: '4px' }} />
                 Delete
               </button>
               <button 
                 style={{
                   ...styles.actionButton,
-                  backgroundColor: '#6c757d',
+                  backgroundColor: '#6B7280',
                   color: '#fff'
                 }} 
                 onClick={cancelDeleteChat}
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = '#6B7280'}
               >
                 Cancel
               </button>
@@ -1726,7 +2029,10 @@ const testAI = async () => {
       {/* Loading Overlay */}
       {loading && (
         <div style={styles.loadingOverlay}>
-          <div style={styles.spinner}></div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '14px' }}>
+            <div style={styles.spinner}></div>
+            <div style={{ color: 'white', fontSize: '14px', fontWeight: '500' }}>Logging out...</div>
+          </div>
         </div>
       )}
     </div>

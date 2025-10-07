@@ -1,0 +1,1584 @@
+import React, { useState } from 'react';
+import { database } from '../../../../../Database/firebaseConfig';
+import { ApproveDeposits, RejectDeposits } from '../../../../../Server/api';
+import { FaCheckCircle, FaTimes, FaExclamationCircle, FaImage, FaChevronLeft, FaChevronRight, FaSpinner } from 'react-icons/fa';
+import Tesseract from 'tesseract.js';
+
+const styles = {
+  container: {
+    flex: 1,
+  },
+  loadingView: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '100%'
+  },
+  tableContainer: {
+    borderRadius: '8px',
+    overflow: 'auto',
+    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+  },
+  table: {
+    width: '100%',
+    borderCollapse: 'collapse',
+    tableLayout: 'fixed',
+    minWidth: '800px'
+  },
+  tableHeader: {
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    height: '50px',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: '16px'
+  },
+  tableHeaderCell: {
+    whiteSpace: 'nowrap'
+  },
+  tableRow: {
+    height: '50px',
+    '&:nth-child(even)': {
+      backgroundColor: '#f5f5f5'
+    },
+    '&:nth-child(odd)': {
+      backgroundColor: '#ddd'
+    }
+  },
+  tableCell: {
+    textAlign: 'center',
+    fontSize: '14px',
+    borderBottom: '1px solid #ddd',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  statusApproved: {
+    color: 'green'
+  },
+  statusRejected: {
+    color: 'red'
+  },
+  noDataMessage: {
+    textAlign: 'center',
+    marginTop: '50px',
+    fontSize: '16px',
+    color: 'gray'
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  modalCard: {
+    width: '40%',
+    maxWidth: '900px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    maxHeight: '80vh',
+    height: '80vh',
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  modalCardSmall: {
+    width: '250px',
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+    textAlign: 'center'
+  },
+  modalContent: {
+    paddingBottom: '12px',
+    overflowY: 'auto',
+    flex: 1
+  },
+  columns: {
+    display: 'flex',
+    flexDirection: 'row',
+    gap: '30px'
+  },
+  leftColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  rightColumn: {
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+  },
+  modalTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  modalDetailText: {
+    fontSize: '13px',
+    marginBottom: '6px',
+    color: '#333',
+    wordBreak: 'break-word',
+    lineHeight: '1.3'
+  },
+  imageGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, 1fr)',
+    marginBottom: '12px',
+    gap: '10px'
+  },
+  imageBlock: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'flex-start'
+  },
+  imageLabel: {
+    fontSize: '13px',
+    fontWeight: 'bold',
+    color: '#333',
+    width: '100%',
+    textAlign: 'left',
+    marginLeft: 0,
+    paddingLeft: 0
+  },
+  imageThumbnail: {
+    width: '90%',
+    height: '120px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    objectFit: 'cover',
+    cursor: 'pointer',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  closeButton: {
+    position: 'absolute',
+    top: '10px',
+    right: '10px',
+    cursor: 'pointer',
+    fontSize: '18px',
+    color: 'grey',
+    backgroundColor: 'transparent',
+    border: 'none',
+    padding: '4px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  bottomButtons: {
+    display: 'flex',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginTop: '16px',
+    gap: '12px',
+    paddingTop: '12px',
+    borderTop: '1px solid #eee'
+  },
+  actionButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '14px',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '6px',
+    transition: 'all 0.2s',
+    minWidth: '100px',
+    outline: 'none',
+    '&:focus': {
+      outline: 'none',
+      boxShadow: 'none'
+    }
+  },
+  approveButton: {
+    backgroundColor: '#4CAF50',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#3e8e41'
+    }
+  },
+  rejectButton: {
+    backgroundColor: '#f44336',
+    color: '#FFF',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  disabledButton: {
+    backgroundColor: '#ccc',
+    cursor: 'not-allowed',
+    opacity: '0.7'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '16px',
+    textAlign: 'center',
+    color: '#333',
+    lineHeight: '1.4'
+  },
+  confirmIcon: {
+    marginBottom: '12px',
+    fontSize: '32px'
+  },
+  spinner: {
+    border: '4px solid rgba(0, 0, 0, 0.1)',
+    borderLeftColor: '#2D5783',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
+  },
+  '@keyframes spin': {
+    '0%': { transform: 'rotate(0deg)' },
+    '100%': { transform: 'rotate(360deg)' }
+  },
+  viewText: {
+    color: '#2D5783',
+    fontSize: '14px',
+    textDecoration: 'underline',
+    cursor: 'pointer',
+    fontWeight: '500',
+    '&:hover': {
+      color: '#1a3d66'
+    },
+    outline: 'none',
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  modalHeader: {
+    borderBottom: '1px solid #eee',
+    paddingBottom: '12px',
+    marginBottom: '12px'
+  },
+  compactField: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '6px',
+    gap: '8px'
+  },
+  fieldLabel: {
+    fontWeight: 'bold',
+    color: '#555',
+    fontSize: '13px',
+    minWidth: '100px'
+  },
+  fieldValue: {
+    textAlign: 'right',
+    flex: 1,
+    wordBreak: 'break-word',
+    color: '#333',
+    fontSize: '13px'
+  },
+  // Compact info modal displayed inside the image viewer
+  infoModalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 3000
+  },
+  infoModalCard: {
+    width: '340px',
+    backgroundColor: 'white',
+    borderRadius: '12px',
+    padding: '20px',
+    boxShadow: '0 12px 28px rgba(0,0,0,0.25)',
+    textAlign: 'center'
+  },
+  infoTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: '12px'
+  },
+  infoRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '10px',
+    margin: '6px 0'
+  },
+  infoLabel: {
+    fontWeight: '600',
+    color: '#555',
+    fontSize: '13px'
+  },
+  infoValue: {
+    color: '#333',
+    fontSize: '13px',
+    maxWidth: '60%',
+    wordBreak: 'break-word',
+    textAlign: 'right'
+  },
+  infoCloseButton: {
+    marginTop: '14px',
+    padding: '8px 16px',
+    borderRadius: '6px',
+    border: 'none',
+    backgroundColor: '#2D5783',
+    color: '#fff',
+    cursor: 'pointer',
+    fontWeight: 'bold'
+  },
+  imageViewerModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2000
+  },
+  imageViewerContent: {
+    position: 'relative',
+    width: '100%',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  largeImage: {
+    width: '90%',
+    maxWidth: '1100px',
+    maxHeight: '82vh',
+    objectFit: 'contain',
+    borderRadius: '4px'
+  },
+  imageViewerLabel: {
+    color: 'white',
+    fontSize: '18px',
+    marginTop: '16px',
+    textAlign: 'center'
+  },
+  imageViewerClose: {
+    position: 'fixed',
+    top: '20px',
+    right: '28px',
+    color: 'white',
+    fontSize: '28px',
+    cursor: 'pointer',
+    padding: '8px',
+    backgroundColor: 'transparent',
+    border: 'none',
+    outline: 'none',
+    zIndex: 2200,
+    '&:focus': {
+      outline: 'none'
+    }
+  },
+  imageViewerNav: {
+    position: 'fixed',
+    top: '50%',
+    transform: 'translateY(-50%)',
+    color: 'white',
+    fontSize: '28px',
+    cursor: 'pointer',
+    padding: '16px',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: '50%',
+    border: 'none',
+    outline: 'none',
+    zIndex: 2200
+  },
+  prevButton: {
+    left: '28px'
+  },
+  nextButton: {
+    right: '28px'
+  },
+  sectionTitle: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    margin: '12px 0 8px 0',
+    paddingBottom: '4px',
+    borderBottom: '1px solid #eee',
+    textAlign: 'left',
+    width: '100%'
+  },
+  rejectionModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1001
+  },
+  rejectionModalContent: {
+    backgroundColor: 'white',
+    borderRadius: '8px',
+    padding: '20px',
+    width: '400px',
+    maxWidth: '90%',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.15)'
+  },
+  rejectionTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    marginBottom: '16px',
+    color: '#2D5783',
+    textAlign: 'center'
+  },
+  reasonOption: {
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: '10px',
+    padding: '8px',
+    borderRadius: '4px',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#f5f5f5'
+    }
+  },
+  reasonRadio: {
+    marginRight: '10px'
+  },
+  reasonText: {
+    flex: 1
+  },
+  customReasonInput: {
+    width: '100%',
+    padding: '8px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    marginTop: '8px'
+  },
+  rejectionButtons: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginTop: '20px',
+    gap: '10px'
+  },
+  cancelButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: '1px solid #ddd',
+    backgroundColor: 'white',
+    cursor: 'pointer'
+  },
+  confirmRejectButton: {
+    padding: '8px 16px',
+    borderRadius: '4px',
+    border: 'none',
+    backgroundColor: '#f44336',
+    color: 'white',
+    cursor: 'pointer',
+    '&:hover': {
+      backgroundColor: '#d32f2f'
+    }
+  },
+  actionText: {
+    fontSize: '14px',
+    cursor: 'pointer',
+    fontWeight: '500',
+    color: '#2D5783',
+    textDecoration: 'none',
+    margin: '0 5px',
+    transition: 'color 0.2s ease, text-decoration 0.2s ease',
+    outline: 'none'
+  },
+  approveHover: {
+    color: '#4CAF50',
+    textDecoration: 'underline'
+  },
+  rejectHover: {
+    color: '#f44336',
+    textDecoration: 'underline'
+  }
+};
+
+const rejectionReasons = [
+  "Invalid proof of deposit",
+  "Incorrect amount",
+  "Unclear image",
+  "Suspicious activity",
+  "Other"
+];
+
+const ApplyDeposits = ({ 
+  deposits, 
+  currentPage, 
+  totalPages, 
+  onPageChange, 
+  refreshData 
+}) => {
+  const [currentAction, setCurrentAction] = useState(null);
+  const [selectedDeposit, setSelectedDeposit] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [imageViewerVisible, setImageViewerVisible] = useState(false);
+  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [showRejectionModal, setShowRejectionModal] = useState(false);
+  const [selectedReason, setSelectedReason] = useState('');
+  const [customReason, setCustomReason] = useState('');
+  const [availableImages, setAvailableImages] = useState([]);
+  const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
+  const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [hoverStates, setHoverStates] = useState({});
+  const [pendingApiCall, setPendingApiCall] = useState(null);
+  const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
+  const showInfoModal = (title, fields) => setInfoModal({ visible: true, title, fields });
+  const closeInfoModal = () => setInfoModal({ visible: false, title: '', fields: [] });
+
+  const formatCurrency = (amount) =>
+    new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+    }).format(amount);
+
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    
+    return `${hours}:${minutes}:${seconds} ${ampm}`;
+  };
+
+  const formatDate = (date) => {
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+  };
+
+  const handleHover = (transactionId, type, isHovering) => {
+    setHoverStates(prev => ({
+      ...prev,
+      [transactionId]: {
+        ...prev[transactionId],
+        [type]: isHovering ? styles[`${type}Hover`] : {}
+      }
+    }));
+  };
+
+  const openModal = (deposit) => {
+    setSelectedDeposit(deposit);
+    setModalVisible(true);
+  };
+
+  // Lightweight OCR status store
+  const [validationStatus, setValidationStatus] = useState({});
+  const getValidationText = (label) => {
+    const status = validationStatus[label];
+    if (!status) return null;
+    const color = status.status === 'valid' ? '#4CAF50'
+      : (status.status === 'invalid' || status.status === 'error') ? '#f44336'
+      : status.status === 'partial' ? '#ff9800'
+      : status.status === 'verifying' ? '#2196F3'
+      : '#fff';
+    return (
+      <div style={{ 
+        marginTop: 8, 
+        fontSize: 13, 
+        color: color,
+        textAlign: 'center',
+        backgroundColor: 'rgba(255,255,255,0.1)',
+        padding: '8px 12px',
+        borderRadius: '4px',
+        maxWidth: '300px',
+        wordWrap: 'break-word'
+      }}>
+        {status.message}
+      </div>
+    );
+  };
+
+   // Load image with CORS strategies and optional proxy (mirrors Registrations)
+   const loadImageWithCORS = async (imageUrl) => {
+     return new Promise((resolve, reject) => {
+       const createCanvasFromImage = (img) => {
+         const canvas = document.createElement('canvas');
+         const ctx = canvas.getContext('2d');
+         canvas.width = img.width || img.naturalWidth;
+         canvas.height = img.height || img.naturalHeight;
+         try {
+           ctx.drawImage(img, 0, 0);
+           return canvas;
+         } catch (error) {
+           return img;
+         }
+       };
+       const tryLoadImage = (corsMode, attempt = 1) => {
+         const newImg = new Image();
+         if (corsMode) newImg.crossOrigin = corsMode;
+         newImg.onload = () => {
+           if (imageUrl.includes('firebasestorage.googleapis.com')) {
+             try { resolve(createCanvasFromImage(newImg)); } catch { resolve(newImg); }
+           } else {
+             resolve(newImg);
+           }
+         };
+         newImg.onerror = () => {
+           if (attempt === 1) {
+             tryLoadImage('use-credentials', 2);
+           } else if (attempt === 2) {
+             tryLoadImage(null, 3);
+           } else if (attempt === 3) {
+             try {
+               const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
+               const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
+               const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+               const proxied = new Image();
+               proxied.crossOrigin = 'anonymous';
+               proxied.onload = () => resolve(proxied);
+               proxied.onerror = () => resolve(newImg);
+               proxied.src = proxyUrl;
+             } catch {
+               resolve(newImg);
+             }
+           }
+         };
+         newImg.src = imageUrl;
+       };
+       tryLoadImage('anonymous', 1);
+     });
+   };
+
+   // Basic OCR preprocessing: upscale + grayscale + contrast tweak
+   const preprocessForOCR = (img, scale = 2, binary = false) => {
+     try {
+       const srcW = img.width || img.naturalWidth || 0;
+       const srcH = img.height || img.naturalHeight || 0;
+       if (!srcW || !srcH) return img;
+       const canvas = document.createElement('canvas');
+       const ctx = canvas.getContext('2d');
+       canvas.width = Math.round(srcW * scale);
+       canvas.height = Math.round(srcH * scale);
+       ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+       const data = imageData.data;
+       for (let i = 0; i < data.length; i += 4) {
+         const r = data[i], g = data[i + 1], b = data[i + 2];
+         let v = 0.299 * r + 0.587 * g + 0.114 * b; // grayscale
+         // increase contrast slightly
+         v = Math.min(255, Math.max(0, (v - 128) * 1.15 + 128));
+         if (binary) v = v > 150 ? 255 : 0;
+         data[i] = data[i + 1] = data[i + 2] = v;
+       }
+       ctx.putImageData(imageData, 0, 0);
+       return canvas;
+     } catch {
+       return img;
+     }
+   };
+
+   const parsePaymentText = (raw) => {
+    const text = (raw || '').replace(/\s+/g, ' ').replace(/[|]/g, ' ').trim();
+
+    const amountPatterns = [
+      /(?:amount|amt|paid)\s*[:\-]?\s*(?:php|₱)?\s*([\d.,]+)\b/i,
+      /(?:php|₱)\s*([\d.,]+)\b/i
+    ];
+    const refPatterns = [
+      /(ref(?:erence)?\s*(?:no\.?|#)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
+      /(ref(?:erence)?\s*(?:no\.?|#)?|gcash\s*ref(?:erence)?|txn\s*id|transaction\s*(?:id|no\.?))\s*[:\-]?\s*([A-Z0-9\-]{6,})/i,
+      /\b(?:ref(?:erence)?\s*(?:no\.?|#)?)\s*([A-Z0-9\-]{6,})\b/i,
+      /\b([A-Z0-9]{10,})\b/
+    ];
+
+    // Date and time extraction similar to Registrations payment proof, with more variations
+    const month = '(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*';
+    const timePart = '(?:\\d{1,2}[:.;\\s]\\d{2}(?:[:.;\\s]\\d{2})?\\s*(?:am|pm)?)';
+    const datePatterns = [
+      new RegExp(`\\b${month}\\s+\\d{1,2},?\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{1,2}\\s+${month}\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b${month}\\s+\\d{1,2}\\s+\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{4}-\\d{2}-\\d{2}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b\\d{1,2}\/\\d{1,2}\/\\d{2,4}(?:\\s+${timePart})?`, 'i'),
+      new RegExp(`\\b(?:date\\s*&\\s*time|date\\s+and\\s+time|transaction\\s*date|date|time)\\s*[:\\-]?\\s*(${month}\\s+\\d{1,2},?\\s+\\d{2,4}(?:\\s+${timePart})?|\\d{1,2}\\/\\d{1,2}\\/\\d{2,4}(?:\\s+${timePart})?|\\d{4}-\\d{2}-\\d{2}(?:\\s+${timePart})?)`, 'i')
+    ];
+
+    let amount = null;
+    for (const re of amountPatterns) {
+      const m = text.match(re);
+      if (m && m[1]) {
+        amount = m[1].replace(/,/g, '');
+        const dotCount = (amount.match(/\./g) || []).length;
+        const commaCount = (amount.match(/,/g) || []).length;
+        if (commaCount && !dotCount) amount = amount.replace(/,/g, '');
+        if (commaCount && dotCount) amount = amount.replace(/,/g, '');
+        break;
+      }
+    }
+
+    let refNo = null;
+    for (const re of refPatterns) {
+      const m = text.match(re);
+      if (m) {
+        refNo = (m[2] || m[1] || '').toString().trim();
+        refNo = refNo.replace(/\s{2,}/g, ' ').trim();
+        break;
+      }
+    }
+    if (!refNo) {
+      const fallback = text.match(/ref(?:erence)?\s*(?:no\.?|#)?\s*[:\-]?\s*([A-Z0-9\s\-]{8,30})/i);
+      if (fallback && fallback[1]) {
+        refNo = fallback[1].replace(/[^A-Z0-9\s\-]/gi, '').replace(/\s{2,}/g, ' ').trim();
+      }
+    }
+    if (!refNo) {
+      const spacedDigits = text.match(/\b\d{3,6}(?:\s+\d{3,6}){1,5}\b/);
+      if (spacedDigits) {
+        refNo = spacedDigits[0].replace(/\s{2,}/g, ' ').trim();
+      }
+    }
+
+    let dateTime = null;
+    for (const re of datePatterns) {
+      const m = text.match(re);
+      if (m) { dateTime = (m[1] || m[0]).trim(); break; }
+    }
+    if (!dateTime) {
+      const dateToken = text.match(new RegExp(`\\b(?:${month})\\s+\\d{1,2},?\\s+\\d{2,4}\\b|\\b\\d{1,2}\/\\d{1,2}\/\\d{2,4}\\b|\\b\\d{4}-\\d{2}-\\d{2}\\b`, 'i'));
+      const timeToken = text.match(/\b\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?\b/i);
+      if (dateToken && timeToken) dateTime = `${dateToken[0]} ${timeToken[0]}`.trim();
+    }
+
+    return { amount, refNo, dateTime };
+  };
+
+  const verifyDepositProof = async (imageUrl, label) => {
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Extracting payment details...' }
+    }));
+    try {
+      const baseImg = await loadImageWithCORS(imageUrl);
+      const preprocessed = preprocessForOCR(baseImg, 2, false);
+      const { data: { text, confidence } } = await Tesseract.recognize(preprocessed, 'eng');
+      const parsed = parsePaymentText(text);
+      const foundAny = parsed.amount || parsed.refNo;
+
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: {
+          status: foundAny ? 'valid' : (confidence > 30 ? 'partial' : 'manual'),
+          message: foundAny
+            ? `Amount: ${parsed.amount || 'N/A'}, Ref No: ${parsed.refNo || 'N/A'}${parsed.dateTime ? `, Date: ${parsed.dateTime}` : ''}`
+            : 'Text detected but could not find Amount/Ref No'
+        }
+      }));
+
+      if (foundAny) {
+        showInfoModal('Verification Success', [
+          { label: 'Amount', value: parsed.amount || 'N/A' },
+          { label: 'Reference No', value: parsed.refNo || 'N/A' },
+          { label: 'Date/Time', value: parsed.dateTime || 'N/A' }
+        ]);
+      } else {
+        showInfoModal('Verification Failed', [
+          { label: 'Reason', value: 'Could not detect Amount and Reference No.' }
+        ]);
+      }
+    } catch (e) {
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Payment OCR failed' }
+      }));
+    }
+  };
+
+  const closeModal = () => {
+    setModalVisible(false);
+    setErrorModalVisible(false);
+  };
+
+  const handleApproveClick = () => {
+    setShowApproveConfirmation(true);
+  };
+
+  const handleRejectClick = () => {
+    setShowRejectionModal(true);
+  };
+
+  const confirmApprove = async () => {
+    setShowApproveConfirmation(false);
+    await processAction(selectedDeposit, 'approve');
+  };
+
+  const handleReasonSelect = (reason) => {
+    setSelectedReason(reason);
+    if (reason !== "Other (please specify)") {
+      setCustomReason('');
+    }
+  };
+
+  const confirmRejection = () => {
+    if (!selectedReason) {
+      setErrorMessage('Please select a rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    if (selectedReason === "Other (please specify)" && !customReason.trim()) {
+      setErrorMessage('Please specify the rejection reason');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    setShowRejectionModal(false);
+    setShowRejectConfirmation(true);
+  };
+
+  const confirmRejectFinal = async () => {
+    setShowRejectConfirmation(false);
+    await processAction(selectedDeposit, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
+  };
+
+  const processAction = async (deposit, action, rejectionReason = '') => {
+    setActionInProgress(true);
+    setIsProcessing(true);
+    setCurrentAction(action);
+
+    try {
+      if (action === 'approve') {
+        await processDatabaseApprove(deposit);
+        setSuccessMessage('Deposit approved successfully!');
+        
+        const approveData = {
+          ...deposit,
+          dateApproved: formatDate(new Date()),
+          timeApproved: formatTime(new Date())
+        };
+        
+        setSelectedDeposit(prev => ({
+          ...prev,
+          dateApproved: approveData.dateApproved,
+          timeApproved: approveData.timeApproved,
+          status: 'approved'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
+      } else {
+        await processDatabaseReject(deposit, rejectionReason);
+        setSuccessMessage('Deposit rejected successfully!');
+        
+        const rejectData = {
+          ...deposit,
+          dateRejected: formatDate(new Date()),
+          timeRejected: formatTime(new Date()),
+          rejectionReason
+        };
+        
+        setSelectedDeposit(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          timeRejected: rejectData.timeRejected,
+          rejectionReason,
+          status: 'rejected'
+        }));
+
+        // Store API call data for later execution
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
+      }
+      
+      setSuccessMessageModalVisible(true);
+    } catch (error) {
+      console.error('Error processing action:', error);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
+      setErrorModalVisible(true);
+    } finally {
+      setIsProcessing(false);
+      setActionInProgress(false);
+    }
+  };
+
+  const processDatabaseApprove = async (deposit) => {
+    try {
+      const now = new Date();
+      const approvalDate = formatDate(now);
+      const approvalTime = formatTime(now);
+      const status = 'approved';
+
+      // Generate a new transaction ID for approved/transactions records
+      const originalTransactionId = deposit.transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Get references to all needed paths
+      const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${originalTransactionId}`);
+      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${deposit.id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${newTransactionId}`);
+      const memberRef = database.ref(`Members/${deposit.id}`);
+      const fundsRef = database.ref('Settings/Funds');
+
+      const memberSnap = await memberRef.once('value');
+
+      if (memberSnap.exists()) {
+        const member = memberSnap.val();
+
+        // First create a copy of the deposit data with approval info
+        const approvedDeposit = { 
+          ...deposit, 
+          transactionId: newTransactionId,
+          originalTransactionId: originalTransactionId,
+          dateApproved: approvalDate,
+          timeApproved: approvalTime,
+          timestamp: now.getTime(),
+          status
+        };
+
+        // Execute all operations in sequence
+        await approvedRef.set(approvedDeposit);
+        await transactionRef.set(approvedDeposit);
+
+        // Update member balance and investment
+        const depositAmount = parseFloat(deposit.amountToBeDeposited) || 0;
+        const newBalance = (parseFloat(member.balance || 0) || 0) + depositAmount;
+        const newInvestment = (parseFloat(member.investment || member.investments || 0) || 0) + depositAmount;
+        await memberRef.update({ balance: newBalance, investment: newInvestment });
+
+        // Update funds
+        const fundSnap = await fundsRef.once('value');
+        const updatedFund = (parseFloat(fundSnap.val()) || 0) + parseFloat(deposit.amountToBeDeposited);
+        await fundsRef.set(updatedFund);
+        
+        // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
+        const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+        await fundsHistoryRef.set(updatedFund);
+
+        // Remove from pending AFTER all other operations succeed
+        await pendingRef.remove();
+      }
+
+      // Return the new transaction ID so caller can propagate it (API, UI)
+      return newTransactionId;
+    } catch (err) {
+      console.error('Approval DB error:', err);
+      throw new Error(err.message || 'Failed to approve deposit');
+    }
+  };
+
+  const processDatabaseReject = async (deposit, rejectionReason) => {
+    try {
+      const now = new Date();
+      const rejectionDate = formatDate(now);
+      const rejectionTime = formatTime(now);
+      const status = 'rejected';
+
+      // Generate a new transaction ID for rejected/transactions records
+      const originalTransactionId = deposit.transactionId;
+      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+      // Get references to all needed paths
+      const pendingRef = database.ref(`Deposits/DepositApplications/${deposit.id}/${originalTransactionId}`);
+      const rejectedRef = database.ref(`Deposits/RejectedDeposits/${deposit.id}/${newTransactionId}`);
+      const transactionRef = database.ref(`Transactions/Deposits/${deposit.id}/${newTransactionId}`);
+
+      // First create a copy of the deposit data with rejection info
+      const rejectedDeposit = { 
+        ...deposit, 
+        transactionId: newTransactionId,
+        originalTransactionId: originalTransactionId,
+        dateRejected: rejectionDate,
+        timeRejected: rejectionTime,
+        timestamp: now.getTime(),
+        status,
+        rejectionReason: rejectionReason || 'Rejected by admin'
+      };
+
+      // Execute all operations in sequence
+      await rejectedRef.set(rejectedDeposit);
+      await transactionRef.set(rejectedDeposit);
+      
+      // Remove from pending AFTER saving to rejected
+      await pendingRef.remove();
+
+      return newTransactionId;
+    } catch (err) {
+      console.error('Rejection DB error:', err);
+      throw new Error(err.message || 'Failed to reject deposit');
+    }
+  };
+
+  const callApiApprove = async (deposit) => {
+    try {
+      const response = await ApproveDeposits({
+        memberId: deposit.id,
+        transactionId: deposit.transactionId,
+        amount: deposit.amountToBeDeposited,
+        dateApproved: deposit.dateApproved,
+        timeApproved: deposit.timeApproved,
+        email: deposit.email,
+        firstName: deposit.firstName,
+        lastName: deposit.lastName,
+        status: 'approved'
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to send approval email');
+      }
+    } catch (err) {
+      console.error('API approve error:', err);
+    }
+  };
+
+  const callApiReject = async (deposit) => {
+    try {
+      const response = await RejectDeposits({
+        memberId: deposit.id,
+        transactionId: deposit.transactionId,
+        amount: deposit.amountToBeDeposited,
+        dateRejected: deposit.dateRejected,
+        timeRejected: deposit.timeRejected,
+        email: deposit.email,
+        firstName: deposit.firstName,
+        lastName: deposit.lastName,
+        status: 'rejected',
+        rejectionReason: deposit.rejectionReason || 'Rejected by admin'
+      });
+      
+      if (!response.ok) {
+        console.error('Failed to send rejection email');
+      }
+    } catch (err) {
+      console.error('API reject error:', err);
+    }
+  };
+
+  const handleSuccessOk = async () => {
+    setSuccessMessageModalVisible(false);
+    closeModal();
+    setSelectedDeposit(null);
+    setCurrentAction(null);
+    
+    // Execute pending API call
+    if (pendingApiCall) {
+      try {
+        if (pendingApiCall.type === 'approve') {
+          await callApiApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await callApiReject(pendingApiCall.data);
+        }
+      } catch (error) {
+        console.error('Error calling API:', error);
+      }
+      setPendingApiCall(null);
+    }
+    
+    refreshData();
+  };
+
+  const openImageViewer = (url, label) => {
+    setCurrentImage({ url, label });
+    setImageViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
+  };
+
+  const navigateImages = (direction) => {
+    if (availableImages.length === 0) return;
+
+    let newIndex;
+    if (direction === 'prev') {
+      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+    } else {
+      newIndex = (currentImageIndex + 1) % availableImages.length;
+    }
+
+    setCurrentImageIndex(newIndex);
+    setCurrentImage(availableImages[newIndex]);
+  };
+
+  if (!deposits.length) {
+    // Show only the text, no container box
+    return (
+      <p style={styles.noDataMessage}>No deposit applications available.</p>
+    );
+  }
+
+  return (
+    <div style={styles.container}>
+      <div style={styles.tableContainer}>
+        <table style={styles.table}>
+          <thead>
+            <tr style={styles.tableHeader}>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Option</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {deposits.map((item, index) => (
+              <tr key={index} style={styles.tableRow}>
+                <td style={styles.tableCell}>{item.id}</td>
+                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
+                <td style={styles.tableCell}>{item.transactionId}</td>
+                <td style={styles.tableCell}>{formatCurrency(item.amountToBeDeposited)}</td>
+                <td style={styles.tableCell}>{item.depositOption}</td>
+                <td style={styles.tableCell}>{item.dateApplied}</td>
+                <td style={{
+                  ...styles.tableCell,
+                  ...(item.status === 'approved' ? styles.statusApproved : {}),
+                  ...(item.status === 'rejected' ? styles.statusRejected : {})
+                }}>
+                  {item.status || 'pending'}
+                </td>
+                <td style={styles.tableCell}>
+                  <span 
+                    style={styles.viewText} 
+                    onClick={() => openModal(item)}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    View
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {modalVisible && selectedDeposit && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCard}>
+            <button 
+              style={styles.closeButton} 
+              onClick={closeModal}
+              aria-label="Close modal"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <div style={styles.modalHeader}>
+              <h2 style={styles.modalTitle}>Deposit Application Details</h2>
+            </div>
+            <div style={styles.modalContent}>
+              <div style={styles.columns}>
+                <div style={styles.leftColumn}>
+                  <div style={styles.sectionTitle}>Member Information</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Member ID:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.id || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Name:</span>
+                    <span style={styles.fieldValue}>{`${selectedDeposit.firstName || ''} ${selectedDeposit.lastName || ''}`}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Email:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.email || 'N/A'}</span>
+                  </div>
+
+                  <div style={styles.sectionTitle}>Transaction Details</div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Transaction ID:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.transactionId || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Amount:</span>
+                    <span style={styles.fieldValue}>{formatCurrency(selectedDeposit.amountToBeDeposited)}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Deposit Option:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.depositOption || 'N/A'}</span>
+                  </div>
+                  <div style={styles.compactField}>
+                    <span style={styles.fieldLabel}>Date Applied:</span>
+                    <span style={styles.fieldValue}>{selectedDeposit.dateApplied || 'N/A'}</span>
+                  </div>
+
+                  {selectedDeposit.dateApproved && (
+                    <>
+                      <div style={styles.sectionTitle}>Approval Information</div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Date Approved:</span>
+                        <span style={styles.fieldValue}>{selectedDeposit.dateApproved}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Time Approved:</span>
+                        <span style={styles.fieldValue}>{selectedDeposit.timeApproved}</span>
+                      </div>
+                    </>
+                  )}
+
+                  {selectedDeposit.dateRejected && (
+                    <>
+                      <div style={styles.sectionTitle}>Rejection Information</div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Date Rejected:</span>
+                        <span style={styles.fieldValue}>{selectedDeposit.dateRejected}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Time Rejected:</span>
+                        <span style={styles.fieldValue}>{selectedDeposit.timeRejected}</span>
+                      </div>
+                      <div style={styles.compactField}>
+                        <span style={styles.fieldLabel}>Rejection Reason:</span>
+                        <span style={styles.fieldValue}>{selectedDeposit.rejectionReason || 'N/A'}</span>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <div style={styles.rightColumn}>
+                  <div style={styles.sectionTitle}>Proof of Deposit</div>
+                  <div style={styles.imageGrid}>
+                    {selectedDeposit.proofOfDepositUrl && (
+                      <div style={styles.imageBlock}>
+                        <p style={styles.imageLabel}>Proof of Deposit</p>
+                        <img
+                          src={selectedDeposit.proofOfDepositUrl}
+                          alt="Proof of Deposit"
+                          style={styles.imageThumbnail}
+                          onClick={() => openImageViewer(selectedDeposit.proofOfDepositUrl, 'Proof of Deposit')}
+                          onFocus={(e) => e.target.style.outline = 'none'}
+                        />
+
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+            {selectedDeposit?.status !== 'approved' && selectedDeposit?.status !== 'rejected' && (
+              <div style={styles.bottomButtons}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.approveButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={handleApproveClick}
+                  disabled={isProcessing}
+                  onFocus={(e) => e.target.style.outline = 'none'}
+                >
+                  Approve
+                </button>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.rejectButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={handleRejectClick}
+                  disabled={isProcessing}
+                  onFocus={(e) => e.target.style.outline = 'none'}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Approve Confirmation Modal */}
+      {showApproveConfirmation && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to approve this deposit?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmApprove}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowApproveConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reject Confirmation Modal */}
+      {showRejectConfirmation && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+            <p style={styles.modalText}>Are you sure you want to reject this deposit?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#2D5783',
+                  color: '#fff'
+                }} 
+                onClick={confirmRejectFinal}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  backgroundColor: '#f44336',
+                  color: '#fff'
+                }} 
+                onClick={() => setShowRejectConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showRejectionModal && (
+        <div style={styles.rejectionModal}>
+          <div style={styles.rejectionModalContent}>
+            <h2 style={styles.rejectionTitle}>Select Rejection Reason</h2>
+            {rejectionReasons.map((reason) => (
+              <div 
+                key={reason} 
+                style={styles.reasonOption}
+                onClick={() => handleReasonSelect(reason)}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', width: '100%' }}>
+                  <input
+                    type="radio"
+                    name="rejectionReason"
+                    checked={selectedReason === reason}
+                    onChange={() => handleReasonSelect(reason)}
+                    style={styles.reasonRadio}
+                  />
+                  <span style={styles.reasonText}>{reason}</span>
+                  {reason === "Other" && selectedReason === reason && (
+                    <input
+                      type="text"
+                      value={customReason}
+                      onChange={(e) => setCustomReason(e.target.value)}
+                      placeholder="Please specify reason"
+                      style={{ ...styles.customReasonInput, marginTop: 0, maxWidth: '60%' }}
+                    />
+                  )}
+                </div>
+              </div>
+            ))}
+            <div style={styles.rejectionButtons}>
+              <button 
+                style={styles.cancelButton}
+                onClick={() => setShowRejectionModal(false)}
+              >
+                Cancel
+              </button>
+              <button 
+                style={styles.confirmRejectButton}
+                onClick={confirmRejection}
+              >
+                Confirm Rejection
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Error Modal */}
+      {errorModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle 
+              style={{ ...styles.confirmIcon, color: '#f44336' }} 
+            />
+            <p style={styles.modalText}>{errorMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={() => setErrorModalVisible(false)}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Processing Modal */}
+      {isProcessing && (
+        <div style={styles.centeredModal}>
+          <div style={styles.spinner}></div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {successMessageModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.modalCardSmall}>
+            {currentAction === 'approve' ? (
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+            ) : (
+              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
+            )}
+            <p style={styles.modalText}>{successMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                backgroundColor: '#2D5783',
+                color: '#fff'
+              }} 
+              onClick={handleSuccessOk}
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Image Viewer Modal */}
+ {/* Image Viewer Modal */}
+      {imageViewerVisible && (
+        <div style={styles.imageViewerModal}>
+          <div style={styles.imageViewerContent}>
+            <img
+              src={currentImage.url}
+              alt={currentImage.label}
+              style={styles.largeImage}
+            />
+            <button 
+              style={styles.imageViewerClose} 
+              onClick={closeImageViewer}
+              aria-label="Close image viewer"
+              onFocus={(e) => e.target.style.outline = 'none'}
+            >
+              <FaTimes />
+            </button>
+            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+            {currentImage?.label === 'Proof of Deposit' && (
+              <div style={{ 
+                position: 'fixed', 
+                bottom: '20px', 
+                left: '50%', 
+                transform: 'translateX(-50%)',
+                backgroundColor: 'rgba(0,0,0,0.8)',
+                padding: '15px 20px',
+                borderRadius: '8px',
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '10px',
+                zIndex: 2001
+              }}>
+                <button
+                  style={{ 
+                    ...styles.actionButton, 
+                    backgroundColor: '#2D5783', 
+                    color: '#fff',
+                    minWidth: '100px',
+                    padding: '10px 20px'
+                  }}
+                  onClick={() => verifyDepositProof(currentImage.url, 'Proof of Deposit')}
+                >
+                  {validationStatus['Proof of Deposit']?.status === 'verifying' ? (
+                    <>
+                      <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
+                      Verifying...
+                    </>
+                  ) : (
+                    'Verify Deposit'
+                  )}
+                </button>
+              </div>
+            )}
+
+            {infoModal.visible && (
+              <div style={styles.infoModalOverlay}>
+                <div style={styles.infoModalCard}>
+                  <div style={styles.infoTitle}>{infoModal.title}</div>
+                  {infoModal.fields.map((f, i) => (
+                    <div key={i} style={styles.infoRow}>
+                      <span style={styles.infoLabel}>{f.label}</span>
+                      <span style={styles.infoValue}>{f.value || 'N/A'}</span>
+                    </div>
+                  ))}
+                  <button
+                    style={styles.infoCloseButton}
+                    onClick={closeInfoModal}
+                    onFocus={(e) => e.target.style.outline = 'none'}
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ApplyDeposits;

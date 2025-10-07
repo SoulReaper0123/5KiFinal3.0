@@ -5,125 +5,145 @@ import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
 const Settings = () => {
   const [activeSection, setActiveSection] = useState('SystemSettings');
-  const [windowWidth, setWindowWidth] = useState(window.innerWidth);
 
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
-      .safe-area-view {
-        flex: 1;
-        background-color: #F5F5F5;
-        height: 100%;
-        width: 100%;
-        overflow: auto;
+      @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
       }
-      .main-container {
-        flex: 1;
+      .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
       }
-      .header-text {
-        font-weight: bold;
-        font-size: 40px;
-        margin-bottom: 10px;
-        margin-left: 25px;
-        margin-right: 25px;
-        margin-top: 100px;
-      }
-      .top-controls {
-        display: flex;
-        justify-content: space-between;
-        margin: 0 25px;
-        align-items: center;
-        flex-wrap: wrap;
-        gap: 10px;
-      }
-      .circle-tab-wrapper {
-        display: flex;
-        background-color: #ddd;
-        height: 40px;
-        border-radius: 30px;
-      }
-      .tab-button {
-        padding: 0 16px;
-        height: 40px;
-        border-radius: 30px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0 1px;
-        border: none;
-        cursor: pointer;
-        outline: none;
-      }
-      .tab-button:focus {
-        outline: none;
-        box-shadow: none;
-      }
-      .tab-text {
-        font-size: 14px;
-      }
-      .data-container {
-        flex: 1;
-        margin: 0 25px;
-        margin-top: 10px;
-        background-color: #fff;
-        border-radius: 8px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
-        min-height: 300px;
-      }
-      .pagination-container {
-        display: flex;
-        justify-content: flex-end;
-        margin: 0 25px;
-        margin-top: 10px;
-        align-items: center;
-      }
-      .pagination-info {
-        font-size: 12px;
-        margin-right: 10px;
-        color: #333;
-      }
-      .pagination-button {
-        padding: 0;
-        background-color: #2D5783;
-        border-radius: 5px;
-        margin: 0 3px;
-        color: white;
-        border: none;
-        cursor: pointer;
-        width: 20px;
-        height: 20px;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-      }
-      .pagination-button svg {
-        font-size: 10px;
-        display: block;
-        margin: 0 auto;
-      }
-      .disabled-button {
-        background-color: #ccc;
-        cursor: not-allowed;
-      }
-      @media (max-width: 768px) {
-        .circle-tab-wrapper {
-          width: 100%;
-          justify-content: center;
-        }
-        .top-controls {
-          justify-content: center;
-        }
+      .hover-lift:hover {
+        transform: translateY(-2px);
+        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
       }
     `;
     document.head.appendChild(styleElement);
 
-    const handleResize = () => setWindowWidth(window.innerWidth);
-    window.addEventListener('resize', handleResize);
     return () => {
       document.head.removeChild(styleElement);
-      window.removeEventListener('resize', handleResize);
     };
   }, []);
+
+  const styles = {
+    safeAreaView: {
+      flex: 1,
+      backgroundColor: '#f8fafc',
+      minHeight: '100vh',
+      padding: '0'
+    },
+    mainContainer: {
+      padding: '24px',
+      maxWidth: '1400px',
+      margin: '0 auto',
+      position: 'relative'
+    },
+    headerSection: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '32px',
+      paddingBottom: '16px',
+      borderBottom: '1px solid #e2e8f0'
+    },
+    headerText: {
+      fontSize: '32px',
+      fontWeight: '700',
+      color: '#1e293b',
+      margin: '0'
+    },
+    headerSubtitle: {
+      fontSize: '16px',
+      color: '#64748b',
+      marginTop: '4px'
+    },
+    controlsSection: {
+      display: 'flex',
+      flexDirection: 'column',
+      gap: '16px',
+    },
+    controlsRow: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      gap: '16px',
+      flexWrap: 'wrap',
+      width: '100%'
+    },
+    tabContainer: {
+      display: 'flex',
+      backgroundColor: 'transparent',
+      borderRadius: '12px',
+      padding: '4px',
+      gap: '4px',
+      flexWrap: 'wrap',
+      flex: '1',
+      minWidth: '0'
+    },
+    tabButton: {
+      padding: '12px 20px',
+      borderRadius: '8px',
+      border: 'none',
+      cursor: 'pointer',
+      fontSize: '14px',
+      fontWeight: '600',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      transition: 'all 0.2s ease',
+      outline: 'none',
+      background: 'transparent',
+      color: '#64748b',
+      whiteSpace: 'nowrap'
+    },
+    activeTabButton: {
+      backgroundColor: '#fff',
+      color: '#1e40af',
+      boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+    },
+    tabIcon: {
+      fontSize: '16px'
+    },
+    dataContainer: {
+      backgroundColor: '#fff',
+      borderRadius: '12px',
+      boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+      overflow: 'hidden',
+      marginBottom: '80px'
+    },
+    loadingContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '200px'
+    },
+    spinner: {
+      border: '4px solid #f3f4f6',
+      borderLeft: '4px solid #1e40af',
+      borderRadius: '50%',
+      width: '40px',
+      height: '40px',
+      animation: 'spin 1s linear infinite'
+    }
+  };
+
+  const tabs = [
+    { 
+      key: 'SystemSettings', 
+      label: 'System Settings', 
+      icon: FaChevronRight,
+      color: '#1e40af'
+    },
+    { 
+      key: 'DataManagement', 
+      label: 'Data Management', 
+      icon: FaChevronLeft,
+      color: '#059669'
+    }
+  ];
 
   const handleTabSwitch = (section) => {
     setActiveSection(section);
@@ -141,44 +161,49 @@ const Settings = () => {
   };
 
   return (
-    <div className="safe-area-view">
-      <div className="main-container">
-        <h2 className="header-text">Settings</h2>
-
-        <div className="top-controls">
-          <div className="circle-tab-wrapper">
-            {[
-              { key: 'SystemSettings', label: 'System Settings', color: '#2D5783' },
-              { key: 'DataManagement', label: 'Data Management', color: '#FF0000' },
-            ].map((tab) => {
-              const isActive = activeSection === tab.key;
-              return (
-                <button
-                  key={tab.key}
-                  onClick={() => handleTabSwitch(tab.key)}
-                  className={`tab-button ${isActive ? 'active-tab' : ''}`}
-                  style={{ 
-                    backgroundColor: isActive ? tab.color : 'transparent',
-                    outline: 'none'
-                  }}
-                >
-                  <span
-                    className="tab-text"
-                    style={{ color: isActive ? '#fff' : '#000' }}
-                  >
-                    {tab.label}
-                  </span>
-                </button>
-              );
-            })}
+    <div style={styles.safeAreaView}>
+      <div style={styles.mainContainer}>
+        {/* Header Section */}
+        <div style={styles.headerSection}>
+          <div>
+            <h1 style={styles.headerText}>Settings</h1>
+            <p style={styles.headerSubtitle}>
+              Manage system configurations and data management
+            </p>
           </div>
         </div>
 
-        <div className="data-container">
-          {renderTabContent()}
+        {/* Controls Section */}
+        <div style={styles.controlsSection}>
+          <div style={styles.controlsRow}>
+            {/* Tabs - Now takes full width */}
+            <div style={styles.tabContainer}>
+              {tabs.map((tab) => {
+                const isActive = activeSection === tab.key;
+                const IconComponent = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleTabSwitch(tab.key)}
+                    style={{
+                      ...styles.tabButton,
+                      ...(isActive ? styles.activeTabButton : {})
+                    }}
+                    className="hover-lift"
+                  >
+                    <IconComponent style={styles.tabIcon} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
-
+        {/* Data Container */}
+        <div style={styles.dataContainer}>
+          {renderTabContent()}
+        </div>
       </div>
     </div>
   );
