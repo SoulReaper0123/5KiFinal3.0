@@ -1726,11 +1726,6 @@ We recommend settling outstanding balances first before reapplying. Once cleared
   };
 
   const handleSuccessOk = async () => {
-    setSuccessMessageModalVisible(false);
-    closeModal();
-    setSelectedLoan(null);
-    setCurrentAction(null);
-    
     if (pendingApiCall) {
       try {
         if (pendingApiCall.type === 'approve') {
@@ -1743,19 +1738,16 @@ We recommend settling outstanding balances first before reapplying. Once cleared
       }
       setPendingApiCall(null);
     }
-  };
 
-  useEffect(() => {
-    if (!successMessageModalVisible && justCompletedAction) {
-      const t = setTimeout(() => {
-        if (typeof refreshData === 'function') {
-          refreshData();
-        }
-        setJustCompletedAction(false);
-      }, 250);
-      return () => clearTimeout(t);
+    setSuccessMessageModalVisible(false);
+    setJustCompletedAction(false);
+    closeModal();
+    if (typeof refreshData === 'function') {
+      await refreshData();
     }
-  }, [successMessageModalVisible, justCompletedAction, refreshData]);
+    setSelectedLoan(null);
+    setCurrentAction(null);
+  };
 
   const openImageViewer = (url, label, index) => {
     const images = [];

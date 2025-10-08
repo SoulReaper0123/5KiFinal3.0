@@ -213,10 +213,6 @@ const styles = {
     fontSize: '0.875rem',
     fontWeight: '500'
   },
-  financialValue: {
-    fontWeight: '600',
-    fontSize: '0.875rem'
-  },
   savingsAmount: {
     color: '#059669'
   },

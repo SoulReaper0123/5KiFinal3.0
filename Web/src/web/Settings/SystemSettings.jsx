@@ -134,80 +134,80 @@ const SystemSettings = () => {
       }
 
       .enhanced-modal-input {
-        width: 100%;
-        padding: 14px 16px;
-        border: 2px solid #e5e7eb;
-        border-radius: 10px;
-        font-size: 15px;
-        margin-bottom: 20px;
-        box-sizing: border-box;
-        transition: all 0.3s ease;
+        width: '100%';
+        padding: '14px 16px';
+        border: '2px solid #e5e7eb';
+        border-radius: '10px';
+        font-size: '15px';
+        margin-bottom: '20px';
+        box-sizing: 'border-box';
+        transition: 'all 0.3s ease';
       }
 
       .enhanced-modal-input:focus {
-        border-color: #1e40af;
-        box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+        border-color: '#1e40af';
+        box-shadow: '0 0 0 3px rgba(30, 64, 175, 0.1)';
       }
 
       .enhanced-modal-textarea {
-        width: 100%;
-        padding: 14px 16px;
-        border: 2px solid #e5e7eb;
-        border-radius: 10px;
-        font-size: 15px;
-        margin-bottom: 20px;
-        box-sizing: border-box;
-        transition: all 0.3s ease;
-        min-height: 200px;
-        resize: vertical;
-        font-family: inherit;
+        width: '100%';
+        padding: '14px 16px';
+        border: '2px solid #e5e7eb';
+        border-radius: '10px';
+        font-size: '15px';
+        margin-bottom: '20px';
+        box-sizing: 'border-box';
+        transition: 'all 0.3s ease';
+        min-height: '200px';
+        resize: 'vertical';
+        font-family: 'inherit';
       }
 
       .enhanced-modal-textarea:focus {
-        border-color: #1e40af;
-        box-shadow: 0 0 0 3px rgba(30, 64, 175, 0.1);
+        border-color: '#1e40af';
+        box-shadow: '0 0 0 3px rgba(30, 64, 175, 0.1)';
       }
 
       .enhanced-modal-buttons {
-        display: flex;
-        justify-content: center;
-        gap: 16px;
-        margin-top: 24px;
+        display: 'flex';
+        justify-content: 'center';
+        gap: '16px';
+        margin-top: '24px';
       }
 
       .enhanced-modal-btn {
-        padding: 14px 24px;
-        border-radius: 10px;
-        border: none;
-        cursor: pointer;
-        font-weight: 600;
-        font-size: 15px;
-        transition: all 0.3s ease;
-        min-width: 120px;
+        padding: '14px 24px';
+        border-radius: '10px';
+        border: 'none';
+        cursor: 'pointer';
+        font-weight: '600';
+        font-size: '15px';
+        transition: 'all 0.3s ease';
+        min-width: '120px';
       }
 
       .enhanced-modal-btn-primary {
-        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-        color: white;
-        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        color: 'white';
+        box-shadow: '0 4px 12px rgba(16, 185, 129, 0.3)';
       }
 
       .enhanced-modal-btn-primary:hover {
-        background: linear-gradient(135deg, #059669 0%, #10b981 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
+        transform: 'translateY(-2px)';
+        box-shadow: '0 6px 20px rgba(16, 185, 129, 0.4)';
       }
 
       .enhanced-modal-btn-secondary {
-        background-color: #f8fafc;
-        color: #64748b;
-        border: 2px solid #e2e8f0;
+        background-color: '#f8fafc';
+        color: '#64748b';
+        border: '2px solid #e2e8f0';
       }
 
       .enhanced-modal-btn-secondary:hover {
-        background-color: #f1f5f9;
-        border-color: #cbd5e1;
-        transform: translateY(-2px);
+        background-color: '#f1f5f9';
+        border-color: '#cbd5e1';
+        transform: 'translateY(-2px)';
       }
     `;
     document.head.appendChild(styleElement);
@@ -307,6 +307,12 @@ const SystemSettings = () => {
   const [tempAboutContent, setTempAboutContent] = useState({ title: '', content: '' });
   const [tempContactContent, setTempContactContent] = useState({ title: '', content: '' });
 
+  // Validation states
+  const [dividendValidation, setDividendValidation] = useState({
+    distributionValid: true,
+    breakdownValid: true
+  });
+
   const db = getDatabase();
 
   // Helper function to format peso amounts with at least 2 decimal places
@@ -316,6 +322,29 @@ const SystemSettings = () => {
       minimumFractionDigits: 2,
       maximumFractionDigits: 2
     });
+  };
+
+  // Helper function to validate dividend percentages with better precision handling
+  const validateDividendPercentages = () => {
+    const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
+    const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
+    const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
+    const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
+    const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
+    
+    // Round to 1 decimal place to avoid floating point precision issues
+    const distTotal = Math.round((membersDividend + fiveKiEarnings) * 10) / 10;
+    const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 10) / 10;
+    
+    const distributionValid = distTotal === 100;
+    const breakdownValid = breakdownTotal === 100;
+    
+    setDividendValidation({
+      distributionValid,
+      breakdownValid
+    });
+    
+    return distributionValid && breakdownValid;
   };
 
   useEffect(() => {
@@ -358,24 +387,26 @@ const SystemSettings = () => {
           },
           TermsAndConditions: data.TermsAndConditions || {
             title: 'Terms and Conditions',
-            content: 'No terms available.'
+            content: ''
           },
           PrivacyPolicy: data.PrivacyPolicy || {
             title: 'Privacy Policy',
-            content: 'No privacy policy available.'
+            content: ''
           },
           AboutUs: data.AboutUs || {
             title: 'About Us',
-            content: 'No information available.'
+            content: ''
           },
           ContactUs: data.ContactUs || {
             title: 'Contact Us',
-            content: 'No contact information available.'
+            content: ''
           }
         };
         setSettings(loaded);
         setSavedSettingsSnapshot(loaded);
         
+        // Validate percentages when settings are loaded
+        validateDividendPercentages();
       }
       setLoading(false);
     });
@@ -418,7 +449,14 @@ const SystemSettings = () => {
   const handleInputChange = (key, value) => {
     const clean = value.replace(/[^0-9.]/g, '');
     if (clean.split('.').length > 2) return;
-    setSettings({ ...settings, [key]: clean });
+    
+    const newSettings = { ...settings, [key]: clean };
+    setSettings(newSettings);
+    
+    // Validate dividend percentages when relevant fields change
+    if (['MembersDividendPercentage', 'FiveKiEarningsPercentage', 'InvestmentSharePercentage', 'PatronageSharePercentage', 'ActiveMonthsPercentage'].includes(key)) {
+      setTimeout(() => validateDividendPercentages(), 0);
+    }
   };
 
   const handleInterestChange = (term, value) => {
@@ -687,6 +725,13 @@ const SystemSettings = () => {
   const handleSave = () => setConfirmationModalVisible(true);
 
   const confirmSave = async () => {
+    // Validate dividend percentages before saving
+    if (!validateDividendPercentages()) {
+      showMessage('Error', 'Please ensure all dividend percentages total exactly 100% before saving.', true);
+      setConfirmationModalVisible(false);
+      return;
+    }
+
     setActionInProgress(true);
     try {
       const settingsRef = ref(db, 'Settings/');
@@ -711,13 +756,21 @@ const SystemSettings = () => {
         return isNaN(parsed) ? defaultValue : parsed;
       };
 
-      const distTotal = safeParseFloat(settings.MembersDividendPercentage, 0) + safeParseFloat(settings.FiveKiEarningsPercentage, 0);
-      const breakdownTotal = safeParseFloat(settings.InvestmentSharePercentage, 0) + safeParseFloat(settings.PatronageSharePercentage, 0) + safeParseFloat(settings.ActiveMonthsPercentage, 0);
+      const membersDividend = safeParseFloat(settings.MembersDividendPercentage, 0);
+      const fiveKiEarnings = safeParseFloat(settings.FiveKiEarningsPercentage, 0);
+      const investmentShare = safeParseFloat(settings.InvestmentSharePercentage, 0);
+      const patronageShare = safeParseFloat(settings.PatronageSharePercentage, 0);
+      const activeMonths = safeParseFloat(settings.ActiveMonthsPercentage, 0);
+      
+      // Final validation check with rounded values
+      const distTotal = Math.round((membersDividend + fiveKiEarnings) * 10) / 10;
+      const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 10) / 10;
+      
       if (distTotal !== 100) {
-        throw new Error('Dividend Distribution must total 100%.');
+        throw new Error('Dividend Distribution must total exactly 100%.');
       }
       if (breakdownTotal !== 100) {
-        throw new Error('Members Dividend Breakdown must total 100%.');
+        throw new Error('Members Dividend Breakdown must total exactly 100%.');
       }
 
       const loanTypesNested = Object.fromEntries(
@@ -732,11 +785,11 @@ const SystemSettings = () => {
         InterestRateByType: parsedByType,
         LoanReminderDays: parseInt(settings.LoanReminderDays || 7, 10),
         DividendDate: settings.DividendDate,
-        MembersDividendPercentage: safeParseFloat(settings.MembersDividendPercentage, 60),
-        FiveKiEarningsPercentage: safeParseFloat(settings.FiveKiEarningsPercentage, 40),
-        InvestmentSharePercentage: safeParseFloat(settings.InvestmentSharePercentage, 60),
-        PatronageSharePercentage: safeParseFloat(settings.PatronageSharePercentage, 25),
-        ActiveMonthsPercentage: safeParseFloat(settings.ActiveMonthsPercentage, 15),
+        MembersDividendPercentage: membersDividend,
+        FiveKiEarningsPercentage: fiveKiEarnings,
+        InvestmentSharePercentage: investmentShare,
+        PatronageSharePercentage: patronageShare,
+        ActiveMonthsPercentage: activeMonths,
         ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
         RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 5000).toFixed(2)),
         LoanTypes: loanTypesNested,
@@ -1453,29 +1506,59 @@ const SystemSettings = () => {
                 ) : (
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
-                      title="Save"
+                      style={{ 
+                        ...styles.headerIconBtn, 
+                        backgroundColor: dividendValidation.distributionValid && dividendValidation.breakdownValid ? '#10b981' : '#9ca3af',
+                        color: '#fff',
+                        cursor: dividendValidation.distributionValid && dividendValidation.breakdownValid ? 'pointer' : 'not-allowed'
+                      }}
+                      title={dividendValidation.distributionValid && dividendValidation.breakdownValid ? "Save Dividend Settings" : "Please fix percentage validation errors"}
                       onClick={async () => {
+                        // Final validation before saving
+                        if (!validateDividendPercentages()) {
+                          showMessage('Error', 'Please ensure all dividend percentages total exactly 100% before saving.', true);
+                          return;
+                        }
+
                         try {
                           setActionInProgress(true);
+                          const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
+                          const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
+                          const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
+                          const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
+                          const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
+                          
                           const payload = {
-                            MembersDividendPercentage: parseFloat(settings.MembersDividendPercentage || 0),
-                            FiveKiEarningsPercentage: parseFloat(settings.FiveKiEarningsPercentage || 0),
-                            InvestmentSharePercentage: parseFloat(settings.InvestmentSharePercentage || 0),
-                            PatronageSharePercentage: parseFloat(settings.PatronageSharePercentage || 0),
-                            ActiveMonthsPercentage: parseFloat(settings.ActiveMonthsPercentage || 0),
+                            MembersDividendPercentage: membersDividend,
+                            FiveKiEarningsPercentage: fiveKiEarnings,
+                            InvestmentSharePercentage: investmentShare,
+                            PatronageSharePercentage: patronageShare,
+                            ActiveMonthsPercentage: activeMonths,
                             DividendDate: settings.DividendDate || ''
                           };
+                          
+                          // Final validation check with rounded values
+                          const distTotal = Math.round((membersDividend + fiveKiEarnings) * 10) / 10;
+                          const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 10) / 10;
+                          
+                          if (distTotal !== 100) {
+                            throw new Error('Dividend Distribution must total exactly 100%.');
+                          }
+                          if (breakdownTotal !== 100) {
+                            throw new Error('Members Dividend Breakdown must total exactly 100%.');
+                          }
+
                           await update(ref(db, 'Settings'), payload);
                           setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ...payload }));
                           setEditDividend(false);
-                          showMessage('Success', 'Dividend settings updated');
+                          showMessage('Success', 'Dividend settings updated successfully!');
                         } catch (e) {
-                          showMessage('Error', e.message || 'Failed to save', true);
+                          showMessage('Error', e.message || 'Failed to save dividend settings', true);
                         } finally {
                           setActionInProgress(false);
                         }
                       }}
+                      disabled={!dividendValidation.distributionValid || !dividendValidation.breakdownValid || actionInProgress}
                     >
                       <FaSave />
                     </button>
@@ -1495,6 +1578,8 @@ const SystemSettings = () => {
                           }));
                         }
                         setEditDividend(false);
+                        // Reset validation state when canceling
+                        validateDividendPercentages();
                       }}
                     >
                       <FaTimes />
@@ -1513,12 +1598,17 @@ const SystemSettings = () => {
                       {editDividend ? (
                         <div style={styles.percentageInputContainer}>
                           <input
-                            style={styles.percentageInput}
+                            style={{
+                              ...styles.percentageInput,
+                              borderColor: dividendValidation.distributionValid ? '#d1d5db' : '#ef4444',
+                              backgroundColor: dividendValidation.distributionValid ? '#ffffff' : '#fef2f2'
+                            }}
                             value={settings.MembersDividendPercentage}
                             onChange={(e) => handleInputChange('MembersDividendPercentage', e.target.value)}
                             type="number"
                             min="0"
                             max="100"
+                            step="0.1"
                           />
                           <span style={styles.percentageSymbol}>%</span>
                         </div>
@@ -1533,12 +1623,17 @@ const SystemSettings = () => {
                       {editDividend ? (
                         <div style={styles.percentageInputContainer}>
                           <input
-                            style={styles.percentageInput}
+                            style={{
+                              ...styles.percentageInput,
+                              borderColor: dividendValidation.distributionValid ? '#d1d5db' : '#ef4444',
+                              backgroundColor: dividendValidation.distributionValid ? '#ffffff' : '#fef2f2'
+                            }}
                             value={settings.FiveKiEarningsPercentage}
                             onChange={(e) => handleInputChange('FiveKiEarningsPercentage', e.target.value)}
                             type="number"
                             min="0"
                             max="100"
+                            step="0.1"
                           />
                           <span style={styles.percentageSymbol}>%</span>
                         </div>
@@ -1550,15 +1645,15 @@ const SystemSettings = () => {
                     </div>
                   </div>
                   
-                  {editDividend && (
-                    <div style={{
-                      ...styles.validationMessage,
-                      color: (parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? '#10b981' : '#ef4444'
-                    }}>
-                      Total: {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)).toFixed(1)}% 
-                      {(parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) === 100 ? ' ✓ Balanced' : ' - Must equal 100%'}
-                    </div>
-                  )}
+                  <div style={{
+                    ...styles.validationMessage,
+                    color: dividendValidation.distributionValid ? '#10b981' : '#ef4444',
+                    backgroundColor: dividendValidation.distributionValid ? '#f0fdf4' : '#fef2f2',
+                    borderColor: dividendValidation.distributionValid ? '#bbf7d0' : '#fecaca'
+                  }}>
+                    Total: {Math.round((parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) * 10) / 10}% 
+                    {dividendValidation.distributionValid ? ' ✓ Balanced' : ' - Must equal exactly 100%'}
+                  </div>
                 </div>
 
                 {/* Members Dividend Breakdown */}
@@ -1570,12 +1665,17 @@ const SystemSettings = () => {
                       {editDividend ? (
                         <div style={styles.percentageInputContainer}>
                           <input
-                            style={styles.percentageInput}
+                            style={{
+                              ...styles.percentageInput,
+                              borderColor: dividendValidation.breakdownValid ? '#d1d5db' : '#ef4444',
+                              backgroundColor: dividendValidation.breakdownValid ? '#ffffff' : '#fef2f2'
+                            }}
                             value={settings.InvestmentSharePercentage}
                             onChange={(e) => handleInputChange('InvestmentSharePercentage', e.target.value)}
                             type="number"
                             min="0"
                             max="100"
+                            step="0.1"
                           />
                           <span style={styles.percentageSymbol}>%</span>
                         </div>
@@ -1590,12 +1690,17 @@ const SystemSettings = () => {
                       {editDividend ? (
                         <div style={styles.percentageInputContainer}>
                           <input
-                            style={styles.percentageInput}
+                            style={{
+                              ...styles.percentageInput,
+                              borderColor: dividendValidation.breakdownValid ? '#d1d5db' : '#ef4444',
+                              backgroundColor: dividendValidation.breakdownValid ? '#ffffff' : '#fef2f2'
+                            }}
                             value={settings.PatronageSharePercentage}
                             onChange={(e) => handleInputChange('PatronageSharePercentage', e.target.value)}
                             type="number"
                             min="0"
                             max="100"
+                            step="0.1"
                           />
                           <span style={styles.percentageSymbol}>%</span>
                         </div>
@@ -1610,12 +1715,17 @@ const SystemSettings = () => {
                       {editDividend ? (
                         <div style={styles.percentageInputContainer}>
                           <input
-                            style={styles.percentageInput}
+                            style={{
+                              ...styles.percentageInput,
+                              borderColor: dividendValidation.breakdownValid ? '#d1d5db' : '#ef4444',
+                              backgroundColor: dividendValidation.breakdownValid ? '#ffffff' : '#fef2f2'
+                            }}
                             value={settings.ActiveMonthsPercentage}
                             onChange={(e) => handleInputChange('ActiveMonthsPercentage', e.target.value)}
                             type="number"
                             min="0"
                             max="100"
+                            step="0.1"
                           />
                           <span style={styles.percentageSymbol}>%</span>
                         </div>
@@ -1627,15 +1737,15 @@ const SystemSettings = () => {
                     </div>
                   </div>
                   
-                  {editDividend && (
-                    <div style={{
-                      ...styles.validationMessage,
-                      color: (parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? '#10b981' : '#ef4444'
-                    }}>
-                      Total: {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)).toFixed(1)}% 
-                      {(parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) === 100 ? ' ✓ Balanced' : ' - Must equal 100%'}
-                    </div>
-                  )}
+                  <div style={{
+                    ...styles.validationMessage,
+                    color: dividendValidation.breakdownValid ? '#10b981' : '#ef4444',
+                    backgroundColor: dividendValidation.breakdownValid ? '#f0fdf4' : '#fef2f2',
+                    borderColor: dividendValidation.breakdownValid ? '#bbf7d0' : '#fecaca'
+                  }}>
+                    Total: {Math.round((parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) * 10) / 10}% 
+                    {dividendValidation.breakdownValid ? ' ✓ Balanced' : ' - Must equal exactly 100%'}
+                  </div>
                 </div>
 
                 {/* Dividend Date */}
@@ -2854,7 +2964,8 @@ const styles = {
     borderRadius: '6px',
     padding: '6px 8px',
     fontSize: '14px',
-    textAlign: 'center'
+    textAlign: 'center',
+    transition: 'all 0.3s ease'
   },
   percentageSymbol: {
     fontSize: '14px',
@@ -2896,9 +3007,9 @@ const styles = {
     fontWeight: '600',
     padding: '10px 12px',
     borderRadius: '8px',
-    backgroundColor: '#f3f4f6',
     textAlign: 'center',
-    border: '1px solid #e5e7eb'
+    border: '1px solid',
+    transition: 'all 0.3s ease'
   },
   dateSection: {
     display: 'flex',

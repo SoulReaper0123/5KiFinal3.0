@@ -693,7 +693,6 @@ const styles = {
   enhancedModalBtnSecondary: {
     padding: '14px 24px',
     borderRadius: '10px',
-    border: 'none',
     cursor: 'pointer',
     fontWeight: '600',
     fontSize: '15px',
