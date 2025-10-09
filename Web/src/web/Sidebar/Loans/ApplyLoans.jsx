@@ -27,22 +27,38 @@ const styles = {
     flex: 1,
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
-  loadingContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '200px',
-    flexDirection: 'column',
-    gap: '1rem'
-  },
-  spinner: {
-    border: '4px solid #f3f4f6',
-    borderLeft: '4px solid #2563eb',
-    borderRadius: '50%',
-    width: '40px',
-    height: '40px',
-    animation: 'spin 1s linear infinite'
-  },
+loadingOverlay: {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(15, 23, 42, 0.8)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1500,
+  backdropFilter: 'blur(4px)',
+},
+spinner: {
+  border: '3px solid rgba(59, 130, 246, 0.3)',
+  borderTop: '3px solid #3B82F6',
+  borderRadius: '50%',
+  width: '36px',
+  height: '36px',
+  animation: 'spin 1s linear infinite'
+},
+loadingContent: {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '14px',
+},
+loadingText: {
+  color: 'white',
+  fontSize: '14px',
+  fontWeight: '500'
+},
   tableContainer: {
     borderRadius: '12px',
     overflow: 'hidden',
@@ -830,28 +846,78 @@ const ApplyLoans = ({
     await processAction(selectedLoan, 'reject', selectedReason === "Other" ? customReason : selectedReason);
   };
 
-  const handleSavingsConfirm = async () => {
-    if (!pendingLoanForSavings) return;
+const handleSavingsConfirm = async () => {
+  if (!pendingLoanForSavings) return;
+  
+  setShowSavingsConfirmModal(false);
+  setIsProcessing(true);
+  setActionInProgress(true);
+  
+  try {
+    // Execute database operations with savings
+    if (savingsShortfall.memberBalance !== undefined) {
+      await processDatabaseApproveWithMemberBalanceShortfall(pendingLoanForSavings, savingsShortfall.needed);
+    } else {
+      await processDatabaseApproveWithSavings(pendingLoanForSavings, savingsShortfall.needed);
+    }
     
+    setSuccessMessage('Loan approved successfully using savings!');
+    
+    const approveData = {
+      ...pendingLoanForSavings,
+      dateApproved: formatDate(new Date()),
+      timeApproved: formatTime(new Date())
+    };
+    
+    setSelectedLoan(prev => ({
+      ...prev,
+      dateApproved: approveData.dateApproved,
+      timeApproved: approveData.timeApproved,
+      status: 'approved'
+    }));
+
+    setPendingApiCall({
+      type: 'approve',
+      data: approveData
+    });
+    
+    setSuccessMessageModalVisible(true);
+    setJustCompletedAction(true);
+  } catch (error) {
+    console.error('Error approving with savings:', error);
+    setErrorMessage(error.message || 'Failed to approve loan with savings.');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false);
+    setActionInProgress(false);
+    setPendingLoanForSavings(null);
+    setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
+  }
+};
+
+  const handleSavingsCancel = () => {
     setShowSavingsConfirmModal(false);
-    setIsProcessing(true);
-    setActionInProgress(true);
-    
-    try {
-      if (savingsShortfall.memberBalance !== undefined) {
-        await processDatabaseApproveWithMemberBalanceShortfall(pendingLoanForSavings, savingsShortfall.needed);
-      } else {
-        await processDatabaseApproveWithSavings(pendingLoanForSavings, savingsShortfall.needed);
-      }
-      
-      setSuccessMessage('Loan approved successfully using savings!');
-      
+    setPendingLoanForSavings(null);
+    setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
+  };
+
+const processAction = async (loan, action, rejectionReason = '') => {
+  // Show loading immediately
+  setActionInProgress(true);
+  setIsProcessing(true);
+  setCurrentAction(action);
+
+  try {
+    // Prepare data for deferred database operations
+    if (action === 'approve') {
+      setSuccessMessage('Loan approved successfully!');
+
       const approveData = {
-        ...pendingLoanForSavings,
+        ...loan,
         dateApproved: formatDate(new Date()),
         timeApproved: formatTime(new Date())
       };
-      
+
       setSelectedLoan(prev => ({
         ...prev,
         dateApproved: approveData.dateApproved,
@@ -863,129 +929,72 @@ const ApplyLoans = ({
         type: 'approve',
         data: approveData
       });
-      
-      setSuccessMessageModalVisible(true);
-      setJustCompletedAction(true);
-    } catch (error) {
-      console.error('Error approving with savings:', error);
-      setErrorMessage(error.message || 'Failed to approve loan with savings.');
-      setErrorModalVisible(true);
-    } finally {
+    } else {
+      setSuccessMessage('Loan rejected successfully!');
+
+      const rejectData = {
+        ...loan,
+        dateRejected: formatDate(new Date()),
+        timeRejected: formatTime(new Date()),
+        rejectionReason
+      };
+
+      setSelectedLoan(prev => ({
+        ...prev,
+        dateRejected: rejectData.dateRejected,
+        timeRejected: rejectData.timeRejected,
+        rejectionReason,
+        status: 'rejected'
+      }));
+
+      setPendingApiCall({
+        type: 'reject',
+        data: rejectData
+      });
+    }
+
+    // Show success modal immediately (database operations deferred to OK button)
+    setSuccessMessageModalVisible(true);
+  } catch (error) {
+    console.error('Error preparing action:', error);
+
+    // Handle savings confirmation errors
+    if (error.message === 'MEMBER_BALANCE_SAVINGS_NEEDED' && error.savingsData) {
+      setSavingsShortfall({
+        needed: error.savingsData.needed,
+        available: error.savingsData.available,
+        remaining: error.savingsData.remaining,
+        memberBalance: error.savingsData.memberBalance,
+        loanAmount: error.savingsData.loanAmount
+      });
+      setPendingLoanForSavings(error.savingsData.loanData);
+      setShowSavingsConfirmModal(true);
       setIsProcessing(false);
       setActionInProgress(false);
-      setPendingLoanForSavings(null);
-      setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
+      return;
     }
-  };
 
-  const handleSavingsCancel = () => {
-    setShowSavingsConfirmModal(false);
-    setPendingLoanForSavings(null);
-    setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
-  };
-
-  const processAction = async (loan, action, rejectionReason = '') => {
-    setActionInProgress(true);
-    setIsProcessing(true);
-    setCurrentAction(action);
-
-    try {
-      if (action === 'approve') {
-        await processDatabaseApprove(loan);
-        setSuccessMessage('Loan approved successfully!');
-        
-        const approveData = {
-          ...loan,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date())
-        };
-        
-        setSelectedLoan(prev => ({
-          ...prev,
-          dateApproved: approveData.dateApproved,
-          timeApproved: approveData.timeApproved,
-          status: 'approved'
-        }));
-
-        setPendingApiCall({
-          type: 'approve',
-          data: approveData
-        });
-      } else {
-        await processDatabaseReject(loan, rejectionReason);
-        setSuccessMessage('Loan rejected successfully!');
-        
-        const rejectData = {
-          ...loan,
-          dateRejected: formatDate(new Date()),
-          timeRejected: formatTime(new Date()),
-          rejectionReason
-        };
-        
-        setSelectedLoan(prev => ({
-          ...prev,
-          dateRejected: rejectData.dateRejected,
-          timeRejected: rejectData.timeRejected,
-          rejectionReason,
-          status: 'rejected'
-        }));
-
-        setPendingApiCall({
-          type: 'reject',
-          data: rejectData
-        });
-      }
-      
-      setSuccessMessageModalVisible(true);
-      setJustCompletedAction(true);
-    } catch (error) {
-      console.error('Error processing action:', error);
-      
-      if (error.message === 'MEMBER_BALANCE_SAVINGS_NEEDED') {
-        console.log('Member balance savings error caught:', error);
-        if (error.savingsData) {
-          setSavingsShortfall({
-            needed: error.savingsData.needed,
-            available: error.savingsData.available,
-            remaining: error.savingsData.remaining,
-            memberBalance: error.savingsData.memberBalance,
-            loanAmount: error.savingsData.loanAmount
-          });
-          setPendingLoanForSavings(error.savingsData.loanData);
-          setShowSavingsConfirmModal(true);
-          setIsProcessing(false);
-          setActionInProgress(false);
-          return;
-        } else {
-          console.error('MEMBER_BALANCE_SAVINGS_NEEDED error missing savingsData:', error);
-          setErrorMessage('Error processing member balance validation. Please try again.');
-          setErrorModalVisible(true);
-          setIsProcessing(false);
-          setActionInProgress(false);
-          return;
-        }
-      }
-      
-      if (error.message === 'SAVINGS_CONFIRMATION_NEEDED' && error.savingsData) {
-        setSavingsShortfall({
-          needed: error.savingsData.needed,
-          available: error.savingsData.available,
-          remaining: error.savingsData.remaining
-        });
-        setPendingLoanForSavings(error.savingsData.loanData);
-        setShowSavingsConfirmModal(true);
-        setIsProcessing(false);
-        setActionInProgress(false);
-        return;
-      }
-      
-      setErrorMessage(error.message || 'An error occurred. Please try again.');
-      setErrorModalVisible(true);
-    } finally {
+    if (error.message === 'SAVINGS_CONFIRMATION_NEEDED' && error.savingsData) {
+      setSavingsShortfall({
+        needed: error.savingsData.needed,
+        available: error.savingsData.available,
+        remaining: error.savingsData.remaining
+      });
+      setPendingLoanForSavings(error.savingsData.loanData);
+      setShowSavingsConfirmModal(true);
       setIsProcessing(false);
       setActionInProgress(false);
+      return;
     }
-  };
+
+    setErrorMessage(error.message || 'An error occurred. Please try again.');
+    setErrorModalVisible(true);
+  } finally {
+    // Hide loading
+    setIsProcessing(false);
+    setActionInProgress(false);
+  }
+};
 
   const processDatabaseApprove = async (loan) => {
     try {
@@ -1725,29 +1734,43 @@ We recommend settling outstanding balances first before reapplying. Once cleared
     }
   };
 
-  const handleSuccessOk = async () => {
-    if (pendingApiCall) {
-      try {
-        if (pendingApiCall.type === 'approve') {
-          await callApiApprove(pendingApiCall.data);
-        } else if (pendingApiCall.type === 'reject') {
-          await callApiReject(pendingApiCall.data);
-        }
-      } catch (error) {
-        console.error('Error calling API:', error);
-      }
-      setPendingApiCall(null);
-    }
+const handleSuccessOk = async () => {
+  // Close success modal
+  setSuccessMessageModalVisible(false);
 
-    setSuccessMessageModalVisible(false);
-    setJustCompletedAction(false);
-    closeModal();
-    if (typeof refreshData === 'function') {
-      await refreshData();
-    }
-    setSelectedLoan(null);
+  if (!pendingApiCall) {
     setCurrentAction(null);
-  };
+    closeModal();
+    setSelectedLoan(null);
+    refreshData();
+    return;
+  }
+
+  setIsProcessing(true);
+  setActionInProgress(true);
+
+  try {
+    if (pendingApiCall.type === 'approve') {
+      await processDatabaseApprove(pendingApiCall.data);
+      callApiApprove(pendingApiCall.data);
+    } else if (pendingApiCall.type === 'reject') {
+      await processDatabaseReject(pendingApiCall.data, pendingApiCall.data.rejectionReason);
+      callApiReject(pendingApiCall.data);
+    }
+  } catch (error) {
+    console.error('Error processing DB or API call:', error);
+    setErrorMessage(error.message || 'An error occurred during final processing.');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false);
+    setActionInProgress(false);
+    setPendingApiCall(null);
+    setCurrentAction(null);
+    closeModal();
+    setSelectedLoan(null);
+    refreshData();
+  }
+};
 
   const openImageViewer = (url, label, index) => {
     const images = [];
@@ -2118,69 +2141,71 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         </div>
       )}
 
-      {/* Approve Confirmation Modal */}
-      {showApproveConfirmation && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-            <p style={styles.modalText}>Are you sure you want to approve this loan?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }} 
-                onClick={confirmApprove}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.secondaryButton
-                }} 
-                onClick={() => setShowApproveConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Approve Confirmation Modal */}
+{showApproveConfirmation && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <p style={styles.modalText}>Are you sure you want to approve this loan?</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={confirmApprove}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }} 
+          onClick={() => setShowApproveConfirmation(false)}
+          disabled={actionInProgress}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-      {/* Reject Confirmation Modal */}
-      {showRejectConfirmation && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-            <p style={styles.modalText}>Are you sure you want to reject this loan?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }} 
-                onClick={confirmRejectFinal}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.secondaryButton
-                }} 
-                onClick={() => setShowRejectConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Reject Confirmation Modal */}
+{showRejectConfirmation && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <p style={styles.modalText}>Are you sure you want to reject this loan?</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={confirmRejectFinal}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }} 
+          onClick={() => setShowRejectConfirmation(false)}
+          disabled={actionInProgress}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Rejection Reason Modal */}
       {showRejectionModal && (
@@ -2251,103 +2276,109 @@ We recommend settling outstanding balances first before reapplying. Once cleared
         </div>
       )}
 
-      {/* Loading Spinner */}
-      {isProcessing && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.spinner}></div>
-        </div>
-      )}
+{/* Loading Overlay - Same design as logout */}
+{isProcessing && (
+  <div style={styles.loadingOverlay}>
+    <div style={styles.loadingContent}>
+      <div style={styles.spinner}></div>
+      <div style={styles.loadingText}>
+        {currentAction === 'approve' ? 'Approving loan...' : 'Rejecting loan...'}
+      </div>
+    </div>
+  </div>
+)}
 
-      {/* Success Modal */}
-      {successMessageModalVisible && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            {currentAction === 'approve' ? (
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
-            ) : (
-              <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
-            )}
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                ...styles.primaryButton
-              }} 
-              onClick={handleSuccessOk}
-            >
-              OK
-            </button>
-          </div>
-        </div>
+ {/* Success Modal */}
+{successMessageModalVisible && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      {currentAction === 'approve' ? (
+        <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+      ) : (
+        <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
       )}
+      <p style={styles.modalText}>{successMessage}</p>
+      <button 
+        style={{
+          ...styles.actionButton,
+          ...styles.primaryButton
+        }} 
+        onClick={handleSuccessOk}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
 
-      {/* Savings Confirmation Modal */}
-      {showSavingsConfirmModal && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.savingsConfirmModal}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-            <div style={styles.modalTitle}>
-              {savingsShortfall.memberBalance !== undefined ? 'Loan Amount Exceeds Member Balance' : 'Insufficient Funds - Use Savings?'}
-            </div>
-            <div style={styles.savingsInfoBox}>
-              <div style={styles.savingsInfoTitle}>Current Financial Status:</div>
-              <div style={styles.savingsInfoText}>
-                {savingsShortfall.memberBalance !== undefined ? (
-                  <>
-                    • Member Current Balance: <strong>{formatCurrency(savingsShortfall.memberBalance)}</strong><br/>
-                    • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
-                    • Amount Exceeding Balance: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
-                    • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
-                    • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
-                  </>
-                ) : (
-                  <>
-                    • Loan Amount: <strong>{formatCurrency(parseFloat(pendingLoanForSavings?.loanAmount || 0))}</strong><br/>
-                    • Shortfall: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
-                    • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
-                    • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
-                  </>
-                )}
-              </div>
-            </div>
-            <p style={styles.modalText}>
-              {savingsShortfall.memberBalance !== undefined ? (
-                <>
-                  The loan amount exceeds the member's current balance. 
-                  Would you like to deduct the remaining <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings?
-                </>
-              ) : (
-                <>
-                  The available funds are insufficient to approve this loan. 
-                  Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall?
-                </>
-              )}
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.approveButton
-                }}
-                onClick={handleSavingsConfirm}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes, Use Savings'}
-              </button>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.rejectButton
-                }}
-                onClick={handleSavingsCancel}
-                disabled={actionInProgress}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+{/* Savings Confirmation Modal */}
+{showSavingsConfirmModal && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.savingsConfirmModal}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <div style={styles.modalTitle}>
+        {savingsShortfall.memberBalance !== undefined ? 'Loan Amount Exceeds Member Balance' : 'Insufficient Funds - Use Savings?'}
+      </div>
+      <div style={styles.savingsInfoBox}>
+        <div style={styles.savingsInfoTitle}>Current Financial Status:</div>
+        <div style={styles.savingsInfoText}>
+          {savingsShortfall.memberBalance !== undefined ? (
+            <>
+              • Member Current Balance: <strong>{formatCurrency(savingsShortfall.memberBalance)}</strong><br/>
+              • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
+              • Amount Exceeding Balance: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
+              • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
+              • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
+            </>
+          ) : (
+            <>
+              • Loan Amount: <strong>{formatCurrency(parseFloat(pendingLoanForSavings?.loanAmount || 0))}</strong><br/>
+              • Shortfall: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
+              • Available Savings: <strong>{formatCurrency(savingsShortfall.available)}</strong><br/>
+              • Remaining Savings After: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
+            </>
+          )}
         </div>
-      )}
+      </div>
+      <p style={styles.modalText}>
+        {savingsShortfall.memberBalance !== undefined ? (
+          <>
+            The loan amount exceeds the member's current balance. 
+            Would you like to deduct the remaining <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings?
+          </>
+        ) : (
+          <>
+            The available funds are insufficient to approve this loan. 
+            Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall?
+          </>
+        )}
+      </p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button
+          style={{
+            ...styles.actionButton,
+            ...styles.approveButton,
+            ...(actionInProgress ? styles.disabledButton : {})
+          }}
+          onClick={handleSavingsConfirm}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes, Use Savings'}
+        </button>
+        <button
+          style={{
+            ...styles.actionButton,
+            ...styles.rejectButton
+          }}
+          onClick={handleSavingsCancel}
+          disabled={actionInProgress}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Image Viewer */}
       {imageViewerVisible && (

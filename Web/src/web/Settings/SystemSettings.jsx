@@ -5,6 +5,7 @@ import 'react-calendar/dist/Calendar.css';
 import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle, FaPiggyBank, FaPercentage, FaCalendarAlt, FaFileContract, FaShieldAlt, FaInfoCircle, FaPhone, FaMoneyBillWave, FaBusinessTime } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { FaEdit, FaSave } from 'react-icons/fa';
+import { ConfirmModal, SuccessModal } from '../components/Modals';
 
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
@@ -14,210 +15,6 @@ const SystemSettings = () => {
     setActiveSection(section);
     setEditMode(false); // Reset edit mode when switching sections
   };
-
-  // Add CSS styles for modals matching registration design
-  useEffect(() => {
-    const styleElement = document.createElement('style');
-    styleElement.innerHTML = `
-      .centered-modal {
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background-color: rgba(0, 0, 0, 0.5);
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        z-index: 1000;
-      }
-
-      .confirm-modal-card {
-        background-color: white;
-        border-radius: 16px;
-        padding: 32px;
-        text-align: center;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        width: 90%;
-        max-width: 420px;
-        border: 1px solid #e2e8f0;
-      }
-
-      .small-modal-card {
-        background-color: white;
-        border-radius: 16px;
-        padding: 32px;
-        text-align: center;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        width: 90%;
-        max-width: 380px;
-        border: 1px solid #e2e8f0;
-      }
-
-      .confirm-icon {
-        font-size: 56px;
-        color: #1e3a8a;
-        margin-bottom: 24px;
-      }
-
-      .modal-text {
-        font-size: 16px;
-        color: #374151;
-        margin-bottom: 28px;
-        line-height: 1.6;
-        font-weight: 500;
-      }
-
-      .bottom-buttons {
-        display: flex;
-        gap: 16px;
-        justify-content: center;
-      }
-
-      .confirm-btn {
-        background: linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%);
-        color: white;
-        border: none;
-        border-radius: 10px;
-        padding: 14px 28px;
-        cursor: pointer;
-        font-size: 15px;
-        font-weight: 600;
-        min-width: 100px;
-        transition: all 0.3s ease;
-        box-shadow: 0 4px 12px rgba(30, 58, 138, 0.3);
-      }
-
-      .confirm-btn:hover {
-        background: linear-gradient(135deg, #3730a3 0%, #1e3a8a 100%);
-        transform: translateY(-2px);
-        box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
-      }
-
-      .cancel-btn {
-        background-color: #f8fafc;
-        color: #64748b;
-        border: 2px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 14px 28px;
-        cursor: pointer;
-        font-size: 15px;
-        font-weight: 600;
-        min-width: 100px;
-        transition: all 0.3s ease;
-      }
-
-      .cancel-btn:hover {
-        background-color: #f1f5f9;
-        border-color: #cbd5e1;
-        transform: translateY(-2px);
-      }
-
-      .enhanced-modal {
-        background-color: white;
-        border-radius: 16px;
-        padding: 32px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-        width: 90%;
-        max-width: 600px;
-        border: 1px solid #e2e8f0;
-        max-height: 80vh;
-        overflow: auto;
-      }
-
-      .enhanced-modal-title {
-        font-size: 20px;
-        font-weight: 600;
-        margin-bottom: 20px;
-        color: #1e293b;
-        text-align: center;
-      }
-
-      .enhanced-modal-input {
-        width: '100%';
-        padding: '14px 16px';
-        border: '2px solid #e5e7eb';
-        border-radius: '10px';
-        font-size: '15px';
-        margin-bottom: '20px';
-        box-sizing: 'border-box';
-        transition: 'all 0.3s ease';
-      }
-
-      .enhanced-modal-input:focus {
-        border-color: '#1e40af';
-        box-shadow: '0 0 0 3px rgba(30, 64, 175, 0.1)';
-      }
-
-      .enhanced-modal-textarea {
-        width: '100%';
-        padding: '14px 16px';
-        border: '2px solid #e5e7eb';
-        border-radius: '10px';
-        font-size: '15px';
-        margin-bottom: '20px';
-        box-sizing: 'border-box';
-        transition: 'all 0.3s ease';
-        min-height: '200px';
-        resize: 'vertical';
-        font-family: 'inherit';
-      }
-
-      .enhanced-modal-textarea:focus {
-        border-color: '#1e40af';
-        box-shadow: '0 0 0 3px rgba(30, 64, 175, 0.1)';
-      }
-
-      .enhanced-modal-buttons {
-        display: 'flex';
-        justify-content: 'center';
-        gap: '16px';
-        margin-top: '24px';
-      }
-
-      .enhanced-modal-btn {
-        padding: '14px 24px';
-        border-radius: '10px';
-        border: 'none';
-        cursor: 'pointer';
-        font-weight: '600';
-        font-size: '15px';
-        transition: 'all 0.3s ease';
-        min-width: '120px';
-      }
-
-      .enhanced-modal-btn-primary {
-        background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-        color: 'white';
-        box-shadow: '0 4px 12px rgba(16, 185, 129, 0.3)';
-      }
-
-      .enhanced-modal-btn-primary:hover {
-        background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)';
-        transform: 'translateY(-2px)';
-        box-shadow: '0 6px 20px rgba(16, 185, 129, 0.4)';
-      }
-
-      .enhanced-modal-btn-secondary {
-        background-color: '#f8fafc';
-        color: '#64748b';
-        border: '2px solid #e2e8f0';
-      }
-
-      .enhanced-modal-btn-secondary:hover {
-        background-color: '#f1f5f9';
-        border-color: '#cbd5e1';
-        transform: 'translateY(-2px)';
-      }
-    `;
-    document.head.appendChild(styleElement);
-
-    return () => {
-      if (document.head.contains(styleElement)) {
-        document.head.removeChild(styleElement);
-      }
-    };
-  }, []);
 
   const [settings, setSettings] = useState({
     Funds: '',
@@ -313,6 +110,18 @@ const SystemSettings = () => {
     breakdownValid: true
   });
 
+  // Confirmation modal state
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    message: '',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
+
+  // Success modal state
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+
   const db = getDatabase();
 
   // Helper function to format peso amounts with at least 2 decimal places
@@ -345,6 +154,26 @@ const SystemSettings = () => {
     });
     
     return distributionValid && breakdownValid;
+  };
+
+  const showConfirmModal = (message, onConfirm, onCancel = () => {}) => {
+    setConfirmModalConfig({
+      message,
+      onConfirm: () => {
+        setConfirmModalVisible(false);
+        onConfirm();
+      },
+      onCancel: () => {
+        setConfirmModalVisible(false);
+        onCancel();
+      }
+    });
+    setConfirmModalVisible(true);
+  };
+
+  const showSuccessMessage = (message) => {
+    setSuccessMessage(message);
+    setSuccessModalVisible(true);
   };
 
   useEffect(() => {
@@ -428,17 +257,17 @@ const SystemSettings = () => {
       await navigator.clipboard.writeText(text);
       setOrientationCopied(true);
       setTimeout(() => setOrientationCopied(false), 2000);
-      showMessage('Success', 'Code copied to clipboard!');
+      showSuccessMessage('Code copied to clipboard!');
     } catch (err) {
       console.error('Failed to copy: ', err);
-      showMessage('Error', 'Failed to copy code', true);
+      setMessageModal({ visible: true, title: 'Error', message: 'Failed to copy code', isError: true });
     }
   };
 
   const handleGenerateOrientationCode = () => {
     const newCode = generateOrientationCode();
     setSettings({ ...settings, OrientationCode: newCode });
-    showMessage('Success', 'New orientation code generated!');
+    showSuccessMessage('New orientation code generated!');
   };
 
   const showMessage = (title, message, isError = false) => {
@@ -513,7 +342,7 @@ const SystemSettings = () => {
     setNewTerm('');
     setNewRate('');
     setAddModalVisible(false);
-    showMessage('Success', 'Global term added. Assign per-type rates below.');
+    showSuccessMessage('Global term added. Assign per-type rates below.');
   };
 
   const requestAddTerm = () => {
@@ -547,7 +376,7 @@ const SystemSettings = () => {
       InterestRateByType: updatedByType,
     }));
     setDeleteModalVisible(false);
-    showMessage('Success', `Deleted ${t} month term for ${lt} only.`);
+    showSuccessMessage(`Deleted ${t} month term for ${lt} only.`);
   };
 
   // Loan Types management functions
@@ -639,7 +468,7 @@ const SystemSettings = () => {
       }));
       setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanTypes: loanTypesNested }));
       setAddLoanTypeWizardVisible(false);
-      showMessage('Success', isEditingLoanType ? 'Loan type updated.' : 'Loan type and per-term rates added.');
+      showSuccessMessage(isEditingLoanType ? 'Loan type updated.' : 'Loan type and per-term rates added.');
       resetWizard();
     } catch (e) {
       showMessage('Error', e.message || 'Failed to save', true);
@@ -670,7 +499,7 @@ const SystemSettings = () => {
     });
     setNewLoanType('');
     setAddLoanTypeModalVisible(false);
-    showMessage('Success', 'Loan type added successfully!');
+    showSuccessMessage('Loan type added successfully!');
   };
 
   const requestDeleteLoanType = (loanType) => {
@@ -714,7 +543,7 @@ const SystemSettings = () => {
       });
       setSavedSettingsSnapshot(prev => ({ ...(prev || {}), InterestRateByType: newInterestByType, LoanTypes: loanTypesNested }));
       setDeleteLoanTypeModalVisible(false);
-      showMessage('Success', 'Loan type deleted successfully!');
+      showSuccessMessage('Loan type deleted successfully!');
     } catch (e) {
       showMessage('Error', e.message || 'Failed to delete', true);
     } finally {
@@ -804,12 +633,22 @@ const SystemSettings = () => {
       await update(settingsRef, updatedData);
       setConfirmationModalVisible(false);
       setEditMode(false);
-      showMessage('Success', 'Settings updated successfully!');
+      showSuccessMessage('Settings updated successfully!');
     } catch (error) {
       showMessage('Error', error.message || ('Failed to update settings: ' + error.message), true);
     } finally {
       setActionInProgress(false);
     }
+  };
+
+  const handleSaveWithConfirmation = () => {
+    showConfirmModal(
+      'Are you sure you want to save all system settings changes?',
+      confirmSave,
+      () => {
+        setConfirmationModalVisible(false);
+      }
+    );
   };
 
   const handleDateChange = (date) => {
@@ -863,7 +702,18 @@ const SystemSettings = () => {
 
     setFundsActionModal(null);
     setActionAmount('');
-    showMessage('Success', `Funds ${fundsActionModal === 'add' ? 'added' : 'withdrawn'} successfully!`);
+    showSuccessMessage(`Funds ${fundsActionModal === 'add' ? 'added' : 'withdrawn'} successfully!`);
+  };
+
+  const handleFundsActionWithConfirmation = () => {
+    const actionText = fundsActionModal === 'add' ? 'transfer from savings to funds' : 'withdraw from funds to savings';
+    showConfirmModal(
+      `Are you sure you want to ${actionText}?`,
+      confirmFundsAction,
+      () => {
+        setFundsActionModal(null);
+      }
+    );
   };
 
   const handleAddSavings = () => {
@@ -886,7 +736,17 @@ const SystemSettings = () => {
 
     setSavingsModalVisible(false);
     setActionAmount('');
-    showMessage('Success', 'Savings added successfully!');
+    showSuccessMessage('Savings added successfully!');
+  };
+
+  const handleAddSavingsWithConfirmation = () => {
+    showConfirmModal(
+      'Are you sure you want to add to savings?',
+      confirmAddSavings,
+      () => {
+        setSavingsModalVisible(false);
+      }
+    );
   };
 
   if (loading) return (
@@ -986,7 +846,7 @@ const SystemSettings = () => {
                           }));
                           
                           setEditGeneralSettings(false);
-                          showMessage('Success', 'Financial settings updated successfully!');
+                          showSuccessMessage('Financial settings updated successfully!');
                         } catch (e) {
                           showMessage('Error', e.message || 'Failed to save financial settings', true);
                         } finally {
@@ -1104,7 +964,7 @@ const SystemSettings = () => {
                           await update(settingsRef, settings.Accounts);
                           setSavedSettingsSnapshot(prev => ({ ...(prev || {}), Accounts: settings.Accounts }));
                           setEditAccounts(false);
-                          showMessage('Success', 'Accounts updated successfully!');
+                          showSuccessMessage('Accounts updated successfully!');
                         } catch (e) {
                           showMessage('Error', e.message || 'Failed to save Accounts', true);
                         } finally {
@@ -1197,7 +1057,7 @@ const SystemSettings = () => {
                             OrientationCode: settings.OrientationCode
                           }));
                           setEditOrientationCode(false);
-                          showMessage('Success', 'Orientation code updated successfully!');
+                          showSuccessMessage('Orientation code updated successfully!');
                         } catch (e) {
                           showMessage('Error', e.message || 'Failed to save orientation code', true);
                         } finally {
@@ -1288,7 +1148,7 @@ const SystemSettings = () => {
                           });
                           setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanReminderDays: settings.LoanReminderDays, ProcessingFee: settings.ProcessingFee }));
                           setEditLoanAndFee(false);
-                          showMessage('Success', 'Loan Reminder and Processing Fee updated');
+                          showSuccessMessage('Loan Reminder and Processing Fee updated');
                         } catch (e) {
                           showMessage('Error', e.message || 'Failed to save', true);
                         } finally {
@@ -1406,7 +1266,7 @@ const SystemSettings = () => {
                           });
                           setSavedSettingsSnapshot(prev => ({ ...(prev || {}), LoanTypes: loanTypesNested }));
                           setEditLoanTypes(false);
-                          showMessage('Success', 'Types of Loan updated');
+                          showSuccessMessage('Types of Loan updated');
                         } catch (e) {
                           showMessage('Error', e.message || 'Failed to save', true);
                         } finally {
@@ -1551,7 +1411,7 @@ const SystemSettings = () => {
                           await update(ref(db, 'Settings'), payload);
                           setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ...payload }));
                           setEditDividend(false);
-                          showMessage('Success', 'Dividend settings updated successfully!');
+                          showSuccessMessage('Dividend settings updated successfully!');
                         } catch (e) {
                           showMessage('Error', e.message || 'Failed to save dividend settings', true);
                         } finally {
@@ -1927,578 +1787,558 @@ const SystemSettings = () => {
           </div>
         )}
 
-        {/* All existing modals remain the same */}
-        {addModalVisible && (
-          <div className="centered-modal">
-            <div className="confirm-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Add {newTerm} months at {newRate}% interest?</p>
-              <div className="bottom-buttons">
-                <button className="confirm-btn" onClick={confirmAddTerm}>Yes</button>
-                <button className="cancel-btn" onClick={() => setAddModalVisible(false)}>No</button>
-              </div>
+        {/* Save All Settings Button */}
+        <div style={styles.saveAllContainer}>
+          <button
+            style={styles.saveAllButton}
+            onClick={handleSaveWithConfirmation}
+            disabled={actionInProgress}
+          >
+            <FaSave style={{ marginRight: 8 }} />
+            {actionInProgress ? 'Saving...' : 'Save All Settings'}
+          </button>
+        </div>
+      </div>
+
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={confirmModalVisible}
+        message={confirmModalConfig.message}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        iconColor="#3B82F6"
+        onConfirm={confirmModalConfig.onConfirm}
+        onCancel={confirmModalConfig.onCancel}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={successModalVisible}
+        message={successMessage}
+        onClose={() => setSuccessModalVisible(false)}
+        okLabel="Continue"
+      />
+
+      {/* All other existing modals remain the same but use the new confirmation pattern */}
+      {addModalVisible && (
+        <ConfirmModal
+          visible={addModalVisible}
+          message={`Add ${newTerm} months at ${newRate}% interest?`}
+          confirmLabel="Yes"
+          cancelLabel="No"
+          iconColor="#3B82F6"
+          onConfirm={confirmAddTerm}
+          onCancel={() => setAddModalVisible(false)}
+        />
+      )}
+
+      {/* Delete Interest Term Modal */}
+      {deleteModalVisible && (
+        <ConfirmModal
+          visible={deleteModalVisible}
+          message={`Delete the ${termToDelete} month term for ${(editingOriginalLoanType || wizardLoanTypeName)} only? Other loan types will keep this term.`}
+          confirmLabel="Yes"
+          cancelLabel="No"
+          iconColor="#3B82F6"
+          onConfirm={confirmDeleteTerm}
+          onCancel={() => setDeleteModalVisible(false)}
+        />
+      )}
+
+      {/* Add Savings Modal */}
+      {savingsModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.smallModalCard}>
+            <FiAlertCircle style={styles.confirmIcon} />
+            <p style={styles.modalText}>Enter amount to add to savings:</p>
+            <input
+              style={styles.modalInput}
+              value={actionAmount}
+              onChange={(e) => setActionAmount(e.target.value)}
+              type="number"
+              placeholder="Amount"
+              min="0"
+              step="0.01"
+            />
+            <div style={styles.bottomButtons}>
+              <button style={styles.confirmBtn} onClick={handleAddSavingsWithConfirmation}>Add</button>
+              <button style={styles.cancelBtn} onClick={() => setSavingsModalVisible(false)}>Cancel</button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Delete Interest Term Modal */}
-        {deleteModalVisible && (
-          <div className="centered-modal">
-            <div className="confirm-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Delete the {termToDelete} month term for {(editingOriginalLoanType || wizardLoanTypeName)} only? Other loan types will keep this term.</p>
-              <div className="bottom-buttons">
-                <button className="confirm-btn" onClick={confirmDeleteTerm}>Yes</button>
-                <button className="cancel-btn" onClick={() => setDeleteModalVisible(false)}>No</button>
-              </div>
+      {/* Funds Action Modal */}
+      {fundsActionModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.smallModalCard}>
+            <FiAlertCircle style={styles.confirmIcon} />
+            <p style={styles.modalText}>
+              {fundsActionModal === 'add' ? 'Add to Funds' : 'Withdraw to Savings'}
+            </p>
+            <p style={styles.modalText}>
+              {fundsActionModal === 'add' ? 
+                `Available Savings: ₱${formatPesoAmount(settings.Savings)}` : 
+                `Available Funds: ₱${formatPesoAmount(settings.Funds)}`}
+            </p>
+            <input
+              style={styles.modalInput}
+              value={actionAmount}
+              onChange={(e) => setActionAmount(e.target.value)}
+              type="number"
+              placeholder="Amount"
+              min="0"
+              step="0.01"
+            />
+            <div style={styles.bottomButtons}>
+              <button style={styles.confirmBtn} onClick={handleFundsActionWithConfirmation}>
+                {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
+              </button>
+              <button style={styles.cancelBtn} onClick={() => setFundsActionModal(null)}>Cancel</button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Add Savings Modal */}
-        {savingsModalVisible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Enter amount to add to savings:</p>
+      {/* Enhanced Add Loan Type Wizard Modal */}
+      {addLoanTypeWizardVisible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.enhancedModal}>
+            <h3 style={styles.enhancedModalTitle}>{isEditingLoanType ? 'Edit Loan Type' : 'Add Loan Type'}</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Loan Type Name</label>
               <input
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  marginBottom: '20px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center'
-                }}
-                value={actionAmount}
-                onChange={(e) => setActionAmount(e.target.value)}
-                type="number"
-                placeholder="Amount"
-                min="0"
-                step="0.01"
+                style={styles.enhancedModalInput}
+                placeholder="e.g., Emergency Loan"
+                value={wizardLoanTypeName}
+                onChange={(e) => setWizardLoanTypeName(e.target.value)}
               />
-              <div className="bottom-buttons">
-                <button className="confirm-btn" onClick={confirmAddSavings}>Add</button>
-                <button className="cancel-btn" onClick={() => setSavingsModalVisible(false)}>Cancel</button>
-              </div>
             </div>
-          </div>
-        )}
 
-        {/* Funds Action Modal */}
-        {fundsActionModal && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">
-                {fundsActionModal === 'add' ? 'Add to Funds' : 'Withdraw to Savings'}
-              </p>
-              <p className="modal-text">
-                {fundsActionModal === 'add' ? 
-                  `Available Savings: ₱${formatPesoAmount(settings.Savings)}` : 
-                  `Available Funds: ₱${formatPesoAmount(settings.Funds)}`}
-              </p>
-              <input
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  border: '1px solid #ddd',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  marginBottom: '20px',
-                  boxSizing: 'border-box',
-                  textAlign: 'center'
-                }}
-                value={actionAmount}
-                onChange={(e) => setActionAmount(e.target.value)}
-                type="number"
-                placeholder="Amount"
-                min="0"
-                step="0.01"
-              />
-              <div className="bottom-buttons">
-                <button className="confirm-btn" onClick={confirmFundsAction}>
-                  {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
-                </button>
-                <button className="cancel-btn" onClick={() => setFundsActionModal(null)}>Cancel</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Enhanced Add Loan Type Wizard Modal */}
-        {addLoanTypeWizardVisible && (
-          <div className="centered-modal">
-            <div className="enhanced-modal">
-              <h3 className="enhanced-modal-title">{isEditingLoanType ? 'Edit Loan Type' : 'Add Loan Type'}</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Loan Type Name</label>
-                <input
-                  className="enhanced-modal-input"
-                  placeholder="e.g., Emergency Loan"
-                  value={wizardLoanTypeName}
-                  onChange={(e) => setWizardLoanTypeName(e.target.value)}
-                />
-              </div>
-
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Terms and Interest Rates</label>
-                {wizardRows.map((row, idx) => (
-                  <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-                    <input
-                      className="enhanced-modal-input"
-                      placeholder="Months (e.g., 6)"
-                      type="number"
-                      value={row.term}
-                      onChange={(e) => updateWizardRow(idx, 'term', e.target.value)}
-                    />
-                    <input
-                      className="enhanced-modal-input"
-                      placeholder="Interest Rate % (e.g., 3.5)"
-                      type="number"
-                      value={row.rate}
-                      onChange={(e) => updateWizardRow(idx, 'rate', e.target.value)}
-                    />
-                    <button
-                      style={{ 
-                        padding: '12px 16px', 
-                        backgroundColor: '#ef4444', 
-                        color: 'white', 
-                        border: 'none', 
-                        borderRadius: '8px', 
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        transition: 'all 0.3s ease',
-                        minWidth: '100px'
-                      }}
-                      onClick={() => removeWizardRow(idx)}
-                      disabled={wizardRows.length === 1}
-                    >
-                      Remove
-                    </button>
-                  </div>
-                ))}
-                <button
-                  style={{ 
-                    padding: '12px 20px', 
-                    backgroundColor: '#1e40af', 
-                    color: 'white', 
-                    border: 'none', 
-                    borderRadius: '8px', 
-                    cursor: 'pointer',
-                    fontWeight: '600',
-                    transition: 'all 0.3s ease',
-                    width: '100%',
-                    marginTop: '8px'
-                  }}
-                  onClick={addWizardRow}
-                >
-                  + Add Row
-                </button>
-              </div>
-
-              {wizardError && (
-                <div style={{ 
-                  color: '#ef4444', 
-                  marginBottom: 16, 
-                  fontSize: 14, 
-                  backgroundColor: '#fef2f2',
-                  padding: '12px 16px',
-                  borderRadius: '8px',
-                  border: '1px solid #fecaca'
-                }}>
-                  {wizardError}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Terms and Interest Rates</label>
+              {wizardRows.map((row, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
+                  <input
+                    style={styles.enhancedModalInput}
+                    placeholder="Months (e.g., 6)"
+                    type="number"
+                    value={row.term}
+                    onChange={(e) => updateWizardRow(idx, 'term', e.target.value)}
+                  />
+                  <input
+                    style={styles.enhancedModalInput}
+                    placeholder="Interest Rate % (e.g., 3.5)"
+                    type="number"
+                    value={row.rate}
+                    onChange={(e) => updateWizardRow(idx, 'rate', e.target.value)}
+                  />
+                  <button
+                    style={styles.removeButton}
+                    onClick={() => removeWizardRow(idx)}
+                    disabled={wizardRows.length === 1}
+                  >
+                    Remove
+                  </button>
                 </div>
-              )}
-
-              <div className="enhanced-modal-buttons">
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
-                  onClick={() => { setAddLoanTypeWizardVisible(false); resetWizard(); }}
-                >
-                  Cancel
-                </button>
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-primary"
-                  onClick={confirmWizardAdd}
-                >
-                  {isEditingLoanType ? 'Save Changes' : 'Add Loan Type'}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Add Loan Type Modal */}
-        {addLoanTypeModalVisible && (
-          <div className="centered-modal">
-            <div className="confirm-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Add "{newLoanType}" as a new loan type?</p>
-              <div className="bottom-buttons">
-                <button className="confirm-btn" onClick={confirmAddLoanType}>Yes</button>
-                <button className="cancel-btn" onClick={() => setAddLoanTypeModalVisible(false)}>No</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Delete Loan Type Modal */}
-        {deleteLoanTypeModalVisible && (
-          <div className="centered-modal">
-            <div className="confirm-modal-card">
-              <FiAlertCircle className="confirm-icon" />
-              <p className="modal-text">Are you sure you want to delete "{loanTypeToDelete}" loan type?</p>
-              <div className="bottom-buttons">
-                <button className="confirm-btn" onClick={confirmDeleteLoanType}>Yes</button>
-                <button className="cancel-btn" onClick={() => setDeleteLoanTypeModalVisible(false)}>No</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Message Modal */}
-        {messageModal.visible && (
-          <div className="centered-modal">
-            <div className="small-modal-card">
-              {messageModal.isError ? (
-                <FiAlertCircle style={{ fontSize: '48px', color: '#ef4444', marginBottom: '20px' }} />
-              ) : (
-                <FaCheckCircle style={{ fontSize: '48px', color: '#10b981', marginBottom: '20px' }} />
-              )}
-              <p className="modal-text">{messageModal.message}</p>
-              <button 
-                className="confirm-btn"
-                onClick={() => setMessageModal({ ...messageModal, visible: false })}
+              ))}
+              <button
+                style={styles.addRowButton}
+                onClick={addWizardRow}
               >
-                OK
+                + Add Row
+              </button>
+            </div>
+
+            {wizardError && (
+              <div style={styles.errorMessage}>
+                {wizardError}
+              </div>
+            )}
+
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => { setAddLoanTypeWizardVisible(false); resetWizard(); }}
+              >
+                Cancel
+              </button>
+              <button
+                style={styles.enhancedModalBtnPrimary}
+                onClick={confirmWizardAdd}
+              >
+                {isEditingLoanType ? 'Save Changes' : 'Add Loan Type'}
               </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Enhanced Terms and Conditions Edit Modal */}
-        {editTermsModal && (
-          <div className="centered-modal">
-            <div className="enhanced-modal">
-              <h3 className="enhanced-modal-title">Edit Terms and Conditions</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
-                <input
-                  className="enhanced-modal-input"
-                  value={tempTermsContent.title}
-                  onChange={(e) => setTempTermsContent(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter title"
-                />
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
-                <textarea
-                  className="enhanced-modal-textarea"
-                  value={tempTermsContent.content}
-                  onChange={(e) => setTempTermsContent(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Enter content"
-                />
-              </div>
-              <div className="enhanced-modal-buttons">
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-primary"
-                  onClick={async () => {
-                    try {
-                      setActionInProgress(true);
-                      const updatedTerms = {
-                        title: tempTermsContent.title,
-                        content: tempTermsContent.content
-                      };
-                      await update(ref(db, 'Settings/TermsAndConditions'), updatedTerms);
-                      setSettings(prev => ({ ...prev, TermsAndConditions: updatedTerms }));
-                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), TermsAndConditions: updatedTerms }));
-                      setEditTermsModal(false);
-                      showMessage('Success', 'Terms and Conditions updated successfully!');
-                    } catch (e) {
-                      showMessage('Error', e.message || 'Failed to save Terms and Conditions', true);
-                    } finally {
-                      setActionInProgress(false);
-                    }
-                  }}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
-                  onClick={() => setEditTermsModal(false)}
-                >
-                  Cancel
-                </button>
-              </div>
+      {/* Add Loan Type Modal */}
+      {addLoanTypeModalVisible && (
+        <ConfirmModal
+          visible={addLoanTypeModalVisible}
+          message={`Add "${newLoanType}" as a new loan type?`}
+          confirmLabel="Yes"
+          cancelLabel="No"
+          iconColor="#3B82F6"
+          onConfirm={confirmAddLoanType}
+          onCancel={() => setAddLoanTypeModalVisible(false)}
+        />
+      )}
+
+      {/* Delete Loan Type Modal */}
+      {deleteLoanTypeModalVisible && (
+        <ConfirmModal
+          visible={deleteLoanTypeModalVisible}
+          message={`Are you sure you want to delete "${loanTypeToDelete}" loan type?`}
+          confirmLabel="Yes"
+          cancelLabel="No"
+          iconColor="#3B82F6"
+          onConfirm={confirmDeleteLoanType}
+          onCancel={() => setDeleteLoanTypeModalVisible(false)}
+        />
+      )}
+
+      {/* Message Modal */}
+      {messageModal.visible && (
+        <div style={styles.centeredModal}>
+          <div style={styles.smallModalCard}>
+            {messageModal.isError ? (
+              <FiAlertCircle style={{ fontSize: '48px', color: '#ef4444', marginBottom: '20px' }} />
+            ) : (
+              <FaCheckCircle style={{ fontSize: '48px', color: '#10b981', marginBottom: '20px' }} />
+            )}
+            <p style={styles.modalText}>{messageModal.message}</p>
+            <button 
+              style={styles.confirmBtn}
+              onClick={() => setMessageModal({ ...messageModal, visible: false })}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Enhanced Terms and Conditions Edit Modal */}
+      {editTermsModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.enhancedModal}>
+            <h3 style={styles.enhancedModalTitle}>Edit Terms and Conditions</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
+              <input
+                style={styles.enhancedModalInput}
+                value={tempTermsContent.title}
+                onChange={(e) => setTempTermsContent(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter title"
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
+              <textarea
+                style={styles.enhancedModalTextarea}
+                value={tempTermsContent.content}
+                onChange={(e) => setTempTermsContent(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter content"
+              />
+            </div>
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={styles.enhancedModalBtnPrimary}
+                onClick={async () => {
+                  try {
+                    setActionInProgress(true);
+                    const updatedTerms = {
+                      title: tempTermsContent.title,
+                      content: tempTermsContent.content
+                    };
+                    await update(ref(db, 'Settings/TermsAndConditions'), updatedTerms);
+                    setSettings(prev => ({ ...prev, TermsAndConditions: updatedTerms }));
+                    setSavedSettingsSnapshot(prev => ({ ...(prev || {}), TermsAndConditions: updatedTerms }));
+                    setEditTermsModal(false);
+                    showSuccessMessage('Terms and Conditions updated successfully!');
+                  } catch (e) {
+                    showMessage('Error', e.message || 'Failed to save Terms and Conditions', true);
+                  } finally {
+                    setActionInProgress(false);
+                  }
+                }}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => setEditTermsModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Enhanced Privacy Policy Edit Modal */}
-        {editPrivacyModal && (
-          <div className="centered-modal">
-            <div className="enhanced-modal">
-              <h3 className="enhanced-modal-title">Edit Privacy Policy</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
-                <input
-                  className="enhanced-modal-input"
-                  value={tempPrivacyContent.title}
-                  onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter title"
-                />
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
-                <textarea
-                  className="enhanced-modal-textarea"
-                  value={tempPrivacyContent.content}
-                  onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Enter content"
-                />
-              </div>
-              <div className="enhanced-modal-buttons">
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-primary"
-                  onClick={async () => {
-                    try {
-                      setActionInProgress(true);
-                      const updatedPrivacy = {
-                        title: tempPrivacyContent.title,
-                        content: tempPrivacyContent.content
-                      };
-                      await update(ref(db, 'Settings/PrivacyPolicy'), updatedPrivacy);
-                      setSettings(prev => ({ ...prev, PrivacyPolicy: updatedPrivacy }));
-                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), PrivacyPolicy: updatedPrivacy }));
-                      setEditPrivacyModal(false);
-                      showMessage('Success', 'Privacy Policy updated successfully!');
-                    } catch (e) {
-                      showMessage('Error', e.message || 'Failed to save Privacy Policy', true);
-                    } finally {
-                      setActionInProgress(false);
-                    }
-                  }}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
-                  onClick={() => setEditPrivacyModal(false)}
-                >
-                  Cancel
-                </button>
-              </div>
+      {/* Enhanced Privacy Policy Edit Modal */}
+      {editPrivacyModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.enhancedModal}>
+            <h3 style={styles.enhancedModalTitle}>Edit Privacy Policy</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
+              <input
+                style={styles.enhancedModalInput}
+                value={tempPrivacyContent.title}
+                onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter title"
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
+              <textarea
+                style={styles.enhancedModalTextarea}
+                value={tempPrivacyContent.content}
+                onChange={(e) => setTempPrivacyContent(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter content"
+              />
+            </div>
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={styles.enhancedModalBtnPrimary}
+                onClick={async () => {
+                  try {
+                    setActionInProgress(true);
+                    const updatedPrivacy = {
+                      title: tempPrivacyContent.title,
+                      content: tempPrivacyContent.content
+                    };
+                    await update(ref(db, 'Settings/PrivacyPolicy'), updatedPrivacy);
+                    setSettings(prev => ({ ...prev, PrivacyPolicy: updatedPrivacy }));
+                    setSavedSettingsSnapshot(prev => ({ ...(prev || {}), PrivacyPolicy: updatedPrivacy }));
+                    setEditPrivacyModal(false);
+                    showSuccessMessage('Privacy Policy updated successfully!');
+                  } catch (e) {
+                    showMessage('Error', e.message || 'Failed to save Privacy Policy', true);
+                  } finally {
+                    setActionInProgress(false);
+                  }
+                }}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => setEditPrivacyModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Enhanced About Us Edit Modal */}
-        {editAboutModal && (
-          <div className="centered-modal">
-            <div className="enhanced-modal">
-              <h3 className="enhanced-modal-title">Edit About Us</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
-                <input
-                  className="enhanced-modal-input"
-                  value={tempAboutContent.title}
-                  onChange={(e) => setTempAboutContent(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter title"
-                />
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
-                <textarea
-                  className="enhanced-modal-textarea"
-                  value={tempAboutContent.content}
-                  onChange={(e) => setTempAboutContent(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Enter content"
-                />
-              </div>
-              <div className="enhanced-modal-buttons">
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-primary"
-                  onClick={async () => {
-                    try {
-                      setActionInProgress(true);
-                      const updatedAbout = {
-                        title: tempAboutContent.title,
-                        content: tempAboutContent.content
-                      };
-                      await update(ref(db, 'Settings/AboutUs'), updatedAbout);
-                      setSettings(prev => ({ ...prev, AboutUs: updatedAbout }));
-                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), AboutUs: updatedAbout }));
-                      setEditAboutModal(false);
-                      showMessage('Success', 'About Us updated successfully!');
-                    } catch (e) {
-                      showMessage('Error', e.message || 'Failed to save About Us', true);
-                    } finally {
-                      setActionInProgress(false);
-                    }
-                  }}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
-                  onClick={() => setEditAboutModal(false)}
-                >
-                  Cancel
-                </button>
-              </div>
+      {/* Enhanced About Us Edit Modal */}
+      {editAboutModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.enhancedModal}>
+            <h3 style={styles.enhancedModalTitle}>Edit About Us</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
+              <input
+                style={styles.enhancedModalInput}
+                value={tempAboutContent.title}
+                onChange={(e) => setTempAboutContent(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter title"
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
+              <textarea
+                style={styles.enhancedModalTextarea}
+                value={tempAboutContent.content}
+                onChange={(e) => setTempAboutContent(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter content"
+              />
+            </div>
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={styles.enhancedModalBtnPrimary}
+                onClick={async () => {
+                  try {
+                    setActionInProgress(true);
+                    const updatedAbout = {
+                      title: tempAboutContent.title,
+                      content: tempAboutContent.content
+                    };
+                    await update(ref(db, 'Settings/AboutUs'), updatedAbout);
+                    setSettings(prev => ({ ...prev, AboutUs: updatedAbout }));
+                    setSavedSettingsSnapshot(prev => ({ ...(prev || {}), AboutUs: updatedAbout }));
+                    setEditAboutModal(false);
+                    showSuccessMessage('About Us updated successfully!');
+                  } catch (e) {
+                    showMessage('Error', e.message || 'Failed to save About Us', true);
+                  } finally {
+                    setActionInProgress(false);
+                  }
+                }}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => setEditAboutModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Enhanced Contact Us Edit Modal */}
-        {editContactModal && (
-          <div className="centered-modal">
-            <div className="enhanced-modal">
-              <h3 className="enhanced-modal-title">Edit Contact Us</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
-                <input
-                  className="enhanced-modal-input"
-                  value={tempContactContent.title}
-                  onChange={(e) => setTempContactContent(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Enter title"
-                />
-              </div>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
-                <textarea
-                  className="enhanced-modal-textarea"
-                  value={tempContactContent.content}
-                  onChange={(e) => setTempContactContent(prev => ({ ...prev, content: e.target.value }))}
-                  placeholder="Enter content"
-                />
-              </div>
-              <div className="enhanced-modal-buttons">
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-primary"
-                  onClick={async () => {
-                    try {
-                      setActionInProgress(true);
-                      const updatedContact = {
-                        title: tempContactContent.title,
-                        content: tempContactContent.content
-                      };
-                      await update(ref(db, 'Settings/ContactUs'), updatedContact);
-                      setSettings(prev => ({ ...prev, ContactUs: updatedContact }));
-                      setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ContactUs: updatedContact }));
-                      setEditContactModal(false);
-                      showMessage('Success', 'Contact Us updated successfully!');
-                    } catch (e) {
-                      showMessage('Error', e.message || 'Failed to save Contact Us', true);
-                    } finally {
-                      setActionInProgress(false);
-                    }
-                  }}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Saving...' : 'Save Changes'}
-                </button>
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
-                  onClick={() => setEditContactModal(false)}
-                >
-                  Cancel
-                </button>
-              </div>
+      {/* Enhanced Contact Us Edit Modal */}
+      {editContactModal && (
+        <div style={styles.centeredModal}>
+          <div style={styles.enhancedModal}>
+            <h3 style={styles.enhancedModalTitle}>Edit Contact Us</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
+              <input
+                style={styles.enhancedModalInput}
+                value={tempContactContent.title}
+                onChange={(e) => setTempContactContent(prev => ({ ...prev, title: e.target.value }))}
+                placeholder="Enter title"
+              />
+            </div>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Content</label>
+              <textarea
+                style={styles.enhancedModalTextarea}
+                value={tempContactContent.content}
+                onChange={(e) => setTempContactContent(prev => ({ ...prev, content: e.target.value }))}
+                placeholder="Enter content"
+              />
+            </div>
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={styles.enhancedModalBtnPrimary}
+                onClick={async () => {
+                  try {
+                    setActionInProgress(true);
+                    const updatedContact = {
+                      title: tempContactContent.title,
+                      content: tempContactContent.content
+                    };
+                    await update(ref(db, 'Settings/ContactUs'), updatedContact);
+                    setSettings(prev => ({ ...prev, ContactUs: updatedContact }));
+                    setSavedSettingsSnapshot(prev => ({ ...(prev || {}), ContactUs: updatedContact }));
+                    setEditContactModal(false);
+                    showSuccessMessage('Contact Us updated successfully!');
+                  } catch (e) {
+                    showMessage('Error', e.message || 'Failed to save Contact Us', true);
+                  } finally {
+                    setActionInProgress(false);
+                  }
+                }}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Saving...' : 'Save Changes'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => setEditContactModal(false)}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Enhanced Add to Savings Modal */}
-        {addToSavingsModalVisible && (
-          <div className="centered-modal">
-            <div className="enhanced-modal" style={{ maxWidth: '400px' }}>
-              <h3 className="enhanced-modal-title">Add to Savings</h3>
-              <div style={{ marginBottom: 20 }}>
-                <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Amount</label>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 'bold', color: '#059669' }}>₱</span>
-                  <input
-                    className="enhanced-modal-input"
-                    value={savingsAddAmount}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                        setSavingsAddAmount(value);
-                      }
-                    }}
-                    type="text"
-                    placeholder="0.00"
-                    autoFocus
-                  />
+      {/* Enhanced Add to Savings Modal */}
+      {addToSavingsModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '400px' }}>
+            <h3 style={styles.enhancedModalTitle}>Add to Savings</h3>
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Amount</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#059669' }}>₱</span>
+                <input
+                  style={styles.enhancedModalInput}
+                  value={savingsAddAmount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setSavingsAddAmount(value);
+                    }
+                  }}
+                  type="text"
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              {savingsAddAmount && parseFloat(savingsAddAmount) > 0 && (
+                <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                  Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) + parseFloat(savingsAddAmount)).toFixed(2))}
                 </div>
-                {savingsAddAmount && parseFloat(savingsAddAmount) > 0 && (
-                  <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                    Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) + parseFloat(savingsAddAmount)).toFixed(2))}
-                  </div>
-                )}
-              </div>
-              <div className="enhanced-modal-buttons">
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-primary"
-                  onClick={async () => {
-                    try {
-                      const addAmount = parseFloat(savingsAddAmount || 0);
-                      if (addAmount <= 0) {
-                        showMessage('Error', 'Please enter a valid amount greater than 0', true);
-                        return;
-                      }
-
-                      setActionInProgress(true);
-                      
-                      const currentSavings = parseFloat(settings.Savings || 0);
-                      const newSavingsTotal = currentSavings + addAmount;
-                      
-                      const updateData = {
-                        Savings: parseFloat(newSavingsTotal.toFixed(2))
-                      };
-                      
-                      await update(ref(db, 'Settings'), updateData);
-                      
-                      setSettings(prev => ({ ...prev, Savings: newSavingsTotal.toString() }));
-                      setSavedSettingsSnapshot(prev => ({ 
-                        ...(prev || {}), 
-                        Savings: newSavingsTotal.toString()
-                      }));
-                      
-                      setSavingsAddAmount('');
-                      setAddToSavingsModalVisible(false);
-                      showMessage('Success', `₱${formatPesoAmount(addAmount)} added to savings successfully!`);
-                    } catch (e) {
-                      showMessage('Error', e.message || 'Failed to add to savings', true);
-                    } finally {
-                      setActionInProgress(false);
+              )}
+            </div>
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={styles.enhancedModalBtnPrimary}
+                onClick={async () => {
+                  try {
+                    const addAmount = parseFloat(savingsAddAmount || 0);
+                    if (addAmount <= 0) {
+                      showMessage('Error', 'Please enter a valid amount greater than 0', true);
+                      return;
                     }
-                  }}
-                  disabled={actionInProgress || !savingsAddAmount || parseFloat(savingsAddAmount) <= 0}
-                >
-                  {actionInProgress ? 'Adding...' : 'Add to Savings'}
-                </button>
-                <button
-                  className="enhanced-modal-btn enhanced-modal-btn-secondary"
-                  onClick={() => {
+
+                    setActionInProgress(true);
+                    
+                    const currentSavings = parseFloat(settings.Savings || 0);
+                    const newSavingsTotal = currentSavings + addAmount;
+                    
+                    const updateData = {
+                      Savings: parseFloat(newSavingsTotal.toFixed(2))
+                    };
+                    
+                    await update(ref(db, 'Settings'), updateData);
+                    
+                    setSettings(prev => ({ ...prev, Savings: newSavingsTotal.toString() }));
+                    setSavedSettingsSnapshot(prev => ({ 
+                      ...(prev || {}), 
+                      Savings: newSavingsTotal.toString()
+                    }));
+                    
                     setSavingsAddAmount('');
                     setAddToSavingsModalVisible(false);
-                  }}
-                >
-                  Cancel
-                </button>
-              </div>
+                    showSuccessMessage(`₱${formatPesoAmount(addAmount)} added to savings successfully!`);
+                  } catch (e) {
+                    showMessage('Error', e.message || 'Failed to add to savings', true);
+                  } finally {
+                    setActionInProgress(false);
+                  }
+                }}
+                disabled={actionInProgress || !savingsAddAmount || parseFloat(savingsAddAmount) <= 0}
+              >
+                {actionInProgress ? 'Adding...' : 'Add to Savings'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => {
+                  setSavingsAddAmount('');
+                  setAddToSavingsModalVisible(false);
+                }}
+              >
+                Cancel
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -2769,6 +2609,30 @@ const styles = {
     gap: '8px',
     transition: 'all 0.3s ease',
     boxShadow: '0 4px 12px rgba(30, 64, 175, 0.3)'
+  },
+  saveAllContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: '32px',
+    paddingTop: '24px',
+    borderTop: '2px solid #e2e8f0'
+  },
+  saveAllButton: {
+    backgroundColor: '#10b981',
+    color: 'white',
+    border: 'none',
+    borderRadius: '12px',
+    padding: '16px 32px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: '600',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+    minWidth: '200px',
+    justifyContent: 'center'
   },
   accountGrid: {
     display: 'grid',
@@ -3123,7 +2987,225 @@ const styles = {
     width: '40px',
     height: '40px',
     animation: 'spin 1s linear infinite'
+  },
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000
+  },
+  smallModalCard: {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '32px',
+    textAlign: 'center',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+    width: '90%',
+    maxWidth: '380px',
+    border: '1px solid #e2e8f0'
+  },
+  confirmIcon: {
+    fontSize: '56px',
+    color: '#1e3a8a',
+    marginBottom: '24px'
+  },
+  modalText: {
+    fontSize: '16px',
+    color: '#374151',
+    marginBottom: '28px',
+    lineHeight: '1.6',
+    fontWeight: '500'
+  },
+  modalInput: {
+    width: '100%',
+    padding: '12px',
+    border: '1px solid #ddd',
+    borderRadius: '6px',
+    fontSize: '14px',
+    marginBottom: '20px',
+    boxSizing: 'border-box',
+    textAlign: 'center'
+  },
+  bottomButtons: {
+    display: 'flex',
+    gap: '16px',
+    justifyContent: 'center'
+  },
+  confirmBtn: {
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '10px',
+    padding: '14px 28px',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: '600',
+    minWidth: '100px',
+    transition: 'all 0.3s ease',
+    boxShadow: '0 4px 12px rgba(30, 58, 138, 0.3)'
+  },
+  cancelBtn: {
+    backgroundColor: '#f8fafc',
+    color: '#64748b',
+    border: '2px solid #e2e8f0',
+    borderRadius: '10px',
+    padding: '14px 28px',
+    cursor: 'pointer',
+    fontSize: '15px',
+    fontWeight: '600',
+    minWidth: '100px',
+    transition: 'all 0.3s ease'
+  },
+  enhancedModal: {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '32px',
+    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+    width: '90%',
+    maxWidth: '600px',
+    border: '1px solid #e2e8f0',
+    maxHeight: '80vh',
+    overflow: 'auto'
+  },
+  enhancedModalTitle: {
+    fontSize: '20px',
+    fontWeight: '600',
+    marginBottom: '20px',
+    color: '#1e293b',
+    textAlign: 'center'
+  },
+  enhancedModalInput: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    fontSize: '15px',
+    marginBottom: '20px',
+    boxSizing: 'border-box',
+    transition: 'all 0.3s ease'
+  },
+  enhancedModalTextarea: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    fontSize: '15px',
+    marginBottom: '20px',
+    boxSizing: 'border-box',
+    transition: 'all 0.3s ease',
+    minHeight: '200px',
+    resize: 'vertical',
+    fontFamily: 'inherit'
+  },
+  enhancedModalButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    gap: '16px',
+    marginTop: '24px'
+  },
+  enhancedModalBtnPrimary: {
+    padding: '14px 24px',
+    borderRadius: '10px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '15px',
+    transition: 'all 0.3s ease',
+    minWidth: '120px',
+    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+    color: 'white',
+    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)'
+  },
+  enhancedModalBtnSecondary: {
+    padding: '14px 24px',
+    borderRadius: '10px',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '15px',
+    transition: 'all 0.3s ease',
+    minWidth: '120px',
+    backgroundColor: '#f8fafc',
+    color: '#64748b',
+    border: '2px solid #e2e8f0'
+  },
+  removeButton: {
+    padding: '12px 16px', 
+    backgroundColor: '#ef4444', 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '8px', 
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    minWidth: '100px'
+  },
+  addRowButton: {
+    padding: '12px 20px', 
+    backgroundColor: '#1e40af', 
+    color: 'white', 
+    border: 'none', 
+    borderRadius: '8px', 
+    cursor: 'pointer',
+    fontWeight: '600',
+    transition: 'all 0.3s ease',
+    width: '100%',
+    marginTop: '8px'
+  },
+  errorMessage: {
+    color: '#ef4444', 
+    marginBottom: 16, 
+    fontSize: 14, 
+    backgroundColor: '#fef2f2',
+    padding: '12px 16px',
+    borderRadius: '8px',
+    border: '1px solid #fecaca'
   }
 };
+
+// Add CSS for animations
+const styleElement = document.createElement('style');
+styleElement.innerHTML = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .confirm-btn:hover {
+    background: linear-gradient(135deg, #3730a3 0%, #1e3a8a 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
+  }
+
+  .cancel-btn:hover {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+  }
+
+  .enhanced-modal-btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669 0%, #10b981 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+  }
+
+  .enhanced-modal-btn-secondary:hover:not(:disabled) {
+    background-color: #f1f5f9;
+    border-color: #cbd5e1;
+    transform: translateY(-2px);
+  }
+
+  .enhanced-modal-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+  }
+`;
+document.head.appendChild(styleElement);
 
 export default SystemSettings;

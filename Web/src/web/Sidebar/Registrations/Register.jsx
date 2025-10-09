@@ -1188,7 +1188,7 @@ const Register = () => {
           <div>
             <h1 style={styles.headerText}>Membership Management</h1>
             <p style={styles.headerSubtitle}>
-              Manage member registrations, approvals, and withdrawals in one place
+              Manage member registrations, approvals, and withdrawals
             </p>
           </div>
         </div>

@@ -7,12 +7,38 @@ const styles = {
   container: {
     flex: 1,
   },
-  loadingView: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%'
-  },
+loadingOverlay: {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(15, 23, 42, 0.8)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1500,
+  backdropFilter: 'blur(4px)',
+},
+spinner: {
+  border: '3px solid rgba(59, 130, 246, 0.3)',
+  borderTop: '3px solid #3B82F6',
+  borderRadius: '50%',
+  width: '36px',
+  height: '36px',
+  animation: 'spin 1s linear infinite'
+},
+loadingContent: {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '14px',
+},
+loadingText: {
+  color: 'white',
+  fontSize: '14px',
+  fontWeight: '500'
+},
   tableContainer: {
     borderRadius: '8px',
     overflow: 'auto',
@@ -221,18 +247,6 @@ const styles = {
   confirmIcon: {
     marginBottom: '12px',
     fontSize: '32px'
-  },
-  spinner: {
-    border: '4px solid rgba(0, 0, 0, 0.1)',
-    borderLeftColor: '#2D5783',
-    borderRadius: '50%',
-    width: '36px',
-    height: '36px',
-    animation: 'spin 1s linear infinite'
-  },
-  '@keyframes spin': {
-    '0%': { transform: 'rotate(0deg)' },
-    '100%': { transform: 'rotate(360deg)' }
   },
   viewText: {
     color: '#2D5783',
@@ -503,72 +517,74 @@ const PermanentWithdraws = ({ refreshData }) => {
     await processAction(selectedWithdrawal, 'reject', selectedReason === "Other (please specify)" ? customReason : selectedReason);
   };
 
-  const processAction = async (withdrawal, action, rejectionReason = '') => {
-    setActionInProgress(true);
-    setIsProcessing(true);
-    setCurrentAction(action);
+const processAction = async (withdrawal, action, rejectionReason = '') => {
+  // Show loading immediately
+  setActionInProgress(true);
+  setIsProcessing(true);
+  setCurrentAction(action);
 
-    try {
-      if (action === 'approve') {
-        await processDatabaseApprove(withdrawal);
-        setSuccessMessage('Membership withdrawal approved successfully!');
-        
-        const approveData = {
-          ...withdrawal,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date()),
-          status: 'approved'
-        };
-        
-        setSelectedWithdrawal(prev => ({
-          ...prev,
-          dateApproved: approveData.dateApproved,
-          timeApproved: approveData.timeApproved,
-          status: 'approved'
-        }));
+  try {
+    // Prepare data without executing database operations
+    if (action === 'approve') {
+      setSuccessMessage('Membership withdrawal approved successfully!');
 
-        // Store API call data for later execution
-        setPendingApiCall({
-          type: 'approve',
-          data: approveData
-        });
-      } else {
-        await processDatabaseReject(withdrawal, rejectionReason);
-        setSuccessMessage('Membership withdrawal rejected successfully!');
-        
-        const rejectData = {
-          ...withdrawal,
-          dateRejected: formatDate(new Date()),
-          timeRejected: formatTime(new Date()),
-          rejectionReason,
-          status: 'rejected'
-        };
-        
-        setSelectedWithdrawal(prev => ({
-          ...prev,
-          dateRejected: rejectData.dateRejected,
-          timeRejected: rejectData.timeRejected,
-          rejectionReason,
-          status: 'rejected'
-        }));
+      const approveData = {
+        ...withdrawal,
+        dateApproved: formatDate(new Date()),
+        timeApproved: formatTime(new Date()),
+        status: 'approved'
+      };
 
-        // Store API call data for later execution
-        setPendingApiCall({
-          type: 'reject',
-          data: rejectData
-        });
-      }
-      
-      setSuccessMessageModalVisible(true);
-    } catch (error) {
-      console.error('Error processing action:', error);
-      setErrorMessage(error.message || 'An error occurred. Please try again.');
-      setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
-      setActionInProgress(false);
+      setSelectedWithdrawal(prev => ({
+        ...prev,
+        dateApproved: approveData.dateApproved,
+        timeApproved: approveData.timeApproved,
+        status: 'approved'
+      }));
+
+      // Store API call data for later execution
+      setPendingApiCall({
+        type: 'approve',
+        data: approveData
+      });
+    } else {
+      setSuccessMessage('Membership withdrawal rejected successfully!');
+
+      const rejectData = {
+        ...withdrawal,
+        dateRejected: formatDate(new Date()),
+        timeRejected: formatTime(new Date()),
+        rejectionReason,
+        status: 'rejected'
+      };
+
+      setSelectedWithdrawal(prev => ({
+        ...prev,
+        dateRejected: rejectData.dateRejected,
+        timeRejected: rejectData.timeRejected,
+        rejectionReason,
+        status: 'rejected'
+      }));
+
+      // Store API call data for later execution
+      setPendingApiCall({
+        type: 'reject',
+        data: rejectData
+      });
     }
-  };
+
+    // Show success modal immediately
+    setSuccessMessageModalVisible(true);
+  } catch (error) {
+    console.error('Error preparing action:', error);
+    setErrorMessage(error.message || 'An error occurred. Please try again.');
+    setErrorModalVisible(true);
+  } finally {
+    // Hide loading
+    setIsProcessing(false);
+    setActionInProgress(false);
+  }
+};
 
 const processDatabaseApprove = async (withdrawal) => {
   try {
@@ -669,35 +685,42 @@ const processDatabaseApprove = async (withdrawal) => {
     }
   };
 
-  const handleSuccessOk = async () => {
-    setSuccessMessageModalVisible(false);
-    setSelectedWithdrawal(null);
-    setCurrentAction(null);
-    
-    // Execute pending API call
+const handleSuccessOk = async () => {
+  // Close success modal
+  setSuccessMessageModalVisible(false);
+  
+  // Trigger background email
+  try {
     if (pendingApiCall) {
-      try {
-        if (pendingApiCall.type === 'approve') {
-          await ApproveMembershipWithdrawal(pendingApiCall.data);
-        } else if (pendingApiCall.type === 'reject') {
-          await RejectMembershipWithdrawal(pendingApiCall.data);
-        }
-      } catch (error) {
-        console.error('Error calling API:', error);
+      if (pendingApiCall.type === 'approve') {
+        ApproveMembershipWithdrawal(pendingApiCall.data);
+      } else if (pendingApiCall.type === 'reject') {
+        RejectMembershipWithdrawal(pendingApiCall.data);
       }
-      setPendingApiCall(null);
     }
-    
-    refreshData();
-  };
-
-  if (loading) {
-    return (
-      <div style={styles.loadingView}>
-        <div style={styles.spinner}></div>
-      </div>
-    );
+  } catch (error) {
+    console.error('Error calling API:', error);
   }
+
+  // Clean up and refresh
+  setPendingApiCall(null);
+  setCurrentAction(null);
+  closeModal();
+  setSelectedWithdrawal(null);
+  refreshData();
+};
+
+{/* Loading Overlay - Same design as logout */}
+{isProcessing && (
+  <div style={styles.loadingOverlay}>
+    <div style={styles.loadingContent}>
+      <div style={styles.spinner}></div>
+      <div style={styles.loadingText}>
+        {currentAction === 'approve' ? 'Approving membership withdrawal...' : 'Rejecting membership withdrawal...'}
+      </div>
+    </div>
+  </div>
+)}
 
   if (!withdrawals.length) {
     // Show only the text, no container box
@@ -850,105 +873,107 @@ const processDatabaseApprove = async (withdrawal) => {
                 )}
               </div>
             </div>
-            {selectedWithdrawal?.status !== 'approved' && selectedWithdrawal?.status !== 'rejected' && (
-              <div style={styles.bottomButtons}>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.approveButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={handleApproveClick}
-                  disabled={isProcessing}
-                  onFocus={(e) => e.target.style.outline = 'none'}
-                >
-                  Approve
-                </button>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.rejectButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={handleRejectClick}
-                  disabled={isProcessing}
-                  onFocus={(e) => e.target.style.outline = 'none'}
-                >
-                  Reject
-                </button>
-              </div>
-            )}
+{selectedWithdrawal?.status !== 'approved' && selectedWithdrawal?.status !== 'rejected' && (
+  <div style={styles.bottomButtons}>
+    <button
+      style={{
+        ...styles.actionButton,
+        ...styles.approveButton,
+        ...(isProcessing ? styles.disabledButton : {})
+      }}
+      onClick={handleApproveClick}
+      disabled={isProcessing}
+      onFocus={(e) => e.target.style.outline = 'none'}
+    >
+      Approve
+    </button>
+    <button
+      style={{
+        ...styles.actionButton,
+        ...styles.rejectButton,
+        ...(isProcessing ? styles.disabledButton : {})
+      }}
+      onClick={handleRejectClick}
+      disabled={isProcessing}
+      onFocus={(e) => e.target.style.outline = 'none'}
+    >
+      Reject
+    </button>
+  </div>
+)}
           </div>
         </div>
       )}
 
-      {/* Approve Confirmation Modal */}
-      {showApproveConfirmation && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>Are you sure you want to approve this membership withdrawal?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={confirmApprove}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
-                }} 
-                onClick={() => setShowApproveConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Approve Confirmation Modal */}
+{showApproveConfirmation && (
+  <div style={styles.centeredModal}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+      <p style={styles.modalText}>Are you sure you want to approve this membership withdrawal?</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            backgroundColor: '#2D5783',
+            color: '#fff',
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={confirmApprove}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            backgroundColor: '#f44336',
+            color: '#fff'
+          }} 
+          onClick={() => setShowApproveConfirmation(false)}
+          disabled={actionInProgress}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-      {/* Reject Confirmation Modal */}
-      {showRejectConfirmation && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>Are you sure you want to reject this membership withdrawal?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={confirmRejectFinal}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f44336',
-                  color: '#fff'
-                }} 
-                onClick={() => setShowRejectConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Reject Confirmation Modal */}
+{showRejectConfirmation && (
+  <div style={styles.centeredModal}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
+      <p style={styles.modalText}>Are you sure you want to reject this membership withdrawal?</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            backgroundColor: '#2D5783',
+            color: '#fff',
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={confirmRejectFinal}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            backgroundColor: '#f44336',
+            color: '#fff'
+          }} 
+          onClick={() => setShowRejectConfirmation(false)}
+          disabled={actionInProgress}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {showRejectionModal && (
         <div style={styles.rejectionModal}>
@@ -1029,30 +1054,30 @@ const processDatabaseApprove = async (withdrawal) => {
         </div>
       )}
 
-      {/* Success Modal */}
-      {successMessageModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            {currentAction === 'approve' ? (
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-            ) : (
-              <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
-            )}
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={handleSuccessOk}
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              OK
-            </button>
-          </div>
-        </div>
+ {/* Success Modal */}
+{successMessageModalVisible && (
+  <div style={styles.centeredModal}>
+    <div style={styles.modalCardSmall}>
+      {currentAction === 'approve' ? (
+        <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
+      ) : (
+        <FaTimes style={{ ...styles.confirmIcon, color: '#f44336' }} />
       )}
+      <p style={styles.modalText}>{successMessage}</p>
+      <button 
+        style={{
+          ...styles.actionButton,
+          backgroundColor: '#2D5783',
+          color: '#fff'
+        }} 
+        onClick={handleSuccessOk}
+        onFocus={(e) => e.target.style.outline = 'none'}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
     </div>
   );
 };

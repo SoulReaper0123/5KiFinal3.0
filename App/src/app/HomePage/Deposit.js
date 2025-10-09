@@ -89,7 +89,7 @@ const Deposit = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.navigate('Home');
+      navigation.navigate('AppHome');
       return true;
     };
 
@@ -529,7 +529,7 @@ const Deposit = () => {
           if (alertType === 'success' && pendingDepositData) {
             // Navigate immediately and run API in background
             resetFormFields();
-            navigation.navigate('Home');
+            navigation.navigate('AppHome');
             
             // Run API call in background after navigation
             setTimeout(async () => {
@@ -546,7 +546,7 @@ const Deposit = () => {
           } else if (alertType === 'success') {
             // Fallback for success without pending data
             resetFormFields();
-            navigation.navigate('Home');
+            navigation.navigate('AppHome');
           }
         }}
         message={alertMessage}
@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#cccccc',
     opacity: 0.6,
   },
-  loadingOverlay: {
+ loadingOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
@@ -713,12 +713,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 999,
   },
+  
   loadingBox: {
     backgroundColor: 'white',
     padding: 30,
     borderRadius: 12,
     alignItems: 'center',
   },
+  
   loadingText: {
     marginTop: 10,
     fontSize: 16,

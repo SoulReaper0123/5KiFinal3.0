@@ -20,9 +20,11 @@ import { RiAdminLine } from 'react-icons/ri';
 import { FiAlertCircle } from 'react-icons/fi';
 import Admins from './Sidebar/Admins';
 import DataMigration from './Sidebar/DataMigration';
+import AccountSettings from './Settings/AccountSettings';
 import { useAuth } from '../web/WebAuth/AuthContext';
 import logo from '../../../assets/logo.png';
 import { generateEnhancedAdminAIResponse } from '../services/enhancedAdminAI';
+import { ConfirmModal, SuccessModal } from './components/Modals';
 
 const SuperAdminHome = () => {
   const [activeSection, setActiveSection] = useState('admins');
@@ -168,6 +170,7 @@ const SuperAdminHome = () => {
     switch (activeSection) {
       case 'dataMigration': return <DataMigration key={`migration-${sectionReloadCounter}`} setShowSplash={setShowSplash} />;
       case 'admins': return <Admins key={`admins-${sectionReloadCounter}`} setShowSplash={setShowSplash} />;
+      case 'accountSettings': return <AccountSettings key={`acctsettings-${sectionReloadCounter}`} />;
       default: return <Admins key={`admins-${sectionReloadCounter}`} setShowSplash={setShowSplash} />;
     }
   };
@@ -187,7 +190,7 @@ const SuperAdminHome = () => {
   const toggleDropdown = () => setIsDropdownVisible(!isDropdownVisible);
 
   const handleAdminIconPress = () => {
-    navigate('/settings');
+    handleSectionChange('accountSettings');
   };
 
   // AI Assistant Functions
@@ -1192,41 +1195,15 @@ const SuperAdminHome = () => {
       )}
 
       {/* Logout Confirmation Modal */}
-      {logoutModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#EF4444' }} />
-            <p style={styles.modalText}>Are you sure you want to log out of the Super Admin Portal?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#EF4444',
-                  color: '#fff',
-                }} 
-                onClick={handleLogout}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#DC2626'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#EF4444'}
-              >
-                <FaSignOutAlt style={{ marginRight: '4px' }} />
-                Logout
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#6B7280',
-                  color: '#fff',
-                }} 
-                onClick={() => setLogoutModalVisible(false)}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#6B7280'}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        visible={logoutModalVisible}
+        message="Are you sure you want to log out of the Super Admin Portal?"
+        onConfirm={handleLogout}
+        onCancel={() => setLogoutModalVisible(false)}
+        confirmLabel="Logout"
+        cancelLabel="Cancel"
+        iconColor="#EF4444"
+      />
 
       {/* AI Assistant Modal - ChatGPT Style */}
       {isAIAssistantVisible && (
@@ -1415,51 +1392,22 @@ const SuperAdminHome = () => {
       )}
 
       {/* Delete Chat Confirmation Modal */}
-      {showDeleteModal && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-            <p style={styles.modalText}>
-              Are you sure you want to delete this chat? This action cannot be undone.
-            </p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#EF4444',
-                  color: '#fff'
-                }} 
-                onClick={deleteChat}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#DC2626'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#EF4444'}
-              >
-                <FaTrash style={{ marginRight: '4px' }} />
-                Delete
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#6B7280',
-                  color: '#fff'
-                }} 
-                onClick={cancelDeleteChat}
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#4B5563'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = '#6B7280'}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        visible={showDeleteModal}
+        message="Are you sure you want to delete this chat? This action cannot be undone."
+        onConfirm={deleteChat}
+        onCancel={cancelDeleteChat}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        iconColor="#f44336"
+      />
 
       {/* Success Message */}
-      {showSuccessMessage && (
-        <div style={styles.successMessage}>
-          <FaTrash />
-          Chat deleted successfully!
-        </div>
-      )}
+      <SuccessModal
+        visible={showSuccessMessage}
+        message="Chat deleted successfully!"
+        onClose={() => setShowSuccessMessage(false)}
+      />
 
       {/* Loading Overlay */}
       {loading && (

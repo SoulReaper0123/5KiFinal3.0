@@ -2,15 +2,31 @@ import React, { useEffect, useState } from 'react';
 import { FaEye, FaEyeSlash, FaCheckCircle, FaUser, FaShieldAlt, FaEdit, FaSave, FaTimes } from 'react-icons/fa';
 import { getDatabase, ref, get, update } from 'firebase/database';
 import { getAuth, reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
+import { ConfirmModal, SuccessModal } from '../components/Modals';
+
+const formatFullName = (data = {}) => {
+  const firstName = (data.firstName || '').trim();
+  const middleName = (data.middleName || '').trim();
+  const lastName = (data.lastName || '').trim();
+  const parts = [firstName, middleName, lastName].filter(Boolean);
+  return parts.length ? parts.join(' ') : (data.name || '').trim();
+};
 
 const AccountSettings = () => {
   const [activeSection, setActiveSection] = useState('account');
   const [adminData, setAdminData] = useState(null);
+  const [memberData, setMemberData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [formError, setFormError] = useState('');
   const [isEditing, setIsEditing] = useState(false);
-  const [editableData, setEditableData] = useState({ name: '', contactNumber: '' });
+  const [editableData, setEditableData] = useState({
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    contactNumber: '',
+    name: ''
+  });
 
   const [changePasswordVisible, setChangePasswordVisible] = useState(false);
   const [currentPassword, setCurrentPassword] = useState('');
@@ -24,50 +40,136 @@ const AccountSettings = () => {
   });
   const [actionInProgress, setActionInProgress] = useState(false);
 
+  // Confirmation modal state
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [confirmModalConfig, setConfirmModalConfig] = useState({
+    message: '',
+    onConfirm: () => {},
+    onCancel: () => {}
+  });
+
   useEffect(() => {
     const fetchAdminData = async () => {
       try {
         const adminId = localStorage.getItem('adminId');
         if (!adminId) throw new Error('No admin ID found.');
         const db = getDatabase();
-        const adminRef = ref(db, `Users/Admin/${adminId}`);
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        const adminRef = ref(db, `${node}/${adminId}`);
         const snapshot = await get(adminRef);
         if (snapshot.exists()) {
           const data = snapshot.val();
-          setAdminData(data);
+          const fallbackName = formatFullName(data);
+          setAdminData({ ...data, name: fallbackName, role });
           setEditableData({
-            name: data.name || '',
-            contactNumber: data.contactNumber || ''
+            firstName: data.firstName || '',
+            middleName: data.middleName || '',
+            lastName: data.lastName || '',
+            contactNumber: data.contactNumber || '',
+            name: fallbackName
           });
-        } else throw new Error('Admin data not found.');
-      } catch (error) {
-        setError(error);
+        } else {
+          throw new Error('Admin data not found.');
+        }
+      } catch (fetchError) {
+        setError(fetchError);
       } finally {
         setLoading(false);
       }
     };
+
+    const fetchMemberData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+        const db = getDatabase();
+        const memberRef = ref(db, `Members/${adminId}`);
+        const snapshot = await get(memberRef);
+        if (snapshot.exists()) {
+          setMemberData(snapshot.val());
+        }
+      } catch (memberError) {
+        console.error('Failed to fetch member data:', memberError);
+      }
+    };
+
     fetchAdminData();
+    fetchMemberData();
   }, []);
 
   const handleEditChange = (field, value) => {
     setFormError('');
-    setEditableData(prev => ({ ...prev, [field]: value }));
+    setEditableData(prev => {
+      const updated = { ...prev, [field]: value };
+      if (['firstName', 'middleName', 'lastName'].includes(field)) {
+        updated.name = formatFullName(updated);
+      }
+      return updated;
+    });
+  };
+
+  const showConfirmModal = (message, onConfirm, onCancel = () => {}) => {
+    setConfirmModalConfig({
+      message,
+      onConfirm: () => {
+        setConfirmModalVisible(false);
+        onConfirm();
+      },
+      onCancel: () => {
+        setConfirmModalVisible(false);
+        onCancel();
+      }
+    });
+    setConfirmModalVisible(true);
   };
 
   const handleSaveChanges = async () => {
     try {
       setActionInProgress(true);
-      const { name, contactNumber } = editableData;
-      if (!name || !contactNumber) {
-        setFormError('All fields must be filled out.');
+      const { firstName, middleName, lastName, name, contactNumber } = editableData;
+
+      if (!firstName.trim() || !lastName.trim() || !contactNumber.trim()) {
+        setFormError('First name, last name, and contact number are required.');
         return;
       }
 
       const adminId = localStorage.getItem('adminId');
+      const role = localStorage.getItem('userRole') || 'admin';
       const db = getDatabase();
-      const adminRef = ref(db, `Users/Admin/${adminId}`);
-      await update(adminRef, editableData);
-      setAdminData(prev => ({ ...prev, ...editableData }));
+      const node = role === 'superadmin' ? 'Users/SuperAdmin' : role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+      const updates = {
+        [`${node}/${adminId}`]: {
+          ...adminData,
+          firstName: firstName.trim(),
+          middleName: middleName.trim(),
+          lastName: lastName.trim(),
+          name,
+          contactNumber: contactNumber.trim(),
+        },
+        [`Members/${adminId}`]: {
+          ...memberData,
+          firstName: firstName.trim(),
+          middleName: middleName.trim(),
+          lastName: lastName.trim(),
+          name,
+          contactNumber: contactNumber.trim(),
+        }
+      };
+
+      await update(ref(db), updates);
+
+      const updatedData = {
+        firstName: firstName.trim(),
+        middleName: middleName.trim(),
+        lastName: lastName.trim(),
+        name,
+        contactNumber: contactNumber.trim(),
+      };
+
+      setAdminData(prev => ({ ...prev, ...updatedData }));
+      setMemberData(prev => ({ ...(prev || {}), ...updatedData }));
+      setEditableData(prev => ({ ...prev, ...updatedData }));
       setIsEditing(false);
       setSuccessMessage('Profile updated successfully!');
       setSuccessModalVisible(true);
@@ -76,6 +178,16 @@ const AccountSettings = () => {
     } finally {
       setActionInProgress(false);
     }
+  };
+
+  const handleSaveChangesWithConfirmation = () => {
+    showConfirmModal(
+      'Are you sure you want to save these changes to your profile?',
+      handleSaveChanges,
+      () => {
+        // Cancel callback - do nothing
+      }
+    );
   };
 
   const handleChangePassword = async () => {
@@ -110,6 +222,16 @@ const AccountSettings = () => {
     } finally {
       setActionInProgress(false);
     }
+  };
+
+  const handleChangePasswordWithConfirmation = () => {
+    showConfirmModal(
+      'Are you sure you want to change your password?',
+      handleChangePassword,
+      () => {
+        // Cancel callback - do nothing
+      }
+    );
   };
 
   const renderPasswordField = (label, value, setter, toggleKey) => (
@@ -229,7 +351,7 @@ const AccountSettings = () => {
                     <button
                       style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
                       title="Save Changes"
-                      onClick={handleSaveChanges}
+                      onClick={handleSaveChangesWithConfirmation}
                       disabled={actionInProgress}
                     >
                       <FaSave />
@@ -379,7 +501,7 @@ const AccountSettings = () => {
                   ...styles.enhancedModalBtnPrimary,
                   ...(actionInProgress && styles.disabledButton)
                 }}
-                onClick={handleChangePassword}
+                onClick={handleChangePasswordWithConfirmation}
                 disabled={actionInProgress}
               >
                 {actionInProgress ? 'Updating...' : 'Update Password'}
@@ -405,22 +527,24 @@ const AccountSettings = () => {
         </div>
       )}
 
-      {/* Enhanced Success Modal */}
-      {successModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.successModal}>
-            <FaCheckCircle style={styles.successIcon} />
-            <h3 style={styles.successTitle}>Success!</h3>
-            <p style={styles.successMessage}>{successMessage}</p>
-            <button
-              style={styles.successButton}
-              onClick={() => setSuccessModalVisible(false)}
-            >
-              Continue
-            </button>
-          </div>
-        </div>
-      )}
+      {/* Confirmation Modal */}
+      <ConfirmModal
+        visible={confirmModalVisible}
+        message={confirmModalConfig.message}
+        confirmLabel="Confirm"
+        cancelLabel="Cancel"
+        iconColor="#3B82F6"
+        onConfirm={confirmModalConfig.onConfirm}
+        onCancel={confirmModalConfig.onCancel}
+      />
+
+      {/* Success Modal */}
+      <SuccessModal
+        visible={successModalVisible}
+        message={successMessage}
+        onClose={() => setSuccessModalVisible(false)}
+        okLabel="Continue"
+      />
     </div>
   );
 };
@@ -738,45 +862,6 @@ const styles = {
     color: '#6b7280',
     fontSize: '16px',
     padding: '4px'
-  },
-  successModal: {
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    padding: '32px',
-    boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
-    width: '90%',
-    maxWidth: '400px',
-    border: '1px solid #e2e8f0',
-    textAlign: 'center'
-  },
-  successIcon: {
-    fontSize: '48px',
-    color: '#10b981',
-    marginBottom: '16px'
-  },
-  successTitle: {
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#1e293b',
-    margin: '0 0 8px 0'
-  },
-  successMessage: {
-    fontSize: '15px',
-    color: '#6b7280',
-    margin: '0 0 24px 0',
-    lineHeight: '1.5'
-  },
-  successButton: {
-    backgroundColor: '#1e40af',
-    color: 'white',
-    border: 'none',
-    borderRadius: '10px',
-    padding: '12px 24px',
-    cursor: 'pointer',
-    fontSize: '15px',
-    fontWeight: '600',
-    transition: 'all 0.3s ease',
-    minWidth: '120px'
   },
   errorMessage: {
     backgroundColor: '#fef2f2',

@@ -31,22 +31,38 @@ const styles = {
     flex: 1,
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
-  loadingContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '200px',
-    flexDirection: 'column',
-    gap: '1rem'
-  },
-  spinner: {
-    border: '4px solid #f3f4f6',
-    borderLeft: '4px solid #2563eb',
-    borderRadius: '50%',
-    width: '40px',
-    height: '40px',
-    animation: 'spin 1s linear infinite'
-  },
+loadingOverlay: {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(15, 23, 42, 0.8)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 1500,
+  backdropFilter: 'blur(4px)',
+},
+spinner: {
+  border: '3px solid rgba(59, 130, 246, 0.3)',
+  borderTop: '3px solid #3B82F6',
+  borderRadius: '50%',
+  width: '36px',
+  height: '36px',
+  animation: 'spin 1s linear infinite'
+},
+loadingContent: {
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '14px',
+},
+loadingText: {
+  color: 'white',
+  fontSize: '14px',
+  fontWeight: '500'
+},
   tableContainer: {
     borderRadius: '12px',
     overflow: 'hidden',
@@ -718,6 +734,7 @@ const Registrations = ({
     blazeface: null
   });
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  const [pendingRemovalId, setPendingRemovalId] = useState(null);
   const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
 
   useEffect(() => {
@@ -1643,57 +1660,25 @@ const Registrations = ({
   };
 
 const processAction = async (registration, action, rejectionReason = '') => {
+  // Show loading immediately
   setActionInProgress(true);
   setIsProcessing(true);
   setCurrentAction(action);
 
   try {
     if (action === 'approve') {
-      const samePersonCheck = await checkIfSamePersonExists(
-        registration.email, 
-        registration.firstName, 
-        registration.lastName
-      );
-
-      if (!samePersonCheck.exists) {
-        // Only block if email exists with DIFFERENT name
-        const emailWithDifferentName = await checkIfEmailExistsInDatabase(
-          registration.email,
-          registration.firstName,
-          registration.lastName
-        );
-        
-        if (emailWithDifferentName) {
-          setErrorMessage('This email is already registered to a different member.');
-          setErrorModalVisible(true);
-          setIsProcessing(false);
-          setActionInProgress(false);
-          return;
-        }
-      }
-      
-      // If we get here, either:
-      // 1. Same person exists (update their record)
-      // 2. Person doesn't exist but email is not used by anyone else (create new)
-      // 3. Email exists in Firebase Auth but not in our database (create new)
-      
-      const memberId = await processDatabaseApprove(registration);
-     await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
-      
       setSuccessMessage('Registration approved successfully!');
-      setSuccessMessageModalVisible(true);
-      
+
       const approveData = {
         ...registration,
-        memberId,
         dateApproved: formatDate(new Date()),
         approvedTime: formatTime(new Date())
       };
 
+      // Local preview only; do not touch DB yet
       setSelectedRegistration(prev => ({
         ...prev,
-        memberId,
-        dateApproved: approveData.dateApproved, 
+        dateApproved: approveData.dateApproved,
         approvedTime: approveData.approvedTime,
         status: 'approved'
       }));
@@ -1704,13 +1689,8 @@ const processAction = async (registration, action, rejectionReason = '') => {
       });
 
     } else {
-      // Rejection logic remains the same
-      await processDatabaseReject(registration, rejectionReason);
-      await removeFromPendingRegistrations(registration.email.replace(/[.#$[\]]/g, '_'));
-      
       setSuccessMessage('Registration rejected successfully!');
-      setSuccessMessageModalVisible(true);
-      
+
       const rejectData = {
         ...registration,
         dateRejected: formatDate(new Date()),
@@ -1718,6 +1698,7 @@ const processAction = async (registration, action, rejectionReason = '') => {
         rejectionReason
       };
 
+      // Local preview only; do not touch DB yet
       setSelectedRegistration(prev => ({
         ...prev,
         dateRejected: rejectData.dateRejected,
@@ -1731,11 +1712,15 @@ const processAction = async (registration, action, rejectionReason = '') => {
         data: rejectData
       });
     }
+
+    // Show success modal immediately
+    setSuccessMessageModalVisible(true);
   } catch (error) {
-    console.error('Error processing action:', error);
+    console.error('Error preparing action:', error);
     setErrorMessage(error.message || 'An error occurred. Please try again.');
     setErrorModalVisible(true);
   } finally {
+    // Hide loading
     setIsProcessing(false);
     setActionInProgress(false);
   }
@@ -1842,8 +1827,17 @@ const processDatabaseApprove = async (reg) => {
   try {
     const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
     let userId = null;
-    
+
     const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
+
+    if (!samePersonCheck.exists) {
+      // Only block if email exists with DIFFERENT name
+      const emailWithDifferentName = await checkIfEmailExistsInDatabase(email, firstName, lastName);
+
+      if (emailWithDifferentName) {
+        throw new Error('This email is already registered to a different member.');
+      }
+    }
     
     if (samePersonCheck.exists) {
       // Update existing member/admin record
@@ -2046,7 +2040,9 @@ const processDatabaseApprove = async (reg) => {
       memberId: newId,
       status: 'approved'
     });
-    
+
+    await removeFromPendingRegistrations(id);
+
     return newId;
   } catch (err) {
     console.error('Approval DB error:', err);
@@ -2122,32 +2118,41 @@ const callApiReject = async (reg) => {
 };
 
 const handleSuccessOk = async () => {
+  // Close success modal
   setSuccessMessageModalVisible(false);
+  
+  // If a pending removal is scheduled (reject flow), perform it now upon user confirmation
+  if (pendingRemovalId) {
+    try {
+      await removeFromPendingRegistrations(pendingRemovalId);
+    } catch (e) {
+      console.error('Failed to remove from pending after action:', e);
+    } finally {
+      setPendingRemovalId(null);
+    }
+  }
+  
+  // Clean up state
   closeModal();
   setSelectedRegistration(null);
   setCurrentAction(null);
   
-  // Call API in background without blocking the UI
-  if (pendingApiCall) {
-    // Don't await these calls - let them run in background
-    if (pendingApiCall.type === 'approve') {
-      callApiApprove(pendingApiCall.data).catch(error => {
-        console.error('Background API approval error:', error);
-        // You could show a subtle notification here if needed
-      });
-    } else if (pendingApiCall.type === 'reject') {
-      callApiReject(pendingApiCall.data).catch(error => {
-        console.error('Background API rejection error:', error);
-        // You could show a subtle notification here if needed
-      });
+  // Trigger background email
+  try {
+    if (pendingApiCall) {
+      if (pendingApiCall.type === 'approve') {
+        callApiApprove(pendingApiCall.data);
+      } else if (pendingApiCall.type === 'reject') {
+        callApiReject(pendingApiCall.data);
+      }
     }
-    setPendingApiCall(null);
+  } catch (error) {
+    console.error('Error calling API:', error);
   }
-  
-  // Refresh data after a short delay to ensure UI is updated first
-  setTimeout(() => {
-    refreshData();
-  }, 500);
+
+  // Clean up and refresh
+  setPendingApiCall(null);
+  refreshData();
 };
 
   const openImageViewer = (url, label, index) => {
@@ -2480,99 +2485,101 @@ const handleSuccessOk = async () => {
               </div>
             </div>
 
-            {selectedRegistration.status !== 'approved' && selectedRegistration.status !== 'rejected' && (
-              <div style={styles.modalActions}>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.approveButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={handleApproveClick}
-                  disabled={isProcessing}
-                >
-                  Approve
-                </button>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.rejectButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={handleRejectClick}
-                  disabled={isProcessing}
-                >
-                  Reject
-                </button>
-              </div>
-            )}
+{selectedRegistration.status !== 'approved' && selectedRegistration.status !== 'rejected' && (
+  <div style={styles.modalActions}>
+    <button
+      style={{
+        ...styles.actionButton,
+        ...styles.approveButton,
+        ...(isProcessing ? styles.disabledButton : {})
+      }}
+      onClick={handleApproveClick}
+      disabled={isProcessing}
+    >
+      Approve
+    </button>
+    <button
+      style={{
+        ...styles.actionButton,
+        ...styles.rejectButton,
+        ...(isProcessing ? styles.disabledButton : {})
+      }}
+      onClick={handleRejectClick}
+      disabled={isProcessing}
+    >
+      Reject
+    </button>
+  </div>
+)}
           </div>
         </div>
       )}
 
-      {/* Approve Confirmation Modal */}
-      {showApproveConfirmation && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-            <p style={styles.modalText}>Are you sure you want to approve this registration?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }} 
-                onClick={confirmApprove}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.secondaryButton
-                }} 
-                onClick={() => setShowApproveConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Approve Confirmation Modal */}
+{showApproveConfirmation && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <p style={styles.modalText}>Are you sure you want to approve this registration?</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={confirmApprove}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }} 
+          onClick={() => setShowApproveConfirmation(false)}
+          disabled={actionInProgress}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-      {/* Reject Confirmation Modal */}
-      {showRejectConfirmation && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-            <p style={styles.modalText}>Are you sure you want to reject this registration?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }} 
-                onClick={confirmRejectFinal}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.secondaryButton
-                }} 
-                onClick={() => setShowRejectConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+{/* Reject Confirmation Modal */}
+{showRejectConfirmation && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <p style={styles.modalText}>Are you sure you want to reject this registration?</p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={confirmRejectFinal}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }} 
+          onClick={() => setShowRejectConfirmation(false)}
+          disabled={actionInProgress}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Rejection Reason Modal */}
       {showRejectionModal && (
@@ -2643,35 +2650,40 @@ const handleSuccessOk = async () => {
         </div>
       )}
 
-      {/* Loading Spinner */}
-      {isProcessing && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.spinner}></div>
-        </div>
-      )}
+{/* Loading Overlay - Same design as logout */}
+{isProcessing && (
+  <div style={styles.loadingOverlay}>
+    <div style={styles.loadingContent}>
+      <div style={styles.spinner}></div>
+      <div style={styles.loadingText}>
+        {currentAction === 'approve' ? 'Approving registration...' : 'Rejecting registration...'}
+      </div>
+    </div>
+  </div>
+)}
 
-      {/* Success Modal */}
-      {successMessageModalVisible && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            {currentAction === 'approve' ? (
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
-            ) : (
-              <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
-            )}
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                ...styles.primaryButton
-              }} 
-              onClick={handleSuccessOk}
-            >
-              OK
-            </button>
-          </div>
-        </div>
+{/* Success Modal */}
+{successMessageModalVisible && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      {currentAction === 'approve' ? (
+        <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+      ) : (
+        <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
       )}
+      <p style={styles.modalText}>{successMessage}</p>
+      <button 
+        style={{
+          ...styles.actionButton,
+          ...styles.primaryButton
+        }} 
+        onClick={handleSuccessOk}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
 
       {/* Image Viewer */}
       {imageViewerVisible && (

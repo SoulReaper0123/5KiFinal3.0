@@ -19,6 +19,7 @@ import ExcelJS from 'exceljs';
 import { database, auth, storage } from '../../../../Database/firebaseConfig';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendCoAdminCredentialsEmail, sendCoAdminDeleteData } from '../../../../Server/api';
+import { ConfirmModal, SuccessModal, ErrorModal } from '../components/Modals';
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -1350,109 +1351,44 @@ const CoAdmins = () => {
 
         {/* Confirmation Modals */}
         {confirmAddVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmAddVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Creation</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to create this co-admin account?
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmAddVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={styles.primaryButton}
-                  onClick={handleAddAdmin}
-                >
-                  Confirm Creation
-                </button>
-              </div>
-            </div>
-          </div>
+          <ConfirmModal
+            visible={confirmAddVisible}
+            message="Are you sure you want to create this co-admin account?"
+            onConfirm={handleAddAdmin}
+            onCancel={() => setConfirmAddVisible(false)}
+            confirmLabel="Confirm Creation"
+            cancelLabel="Cancel"
+            iconColor="#1e3a8a"
+          />
         )}
 
         {confirmDeleteVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmDeleteVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Deletion</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to delete this co-admin account? This action cannot be undone.
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmDeleteVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    ...styles.deleteButton
-                  }}
-                  onClick={handleDeleteAdmin}
-                >
-                  Delete Account
-                </button>
-              </div>
-            </div>
-          </div>
+          <ConfirmModal
+            visible={confirmDeleteVisible}
+            message="Are you sure you want to delete this co-admin account? This action cannot be undone."
+            onConfirm={handleDeleteAdmin}
+            onCancel={() => setConfirmDeleteVisible(false)}
+            confirmLabel="Delete Account"
+            cancelLabel="Cancel"
+            iconColor="#dc2626"
+          />
         )}
 
         {/* Success Modal */}
-        {successModalVisible && (
-          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {successMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={handleSuccessOk}
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <SuccessModal 
+          visible={!!successModalVisible}
+          message={successMessage}
+          onClose={handleSuccessOk}
+          okLabel="Continue"
+        />
 
         {/* Error Modal */}
-        {errorModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {errorMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={() => setErrorModalVisible(false)}
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <ErrorModal 
+          visible={!!errorModalVisible}
+          message={errorMessage}
+          onClose={() => setErrorModalVisible(false)}
+          okLabel="Try Again"
+        />
 
         {/* Processing Overlay */}
         {isProcessing && (

@@ -3,7 +3,7 @@ import { database } from '../../../../../Database/firebaseConfig';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 import { SendLoanReminder } from '../../../../../Server/api';
-import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner, FaChartLine, FaMoneyBillWave, FaUsers, FaCreditCard, FaExchangeAlt, FaShieldAlt, FaSearch, FaCalendarAlt, FaFilter } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner, FaChartLine, FaMoneyBillWave, FaUsers, FaCreditCard, FaExchangeAlt, FaShieldAlt, FaSearch, FaCalendarAlt, FaFilter, FaPiggyBank, FaBusinessTime, FaPercentage, FaFileContract, FaInfoCircle, FaPhone } from 'react-icons/fa';
 
 // Register Chart.js components
 Chart.register(
@@ -36,7 +36,6 @@ const Dashboard = () => {
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
   const [dividendsData, setDividendsData] = useState([]);
-  const [selectedChart, setSelectedChart] = useState('loans');
   const [searchTerm, setSearchTerm] = useState('');
   const [showResendConfirmation, setShowResendConfirmation] = useState(false);
   const [selectedLoan, setSelectedLoan] = useState(null);
@@ -249,15 +248,6 @@ const Dashboard = () => {
   useEffect(() => {
     fetchDashboardData();
   }, [selectedYear]);
-
-  // Refresh dividends data when year changes
-  useEffect(() => {
-    if (selectedChart === 'dividends') {
-      setDividendsLoading(true);
-      fetchDashboardData({ lightweight: true })
-        .finally(() => setDividendsLoading(false));
-    }
-  }, [selectedYear, selectedChart]);
 
   const parseCustomDate = (dateString) => {
     if (!dateString) return null;
@@ -1109,257 +1099,243 @@ const Dashboard = () => {
     loan.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  // Enhanced professional styles for banking dashboard
+  // Enhanced professional styles matching the Settings component design
   const styles = {
     container: {
-      width: '100%',
-      height: '100%',
-      padding: '20px',
-      overflowY: 'auto',
-      overflowX: 'hidden',
-      backgroundColor: '#F8FAFC',
-      fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+      flex: 1,
+      backgroundColor: '#f8fafc',
+      minHeight: '100vh',
+      padding: '0'
     },
-    header: {
-      marginBottom: '24px',
+    mainContainer: {
+      padding: '24px',
+      maxWidth: '1400px',
+      margin: '0 auto',
+      position: 'relative'
+    },
+    headerSection: {
+      display: 'flex',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: '32px',
       paddingBottom: '16px',
-      borderBottom: '1px solid #E5E7EB'
+      borderBottom: '1px solid #e2e8f0'
     },
-    headerTitle: {
-      fontSize: '24px',
+    headerText: {
+      fontSize: '32px',
       fontWeight: '700',
-      color: '#1E293B',
-      margin: 0,
-      background: 'linear-gradient(135deg, #1E293B 0%, #3B82F6 100%)',
-      WebkitBackgroundClip: 'text',
-      WebkitTextFillColor: 'transparent',
+      color: '#1e293b',
+      margin: '0'
     },
-    metricsGrid: {
+    headerSubtitle: {
+      fontSize: '16px',
+      color: '#64748b',
+      marginTop: '4px'
+    },
+    // Primary Metrics Grid
+    primaryMetricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
-      gap: '16px',
-      marginBottom: '24px',
-      width: '100%',
-      alignItems: 'stretch'
+      gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))',
+      gap: '20px',
+      marginBottom: '24px'
     },
+    // Secondary Metrics Grid
     secondaryMetricsGrid: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+      gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
       gap: '16px',
-      marginBottom: '32px',
-      marginTop: '32px',
-      width: '100%',
-      alignItems: 'stretch'
+      marginBottom: '32px'
     },
     primaryCard: {
-      padding: '20px',
-      display: 'flex',
-      flexDirection: 'column',
-      justifyContent: 'space-between',
-      height: 'auto',
-      minHeight: '120px',
-      borderRadius: '12px',
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      border: '1px solid #F1F5F9',
-      transition: 'all 0.2s ease',
+      backgroundColor: '#ffffff',
+      borderRadius: '16px',
+      padding: '24px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+      border: '1px solid #f1f5f9',
+      transition: 'all 0.3s ease',
       position: 'relative',
-      overflow: 'hidden',
+      overflow: 'hidden'
     },
     fundsCard: {
       background: 'linear-gradient(135deg, #1E3A8A 0%, #2D5783 100%)',
       color: 'white',
     },
     metricCard: {
-      backgroundColor: 'white',
+      backgroundColor: '#ffffff',
       borderRadius: '12px',
-      padding: '16px',
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      border: '1px solid #F1F5F9',
-      transition: 'all 0.2s ease',
-      height: 'auto',
+      padding: '20px',
+      boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+      border: '1px solid #f1f5f9',
+      transition: 'all 0.3s ease'
+    },
+    cardHeader: {
       display: 'flex',
-      flexDirection: 'column',
       justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: '16px'
     },
-    metricContent: {
-      marginBottom: '12px'
+    cardTitle: {
+      display: 'flex',
+      alignItems: 'center',
+      gap: '12px'
     },
-    metricTitle: {
-      fontSize: '12px',
+    cardIcon: {
+      fontSize: '24px',
+      color: '#1e40af'
+    },
+    fundsCardIcon: {
+      fontSize: '24px',
+      color: 'rgba(255, 255, 255, 0.9)'
+    },
+    cardTitleText: {
+      fontSize: '18px',
       fontWeight: '600',
-      marginBottom: '6px',
-      color: '#6B7280',
-      textTransform: 'uppercase',
-      letterSpacing: '0.5px'
+      color: '#1e293b',
+      margin: '0'
     },
-    fundsMetricTitle: {
-      color: 'rgba(255, 255, 255, 0.9)',
+    fundsCardTitleText: {
+      fontSize: '18px',
+      fontWeight: '600',
+      color: 'white',
+      margin: '0'
     },
     metricValue: {
-      fontSize: '24px',
+      fontSize: '28px',
       fontWeight: '700',
-      marginBottom: '6px',
-      color: '#1F2937'
+      marginBottom: '8px',
+      color: '#1e293b'
     },
     fundsMetricValue: {
+      fontSize: '28px',
+      fontWeight: '700',
+      marginBottom: '8px',
       color: 'white'
     },
+    secondaryMetricValue: {
+      fontSize: '22px',
+      fontWeight: '700',
+      marginBottom: '4px',
+      color: '#1e293b'
+    },
     metricDescription: {
-      fontSize: '12px',
-      color: '#6B7280'
+      fontSize: '14px',
+      color: '#64748b',
+      marginBottom: '12px'
     },
     fundsMetricDescription: {
-      color: 'rgba(255, 255, 255, 0.8)'
+      fontSize: '14px',
+      color: 'rgba(255, 255, 255, 0.8)',
+      marginBottom: '12px'
+    },
+    secondaryMetricDescription: {
+      fontSize: '13px',
+      color: '#64748b'
     },
     healthIndicator: {
-      padding: '6px 10px',
-      fontSize: '11px',
+      padding: '8px 12px',
+      fontSize: '12px',
       fontWeight: '600',
       textAlign: 'center',
-      backgroundColor: '#10B981',
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
       color: 'white',
-      borderRadius: '6px',
+      borderRadius: '8px',
       marginTop: '8px',
       backdropFilter: 'blur(10px)',
       border: '1px solid rgba(255, 255, 255, 0.2)'
     },
-    chartsSection: {
-      marginBottom: '24px'
-    },
-    chartSelector: {
-      display: 'flex',
-      gap: '8px',
-      flexWrap: 'wrap',
-      marginTop: '16px',
-      marginBottom: '16px'
-    },
-    chartButton: {
-      padding: '10px 16px',
-      backgroundColor: 'white',
-      border: '1px solid #E5E7EB',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      fontSize: '13px',
-      fontWeight: '500',
-      transition: 'all 0.2s ease',
-      boxShadow: '0 1px 2px 0 rgba(0, 0, 0, 0.05)',
-    },
-    selectedChartButton: {
-      backgroundColor: '#1E3A8A',
-      color: 'white',
-      borderColor: '#1E3A8A',
-      boxShadow: '0 2px 4px rgba(30, 58, 138, 0.2)',
-    },
-    chartContainer: {
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '20px',
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      border: '1px solid #F1F5F9',
-    },
-    chartHeader: {
-      display: 'flex',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: '16px'
-    },
-    chartTitle: {
-      fontSize: '16px',
-      fontWeight: '600',
-      color: '#1F2937'
-    },
-    yearSelect: {
-      padding: '8px 12px',
-      border: '1px solid #E5E7EB',
-      borderRadius: '6px',
-      backgroundColor: 'white',
-      fontSize: '13px',
-      fontWeight: '500',
-      transition: 'all 0.2s ease',
-    },
-    chartWrapper: {
-      height: '240px',
-      position: 'relative'
-    },
-    loansSection: {
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '20px',
-      boxShadow: '0 2px 4px rgba(0, 0, 0, 0.05)',
-      border: '1px solid #F1F5F9',
-      width: '100%',
-      boxSizing: 'border-box',
-      overflow: 'hidden'
+    section: {
+      marginBottom: '32px'
     },
     sectionHeader: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: '16px',
-      flexWrap: 'wrap',
-      gap: '12px',
-      width: '100%'
+      marginBottom: '20px'
     },
     sectionTitle: {
-      fontSize: '16px',
+      fontSize: '20px',
       fontWeight: '600',
-      color: '#1F2937',
-      flex: '1 1 auto',
-      minWidth: '0'
+      color: '#1e293b'
+    },
+    yearSelect: {
+      padding: '10px 16px',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      backgroundColor: 'white',
+      fontSize: '14px',
+      fontWeight: '500',
+      transition: 'all 0.3s ease',
+      outline: 'none'
+    },
+    chartContainer: {
+      backgroundColor: 'white',
+      borderRadius: '16px',
+      padding: '24px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+      border: '1px solid #f1f5f9',
+      marginBottom: '24px'
+    },
+    chartWrapper: {
+      height: '300px',
+      position: 'relative'
+    },
+    loansSection: {
+      backgroundColor: 'white',
+      borderRadius: '16px',
+      padding: '24px',
+      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+      border: '1px solid #f1f5f9'
     },
     searchBox: {
-      minWidth: '240px',
-      maxWidth: '320px',
-      flex: '0 0 auto',
-      position: 'relative'
+      position: 'relative',
+      minWidth: '280px'
     },
     searchInput: {
       width: '100%',
-      padding: '10px 16px 10px 40px',
-      border: '1px solid #E5E7EB',
-      borderRadius: '8px',
-      fontSize: '13px',
+      padding: '12px 16px 12px 40px',
+      border: '1px solid #e2e8f0',
+      borderRadius: '10px',
+      fontSize: '14px',
       boxSizing: 'border-box',
       outline: 'none',
-      transition: 'all 0.2s ease',
-      backgroundColor: '#F9FAFB',
+      transition: 'all 0.3s ease',
+      backgroundColor: '#f8fafc'
     },
     searchIcon: {
       position: 'absolute',
       left: '12px',
       top: '50%',
       transform: 'translateY(-50%)',
-      color: '#6B7280',
-      fontSize: '14px'
+      color: '#64748b',
+      fontSize: '16px'
     },
     tableContainer: {
       overflowX: 'auto',
       marginTop: '16px',
-      maxWidth: '100%',
-      borderRadius: '8px',
-      border: '1px solid #E5E7EB',
+      borderRadius: '12px',
+      border: '1px solid #e2e8f0'
     },
     loansTable: {
       width: '100%',
       borderCollapse: 'collapse',
-      fontSize: '13px'
+      fontSize: '14px'
     },
     tableHeader: {
-      backgroundColor: '#F8FAFC',
+      backgroundColor: '#f8fafc',
       color: '#374151',
-      padding: '12px',
-      textAlign: 'center',
+      padding: '16px',
+      textAlign: 'left',
       fontWeight: '600',
-      borderBottom: '1px solid #E5E7EB',
-      fontSize: '12px',
+      borderBottom: '1px solid #e2e8f0',
+      fontSize: '13px',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
     },
     tableCell: {
-      padding: '12px',
-      borderBottom: '1px solid #F1F5F9',
-      textAlign: 'center',
-      fontSize: '13px'
+      padding: '16px',
+      borderBottom: '1px solid #f1f5f9',
+      textAlign: 'left',
+      fontSize: '14px'
     },
     overdueDate: {
       color: '#EF4444',
@@ -1367,92 +1343,60 @@ const Dashboard = () => {
     },
     overdueBadge: {
       display: 'inline-block',
-      marginLeft: '6px',
-      padding: '3px 6px',
-      borderRadius: '4px',
+      marginLeft: '8px',
+      padding: '4px 8px',
+      borderRadius: '6px',
       backgroundColor: '#FEF2F2',
       color: '#DC2626',
-      fontSize: '11px',
+      fontSize: '12px',
       fontWeight: '600',
       border: '1px solid #FECACA'
     },
     resendButton: {
-      padding: '6px 12px',
-      backgroundColor: '#1E3A8A',
+      padding: '8px 16px',
+      backgroundColor: '#1e40af',
       color: 'white',
       border: 'none',
-      borderRadius: '6px',
+      borderRadius: '8px',
       cursor: 'pointer',
-      fontSize: '12px',
-      fontWeight: '600',
-      transition: 'all 0.2s ease',
-      boxShadow: '0 1px 2px rgba(30, 58, 138, 0.2)',
-    },
-    dividendsModalTable: {
-      width: '100%',
-      borderCollapse: 'collapse',
-      minWidth: '600px'
-    },
-    dividendsModalTh: {
-      textAlign: 'left',
-      padding: '10px 12px',
-      borderBottom: '1px solid #E5E7EB',
-      fontWeight: 600,
       fontSize: '13px',
-      backgroundColor: '#F8FAFC'
+      fontWeight: '600',
+      transition: 'all 0.3s ease',
+      boxShadow: '0 2px 4px rgba(30, 64, 175, 0.2)',
     },
-    dividendsModalTd: {
-      padding: '10px 12px',
-      borderBottom: '1px solid #F1F5F9',
-      fontSize: '13px'
-    },
-    modalFooterRow: {
+    // Modal styles matching Settings component
+    centeredModal: {
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
       display: 'flex',
-      justifyContent: 'flex-end',
-      gap: '10px',
-      marginTop: '20px',
-      paddingTop: '16px',
-      borderTop: '1px solid #E5E7EB'
+      justifyContent: 'center',
+      alignItems: 'center',
+      zIndex: 1000,
+    },
+    modalCard: {
+      backgroundColor: 'white',
+      borderRadius: '16px',
+      padding: '32px',
+      boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+      width: '90%',
+      maxWidth: '900px',
+      border: '1px solid #e2e8f0',
+      maxHeight: '80vh',
+      overflow: 'auto'
     },
     modalCardSmall: {
-      width: '360px',
       backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '24px',
-      position: 'relative',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      boxShadow: '0 10px 25px rgba(0, 0, 0, 0.15)',
+      borderRadius: '16px',
+      padding: '32px',
       textAlign: 'center',
-      border: '1px solid #F1F5F9'
-    },
-    confirmIcon: {
-      marginBottom: '16px',
-      fontSize: '40px'
-    },
-    modalText: {
-      fontSize: '14px',
-      marginBottom: '20px',
-      textAlign: 'center',
-      color: '#374151',
-      lineHeight: '1.5',
-      fontWeight: '500'
-    },
-    actionButton: {
-      padding: '10px 20px',
-      borderRadius: '6px',
-      border: 'none',
-      cursor: 'pointer',
-      fontWeight: '600',
-      fontSize: '13px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: '6px',
-      transition: 'all 0.2s ease',
-      minWidth: '100px',
-      outline: 'none',
+      boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
+      width: '90%',
+      maxWidth: '420px',
+      border: '1px solid #e2e8f0'
     },
     closeButton: {
       position: 'absolute',
@@ -1463,146 +1407,90 @@ const Dashboard = () => {
       color: '#64748B',
       backgroundColor: 'transparent',
       border: 'none',
-      padding: '6px',
-      borderRadius: '4px',
-      transition: 'all 0.2s ease',
+      padding: '8px',
+      borderRadius: '6px',
+      transition: 'all 0.3s ease',
     },
-    disabledButton: {
-      backgroundColor: '#9CA3AF',
-      cursor: 'not-allowed',
-      opacity: '0.7'
+    confirmIcon: {
+      fontSize: '56px',
+      color: '#1e3a8a',
+      marginBottom: '24px'
     },
-    noResults: {
-      textAlign: 'center',
-      color: '#6B7280',
-      padding: '32px',
-      fontSize: '14px'
-    },
-    centeredModal: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.8)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(4px)',
-      padding: '16px'
-    },
-    modal: {
-      position: 'fixed',
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      backgroundColor: 'rgba(15, 23, 42, 0.8)',
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      zIndex: 1000,
-      backdropFilter: 'blur(4px)'
-    },
-    modalCard: {
-      width: '90%',
-      maxWidth: '900px',
-      backgroundColor: 'white',
-      borderRadius: '12px',
-      padding: '24px',
-      position: 'relative',
-      boxShadow: '0 20px 25px rgba(0, 0, 0, 0.15)',
-      maxHeight: '85vh',
-      height: '80vh',
-      display: 'flex',
-      flexDirection: 'column',
-      overflowX: 'hidden',
-      border: '1px solid #F1F5F9'
-    },
-    modalContent: {
-      paddingBottom: '16px',
-      overflowY: 'auto',
-      flex: 1
-    },
-    modalTitle: {
-      fontSize: '20px',
-      fontWeight: '600',
-      color: '#1E293B',
-      margin: '0 0 20px 0',
-      textAlign: 'left'
-    },
-    modalIcon: {
-      fontSize: '40px',
-      marginBottom: '12px'
+    modalText: {
+      fontSize: '16px',
+      color: '#374151',
+      marginBottom: '28px',
+      lineHeight: '1.6',
+      fontWeight: '500'
     },
     modalActions: {
       display: 'flex',
-      justifyContent: 'center',
-      gap: '10px'
+      gap: '16px',
+      justifyContent: 'center'
     },
-    modalButton: {
-      padding: '10px 20px',
-      borderRadius: '6px',
+    actionButton: {
+      padding: '14px 28px',
+      borderRadius: '10px',
       border: 'none',
       cursor: 'pointer',
+      fontSize: '15px',
       fontWeight: '600',
-      fontSize: '13px'
+      minWidth: '100px',
+      transition: 'all 0.3s ease',
+      boxShadow: '0 4px 12px rgba(30, 58, 138, 0.3)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: '8px'
     },
-    spinner: {
-      border: '3px solid rgba(59, 130, 246, 0.3)',
-      borderTop: '3px solid #3B82F6',
-      borderRadius: '50%',
-      width: '40px',
-      height: '40px',
-      animation: 'spin 1s linear infinite'
+    primaryActionButton: {
+      background: 'linear-gradient(135deg, #1e3a8a 0%, #3730a3 100%)',
+      color: 'white',
     },
-    loadingText: {
-      color: '#FFFFFF',
-      marginTop: '12px',
-      fontSize: '14px',
-      fontWeight: '500'
+    secondaryActionButton: {
+      backgroundColor: '#f8fafc',
+      color: '#64748b',
+      border: '2px solid #e2e8f0',
     },
     // Dividends Table Styles
     dividendsTableContainer: {
       overflowX: 'auto',
       marginTop: '20px',
-      border: '1px solid #E5E7EB',
-      borderRadius: '8px',
-      backgroundColor: '#fff',
-      maxWidth: '100%'
+      border: '1px solid #e2e8f0',
+      borderRadius: '12px',
+      backgroundColor: '#fff'
     },
     dividendsTable: {
       width: '100%',
       borderCollapse: 'collapse',
-      fontSize: '13px',
+      fontSize: '14px',
       minWidth: '1400px'
     },
     dividendsHeaderRow: {
-      backgroundColor: '#F8FAFC',
-      borderBottom: '2px solid #E5E7EB'
+      backgroundColor: '#f8fafc',
+      borderBottom: '2px solid #e2e8f0'
     },
     dividendsHeaderCell: {
-      padding: '12px 10px',
+      padding: '16px 12px',
       textAlign: 'left',
       fontWeight: '600',
       color: '#374151',
-      borderRight: '1px solid #E5E7EB',
+      borderRight: '1px solid #e2e8f0',
       whiteSpace: 'nowrap',
       minWidth: '80px',
-      fontSize: '12px',
+      fontSize: '13px',
       textTransform: 'uppercase',
       letterSpacing: '0.5px'
     },
     dividendsDataRow: {
-      borderBottom: '1px solid #F1F5F9',
+      borderBottom: '1px solid #f1f5f9',
       transition: 'background-color 0.2s',
     },
     dividendsDataCell: {
-      padding: '12px 10px',
-      borderRight: '1px solid #F1F5F9',
+      padding: '16px 12px',
+      borderRight: '1px solid #f1f5f9',
       verticalAlign: 'middle',
-      fontSize: '13px'
+      fontSize: '14px'
     },
     memberInfo: {
       display: 'flex',
@@ -1612,19 +1500,19 @@ const Dashboard = () => {
     memberName: {
       fontWeight: '600',
       color: '#1F2937',
-      marginBottom: '2px'
+      marginBottom: '4px'
     },
     memberId: {
-      fontSize: '11px',
+      fontSize: '12px',
       color: '#6B7280'
     },
     dividendCell: {
-      padding: '6px 8px',
-      borderRadius: '6px',
+      padding: '8px 10px',
+      borderRadius: '8px',
       textAlign: 'center',
       color: '#fff',
       fontWeight: '500',
-      minHeight: '28px',
+      minHeight: '32px',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -1632,23 +1520,73 @@ const Dashboard = () => {
       cursor: 'pointer',
       border: '2px solid transparent'
     },
-    // Card hover effects
-    cardHover: {
-      transform: 'translateY(-2px)',
-      boxShadow: '0 8px 15px rgba(0, 0, 0, 0.1)'
+    loadingContainer: {
+      display: 'flex',
+      justifyContent: 'center',
+      alignItems: 'center',
+      height: '200px',
+      flexDirection: 'column',
+      gap: '16px'
     },
-    buttonHover: {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+    spinner: {
+      border: '4px solid #f3f4f6',
+      borderLeft: '4px solid #1e40af',
+      borderRadius: '50%',
+      width: '40px',
+      height: '40px',
+      animation: 'spin 1s linear infinite'
+    },
+    loadingText: {
+      color: '#6B7280',
+      fontSize: '16px',
+      fontWeight: '500'
+    },
+    noResults: {
+      textAlign: 'center',
+      color: '#6B7280',
+      padding: '40px',
+      fontSize: '16px'
+    },
+    // Charts Grid
+    chartsGrid: {
+      display: 'grid',
+      gridTemplateColumns: 'repeat(2, 1fr)',
+      gap: '20px',
+      marginBottom: '20px'
+    },
+    // Distribution Summary
+    distributionSummary: {
+      display: 'flex',
+      justifyContent: 'center',
+      gap: '12px',
+      marginBottom: '20px',
+      flexWrap: 'wrap'
+    }
+  };
+
+  // Add hover effects
+  const addHoverEffect = (element) => {
+    if (element && element.style) {
+      element.style.transform = 'translateY(-2px)';
+      element.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+    }
+  };
+
+  const removeHoverEffect = (element) => {
+    if (element && element.style) {
+      element.style.transform = 'translateY(0)';
+      element.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
     }
   };
 
   if (loading) {
     return (
       <div style={styles.container}>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh', flexDirection: 'column', gap: '12px' }}>
-          <div style={styles.spinner}></div>
-          <div style={{ color: '#6B7280', fontSize: '14px', fontWeight: '500' }}>Loading dashboard data...</div>
+        <div style={styles.mainContainer}>
+          <div style={styles.loadingContainer}>
+            <div style={styles.spinner}></div>
+            <div style={styles.loadingText}>Loading dashboard data...</div>
+          </div>
         </div>
       </div>
     );
@@ -1656,824 +1594,536 @@ const Dashboard = () => {
 
   return (
     <div style={styles.container}>
-      <div style={styles.header}>
-        <h1 style={styles.headerTitle}>5KI Financial Services Dashboard</h1>
-      </div>
-
-      <div style={styles.metricsGrid}>
-        <div 
-          style={{...styles.metricCard, ...styles.fundsCard, ...styles.primaryCard}}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <div style={{...styles.metricContent, marginBottom: '4px'}}>
-            <h3 style={{...styles.metricTitle, ...styles.fundsMetricTitle}}>Available Funds</h3>
-            <div style={{...styles.metricValue, ...styles.fundsMetricValue}}>₱{formatCurrency(fundsData.availableFunds)}</div>
-            <div style={{...styles.metricDescription, ...styles.fundsMetricDescription}}>Capital available for new loans</div>
+      <div style={styles.mainContainer}>
+        {/* Header Section */}
+        <div style={styles.headerSection}>
+          <div>
+            <h1 style={styles.headerText}>Financial Dashboard</h1>
+            <p style={styles.headerSubtitle}>
+              Monitor financial performance and manage loan operations
+            </p>
           </div>
-          <div style={styles.healthIndicator}>
-            Financial Health: {healthStatus}
-          </div>
+          <select 
+            value={selectedYear}
+            onChange={(e) => setSelectedYear(e.target.value)}
+            style={styles.yearSelect}
+          >
+            {generateYears().map(year => (
+              <option key={year} value={year}>{year}</option>
+            ))}
+          </select>
         </div>
 
-        <div 
-          style={{...styles.metricCard, ...styles.primaryCard}}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-2px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <div style={styles.metricContent}>
-            <h3 style={styles.metricTitle}>Total Yields</h3>
+        {/* Primary Key Metrics Grid */}
+        <div style={styles.primaryMetricsGrid}>
+          <div 
+            style={{...styles.primaryCard, ...styles.fundsCard}}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+          >
+            <div style={styles.cardHeader}>
+              <div style={styles.cardTitle}>
+                <FaMoneyBillWave style={styles.fundsCardIcon} />
+                <h3 style={styles.fundsCardTitleText}>Available Funds</h3>
+              </div>
+            </div>
+            <div style={styles.fundsMetricValue}>₱{formatCurrency(fundsData.availableFunds)}</div>
+            <div style={styles.fundsMetricDescription}>Capital available for new loans</div>
+            <div style={styles.healthIndicator}>
+              Financial Health: {healthStatus}
+            </div>
+          </div>
+
+          <div 
+            style={styles.primaryCard}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+          >
+            <div style={styles.cardHeader}>
+              <div style={styles.cardTitle}>
+                <FaChartLine style={styles.cardIcon} />
+                <h3 style={styles.cardTitleText}>Total Yields</h3>
+              </div>
+            </div>
             <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalYields)}</div>
-            <div style={styles.metricDescription}>Total Interest for payments</div>
+            <div style={styles.metricDescription}>Total interest from payments</div>
           </div>
-          <div style={{...styles.healthIndicator, backgroundColor: '#10B981', opacity: 0}}>
-            Placeholder
-          </div>
-        </div>
-      </div>
 
-      <div style={styles.secondaryMetricsGrid}>
-        <div 
-          style={{...styles.metricCard, ...styles.secondaryCard}}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <div style={styles.metricContent}>
-            <h3 style={styles.metricTitle}>Total Members</h3>
+          <div 
+            style={styles.primaryCard}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+          >
+            <div style={styles.cardHeader}>
+              <div style={styles.cardTitle}>
+                <FaUsers style={styles.cardIcon} />
+                <h3 style={styles.cardTitleText}>Total Members</h3>
+              </div>
+            </div>
             <div style={styles.metricValue}>{fundsData.totalMembers}</div>
-            <div style={styles.metricDescription}>Registered members</div>
+            <div style={styles.metricDescription}>Total members in 5KI </div>
           </div>
         </div>
 
-        <div 
-          style={{...styles.metricCard, ...styles.secondaryCard}}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <div style={styles.metricContent}>
-            <h3 style={styles.metricTitle}>Total Loans</h3>
-            <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalLoans)}</div>
-            <div style={styles.metricDescription}>Active loan principal</div>
-          </div>
-        </div>
-
-        <div 
-          style={{...styles.metricCard, ...styles.secondaryCard}}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <div style={styles.metricContent}>
-            <h3 style={styles.metricTitle}>Total Receivables</h3>
-            <div style={styles.metricValue}>₱{formatCurrency(fundsData.totalReceivables)}</div>
-            <div style={styles.metricDescription}>Outstanding balances</div>
-          </div>
-        </div>
-
-        <div 
-          style={{...styles.metricCard, ...styles.secondaryCard}}
-          onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-1px)'}
-          onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-        >
-          <div style={styles.metricContent}>
-            <h3 style={styles.metricTitle}>5KI Earnings</h3>
-            <div style={styles.metricValue}>₱{formatCurrency(fundsData.fiveKISavings)}</div>
-            <div style={styles.metricDescription}>Organization savings</div>
-          </div>
-        </div>
-      </div>
-
-      <div style={styles.chartsSection}>
-        <div style={styles.chartSelector}>
-          <button 
-            style={{
-              ...styles.chartButton,
-              ...(selectedChart === 'loans' && styles.selectedChartButton)
-            }}
-            onClick={() => setSelectedChart('loans')}
-            onMouseEnter={(e) => !(selectedChart === 'loans') && (e.target.style.transform = 'translateY(-1px)')}
-            onMouseLeave={(e) => !(selectedChart === 'loans') && (e.target.style.transform = 'translateY(0)')}
+        {/* Secondary Metrics Grid */}
+        <div style={styles.secondaryMetricsGrid}>
+          <div 
+            style={styles.metricCard}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
           >
-            Loans Breakdown
-          </button>
-          <button 
-            style={{
-              ...styles.chartButton,
-              ...(selectedChart === 'earnings' && styles.selectedChartButton)
-            }}
-            onClick={() => setSelectedChart('earnings')}
-            onMouseEnter={(e) => !(selectedChart === 'earnings') && (e.target.style.transform = 'translateY(-1px)')}
-            onMouseLeave={(e) => !(selectedChart === 'earnings') && (e.target.style.transform = 'translateY(0)')}
+            <div style={styles.cardTitle}>
+              <FaCreditCard style={styles.cardIcon} />
+              <h3 style={styles.cardTitleText}>Total Loans</h3>
+            </div>
+            <div style={styles.secondaryMetricValue}>₱{formatCurrency(fundsData.totalLoans)}</div>
+            <div style={styles.secondaryMetricDescription}>Active loan principal</div>
+          </div>
+
+          <div 
+            style={styles.metricCard}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
           >
-            Funds & Savings
-          </button>
-          <button 
-            style={{
-              ...styles.chartButton,
-              ...(selectedChart === 'dividends' && styles.selectedChartButton)
-            }}
-            onClick={() => setSelectedChart('dividends')}
-            onMouseEnter={(e) => !(selectedChart === 'dividends') && (e.target.style.transform = 'translateY(-1px)')}
-            onMouseLeave={(e) => !(selectedChart === 'dividends') && (e.target.style.transform = 'translateY(0)')}
+            <div style={styles.cardTitle}>
+              <FaExchangeAlt style={styles.cardIcon} />
+              <h3 style={styles.cardTitleText}>Total Receivables</h3>
+            </div>
+            <div style={styles.secondaryMetricValue}>₱{formatCurrency(fundsData.totalReceivables)}</div>
+            <div style={styles.secondaryMetricDescription}>Outstanding balances</div>
+          </div>
+
+          <div 
+            style={styles.metricCard}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
           >
-            Dividends
-          </button>
+            <div style={styles.cardTitle}>
+              <FaPiggyBank style={styles.cardIcon} />
+              <h3 style={styles.cardTitleText}>5KI Earnings</h3>
+            </div>
+            <div style={styles.secondaryMetricValue}>₱{formatCurrency(fundsData.fiveKISavings)}</div>
+            <div style={styles.secondaryMetricDescription}>Organization savings</div>
+          </div>
+
+          <div 
+            style={styles.metricCard}
+            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+          >
+            <div style={styles.cardTitle}>
+              <FaBusinessTime style={styles.cardIcon} />
+              <h3 style={styles.cardTitleText}>Active Borrowers</h3>
+            </div>
+            <div style={styles.secondaryMetricValue}>{fundsData.activeBorrowers}</div>
+            <div style={styles.secondaryMetricDescription}>Members with active loans</div>
+          </div>
         </div>
 
-        <div style={styles.chartContainer}>
-          {selectedChart === 'loans' && (
-            <>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Loans Portfolio</h3>
+        {/* Loans Portfolio Section */}
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Loans Portfolio Overview</h2>
+          </div>
+          <div style={styles.chartContainer}>
+            <div style={styles.chartWrapper}>
+              <Bar 
+                data={{
+                  labels: ['Total Loans', 'Total Receivables'],
+                  datasets: [
+                    {
+                      label: 'Amount',
+                      data: [fundsData.totalLoans, fundsData.totalReceivables],
+                      backgroundColor: ['#2D5783', '#3B82F6'],
+                      borderColor: ['#1E3A5F', '#1F5FBF'],
+                      borderWidth: 1,
+                      borderRadius: 6,
+                      barThickness: 48,
+                    }
+                  ]
+                }} 
+                options={loansChartOptions}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Financial Growth Section - Side by Side Charts */}
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Financial Growth Overview ({selectedYear})</h2>
+          </div>
+          
+          <div style={styles.chartsGrid}>
+            {/* Financial Growth Overview Chart */}
+            <div style={styles.chartContainer}>
+              <div style={styles.sectionHeader}>
+                <h3 style={styles.sectionTitle}>Funds & Savings</h3>
               </div>
               <div style={styles.chartWrapper}>
-                <Bar 
+                <Line 
+                  data={fundsLineData} 
+                  options={fundsChartOptions}
+                />
+              </div>
+            </div>
+
+            {/* Yields Growth Chart */}
+            <div style={styles.chartContainer}>
+              <div style={styles.sectionHeader}>
+                <h3 style={styles.sectionTitle}>Yields Growth</h3>
+              </div>
+              <div style={styles.chartWrapper}>
+                <Line 
+                  data={yieldsLineData}
+                  options={fundsChartOptions}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Dividends Distribution Section */}
+        <div style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <h2 style={styles.sectionTitle}>Dividends Distribution ({selectedYear})</h2>
+            <button 
+              onClick={openDividendsModal} 
+              style={styles.resendButton}
+              onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+              onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+            >
+              <FaExchangeAlt />
+              Distribute Dividends
+            </button>
+          </div>
+
+          {/* Distribution Summary */}
+          <div style={styles.distributionSummary}>
+            {(() => {
+              const totalYields = fundsData.totalYields || 0;
+              const membersDividendValue = totalYields * (fundsData.membersDividendPercentage || 0);
+              const fiveKiEarningsValue = totalYields * (fundsData.fiveKiEarningsPercentage || 0);
+              const chip = (bg, border, color, label) => (
+                <div style={{ 
+                  padding: '8px 16px', 
+                  background: bg, 
+                  color, 
+                  border: `1px solid ${border}`, 
+                  borderRadius: '8px', 
+                  fontWeight: 600, 
+                  fontSize: '13px' 
+                }}>
+                  {label}
+                </div>
+              );
+              return (
+                <>
+                  {chip('#ECFDF5', '#A7F3D0', '#065F46', `Members Dividend: ₱${formatCurrency(membersDividendValue)}`)}
+                  {chip('#EFF6FF', '#BFDBFE', '#1E3A8A', `5KI Earnings: ₱${formatCurrency(fiveKiEarningsValue)}`)}
+                </>
+              );
+            })()}
+          </div>
+
+          {/* Due Indicator */}
+          <div style={{ marginBottom: '20px' }}>
+            {(() => {
+              const settingsDate = (window.__dividendSettingsDate || '').toString();
+              const isDue = (() => {
+                if (!settingsDate) return false;
+                const d = new Date(settingsDate);
+                if (isNaN(d.getTime())) return false;
+                const today = new Date();
+                const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+                const tt = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+                return dd.getTime() <= tt.getTime();
+              })();
+              return isDue ? (
+                <span style={{ 
+                  ...styles.overdueBadge, 
+                  backgroundColor: '#FEF3C7', 
+                  color: '#B45309', 
+                  borderRadius: '8px',
+                  padding: '8px 16px',
+                  fontSize: '13px'
+                }}>
+                  Dividends Action Needed
+                </span>
+              ) : null;
+            })()}
+          </div>
+
+          {/* Dividends Visualization */}
+          <div style={styles.chartsGrid}>
+            <div style={styles.chartContainer}>
+              <div style={styles.chartWrapper}>
+                <Pie
                   data={{
-                    labels: ['Total Loans', 'Total Receivables'],
+                    labels: ['Members Dividend', '5KI Earnings'],
                     datasets: [
                       {
-                        label: 'Amount',
-                        data: [fundsData.totalLoans, fundsData.totalReceivables],
-                        backgroundColor: ['#2D5783', '#3B82F6'],
-                        borderColor: ['#1E3A5F', '#1F5FBF'],
-                        borderWidth: 1,
-                        borderRadius: 4,
-                        barThickness: 40,
-                        maxBarThickness: 48
+                        data: [
+                          ((fundsData.membersDividendPercentage || 0) * 100),
+                          ((fundsData.fiveKiEarningsPercentage || 0) * 100)
+                        ],
+                        backgroundColor: ['#10B981', '#3B82F6'],
+                        borderColor: ['#fff', '#fff'],
+                        borderWidth: 2
                       }
                     ]
-                  }} 
+                  }}
                   options={{
-                    ...loansChartOptions,
-                    indexAxis: 'x', // vertical bars
-                    scales: {
-                      ...loansChartOptions.scales,
-                      y: {
-                        ...loansChartOptions.scales.y,
-                        beginAtZero: true
+                    plugins: {
+                      legend: { position: 'bottom' },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(0)}%`
+                        }
                       }
                     }
                   }}
                 />
               </div>
-            </>
-          )}
+            </div>
 
-          {selectedChart === 'earnings' && (
-            <>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Funds & Savings Growth ({selectedYear})</h3>
-                <select 
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  style={styles.yearSelect}
-                >
-                  {generateYears().map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
-                <div style={styles.chartWrapper}>
-                  <Line 
-                    data={fundsLineData} 
-                    options={fundsChartOptions}
-                  />
-                </div>
-              </div>
-
-              {/* Yields Line Graph */}
-              <div style={{ ...styles.chartHeader, marginTop: '16px' }}>
-                <h3 style={styles.chartTitle}>Yields Growth ({selectedYear})</h3>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '10px' }}>
-                <div style={styles.chartWrapper}>
-                  <Line 
-                    data={yieldsLineData}
-                    options={fundsChartOptions}
-                  />
-                </div>
-              </div>
-            </>
-          )}
-
-          {selectedChart === 'dividends' && (
-            <>
-              <div style={styles.chartHeader}>
-                <h3 style={styles.chartTitle}>Dividends Distribution ({selectedYear})</h3>
-                <select 
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(e.target.value)}
-                  style={styles.yearSelect}
-                >
-                  {generateYears().map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-              {/* Centered summary labels directly under title + action row */}
-              <div style={{ display: 'flex', justifyContent: 'center', gap: '6px', marginBottom: '6px', marginTop: '2px', textAlign: 'center', flexWrap: 'wrap' }}>
-                {(() => {
-                  const totalYields = fundsData.totalYields || 0;
-                  const membersDividendValue = totalYields * (fundsData.membersDividendPercentage || 0);
-                  const fiveKiEarningsValue = totalYields * (fundsData.fiveKiEarningsPercentage || 0);
-                  const chip = (bg, border, color, label) => (
-                    <div style={{ padding: '3px 6px', background: bg, color, border: `1px solid ${border}`, borderRadius: '6px', fontWeight: 600, fontSize: '11px' }}>{label}</div>
-                  );
-                  return (
-                    <>
-                      {chip('#ECFDF5', '#A7F3D0', '#065F46', `Members Dividend: ₱${formatCurrency(membersDividendValue)} (${((fundsData.membersDividendPercentage || 0) * 100).toFixed(0)}%)`)}
-                      {chip('#EFF6FF', '#BFDBFE', '#1E3A8A', `5KI Earnings: ₱${formatCurrency(fiveKiEarningsValue)} (${((fundsData.fiveKiEarningsPercentage || 0) * 100).toFixed(0)}%)`)}
-                    </>
-                  );
-                })()}
-              </div>
-
-              {/* Action row: Due badge and distribution button */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <div>
-                  {(() => {
-                    // Show due/overdue indicator like Overdue Loans when DividendDate is today or past
-                    const settingsDate = (window.__dividendSettingsDate || '').toString();
-                    const isDue = (() => {
-                      if (!settingsDate) return false;
-                      const d = new Date(settingsDate);
-                      if (isNaN(d.getTime())) return false;
-                      const today = new Date();
-                      const dd = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                      const tt = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                      return dd.getTime() <= tt.getTime();
-                    })();
-                    return isDue ? (
-                      <span style={{ ...styles.overdueBadge, backgroundColor: '#FEF3C7', color: '#B45309', borderRadius: 4 }}>Dividends Action Needed</span>
-                    ) : null;
-                  })()}
-                </div>
-                <div>
-                  <button 
-                    onClick={openDividendsModal} 
-                    style={styles.resendButton}
-                    onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                    onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                  >
-                    Distribute Dividends
-                  </button>
-                </div>
-              </div>
-
-              {showDividendsModal && (
-                <div style={styles.centeredModal}>
-                  <div style={styles.modalCard}>
-                    <button 
-                      style={styles.closeButton} 
-                      onClick={() => setShowDividendsModal(false)}
-                      aria-label="Close modal"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      <FaTimes />
-                    </button>
-                    <h3 style={styles.modalTitle}>Distribute Dividends</h3>
-                    <div style={styles.modalContent}>
-                      <div style={{ overflowX: 'auto' }}>
-                        <table style={styles.dividendsModalTable}>
-                          <thead>
-                            <tr>
-                              <th style={styles.dividendsModalTh}>Member ID</th>
-                              <th style={styles.dividendsModalTh}>Member</th>
-                              <th style={styles.dividendsModalTh}>Investments</th>
-                              <th style={styles.dividendsModalTh}>Savings</th>
-                              <th style={styles.dividendsModalTh}>Dividends</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {distributionMembers.map(r => (
-                              <tr key={r.memberId}>
-                                <td style={styles.dividendsModalTd}>{r.memberId}</td>
-                                <td style={styles.dividendsModalTd}>{r.name}</td>
-                                <td style={styles.dividendsModalTd}>₱{formatCurrency(r.investment)}</td>
-                                <td style={styles.dividendsModalTd}>₱{formatCurrency(r.savings)}</td>
-                                <td style={styles.dividendsModalTd}><strong>₱{formatCurrency(r.dividend)}</strong></td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    </div>
-                    <div style={styles.modalFooterRow}>
-                      <button 
-                        style={{ ...styles.actionButton, backgroundColor: '#f1f5f9', color: '#111' }}
-                        onClick={() => setShowDividendsModal(false)}
-                        onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                        onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                      >
-                        Cancel
-                      </button>
-                      <button 
-                        style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
-                        onClick={confirmDistributeDividends}
-                        disabled={distributionProcessing || distributionMembers.length === 0}
-                        onMouseEnter={(e) => !distributionProcessing && distributionMembers.length > 0 && (e.target.style.transform = 'translateY(-1px)')}
-                        onMouseLeave={(e) => !distributionProcessing && distributionMembers.length > 0 && (e.target.style.transform = 'translateY(0)')}
-                      >
-                        {distributionProcessing ? 'Processing...' : 'Distribute'}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Confirm Modal */}
-              {distributionConfirmVisible && (
-                <div style={styles.centeredModal}>
-                  <div style={styles.modalCardSmall}>
-                    <button 
-                      style={styles.closeButton} 
-                      onClick={() => setDistributionConfirmVisible(false)}
-                      aria-label="Close modal"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      <FaTimes />
-                    </button>
-                    <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-                    <p style={styles.modalText}>Are you sure you want to distribute dividends to all listed members?</p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      <button 
-                        style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
-                        onClick={performDistributeDividends}
-                        disabled={distributionProcessing}
-                        onMouseEnter={(e) => !distributionProcessing && (e.target.style.transform = 'translateY(-1px)')}
-                        onMouseLeave={(e) => !distributionProcessing && (e.target.style.transform = 'translateY(0)')}
-                      >
-                        {distributionProcessing ? 'Processing...' : 'Yes'}
-                      </button>
-                      <button 
-                        style={{ ...styles.actionButton, backgroundColor: '#f1f5f9', color: '#111' }}
-                        onClick={() => setDistributionConfirmVisible(false)}
-                        onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                        onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                      >
-                        No
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Success Modal */}
-              {distributionSuccessVisible && (
-                <div style={styles.centeredModal}>
-                  <div style={styles.modalCardSmall}>
-                    <button 
-                      style={styles.closeButton} 
-                      onClick={() => setDistributionSuccessVisible(false)}
-                      aria-label="Close modal"
-                      onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                      onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-                    >
-                      <FaTimes />
-                    </button>
-                    <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-                    <p style={styles.modalText}>Dividends distributed successfully!</p>
-                    <button 
-                      style={{ ...styles.actionButton, backgroundColor: '#2D5783', color: '#fff' }}
-                      onClick={() => {
-                        setDistributionSuccessVisible(false);
-                        setShowDividendsModal(false);
-                        fetchDashboardData({ lightweight: true });
-                      }}
-                      onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                      onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                    >
-                      OK
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Dividends Pie Charts */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(180px, 1fr))', gap: '10px', marginBottom: '10px' }}>
-                <div style={{ ...styles.chartWrapper }}>
-                  <Pie
-                    data={{
-                      labels: ['Members Dividend', '5KI Earnings'],
-                      datasets: [
-                        {
-                          data: [
-                            ((fundsData.membersDividendPercentage || 0) * 100),
-                            ((fundsData.fiveKiEarningsPercentage || 0) * 100)
-                          ],
-                          backgroundColor: ['#10B981', '#3B82F6'],
-                          borderColor: ['#fff', '#fff'],
-                          borderWidth: 1
-                        }
-                      ]
-                    }}
-                    options={{
-                      plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                          callbacks: {
-                            label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(0)}%`
-                          }
+            <div style={styles.chartContainer}>
+              <div style={styles.chartWrapper}>
+                <Pie
+                  data={{
+                    labels: ['Investment Share', 'Patronage Share', 'Active Months'],
+                    datasets: [
+                      {
+                        data: [
+                          ((fundsData.investmentSharePercentage || 0) * 100),
+                          ((fundsData.patronageSharePercentage || 0) * 100),
+                          ((fundsData.activeMonthsPercentage || 0) * 100)
+                        ],
+                        backgroundColor: ['#7C3AED', '#DC2626', '#059669'],
+                        borderColor: ['#fff', '#fff', '#fff'],
+                        borderWidth: 2
+                      }
+                    ]
+                  }}
+                  options={{
+                    plugins: {
+                      legend: { position: 'bottom' },
+                      tooltip: {
+                        callbacks: {
+                          label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(0)}%`
                         }
                       }
-                    }}
-                  />
-                </div>
-
-                <div style={{ ...styles.chartWrapper, minWidth: '180px' }}>
-                  <Pie
-                    data={(() => {
-                      // Compute top members by Total % (table logic), shown as percentages
-                      const totalInvestments = dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
-                      const totalLoans = dividendsData.reduce((sum, m) => sum + (m.totalLoanAmount || 0), 0);
-                      const totalActiveMonths = dividendsData.reduce((sum, m) => sum + (m.activeMonthsCount ?? 0), 0);
-
-                      const calcPct = (m) => {
-                        const invShare = totalInvestments > 0 ? (m.investment || 0) / totalInvestments : 0;
-                        const patShare = totalLoans > 0 ? (m.totalLoanAmount || 0) / totalLoans : 0;
-                        const actShare = totalActiveMonths > 0 ? (m.activeMonthsCount ?? 0) / totalActiveMonths : 0;
-                        const pct =
-                          (invShare * (fundsData.investmentSharePercentage || 0)) +
-                          (patShare * (fundsData.patronageSharePercentage || 0)) +
-                          (actShare * (fundsData.activeMonthsPercentage || 0));
-                        return +(pct * 100).toFixed(2); // percent
-                      };
-
-                      const ranked = dividendsData
-                        .map(m => ({
-                          name: m.memberName || m.memberId,
-                          percent: calcPct(m)
-                        }))
-                        .sort((a, b) => b.percent - a.percent)
-                        .slice(0, 6);
-
-                      const labels = ranked.map(r => r.name.length > 14 ? r.name.slice(0, 13) + '…' : r.name);
-                      const values = ranked.map(r => r.percent);
-
-                      return {
-                        labels,
-                        datasets: [
-                          {
-                            data: values,
-                            backgroundColor: ['#F59E0B','#2D5783','#10B981','#3B82F6','#7C3AED','#DC2626'],
-                            borderColor: ['#fff','#fff','#fff','#fff','#fff','#fff'],
-                            borderWidth: 1
-                          }
-                        ]
-                      };
-                    })()}
-                    options={{
-                      plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                          callbacks: {
-                            label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(2)}%`
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </div>
-
-                <div style={{ ...styles.chartWrapper, minWidth: '180px' }}>
-                  <Pie
-                    data={{
-                      labels: ['Investment Share', 'Patronage Share', 'Active Months'],
-                      datasets: [
-                        {
-                          data: [
-                            ((fundsData.investmentSharePercentage || 0) * 100),
-                            ((fundsData.patronageSharePercentage || 0) * 100),
-                            ((fundsData.activeMonthsPercentage || 0) * 100)
-                          ],
-                          backgroundColor: ['#7C3AED', '#DC2626', '#059669'],
-                          borderColor: ['#fff', '#fff', '#fff'],
-                          borderWidth: 1
-                        }
-                      ]
-                    }}
-                    options={{
-                      plugins: {
-                        legend: { position: 'bottom' },
-                        tooltip: {
-                          callbacks: {
-                            label: (ctx) => `${ctx.label}: ${ctx.parsed.toFixed(0)}%`
-                          }
-                        }
-                      }
-                    }}
-                  />
-                </div>
+                    }
+                  }}
+                />
               </div>
+            </div>
+          </div>
 
-              {/* Dividends Total % Chart (Top 10) */}
-              <h3 style={styles.chartTitle}>Total Share ({selectedYear})</h3>
-              <div style={{ ...styles.chartWrapper, minHeight: '220px', marginBottom: '10px' }}>
-                {(() => {
-                  const totalInvestments = dividendsData.reduce((sum, m) => sum + (m.investment || 0), 0);
-                  const totalLoans = dividendsData.reduce((sum, m) => sum + (m.totalLoanAmount || 0), 0);
-                  const totalActiveMonths = dividendsData.reduce((sum, m) => sum + (m.activeMonthsCount ?? 0), 0);
+          {/* Detailed Dividends Table */}
+          <div style={styles.chartContainer}>
+            <div style={styles.sectionHeader}>
+              <h3 style={styles.sectionTitle}>Member Dividends Breakdown</h3>
+            </div>
+            <div style={styles.dividendsTableContainer}>
+              {(() => {
+                const totalAllMembersInvestment = dividendsData.reduce((sum, member) => sum + (member.investment || 0), 0);
+                window.totalAllMembersInvestment = totalAllMembersInvestment;
+                const totalAllMembersLoanAmount = dividendsData.reduce((sum, member) => sum + (member.totalLoanAmount || 0), 0);
+                window.totalAllMembersLoanAmount = totalAllMembersLoanAmount;
+                const totalActiveMonths = dividendsData.reduce((sum, member) => sum + (member.activeMonthsCount || 0), 0);
+                window.totalActiveMonths = totalActiveMonths;
+                return null;
+              })()}
+              
+              <table style={styles.dividendsTable}>
+                <thead>
+                  <tr style={styles.dividendsHeaderRow}>
+                    <th style={styles.dividendsHeaderCell}>Members</th>
+                    <th style={styles.dividendsHeaderCell}>Investment</th>
+                    <th style={styles.dividendsHeaderCell}>Jan</th>
+                    <th style={styles.dividendsHeaderCell}>Feb</th>
+                    <th style={styles.dividendsHeaderCell}>Mar</th>
+                    <th style={styles.dividendsHeaderCell}>Apr</th>
+                    <th style={styles.dividendsHeaderCell}>May</th>
+                    <th style={styles.dividendsHeaderCell}>Jun</th>
+                    <th style={styles.dividendsHeaderCell}>Jul</th>
+                    <th style={styles.dividendsHeaderCell}>Aug</th>
+                    <th style={styles.dividendsHeaderCell}>Sep</th>
+                    <th style={styles.dividendsHeaderCell}>Oct</th>
+                    <th style={styles.dividendsHeaderCell}>Nov</th>
+                    <th style={styles.dividendsHeaderCell}>Dec</th>
+                    <th style={styles.dividendsHeaderCell}>Total</th>
+                    <th style={styles.dividendsHeaderCell}>Loan Count</th>
+                    <th style={styles.dividendsHeaderCell}>Amount</th>
+                    <th style={styles.dividendsHeaderCell}>Investment Share</th>
+                    <th style={styles.dividendsHeaderCell}>Patronage Share</th>
+                    <th style={styles.dividendsHeaderCell}>Active Month</th>
+                    <th style={styles.dividendsHeaderCell}>Active Month %</th>
+                    <th style={styles.dividendsHeaderCell}>Total %</th>
+                    <th style={styles.dividendsHeaderCell}>Total Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dividendsData.map((member, index) => (
+                    <tr key={member.memberId} style={styles.dividendsDataRow}>
+                      <td style={styles.dividendsDataCell}>
+                        <div style={styles.memberInfo}>
+                          <span style={styles.memberName}>{member.memberName}</span>
+                          <span style={styles.memberId}>ID: {member.memberId}</span>
+                        </div>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        ₱{formatCurrency(member.investment)}
+                      </td>
+                      {member.monthlyDividends.map((dividend, monthIndex) => {
+                        const hasTransactions = member.monthlyTransactions[monthIndex]?.length > 0;
+                        return (
+                          <td key={monthIndex} style={styles.dividendsDataCell}>
+                            <div 
+                              style={{
+                                ...styles.dividendCell,
+                                backgroundColor: dividend > 0 
+                                  ? `rgba(16, 185, 129, ${Math.min(Math.abs(dividend) / 1000, 0.8)})` 
+                                  : dividend < 0 
+                                    ? `rgba(239, 68, 68, ${Math.min(Math.abs(dividend) / 1000, 0.8)})` 
+                                    : '#f8f9fa',
+                                color: dividend !== 0 ? '#fff' : '#666',
+                                cursor: hasTransactions ? 'pointer' : 'default',
+                              }}
+                              onClick={() => hasTransactions && handleMonthClick(member, monthIndex)}
+                              onMouseEnter={(e) => {
+                                if (hasTransactions) {
+                                  e.target.style.transform = 'scale(1.05)';
+                                  e.target.style.borderColor = dividend > 0 ? '#10B981' : '#EF4444';
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                if (hasTransactions) {
+                                  e.target.style.transform = 'scale(1)';
+                                  e.target.style.borderColor = 'transparent';
+                                }
+                              }}
+                            >
+                              {dividend > 0 ? '+' : dividend < 0 ? '-' : ''}₱{formatCurrency(Math.abs(dividend))}
+                            </div>
+                          </td>
+                        );
+                      })}
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{
+                          color: member.totalDividends > 0 ? '#10B981' : member.totalDividends < 0 ? '#EF4444' : '#666'
+                        }}>
+                          {member.totalDividends > 0 ? '+' : member.totalDividends < 0 ? '-' : ''}₱{formatCurrency(Math.abs(member.totalDividends))}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#2D5783'}}>
+                          {member.approvedLoansCount || 0}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#059669'}}>
+                          ₱{formatCurrency(member.totalLoanAmount || 0)}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#7C3AED'}}>
+                          {window.totalAllMembersInvestment > 0 
+                            ? ((member.investment / window.totalAllMembersInvestment) * 100).toFixed(2) + '%' 
+                            : '0.00%'}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#DC2626'}}>
+                          {totalAllMembersLoanAmount > 0 
+                            ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount) * 100).toFixed(2) + '%' 
+                            : '0.00%'}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#059669'}}>
+                          {member.activeMonthsCount ?? 0}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#7C3AED'}}>
+                          {(() => {
+                            const totalActiveMonths = window.totalActiveMonths || 1; // avoid divide by 0
+                            const activeMonthShareDecimal = (member.activeMonthsCount ?? 0) / totalActiveMonths;
+                            return (activeMonthShareDecimal * 100).toFixed(2) + '%';
+                          })()}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#DC2626'}}>
+                          {(() => {
+                            // Member shares based on totals
+                            const totalInvestments = window.totalAllMembersInvestment || 0;
+                            const totalLoans = window.totalAllMembersLoanAmount || 0;
+                            const totalActiveMonths = window.totalActiveMonths || 0;
 
-                  const toPct = (m) => {
-                    const invShare = totalInvestments > 0 ? (m.investment || 0) / totalInvestments : 0;
-                    const patShare = totalLoans > 0 ? (m.totalLoanAmount || 0) / totalLoans : 0;
-                    const actShare = totalActiveMonths > 0 ? (m.activeMonthsCount ?? 0) / totalActiveMonths : 0;
+                            const investmentShareDecimal = totalInvestments > 0
+                              ? (member.investment / totalInvestments)
+                              : 0;
+                            const patronageShareDecimal = totalLoans > 0
+                              ? (((member.totalLoanAmount || 0) / totalLoans))
+                              : 0;
+                            const activeMonthShareDecimal = totalActiveMonths > 0
+                              ? ((member.activeMonthsCount ?? 0) / totalActiveMonths)
+                              : 0;
 
-                    const pct =
-                      (invShare * (fundsData.investmentSharePercentage || 0)) +
-                      (patShare * (fundsData.patronageSharePercentage || 0)) +
-                      (actShare * (fundsData.activeMonthsPercentage || 0));
+                            // Weights (already decimals) from settings
+                            const totalPercentage =
+                              (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
+                              (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
+                              (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
 
-                    return +(pct * 100).toFixed(2);
-                  };
+                            return (totalPercentage * 100).toFixed(2) + '%';
+                          })()}
+                        </strong>
+                      </td>
+                      <td style={styles.dividendsDataCell}>
+                        <strong style={{color: '#111827'}}>
+                          {(() => {
+                            // Total Share = Total Yields * Total% * MembersDividendPercentage (all decimals)
+                            const totalYields = fundsData.totalYields || 0;
 
-                  const ranked = dividendsData
-                    .map(m => ({ name: m.memberName || m.memberId, value: toPct(m) }))
-                    .sort((a, b) => b.value - a.value)
-                    .slice(0, 8);
+                            // Use totals-based shares (consistent with Total % cell)
+                            const totalInvestments = window.totalAllMembersInvestment || 0;
+                            const totalLoans = window.totalAllMembersLoanAmount || 0;
+                            const totalActiveMonths = window.totalActiveMonths || 0;
 
-                  const labels = ranked.map(r => r.name.length > 16 ? r.name.slice(0, 15) + '…' : r.name);
-                  const values = ranked.map(r => r.value);
+                            const investmentShareDecimal = totalInvestments > 0 
+                              ? (member.investment / totalInvestments) 
+                              : 0;
+                            const patronageShareDecimal = totalLoans > 0 
+                              ? (((member.totalLoanAmount || 0) / totalLoans)) 
+                              : 0;
+                            const activeMonthShareDecimal = totalActiveMonths > 0 
+                              ? ((member.activeMonthsCount ?? 0) / totalActiveMonths) 
+                              : 0;
 
-                  return (
-                    <Bar
-                      data={{
-                        labels,
-                        datasets: [
-                          {
-                            label: 'Total Share (₱)',
-                            data: ranked.map(r => {
-                              // Convert percentage to peso value using total yields and members dividend
-                              const totalYields = fundsData.totalYields || 0;
-                              const membersDividendDecimal = fundsData.membersDividendPercentage || 0;
-                              return +(r.value / 100 * totalYields * membersDividendDecimal).toFixed(2);
-                            }),
-                            backgroundColor: '#2D5783',
-                            borderRadius: 3,
-                            barThickness: 12,
-                            maxBarThickness: 14,
-                          }
-                        ]
-                      }}
-                      options={{
-                        indexAxis: 'y',
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        plugins: {
-                          legend: { display: false },
-                          tooltip: {
-                            callbacks: {
-                              label: (ctx) => `₱${formatCurrency(ctx.parsed.x)}`
-                            }
-                          }
-                        },
-                        scales: {
-                          x: {
-                            beginAtZero: true,
-                            ticks: {
-                              callback: (v) => `₱${formatCurrency(v)}`
-                            },
-                            grid: { display: true, color: 'rgba(0,0,0,0.06)' }
-                          },
-                          y: {
-                            ticks: { autoSkip: false },
-                            grid: { display: false },
-                            afterFit: (scale) => { scale.width = Math.min(scale.width, 140); }
-                          }
-                        }
-                      }}
-                    />
-                  );
-                })()}
-              </div>
-
-              <div style={styles.dividendsTableContainer}>
-                {(() => {
-                  // Calculate totals for investment, patronage share and active months distribution
-                  const totalAllMembersInvestment = dividendsData.reduce((sum, member) => sum + (member.investment || 0), 0);
-                  window.totalAllMembersInvestment = totalAllMembersInvestment; // Store for use in table rows
-
-                  const totalAllMembersLoanAmount = dividendsData.reduce((sum, member) => sum + (member.totalLoanAmount || 0), 0);
-                  window.totalAllMembersLoanAmount = totalAllMembersLoanAmount; // Store for use in table rows
-
-                  const totalActiveMonths = dividendsData.reduce((sum, member) => sum + (member.activeMonthsCount || 0), 0);
-                  window.totalActiveMonths = totalActiveMonths;
-                  return null;
-                })()}
-                <table style={styles.dividendsTable}>
-                  <thead>
-                    <tr style={styles.dividendsHeaderRow}>
-                      <th style={styles.dividendsHeaderCell}>Members</th>
-                      <th style={styles.dividendsHeaderCell}>Investment</th>
-                      <th style={styles.dividendsHeaderCell}>Jan</th>
-                      <th style={styles.dividendsHeaderCell}>Feb</th>
-                      <th style={styles.dividendsHeaderCell}>Mar</th>
-                      <th style={styles.dividendsHeaderCell}>Apr</th>
-                      <th style={styles.dividendsHeaderCell}>May</th>
-                      <th style={styles.dividendsHeaderCell}>Jun</th>
-                      <th style={styles.dividendsHeaderCell}>Jul</th>
-                      <th style={styles.dividendsHeaderCell}>Aug</th>
-                      <th style={styles.dividendsHeaderCell}>Sep</th>
-                      <th style={styles.dividendsHeaderCell}>Oct</th>
-                      <th style={styles.dividendsHeaderCell}>Nov</th>
-                      <th style={styles.dividendsHeaderCell}>Dec</th>
-                      <th style={styles.dividendsHeaderCell}>Total</th>
-                      <th style={styles.dividendsHeaderCell}>Loan Count</th>
-                      <th style={styles.dividendsHeaderCell}>Amount</th>
-                      <th style={styles.dividendsHeaderCell}>Investment Share</th>
-                      <th style={styles.dividendsHeaderCell}>Patronage Share</th>
-                      <th style={styles.dividendsHeaderCell}>Active Month</th>
-                      <th style={styles.dividendsHeaderCell}>Active Month %</th>
-                      <th style={styles.dividendsHeaderCell}>Total %</th>
-                      <th style={styles.dividendsHeaderCell}>Total Share</th>
+                            const totalPercentageDecimal = 
+                              (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
+                              (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
+                              (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
+                            const membersDividendDecimal = fundsData.membersDividendPercentage || 0; // settings already /100
+                            const totalShare = totalYields * totalPercentageDecimal * membersDividendDecimal;
+                            return `₱${formatCurrency(totalShare)}`;
+                          })()}
+                        </strong>
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {dividendsData.map((member, index) => (
-                      <tr key={member.memberId} style={styles.dividendsDataRow}>
-                        <td style={styles.dividendsDataCell}>
-                          <div style={styles.memberInfo}>
-                            <span style={styles.memberName}>{member.memberName}</span>
-                            <span style={styles.memberId}>ID: {member.memberId}</span>
-                          </div>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          ₱{formatCurrency(member.investment)}
-                        </td>
-                        {member.monthlyDividends.map((dividend, monthIndex) => {
-                          const hasTransactions = member.monthlyTransactions[monthIndex]?.length > 0;
-                          return (
-                            <td key={monthIndex} style={styles.dividendsDataCell}>
-                              <div 
-                                style={{
-                                  ...styles.dividendCell,
-                                  backgroundColor: dividend > 0 
-                                    ? `rgba(16, 185, 129, ${Math.min(Math.abs(dividend) / 1000, 0.8)})` 
-                                    : dividend < 0 
-                                      ? `rgba(239, 68, 68, ${Math.min(Math.abs(dividend) / 1000, 0.8)})` 
-                                      : '#f8f9fa',
-                                  color: dividend !== 0 ? '#fff' : '#666',
-                                  cursor: hasTransactions ? 'pointer' : 'default',
-                                  transition: 'all 0.2s ease',
-                                  border: hasTransactions ? '2px solid transparent' : 'none',
-                                  position: 'relative'
-                                }}
-                                onClick={() => hasTransactions && handleMonthClick(member, monthIndex)}
-                                onMouseEnter={(e) => {
-                                  if (hasTransactions) {
-                                    e.target.style.transform = 'scale(1.05)';
-                                    e.target.style.borderColor = dividend > 0 ? '#10B981' : '#EF4444';
-                                  }
-                                }}
-                                onMouseLeave={(e) => {
-                                  if (hasTransactions) {
-                                    e.target.style.transform = 'scale(1)';
-                                    e.target.style.borderColor = 'transparent';
-                                  }
-                                }}
-                              >
-                                {dividend > 0 ? '+' : dividend < 0 ? '-' : ''}₱{formatCurrency(Math.abs(dividend))}
-                                {hasTransactions && member.monthlyTransactions[monthIndex].length > 1 && (
-                                  <span style={{
-                                    position: 'absolute',
-                                    top: '1px',
-                                    right: '1px',
-                                    fontSize: '9px',
-                                    backgroundColor: 'rgba(255,255,255,0.8)',
-                                    color: '#333',
-                                    borderRadius: '50%',
-                                    width: '14px',
-                                    height: '14px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    fontWeight: 'bold'
-                                  }}>
-                                    {member.monthlyTransactions[monthIndex].length}
-                                  </span>
-                                )}
-                              </div>
-                            </td>
-                          );
-                        })}
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{
-                            color: member.totalDividends > 0 ? '#10B981' : member.totalDividends < 0 ? '#EF4444' : '#666'
-                          }}>
-                            {member.totalDividends > 0 ? '+' : member.totalDividends < 0 ? '-' : ''}₱{formatCurrency(Math.abs(member.totalDividends))}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#2D5783'}}>
-                            {member.approvedLoansCount || 0}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#059669'}}>
-                            ₱{formatCurrency(member.totalLoanAmount || 0)}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#7C3AED'}}>
-                            {window.totalAllMembersInvestment > 0 
-                              ? ((member.investment / window.totalAllMembersInvestment) * 100).toFixed(2) + '%' 
-                              : '0.00%'}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#DC2626'}}>
-                            {totalAllMembersLoanAmount > 0 
-                              ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount) * 100).toFixed(2) + '%' 
-                              : '0.00%'}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#059669'}}>
-                            {member.activeMonthsCount ?? 0}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#7C3AED'}}>
-                            {(() => {
-                              const totalActiveMonths = window.totalActiveMonths || 1; // avoid divide by 0
-                              const activeMonthShareDecimal = (member.activeMonthsCount ?? 0) / totalActiveMonths;
-                              return (activeMonthShareDecimal * 100).toFixed(2) + '%';
-                            })()}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#DC2626'}}>
-                            {(() => {
-                              // Member shares based on totals
-                              const totalInvestments = window.totalAllMembersInvestment || 0;
-                              const totalLoans = window.totalAllMembersLoanAmount || 0;
-                              const totalActiveMonths = window.totalActiveMonths || 0;
-
-                              const investmentShareDecimal = totalInvestments > 0
-                                ? (member.investment / totalInvestments)
-                                : 0;
-                              const patronageShareDecimal = totalLoans > 0
-                                ? (((member.totalLoanAmount || 0) / totalLoans))
-                                : 0;
-                              const activeMonthShareDecimal = totalActiveMonths > 0
-                                ? ((member.activeMonthsCount ?? 0) / totalActiveMonths)
-                                : 0;
-
-                              // Weights (already decimals) from settings
-                              const totalPercentage =
-                                (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
-                                (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
-                                (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
-
-                              return (totalPercentage * 100).toFixed(2) + '%';
-                            })()}
-                          </strong>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <strong style={{color: '#111827'}}>
-                            {(() => {
-                              // Total Share = Total Yields * Total% * MembersDividendPercentage (all decimals)
-                              const totalYields = fundsData.totalYields || 0;
-
-                              // Use totals-based shares (consistent with Total % cell)
-                              const totalInvestments = window.totalAllMembersInvestment || 0;
-                              const totalLoans = window.totalAllMembersLoanAmount || 0;
-                              const totalActiveMonths = window.totalActiveMonths || 0;
-
-                              const investmentShareDecimal = totalInvestments > 0 
-                                ? (member.investment / totalInvestments) 
-                                : 0;
-                              const patronageShareDecimal = totalLoans > 0 
-                                ? (((member.totalLoanAmount || 0) / totalLoans)) 
-                                : 0;
-                              const activeMonthShareDecimal = totalActiveMonths > 0 
-                                ? ((member.activeMonthsCount ?? 0) / totalActiveMonths) 
-                                : 0;
-
-                              const totalPercentageDecimal = 
-                                (investmentShareDecimal * (fundsData.investmentSharePercentage || 0)) +
-                                (patronageShareDecimal * (fundsData.patronageSharePercentage || 0)) +
-                                (activeMonthShareDecimal * (fundsData.activeMonthsPercentage || 0));
-                              const membersDividendDecimal = fundsData.membersDividendPercentage || 0; // settings already /100
-                              const totalShare = totalYields * totalPercentageDecimal * membersDividendDecimal;
-                              return `₱${formatCurrency(totalShare)}`;
-                            })()}
-                          </strong>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          )}
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
-      </div>
 
-      {selectedChart === 'loans' && (
-        <div style={styles.loansSection}>
+        {/* Active Loans Management Section */}
+        <div style={styles.section}>
           <div style={styles.sectionHeader}>
             <h2 style={styles.sectionTitle}>Active Loans Portfolio</h2>
             <div style={styles.searchBox}>
@@ -2490,282 +2140,402 @@ const Dashboard = () => {
             </div>
           </div>
           
-          <div style={styles.tableContainer}>
-            <table style={styles.loansTable}>
-              <thead>
-                <tr>
-                  <th style={styles.tableHeader}>Member ID</th>
-                  <th style={styles.tableHeader}>Transaction ID</th>
-                  <th style={styles.tableHeader}>Amount</th>
-                  <th style={styles.tableHeader}>Outstanding</th>
-                  <th style={styles.tableHeader}>Term</th>
-                  <th style={styles.tableHeader}>Interest</th>
-                  <th style={styles.tableHeader}>Monthly</th>
-                  <th style={styles.tableHeader}>Total Monthly</th>
-                  <th style={styles.tableHeader}>Penalty</th>
-                  <th style={styles.tableHeader}>New Total Monthly</th>
-                  <th style={styles.tableHeader}>Due Date</th>
-                  <th style={styles.tableHeader}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredLoans.length > 0 ? (
-                  filteredLoans.map((loan, index) => (
-                    <tr key={`${loan.memberId}-${loan.transactionId}`}>
-                      <td style={styles.tableCell}>{loan.memberId}</td>
-                      <td style={styles.tableCell}>{loan.transactionId}</td>
-                      <td style={styles.tableCell}>₱{formatCurrency(loan.loanAmount)}</td>
-                      <td style={styles.tableCell}>₱{formatCurrency(loan.outstandingBalance)}</td>
-                      <td style={styles.tableCell}>{loan.term}</td>
-                      <td style={styles.tableCell}>{loan.interest}</td>
-                      <td style={styles.tableCell}>₱{formatCurrency(loan.monthlyPayment)}</td>
-                      <td style={styles.tableCell}>₱{formatCurrency(loan.totalMonthlyPayment)}</td>
-                      {(() => {
-                        const { penalty, newTotalMonthly } = computePenaltyAndNewTotal(loan);
-                        return (
-                          <>
-                            <td style={styles.tableCell}>₱{formatCurrency(penalty)}</td>
-                            <td style={styles.tableCell}>₱{formatCurrency(newTotalMonthly)}</td>
-                          </>
-                        );
-                      })()}
-                      <td style={styles.tableCell}>
-                        <span style={loan.isOverdue ? styles.overdueDate : null}>
-                          {formatDisplayDate(loan.dueDate)}
-                        </span>
-                        {loan.isOverdue && <span style={styles.overdueBadge}>Overdue</span>}
-                      </td>
-                      <td style={styles.tableCell}>
-                        <button 
-                          onClick={() => handleResendClick(loan)}
-                          style={styles.resendButton}
-                          onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-                          onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-                        >
-                          Resend Reminder
-                        </button>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="10" style={styles.noResults}>No loans found matching your search criteria</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {showResendConfirmation && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <button 
-              style={styles.closeButton} 
-              onClick={() => setShowResendConfirmation(false)}
-              aria-label="Close modal"
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-            >
-              <FaTimes />
-            </button>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2D5783' }} />
-            <p style={styles.modalText}>Are you sure you want to resend the payment reminder?</p>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#2D5783',
-                  color: '#fff'
-                }} 
-                onClick={confirmResendReminder}
-                disabled={actionInProgress}
-                onMouseEnter={(e) => !actionInProgress && (e.target.style.transform = 'translateY(-1px)')}
-                onMouseLeave={(e) => !actionInProgress && (e.target.style.transform = 'translateY(0)')}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  backgroundColor: '#f1f5f9',
-                  color: '#111'
-                }} 
-                onClick={() => setShowResendConfirmation(false)}
-                disabled={actionInProgress}
-                onMouseEnter={(e) => !actionInProgress && (e.target.style.transform = 'translateY(-1px)')}
-                onMouseLeave={(e) => !actionInProgress && (e.target.style.transform = 'translateY(0)')}
-              >
-                No
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {successMessageModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <button 
-              style={styles.closeButton} 
-              onClick={() => setSuccessMessageModalVisible(false)}
-              aria-label="Close modal"
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-            >
-              <FaTimes />
-            </button>
-            <FaCheckCircle style={{ ...styles.confirmIcon, color: '#4CAF50' }} />
-            <p style={styles.modalText}>{successMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={() => setSuccessMessageModalVisible(false)}
-              onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-
-      {errorModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCardSmall}>
-            <button 
-              style={styles.closeButton} 
-              onClick={() => setErrorModalVisible(false)}
-              aria-label="Close modal"
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-            >
-              <FaTimes />
-            </button>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#f44336' }} />
-            <p style={styles.modalText}>{errorMessage}</p>
-            <button 
-              style={{
-                ...styles.actionButton,
-                backgroundColor: '#2D5783',
-                color: '#fff'
-              }} 
-              onClick={() => setErrorModalVisible(false)}
-              onMouseEnter={(e) => e.target.style.transform = 'translateY(-1px)'}
-              onMouseLeave={(e) => e.target.style.transform = 'translateY(0)'}
-            >
-              OK
-            </button>
-          </div>
-        </div>
-      )}
-
-      {actionInProgress && (
-        <div style={styles.centeredModal}>
-          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-            <div style={styles.spinner}></div>
-            <div style={styles.loadingText}>Processing...</div>
-          </div>
-        </div>
-      )}
-
-      {/* Transaction Breakdown Modal */}
-      {transactionBreakdownModal && (
-        <div style={styles.centeredModal}>
-          <div style={styles.modalCard}>
-            <button 
-              style={styles.closeButton} 
-              onClick={() => setTransactionBreakdownModal(false)}
-              aria-label="Close modal"
-              onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-            >
-              <FaTimes />
-            </button>
-            
-            <h3 style={styles.modalTitle}>
-              Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
-            </h3>
-            
-            <div style={{marginBottom: '16px', color: '#666', fontSize: '13px'}}>
-              <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
-            </div>
-
-            <div style={styles.modalContent}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px', tableLayout: 'fixed', margin: 0 }}>
+          <div style={styles.loansSection}>
+            <div style={styles.tableContainer}>
+              <table style={styles.loansTable}>
                 <thead>
-                  <tr style={styles.dividendsHeaderRow}>
-                    <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
-                    <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
-                    <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
+                  <tr>
+                    <th style={styles.tableHeader}>Member ID</th>
+                    <th style={styles.tableHeader}>Transaction ID</th>
+                    <th style={styles.tableHeader}>Amount</th>
+                    <th style={styles.tableHeader}>Outstanding</th>
+                    <th style={styles.tableHeader}>Term</th>
+                    <th style={styles.tableHeader}>Interest</th>
+                    <th style={styles.tableHeader}>Monthly</th>
+                    <th style={styles.tableHeader}>Total Monthly</th>
+                    <th style={styles.tableHeader}>Penalty</th>
+                    <th style={styles.tableHeader}>New Total Monthly</th>
+                    <th style={styles.tableHeader}>Due Date</th>
+                    <th style={styles.tableHeader}>Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedMonthTransactions.transactions.map((transaction, index) => (
-                    <tr key={index} style={styles.dividendsDataRow}>
-                      <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        {transaction.formattedDate}
-                      </td>
-                      <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        <span style={{
-                          backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
-                          color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
-                          padding: '3px 6px',
-                          borderRadius: '8px',
-                          fontSize: '11px',
-                          fontWeight: '600'
-                        }}>
-                          {transaction.type}
-                        </span>
-                      </td>
-                      <td style={{...styles.dividendsDataCell, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'}}>
-                        <div>
-                          <span style={{
-                            color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
-                            fontWeight: 'bold'
-                          }}>
-                            {transaction.adjustedAmount > 0 ? '+' : transaction.adjustedAmount < 0 ? '-' : ''}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
+                  {filteredLoans.length > 0 ? (
+                    filteredLoans.map((loan, index) => (
+                      <tr key={`${loan.memberId}-${loan.transactionId}`}>
+                        <td style={styles.tableCell}>{loan.memberId}</td>
+                        <td style={styles.tableCell}>{loan.transactionId}</td>
+                        <td style={styles.tableCell}>₱{formatCurrency(loan.loanAmount)}</td>
+                        <td style={styles.tableCell}>₱{formatCurrency(loan.outstandingBalance)}</td>
+                        <td style={styles.tableCell}>{loan.term}</td>
+                        <td style={styles.tableCell}>{loan.interest}</td>
+                        <td style={styles.tableCell}>₱{formatCurrency(loan.monthlyPayment)}</td>
+                        <td style={styles.tableCell}>₱{formatCurrency(loan.totalMonthlyPayment)}</td>
+                        {(() => {
+                          const { penalty, newTotalMonthly } = computePenaltyAndNewTotal(loan);
+                          return (
+                            <>
+                              <td style={styles.tableCell}>₱{formatCurrency(penalty)}</td>
+                              <td style={styles.tableCell}>₱{formatCurrency(newTotalMonthly)}</td>
+                            </>
+                          );
+                        })()}
+                        <td style={styles.tableCell}>
+                          <span style={loan.isOverdue ? styles.overdueDate : null}>
+                            {formatDisplayDate(loan.dueDate)}
                           </span>
-                          <div style={{fontSize: '10px', color: '#666', marginTop: '1px'}}>
-                            Original: ₱{formatCurrency(transaction.originalAmount)}
-                          </div>
-                        </div>
+                          {loan.isOverdue && <span style={styles.overdueBadge}>Overdue</span>}
+                        </td>
+                        <td style={styles.tableCell}>
+                          <button 
+                            onClick={() => handleResendClick(loan)}
+                            style={styles.resendButton}
+                            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+                          >
+                            <FaExchangeAlt />
+                            Resend Reminder
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan="12" style={styles.noResults}>
+                        No loans found matching your search criteria
                       </td>
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+
+        {/* All Modals */}
+        {showDividendsModal && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCard}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setShowDividendsModal(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
+              <h3 style={styles.modalTitle}>Distribute Dividends</h3>
+              <div style={{ overflowX: 'auto', marginTop: '20px' }}>
+                <table style={styles.dividendsTable}>
+                  <thead>
+                    <tr>
+                      <th style={styles.dividendsHeaderCell}>Member ID</th>
+                      <th style={styles.dividendsHeaderCell}>Member</th>
+                      <th style={styles.dividendsHeaderCell}>Investments</th>
+                      <th style={styles.dividendsHeaderCell}>Savings</th>
+                      <th style={styles.dividendsHeaderCell}>Dividends</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {distributionMembers.map(r => (
+                      <tr key={r.memberId}>
+                        <td style={styles.dividendsDataCell}>{r.memberId}</td>
+                        <td style={styles.dividendsDataCell}>{r.name}</td>
+                        <td style={styles.dividendsDataCell}>₱{formatCurrency(r.investment)}</td>
+                        <td style={styles.dividendsDataCell}>₱{formatCurrency(r.savings)}</td>
+                        <td style={styles.dividendsDataCell}><strong>₱{formatCurrency(r.dividend)}</strong></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{...styles.modalActions, marginTop: '24px'}}>
+                <button 
+                  style={{...styles.actionButton, ...styles.secondaryActionButton}}
+                  onClick={() => setShowDividendsModal(false)}
+                  onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                  onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+                >
+                  Cancel
+                </button>
+                <button 
+                  style={{...styles.actionButton, ...styles.primaryActionButton}}
+                  onClick={confirmDistributeDividends}
+                  disabled={distributionProcessing || distributionMembers.length === 0}
+                  onMouseEnter={(e) => !distributionProcessing && distributionMembers.length > 0 && addHoverEffect(e.currentTarget)}
+                  onMouseLeave={(e) => !distributionProcessing && distributionMembers.length > 0 && removeHoverEffect(e.currentTarget)}
+                >
+                  {distributionProcessing ? 'Processing...' : 'Distribute'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Confirm Distribution Modal */}
+        {distributionConfirmVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setDistributionConfirmVisible(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
+              <FaExclamationCircle style={styles.confirmIcon} />
+              <p style={styles.modalText}>Are you sure you want to distribute dividends to all listed members?</p>
+              <div style={styles.modalActions}>
+                <button 
+                  style={{...styles.actionButton, ...styles.primaryActionButton}}
+                  onClick={performDistributeDividends}
+                  disabled={distributionProcessing}
+                  onMouseEnter={(e) => !distributionProcessing && addHoverEffect(e.currentTarget)}
+                  onMouseLeave={(e) => !distributionProcessing && removeHoverEffect(e.currentTarget)}
+                >
+                  {distributionProcessing ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  style={{...styles.actionButton, ...styles.secondaryActionButton}}
+                  onClick={() => setDistributionConfirmVisible(false)}
+                  onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                  onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal */}
+        {distributionSuccessVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setDistributionSuccessVisible(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
+              <FaCheckCircle style={{...styles.confirmIcon, color: '#10b981'}} />
+              <p style={styles.modalText}>Dividends distributed successfully!</p>
+              <button 
+                style={{...styles.actionButton, ...styles.primaryActionButton}}
+                onClick={() => {
+                  setDistributionSuccessVisible(false);
+                  setShowDividendsModal(false);
+                  fetchDashboardData({ lightweight: true });
+                }}
+                onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {showResendConfirmation && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setShowResendConfirmation(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
+              <FaExclamationCircle style={styles.confirmIcon} />
+              <p style={styles.modalText}>Are you sure you want to resend the payment reminder?</p>
+              <div style={styles.modalActions}>
+                <button 
+                  style={{...styles.actionButton, ...styles.primaryActionButton}}
+                  onClick={confirmResendReminder}
+                  disabled={actionInProgress}
+                  onMouseEnter={(e) => !actionInProgress && addHoverEffect(e.currentTarget)}
+                  onMouseLeave={(e) => !actionInProgress && removeHoverEffect(e.currentTarget)}
+                >
+                  {actionInProgress ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  style={{...styles.actionButton, ...styles.secondaryActionButton}}
+                  onClick={() => setShowResendConfirmation(false)}
+                  disabled={actionInProgress}
+                  onMouseEnter={(e) => !actionInProgress && addHoverEffect(e.currentTarget)}
+                  onMouseLeave={(e) => !actionInProgress && removeHoverEffect(e.currentTarget)}
+                >
+                  No
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {successMessageModalVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setSuccessMessageModalVisible(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
+              <FaCheckCircle style={{...styles.confirmIcon, color: '#10b981'}} />
+              <p style={styles.modalText}>{successMessage}</p>
+              <button 
+                style={{...styles.actionButton, ...styles.primaryActionButton}}
+                onClick={() => setSuccessMessageModalVisible(false)}
+                onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {errorModalVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setErrorModalVisible(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
+              <FaExclamationCircle style={{...styles.confirmIcon, color: '#ef4444'}} />
+              <p style={styles.modalText}>{errorMessage}</p>
+              <button 
+                style={{...styles.actionButton, ...styles.primaryActionButton}}
+                onClick={() => setErrorModalVisible(false)}
+                onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+
+        {actionInProgress && (
+          <div style={styles.centeredModal}>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px' }}>
+              <div style={styles.spinner}></div>
+              <div style={styles.loadingText}>Processing...</div>
+            </div>
+          </div>
+        )}
+
+        {/* Transaction Breakdown Modal */}
+        {transactionBreakdownModal && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCard}>
+              <button 
+                style={styles.closeButton} 
+                onClick={() => setTransactionBreakdownModal(false)}
+                aria-label="Close modal"
+                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              >
+                <FaTimes />
+              </button>
               
-              <div style={{
-                marginTop: '16px', 
-                padding: '12px', 
-                backgroundColor: '#f8f9fa', 
-                borderRadius: '6px',
-                borderLeft: '4px solid #2D5783'
-              }}>
-                <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                  <span style={{fontWeight: '600', color: '#2D5783'}}>
-                    Month Total ({selectedMonthTransactions.transactions.length} transactions):
-                  </span>
-                  <span style={{
-                    fontSize: '16px',
-                    fontWeight: 'bold',
-                    color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
-                  }}>
-                    {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
-                     selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
-                    ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
-                  </span>
+              <h3 style={styles.modalTitle}>
+                Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
+              </h3>
+              
+              <div style={{marginBottom: '16px', color: '#666', fontSize: '14px'}}>
+                <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
+              </div>
+
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={styles.dividendsHeaderRow}>
+                      <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
+                      <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
+                      <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {selectedMonthTransactions.transactions.map((transaction, index) => (
+                      <tr key={index} style={styles.dividendsDataRow}>
+                        <td style={styles.dividendsDataCell}>
+                          {transaction.formattedDate}
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <span style={{
+                            backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
+                            color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
+                            padding: '6px 12px',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                            fontWeight: '600'
+                          }}>
+                            {transaction.type}
+                          </span>
+                        </td>
+                        <td style={styles.dividendsDataCell}>
+                          <div>
+                            <span style={{
+                              color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
+                              fontWeight: 'bold',
+                              fontSize: '14px'
+                            }}>
+                              {transaction.adjustedAmount > 0 ? '+' : transaction.adjustedAmount < 0 ? '-' : ''}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
+                            </span>
+                            <div style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                              Original: ₱{formatCurrency(transaction.originalAmount)}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                
+                <div style={{
+                  marginTop: '20px', 
+                  padding: '16px', 
+                  backgroundColor: '#f8f9fa', 
+                  borderRadius: '8px',
+                  borderLeft: '4px solid #2D5783'
+                }}>
+                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+                    <span style={{fontWeight: '600', color: '#2D5783', fontSize: '14px'}}>
+                      Month Total ({selectedMonthTransactions.transactions.length} transactions):
+                    </span>
+                    <span style={{
+                      fontSize: '18px',
+                      fontWeight: 'bold',
+                      color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
+                    }}>
+                      {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
+                       selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
+                      ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };

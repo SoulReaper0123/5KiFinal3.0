@@ -1114,7 +1114,7 @@ const ApplyDeposits = ({
       console.error('Error preparing action:', error);
       setErrorMessage(error.message || 'An error occurred. Please try again.');
       setErrorModalVisible(true);
-    } finally {
+      // Hide loading on error
       setIsProcessing(false);
       setActionInProgress(false);
     }
@@ -1279,8 +1279,12 @@ const ApplyDeposits = ({
   };
 
   const handleSuccessOk = async () => {
-    // Finalize DB changes and refresh only after user confirms
+    // Show loading spinner and hide success modal
+    setIsProcessing(true);
+    setSuccessMessageModalVisible(false);
+
     try {
+      // Finalize DB changes
       if (pendingApiCall) {
         if (pendingApiCall.type === 'approve') {
           await processDatabaseApprove(pendingApiCall.data);
@@ -1290,13 +1294,8 @@ const ApplyDeposits = ({
       }
     } catch (err) {
       console.error('Finalize DB on OK error:', err);
+      // Optionally show error modal here if needed
     }
-
-    // Close modal and clean state
-    setSuccessMessageModalVisible(false);
-    closeModal();
-    setSelectedDeposit(null);
-    setCurrentAction(null);
 
     // Trigger background email after DB success; do not block UI
     try {
@@ -1313,8 +1312,16 @@ const ApplyDeposits = ({
       setPendingApiCall(null);
     }
 
+    // Close modal and clean state
+    closeModal();
+    setSelectedDeposit(null);
+    setCurrentAction(null);
+
     // Finally refresh
     refreshData();
+
+    // Hide loading spinner
+    setIsProcessing(false);
   };
 
   const openImageViewer = (url, label) => {

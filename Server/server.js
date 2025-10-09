@@ -2266,7 +2266,7 @@ app.post('/send-loan-reminder', async (req, res) => {
         outstandingBalance,
         memberId,
         transactionId,
-        websiteLink,
+        websiteLink, // This is overriding your constant!
         facebookLink
     } = req.body;
 
@@ -2300,6 +2300,10 @@ app.post('/send-loan-reminder', async (req, res) => {
             : `Reminder: Loan Payment Due in ${daysUntilDue} Day${daysUntilDue === 1 ? '' : 's'}`;
 
         console.log('[NOTIFICATION] Sending loan reminder to user');
+        
+        // FIX: Always use the correct website link with "app"
+        const paymentWebsiteLink = WEBSITE_LINK; // This will always be 'https://fivekiapp.onrender.com'
+        
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
@@ -2352,7 +2356,7 @@ app.post('/send-loan-reminder', async (req, res) => {
                     </div>
                     
                     <p>
-                        <a href="${websiteLink || WEBSITE_LINK}" 
+                        <a href="${paymentWebsiteLink}" 
                            style="display: inline-block; background-color: #3498db; color: white; 
                                   padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
                             Make Payment Now
@@ -2379,12 +2383,14 @@ app.post('/send-loan-reminder', async (req, res) => {
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
+        console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`); // Add this for debugging
         res.status(200).json({ 
             success: true,
             message: 'Loan reminder email sent successfully',
             data: {
                 emailSent: email,
                 daysUntilDue: daysUntilDue,
+                paymentLink: paymentWebsiteLink, // Include the link in response for verification
                 timestamp: new Date().toISOString()
             }
         });

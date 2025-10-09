@@ -887,7 +887,7 @@ const Transactions = () => {
           <div>
             <h1 style={styles.headerText}>Transaction Management</h1>
             <p style={styles.headerSubtitle}>
-              Monitor and manage all member transactions in one place
+              Monitor and manage all member transactions
             </p>
           </div>
         </div>
