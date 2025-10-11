@@ -611,7 +611,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
               <TouchableOpacity 
                 style={styles.fallbackMenuItem} 
-                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Terms'); }}
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Terms and Conditions'); }}
                 activeOpacity={0.7}
               >
                 <View style={styles.fallbackMenuIcon}>
@@ -623,7 +623,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
               <TouchableOpacity 
                 style={styles.fallbackMenuItem} 
-                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Privacy'); }}
+                onPress={() => { setFallbackDrawerVisible(false); navigation.navigate('Privacy Policy'); }}
                 activeOpacity={0.7}
               >
                 <View style={styles.fallbackMenuIcon}>

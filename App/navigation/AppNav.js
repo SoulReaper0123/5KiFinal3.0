@@ -283,8 +283,8 @@ const DrawerNavigator = ({ route }) => {
           options={{ headerShown: false }} 
         />
         <Drawer.Screen name="Profile" component={ProfileScreen} initialParams={{ email }} options={{ headerShown: false }} />
-        <Drawer.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
-        <Drawer.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
+        <Drawer.Screen name="Terms" component={Terms} options={{ headerShown: false }} />
+        <Drawer.Screen name="Privacy" component={Privacy} options={{ headerShown: false }} />
         <Drawer.Screen name="About Us" component={AboutUs} options={{ headerShown: false }} />
         <Drawer.Screen name="Contact Us" component={ContactUs} options={{ headerShown: false }} />
         <Drawer.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
@@ -323,8 +323,8 @@ const AppNav = () => (
       <Stack.Screen name="LoanDetails" component={require('../src/app/HomePage/LoanDetails').default} options={{ headerShown: false }} />
       <Stack.Screen name="Deposit" component={Deposit} options={{ headerShown: false }} />
       <Stack.Screen name="Withdraw" component={Withdraw} options={{ headerShown: false }} />
-      <Stack.Screen name="Terms" component={Terms} options={{ headerShown: false }} />
-      <Stack.Screen name="Privacy" component={Privacy} options={{ headerShown: false }} />
+      <Stack.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
+      <Stack.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
       <Stack.Screen name="TwoFactorEmail" component={TwoFactorEmail} options={{ headerShown: false }} />
       <Stack.Screen name="VerifyCode" component={VerifyCode} options={{ headerShown: false }} />
       <Stack.Screen name="Bot" component={Bot} options={{ headerShown: false }} />

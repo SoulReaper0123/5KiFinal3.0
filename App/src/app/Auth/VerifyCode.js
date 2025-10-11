@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -36,14 +37,6 @@ export default function VerifyCode({ route, navigation }) {
     return () => clearInterval(t);
   }, [secondsLeft]);
 
-  // Invalidate code and clear inputs when timer expires
-  useEffect(() => {
-    if (secondsLeft <= 0) {
-      setExpectedCode(''); // invalidate previous code after expiry
-      setDigits(['', '', '', '', '', '']); // clear any entered digits
-    }
-  }, [secondsLeft]);
-
   const handleChange = (text, index) => {
     if (!/^\d?$/.test(text)) return;
 
@@ -56,11 +49,7 @@ export default function VerifyCode({ route, navigation }) {
     }
 
     if (index === 5 && text) {
-      if (secondsLeft > 0 && expectedCode) {
-        handleVerify();
-      } else {
-        Alert.alert('Code expired', 'Please resend a new verification code.');
-      }
+      handleVerify();
     }
   };
 
@@ -76,14 +65,6 @@ export default function VerifyCode({ route, navigation }) {
   const handleVerify = () => {
     const code = digits.join('');
     if (code.length < 6) return;
-
-    // Prevent verification if the code is expired or invalidated
-    if (secondsLeft <= 0 || !expectedCode) {
-      Alert.alert('Code expired', 'Please resend a new verification code.');
-      setDigits(['', '', '', '', '', '']);
-      inputRefs.current[0]?.focus();
-      return;
-    }
 
     if (code === expectedCode) {
       // Prefer DrawerNav; if it fails, fallback to AppHomeStandalone
@@ -138,12 +119,14 @@ export default function VerifyCode({ route, navigation }) {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
           <MaterialIcons name="arrow-back" size={24} color="#0F172A" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Verification</Text>
-        <View style={{ width: 24 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
         <View style={styles.contentWrapper}>
+          <View style={styles.logoWrapper}>
+            <Image source={require('../../../assets/logo.png')} style={styles.logo} />
+          </View>
+
           <View style={{ marginBottom: 16 }}>
             <Text style={styles.title}>Enter Verification Code</Text>
             <Text style={styles.subLabel}>We sent a 6-digit code to your email</Text>
@@ -174,12 +157,9 @@ export default function VerifyCode({ route, navigation }) {
 
             {/* Continue */}
             <TouchableOpacity
-              style={[
-                styles.primaryButton,
-                (digits.join('').length < 6 || secondsLeft <= 0 || !expectedCode) && styles.disabledButton
-              ]}
+              style={[styles.primaryButton, digits.join('').length < 6 && styles.disabledButton]}
               onPress={handleVerify}
-              disabled={digits.join('').length < 6 || secondsLeft <= 0 || !expectedCode}
+              disabled={digits.join('').length < 6}
             >
               <Text style={styles.primaryButtonText}>Continue</Text>
             </TouchableOpacity>
@@ -200,61 +180,59 @@ export default function VerifyCode({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: {
+    container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
+    paddingHorizontal: 16,
+    paddingTop: 48,
+    paddingBottom: 48,
   },
-  header: {
-    height: 54,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 12,
-    backgroundColor: '#FFFFFF',
-    borderBottomColor: '#E2E8F0',
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
+
   headerBack: {
-    padding: 8,
+    alignSelf: 'flex-start',
   },
-  headerTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
+
   scrollContent: {
     flexGrow: 1,
-    padding: 16,
-    paddingBottom: 24,
+    paddingVertical: 24,
   },
   title: {
     fontSize: 22,
     fontWeight: '700',
     color: '#0F172A',
     textAlign: 'left',
+    alignSelf: 'stretch',
   },
   subLabel: {
     fontSize: 13,
     marginTop: 2,
     color: '#475569',
+    alignSelf: 'stretch',
   },
   card: {
     backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
+    marginBottom: 24,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
+    alignSelf: 'stretch',
+    width: '100%',
+    maxWidth: 420,
   },
   codeInputContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    alignSelf: 'stretch',
     width: '100%',
+    maxWidth: 360,
+    marginTop: 8,
     marginBottom: 12,
     gap: 8,
+    paddingHorizontal: 4,
   },
   codeInput: {
     flex: 1,
@@ -303,8 +281,30 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   contentWrapper: {
-    flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 16,
+    alignSelf: 'stretch',
+    alignItems: 'flex-start',
+    paddingHorizontal: 0,
+    paddingVertical: 65,
+    width: '100%',
+  },
+  logoWrapper: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 4,
+    borderColor: '#1E3A5F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  logo: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    resizeMode: 'contain',
   },
 });

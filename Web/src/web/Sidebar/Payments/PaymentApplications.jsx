@@ -91,10 +91,7 @@ loadingText: {
   tableRow: {
     height: '52px',
     transition: 'background-color 0.2s ease',
-    borderBottom: '1px solid #f1f5f9',
-    '&:hover': {
-      backgroundColor: '#f8fafc'
-    }
+    borderBottom: '1px solid #f1f5f9'
   },
   tableCell: {
     padding: '0.75rem',
@@ -1213,9 +1210,9 @@ const processDatabaseApprove = async (payment) => {
     // Calculate allocation for balance and investment
     const principalToMember = principalPaid - borrowedFromSavings;
     
-    // ALLOCATION LOGIC: All excess goes to investment, principal goes to balance
+    // ALLOCATION LOGIC: Excess goes to investment, balance, and funds
     investmentIncrease = excessPayment;
-    balanceIncrease = principalToMember;
+    balanceIncrease = principalToMember + excessPayment;
 
     const memberBalanceToSet = Math.ceil((memberBalance + balanceIncrease) * 100) / 100;
     const memberInvestmentToSet = Math.ceil((memberInvestment + investmentIncrease) * 100) / 100;
@@ -1264,9 +1261,9 @@ const processDatabaseApprove = async (payment) => {
       await yieldsHistoryRef.update(yieldsHistoryUpdate);
     }
 
-    // Update Funds with principal amount minus borrowed portion (excess already allocated to investment)
+    // Update Funds with principal amount minus borrowed portion (excess is allocated to investment, balance, and funds)
     const principalToFunds = principalPaid - borrowedFromSavings;
-    const fundsIncrease = principalToFunds; // Excess is not added to funds since it goes to investment
+    const fundsIncrease = principalToFunds + excessPayment;
     
     if (fundsIncrease > 0) {
       const newFundsAmount = Math.ceil((currentFunds + fundsIncrease) * 100) / 100;

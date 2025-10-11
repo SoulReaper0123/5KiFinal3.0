@@ -1,27 +1,11 @@
-# ApplyLoans.jsx Modification Plan
+# TODO: Fix ApplyLoans.jsx Loan Approval Logic
 
-## Objective
-Make ApplyLoans.jsx behave like ApplyDeposits.jsx by deferring database operations to the success OK button.
-
-## Changes Required
-
-### 1. Modify processAction function
-- [ ] Remove immediate database operations (processDatabaseApprove/Reject calls)
-- [ ] Keep only: set successMessage, update selectedLoan locally, set pendingApiCall, show successMessageModalVisible
-- [ ] Ensure savings confirmation logic remains intact (as it precedes success modal)
-
-### 2. Modify handleSuccessOk function
-- [ ] Add loading state at start
-- [ ] Add database operations based on pendingApiCall.type
-- [ ] Keep existing API calls
-- [ ] Keep cleanup and refresh logic
-- [ ] Remove loading state at end
-
-### 3. Testing
-- [ ] Verify approve flow works with deferred DB operations
-- [ ] Verify reject flow works with deferred DB operations
-- [ ] Verify savings confirmation still works (since it happens before success modal)
-- [ ] Verify API calls still happen after DB operations
-
-## Files to Edit
-- Web/src/web/Sidebar/Loans/ApplyLoans.jsx
+## Steps to Complete
+- [ ] Rename state `memberInvestment` to `memberBalance` and update all references in ApplyLoans.jsx
+- [ ] Update `processAction` function for 'approve' to implement sequential deduction logic: balance → funds → savings (with confirmation if savings used)
+- [ ] Merge database processing functions into a single `processDatabaseApprove` that handles deductions based on parameters (useSavings, savingsAmount)
+- [ ] Update `handleSavingsConfirm` to set correct pendingApiCall for savings usage
+- [ ] Update `handleSuccessOk` to call the unified DB function with appropriate params
+- [ ] Remove redundant DB functions (`processDatabaseApproveWithSavings`, `processDatabaseApproveWithMemberBalanceShortfall`)
+- [ ] Test the changes: Run locally, verify deductions in Firebase, check modal calculations
+- [ ] Verify email API calls still work for approvals/rejections

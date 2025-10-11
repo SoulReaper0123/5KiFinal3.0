@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { sendVerificationCode } from '../../api';
 
@@ -46,6 +46,10 @@ export default function TwoFactorEmail({ route, navigation }) {
       </TouchableOpacity>
 
       <View style={styles.contentWrapper}>
+        <View style={styles.logoWrapper}>
+          <Image source={require('../../../assets/logo.png')} style={styles.logo} />
+        </View>
+
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.title}>Two-Factor Authentication</Text>
           <Text style={styles.subLabel}>We'll send a 6-digit code to your email</Text>
@@ -81,10 +85,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
     padding: 16,
-    paddingBottom: 32,
+    paddingBottom: 150,
   },
   backButton: {
-     alignSelf: 'flex-start',
+    alignSelf: 'flex-start',
     marginBottom: 10,
     marginTop: 20,
   },
@@ -156,5 +160,24 @@ const styles = StyleSheet.create({
   contentWrapper: {
     flex: 1,
     justifyContent: 'center',
+  },
+  logoWrapper: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    borderWidth: 4,
+    borderColor: '#1E3A5F',
+    justifyContent: 'center',
+    alignItems: 'center',
+    alignSelf: 'center',
+    marginBottom: 24,
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+  },
+  logo: {
+    width: 110,
+    height: 110,
+    borderRadius: 55,
+    resizeMode: 'contain',
   },
 });
