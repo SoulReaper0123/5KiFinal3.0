@@ -75,7 +75,7 @@ loadingText: {
     minWidth: '1000px'
   },
   tableHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     height: '56px',
     fontWeight: '600',
@@ -142,7 +142,7 @@ loadingText: {
     border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     padding: '1.5rem 2rem',
     display: 'flex',
@@ -590,7 +590,7 @@ loadingText: {
     fontWeight: '600'
   },
   primaryButton: {
-    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     '&:hover': {
       transform: 'translateY(-1px)',
@@ -1279,6 +1279,7 @@ const processDatabaseApprove = async (payment) => {
       ...paymentData,
       transactionId: newTransactionId,
       originalTransactionId: originalTransactionId,
+      selectedLoanId: payment.selectedLoanId,
       dateApproved: formatDate(now),
       timeApproved: formatTime(now),
       timestamp: now.getTime(),

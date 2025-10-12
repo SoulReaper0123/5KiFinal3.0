@@ -210,9 +210,8 @@ export default function LoanPaymentHistory() {
           return;
         }
 
-        const approvedRef = ref(database, `Payments/ApprovedPayments/${memberId}`);
         const txRef = ref(database, `Transactions/Payments/${memberId}`);
-        const [approvedSnap, txSnap] = await Promise.all([get(approvedRef), get(txRef)]);
+        const txSnap = await get(txRef);
 
         const collected = [];
         const sameLoan = (t = {}) => {
@@ -272,18 +271,9 @@ export default function LoanPaymentHistory() {
               payload.referenceId ||
               payload.receiptNumber ||
               payload.receipt,
+            appliedToLoan: payload.appliedToLoan,
           });
         };
-
-        if (approvedSnap?.exists()) {
-          const data = approvedSnap.val();
-          Object.entries(data).forEach(([id, payload]) => {
-            if (!sameLoan(payload)) return;
-            const status = String(payload.status || '').toLowerCase();
-            if (status && status !== 'approved' && status !== 'paid') return;
-            pushPayment({ source: 'approved', id, payload });
-          });
-        }
 
         if (txSnap?.exists()) {
           const data = txSnap.val();
@@ -296,8 +286,13 @@ export default function LoanPaymentHistory() {
         }
 
         const approvedOnly = collected.filter((payment) => payment.status === 'paid');
-        approvedOnly.sort((a, b) => b.timestamp - a.timestamp);
-        setPayments(approvedOnly);
+        // Filter to only include payments with the common appliedToLoan
+        const filteredPayments = approvedOnly.filter((payment) => {
+          const commonId = loan.commonOriginalTransactionId;
+          return commonId && payment.appliedToLoan === commonId;
+        });
+        filteredPayments.sort((a, b) => b.timestamp - a.timestamp);
+        setPayments(filteredPayments);
       } catch (e) {
         console.error('Error fetching payments:', e);
       } finally {
@@ -366,9 +361,15 @@ export default function LoanPaymentHistory() {
               </View>
             ))
           ) : (
-            <Text style={styles.emptyText}>No payments found for this loan</Text>
+            <Text style={styles.emptyText}>
+              No payments found for this loan{loan?.commonOriginalTransactionId ? `. Original Transaction ID: ${loan.commonOriginalTransactionId}` : ''}
+            </Text>
           )}
         </ScrollView>
+      )}
+
+      {payments.length > 0 && loan?.commonOriginalTransactionId && (
+        <Text style={styles.originalIdText}>Original Transaction ID: {loan.commonOriginalTransactionId}</Text>
       )}
     </View>
   );
@@ -431,4 +432,5 @@ const styles = StyleSheet.create({
   paymentSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
   paymentAmount: { fontSize: 14, fontWeight: '700', marginLeft: 12 },
   emptyText: { textAlign: 'center', color: '#64748B', marginTop: 16 },
+  originalIdText: { textAlign: 'center', color: '#64748B', marginTop: 8, fontSize: 12 },
 });

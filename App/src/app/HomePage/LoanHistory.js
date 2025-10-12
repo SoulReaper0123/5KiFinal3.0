@@ -247,6 +247,28 @@ export default function LoanHistory() {
         });
 
         parsed.sort((a, b) => b.timestamp - a.timestamp);
+
+        // Fetch payments for each loan to check for common originalTransactionId
+        for (const loan of parsed) {
+          try {
+            const paymentsRef = ref(database, `Payments/ApprovedPayments/${loan.memberId}`);
+            const paymentsSnap = await get(paymentsRef);
+            if (paymentsSnap.exists()) {
+              const paymentsData = paymentsSnap.val();
+              const loanPayments = Object.values(paymentsData).filter(p => p.appliedToLoan === loan.transactionId);
+              const originalIds = loanPayments.map(p => p.originalTransactionId).filter(id => id);
+              if (originalIds.length > 0) {
+                const uniqueIds = [...new Set(originalIds)];
+                if (uniqueIds.length === 1) {
+                  loan.commonOriginalTransactionId = uniqueIds[0];
+                }
+              }
+            }
+          } catch (e) {
+            console.error('Error fetching payments for loan:', loan.transactionId, e);
+          }
+        }
+
         setLoans(parsed);
       } else {
         setLoans([]);

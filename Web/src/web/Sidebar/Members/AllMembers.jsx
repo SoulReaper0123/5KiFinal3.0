@@ -56,7 +56,7 @@ const styles = {
     minWidth: '1000px'
   },
   tableHeader: {
-    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     height: '56px',
     fontWeight: '600',
@@ -681,7 +681,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
               <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Loans</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Role</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>

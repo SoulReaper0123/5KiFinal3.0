@@ -73,7 +73,7 @@ loadingText: {
     minWidth: '1000px'
   },
   tableHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     height: '56px',
     fontWeight: '600',
@@ -143,7 +143,7 @@ loadingText: {
     border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     padding: '1.5rem 2rem',
     display: 'flex',
@@ -568,7 +568,7 @@ loadingText: {
     fontWeight: '600'
   },
   primaryButton: {
-    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     '&:hover': {
       transform: 'translateY(-1px)',
@@ -919,62 +919,18 @@ const processAction = async (loan, action, rejectionReason = '') => {
       const processingFeeSnap = await database.ref('Settings/ProcessingFee').once('value');
       const processingFee = parseFloat(processingFeeSnap.val()) || 0;
 
-      // Calculate deductions sequentially: balance -> funds -> savings
-      const deductFromBalance = Math.min(requestedAmount, memberBalance);
-      const remaining1 = requestedAmount - deductFromBalance;
-      const deductFromFunds = Math.min(remaining1, currentFunds);
-      const remaining2 = remaining1 - deductFromFunds;
+      const isWithinInvestment = requestedAmount <= memberInvestment;
+      let deductBalance, deductFunds, shortfall;
 
-      if (remaining2 > 0) {
-        if (remaining2 > currentSavings) {
-          throw new Error(`Insufficient savings to cover shortfall. Needed: ${formatCurrency(remaining2)}, Available: ${formatCurrency(currentSavings)}`);
+      if (isWithinInvestment) {
+        deductBalance = Math.min(requestedAmount, memberBalance);
+        deductFunds = Math.min(requestedAmount, currentFunds);
+        shortfall = 0;
+
+        if (deductBalance + deductFunds < requestedAmount) {
+          throw new Error('Insufficient member balance and funds to cover the loan amount.');
         }
 
-        const shortfall = remaining2;
-
-        if (requestedAmount <= memberInvestment) {
-          // Auto use savings without modal if loan <= investment
-          setSuccessMessage('Loan approved successfully using savings automatically!');
-
-          const approveData = {
-            ...loan,
-            dateApproved: formatDate(new Date()),
-            timeApproved: formatTime(new Date())
-          };
-
-          setSelectedLoan(prev => ({
-            ...prev,
-            dateApproved: approveData.dateApproved,
-            timeApproved: approveData.timeApproved,
-            status: 'approved'
-          }));
-
-          setPendingApiCall({
-            type: 'approve',
-            data: approveData,
-            useSavings: true,
-            savingsAmount: shortfall
-          });
-
-          setSuccessMessageModalVisible(true);
-        } else {
-          // Show savings confirmation modal for shortfall if loan > investment
-          setSavingsShortfall({
-            needed: shortfall,
-            available: currentSavings,
-            remaining: currentSavings - shortfall + processingFee,
-            processingFee: processingFee,
-            deductFromBalance: deductFromBalance,
-            deductFromFunds: deductFromFunds,
-            loanAmount: requestedAmount
-          });
-          setPendingLoanForSavings(loan);
-          setShowSavingsConfirmModal(true);
-          setIsProcessing(false);
-          setActionInProgress(false);
-          return;
-        }
-      } else {
         // No shortfall, proceed to success
         setSuccessMessage('Loan approved successfully!');
 
@@ -994,13 +950,41 @@ const processAction = async (loan, action, rejectionReason = '') => {
         setPendingApiCall({
           type: 'approve',
           data: approveData,
-          useSavings: false,
+          deductBalance,
+          deductFunds,
           savingsAmount: 0
         });
-      }
 
-      // Show success modal immediately (database operations deferred to OK button)
-      setSuccessMessageModalVisible(true);
+        // Show success modal immediately (database operations deferred to OK button)
+        setSuccessMessageModalVisible(true);
+} else {
+  // For loans exceeding investment: use full investment amount from both balance AND funds
+  deductBalance = Math.min(memberInvestment, memberBalance); // ₱5,010
+  deductFunds = Math.min(memberInvestment, currentFunds);    // ₱5,010
+  
+  // FIX: Calculate shortfall correctly - only the amount exceeding investment
+  shortfall = Math.max(0, requestedAmount - memberInvestment); // ₱10 (5020 - 5010)
+
+  if (shortfall > currentSavings) {
+    throw new Error(`Insufficient savings to cover shortfall. Needed: ${formatCurrency(shortfall)}, Available: ${formatCurrency(currentSavings)}`);
+  }
+
+  // Show savings confirmation modal for shortfall if loan > investment
+  setSavingsShortfall({
+    needed: shortfall,
+    available: currentSavings,
+    remaining: currentSavings - shortfall + processingFee,
+    processingFee: processingFee,
+    deductFromBalance: deductBalance,
+    deductFromFunds: deductFunds,
+    loanAmount: requestedAmount
+  });
+  setPendingLoanForSavings(loan);
+  setShowSavingsConfirmModal(true);
+  setIsProcessing(false);
+  setActionInProgress(false);
+  return;
+}
     } else {
       setSuccessMessage('Loan rejected successfully!');
 
@@ -1023,6 +1007,9 @@ const processAction = async (loan, action, rejectionReason = '') => {
         type: 'reject',
         data: rejectData
       });
+
+      // Show success modal immediately (database operations deferred to OK button)
+      setSuccessMessageModalVisible(true);
     }
   } catch (error) {
     console.error('Error preparing action:', error);
@@ -1038,9 +1025,8 @@ const processAction = async (loan, action, rejectionReason = '') => {
   }
 };
 
-const processDatabaseApprove = async (loan, useSavings = false, savingsAmount = 0) => {
-  console.log('processDatabaseApprove called with useSavings:', useSavings, 'savingsAmount:', savingsAmount);
-    try {
+const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsAmount) => {
+  try {
       const { id, transactionId, term, loanAmount } = loan;
 
       const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
@@ -1134,7 +1120,7 @@ const processDatabaseApprove = async (loan, useSavings = false, savingsAmount = 
         paymentsMade: 0,
         amountPaid: 0,
         remainingBalance: Math.round(totalTermPayment * 100) / 100,
-        borrowedFromSavings: useSavings ? Math.round(savingsAmount * 100) / 100 : 0
+      borrowedFromSavings: Math.round(savingsAmount * 100) / 100
       };
 
       await approvedRef.set(approvedData);
@@ -1142,40 +1128,39 @@ const processDatabaseApprove = async (loan, useSavings = false, savingsAmount = 
       await currentLoanRef.set(approvedData);
       await memberLoanRef.set(approvedData);
 
-      // Deduct from member balance
-      const balanceToDeduct = Math.min(amount, memberBalance);
-      const newMemberBalance = Math.max(0, Math.ceil((memberBalance - balanceToDeduct) * 100) / 100);
-      await memberBalanceRef.set(newMemberBalance);
+    // Deduct from member balance
+    const balanceToDeduct = deductBalance;
+    const newMemberBalance = Math.max(0, Math.ceil((memberBalance - balanceToDeduct) * 100) / 100);
+    await memberBalanceRef.set(newMemberBalance);
 
-      // Deduct from funds
-      const remainingAfterBalance = amount - balanceToDeduct;
-      const fundsToDeduct = Math.min(remainingAfterBalance, currentFunds);
-      const newFundsAmount = currentFunds - fundsToDeduct;
-      await fundsRef.set(newFundsAmount);
+    // Deduct from funds
+    const fundsToDeduct = deductFunds;
+    const newFundsAmount = currentFunds - fundsToDeduct;
+    await fundsRef.set(newFundsAmount);
 
-      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-      await fundsHistoryRef.set(newFundsAmount);
+    const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+    await fundsHistoryRef.set(newFundsAmount);
 
-      const dateKey = now.toISOString().split('T')[0];
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+    const dateKey = now.toISOString().split('T')[0];
+    const savingsRef = database.ref('Settings/Savings');
+    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
 
-      const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
-        savingsRef.once('value'),
-        savingsHistoryRef.child(dateKey).once('value')
-      ]);
+    const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
+      savingsRef.once('value'),
+      savingsHistoryRef.child(dateKey).once('value')
+    ]);
 
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const savingsChange = useSavings ? -savingsAmount + processingFee : processingFee;
-      const newSavingsAmount = Math.ceil((currentSavings + savingsChange) * 100) / 100;
-      await savingsRef.set(newSavingsAmount);
+    const currentSavings = parseFloat(savingsSnap.val()) || 0;
+    const savingsChange = -savingsAmount + processingFee;
+    const newSavingsAmount = Math.ceil((currentSavings + savingsChange) * 100) / 100;
+    await savingsRef.set(newSavingsAmount);
 
-      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-      const newDaySavings = Math.ceil((currentDaySavings + savingsChange) * 100) / 100;
-      await savingsHistoryRef.child(dateKey).set(newDaySavings);
+    const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+    const newDaySavings = Math.ceil((currentDaySavings + savingsChange) * 100) / 100;
+    await savingsHistoryRef.child(dateKey).set(newDaySavings);
 
-      console.log(`Member balance deducted: ${formatCurrency(balanceToDeduct)}, funds deducted: ${formatCurrency(fundsToDeduct)}, savings change: ${formatCurrency(savingsChange)}, useSavings: ${useSavings}, savingsAmount: ${savingsAmount}`);
+    console.log(`Member balance deducted: ${formatCurrency(balanceToDeduct)}, funds deducted: ${formatCurrency(fundsToDeduct)}, savings change: ${formatCurrency(savingsChange)}, savingsAmount: ${savingsAmount}`);
 
       await loanRef.remove();
 
@@ -1526,11 +1511,7 @@ const handleSuccessOk = async () => {
 
   try {
     if (pendingApiCall.type === 'approve') {
-      if (pendingApiCall.useSavings) {
-        await processDatabaseApprove(pendingApiCall.data, true, pendingApiCall.savingsAmount);
-      } else {
-        await processDatabaseApprove(pendingApiCall.data, false, 0);
-      }
+      await processDatabaseApprove(pendingApiCall.data, pendingApiCall.deductBalance, pendingApiCall.deductFunds, pendingApiCall.savingsAmount);
       callApiApprove(pendingApiCall.data);
     } else if (pendingApiCall.type === 'approve_with_savings') {
       await processDatabaseApproveWithSavings(pendingApiCall.data, pendingApiCall.savingsAmount);

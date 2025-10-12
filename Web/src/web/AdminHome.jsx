@@ -545,7 +545,7 @@ const AdminHome = () => {
     },
     sidebar: {
       width: `${sidebarWidth}px`,
-      background: 'linear-gradient(180deg, #1E3A8A 0%, #2D5783 100%)',
+      background: 'linear-gradient(180deg, #1E3A5F 0%, #2D5783 100%)',
       padding: '16px 0',
       transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       overflow: 'hidden',
