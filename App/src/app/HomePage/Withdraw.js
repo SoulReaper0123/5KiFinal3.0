@@ -157,11 +157,15 @@ const Withdraw = () => {
 const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
 useEffect(() => {
+  // For Cash withdrawals, only check withdrawOption and withdrawAmount
+  // For Bank/GCash, also check accountName and accountNumber
   const hasEmptyFields = !withdrawOption || !withdrawAmount ||
     (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
+  
   const amount = parseFloat(withdrawAmount);
   const insufficientBalance = amount > balance;
   const belowMinimum = !isNaN(amount) && amount < 5000;
+  
   setIsSubmitDisabled(hasEmptyFields || insufficientBalance || belowMinimum);
 }, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
 

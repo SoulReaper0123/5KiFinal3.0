@@ -132,7 +132,7 @@ const AdminLoginPage = () => {
       flexDirection: 'column',
       justifyContent: 'center',
       alignItems: 'center',
-      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+      background: 'linear-gradient(180deg, #1E3A5F 0%, #2D5783 100%)',
       padding: isSmallScreen ? '60px 24px' : '60px 80px',
       position: 'relative',
       overflow: 'hidden',
@@ -264,7 +264,7 @@ const AdminLoginPage = () => {
       overflow: 'hidden',
     },
     loginButton: {
-      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+      background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
       color: 'white',
       boxShadow: '0 4px 6px -1px rgba(59, 130, 246, 0.3), 0 2px 4px -1px rgba(59, 130, 246, 0.2)',
     },

@@ -20,10 +20,6 @@ export default function LoanHistory() {
   const [loans, setLoans] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  // Inline expand removed; we now navigate to a details screen
-  const [expandedLoanId, setExpandedLoanId] = useState(null); // unused
-  const [paymentsByLoan, setPaymentsByLoan] = useState({}); // kept for computeLoanStatus if needed
-  const [loadingByLoan, setLoadingByLoan] = useState({}); // kept for future use
 
   // Get email from multiple sources for better compatibility
   const getEmailFromSources = () => {
@@ -194,6 +190,17 @@ export default function LoanHistory() {
             const status = String(txnDetails.status || memberData.status || 'paid').toLowerCase();
             if (status !== 'paid') return;
 
+            // Extract originalTransactionId directly from the loan data
+            const originalTransactionId = 
+              txnDetails.originalTransactionId ||
+              memberData.originalTransactionId;
+
+            console.log('📋 Found loan:', {
+              transactionId: txnDetails.transactionId || transactionKey,
+              originalTransactionId: originalTransactionId,
+              memberId: memberId
+            });
+
             parsed.push({
               memberId,
               transactionId:
@@ -241,6 +248,8 @@ export default function LoanHistory() {
                 memberData.loanTransactionId ||
                 memberData.loanTxnId ||
                 null,
+              // ADD THIS: Capture originalTransactionId from loan data
+              originalTransactionId: originalTransactionId,
               rawDetails: { ...memberData, ...txnDetails },
             });
           });
@@ -248,8 +257,15 @@ export default function LoanHistory() {
 
         parsed.sort((a, b) => b.timestamp - a.timestamp);
 
-        // Fetch payments for each loan to check for common originalTransactionId
+        // Optional: Also try to find common originalTransactionId from payments
+        // This is a fallback if originalTransactionId is not in loan data
         for (const loan of parsed) {
+          // If we already have originalTransactionId from loan data, skip payment lookup
+          if (loan.originalTransactionId) {
+            console.log('✅ Using originalTransactionId from loan data:', loan.originalTransactionId);
+            continue;
+          }
+
           try {
             const paymentsRef = ref(database, `Payments/ApprovedPayments/${loan.memberId}`);
             const paymentsSnap = await get(paymentsRef);
@@ -261,6 +277,7 @@ export default function LoanHistory() {
                 const uniqueIds = [...new Set(originalIds)];
                 if (uniqueIds.length === 1) {
                   loan.commonOriginalTransactionId = uniqueIds[0];
+                  console.log('🔄 Found commonOriginalTransactionId from payments:', uniqueIds[0]);
                 }
               }
             }
@@ -333,13 +350,26 @@ export default function LoanHistory() {
           {loans.length > 0 ? (
             loans.map((loan) => (
               <View key={loan.transactionId}>
-                <TouchableOpacity style={styles.card} onPress={() => navigation.navigate('LoanPaymentHistory', { loan })}>
+                <TouchableOpacity 
+                  style={styles.card} 
+                  onPress={() => {
+                    console.log('🔄 Navigating to LoanPaymentHistory with loan:', {
+                      transactionId: loan.transactionId,
+                      originalTransactionId: loan.originalTransactionId,
+                      commonOriginalTransactionId: loan.commonOriginalTransactionId
+                    });
+                    navigation.navigate('LoanPaymentHistory', { loan });
+                  }}
+                >
                   <View style={styles.iconContainer}>
                     <MaterialIcons name="history" size={22} color="#1E3A5F" />
                   </View>
                   <View style={styles.info}>
                     <Text style={styles.title}>{formatLoanType(loan)}</Text>
                     <Text style={styles.sub}>{formatCurrency(loan.amount)}</Text>
+                    {loan.originalTransactionId && (
+                      <Text style={styles.originalId}>Ref: {loan.originalTransactionId}</Text>
+                    )}
                   </View>
                   <View style={styles.rightCol}>
                     <Text style={[styles.status, { color: '#4CAF50' }]}>PAID</Text>
@@ -352,8 +382,6 @@ export default function LoanHistory() {
           )}
         </ScrollView>
       )}
-
-
     </View>
   );
 }
@@ -433,6 +461,12 @@ const styles = StyleSheet.create({
     color: '#64748B',
     marginTop: 2,
   },
+  originalId: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginTop: 2,
+    fontStyle: 'italic',
+  },
   amount: {
     fontSize: 16,
     fontWeight: '700',
@@ -447,53 +481,5 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     color: '#64748B',
     marginTop: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.25)',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-  },
-  modalCard: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  modalTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1E3A5F',
-  },
-  paymentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
-  },
-
-  paymentTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
-  paymentSub: {
-    fontSize: 12,
-    color: '#64748B',
-    marginTop: 2,
-  },
-  paymentAmount: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginLeft: 12,
   },
 });

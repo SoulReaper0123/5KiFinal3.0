@@ -34,7 +34,7 @@ const WebHome = () => {
     },
     leftColumn: {
       flex: 1.2,
-      background: 'linear-gradient(135deg, #1E3A8A 0%, #3B82F6 100%)',
+      background: 'linear-gradient(180deg, #1E3A5F 0%, #2D5783 100%)',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',

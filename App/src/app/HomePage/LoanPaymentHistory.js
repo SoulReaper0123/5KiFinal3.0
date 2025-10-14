@@ -112,6 +112,7 @@ export default function LoanPaymentHistory() {
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState([]);
   const [loanDetails, setLoanDetails] = useState(null);
+  const [originalTransactionId, setOriginalTransactionId] = useState(null);
 
   const formatCurrency = (n) => `₱${(Number(n) || 0).toFixed(2)}`;
   const formatDate = (value) => {
@@ -138,171 +139,216 @@ export default function LoanPaymentHistory() {
   };
 
   useEffect(() => {
-    const fetchLoanData = async () => {
-      if (!loan) { setLoading(false); return; }
-      try {
-        const memberId = loan.memberId || loan.memberID || loan.borrowerId;
-        const loansRef = memberId ? ref(database, `Transactions/Loans/${memberId}`) : null;
-        const loanSnap = loansRef ? await get(loansRef) : null;
-        let foundLoan = null;
-        if (loanSnap?.exists()) {
-          const loansData = loanSnap.val();
-          for (const [id, detail] of Object.entries(loansData)) {
-            const normalizedId = String(id);
-            const matchesTransaction = normalizedId === String(loan.transactionId);
-            const matchesLoanId =
-              loan.loanId &&
-              (String(detail.loanId || detail._loanId || detail.selectedLoanId || id) === String(loan.loanId));
-            if (matchesTransaction || matchesLoanId) {
-              foundLoan = { id, ...detail };
-              break;
-            }
-          }
-        }
+ const fetchCompleteLoanDetails = async () => {
+  if (!loan) {
+    setLoading(false);
+    return;
+  }
 
-        if (foundLoan) {
-          const amountValue = parseCurrencyValue(foundLoan.loanAmount ?? foundLoan.approvedAmount ?? loan.amount);
-          const termValue = foundLoan.term || foundLoan.loanTerm || foundLoan.loanTermMonths || loan.term;
-          const rateValue = parseCurrencyValue(foundLoan.interestRate ?? foundLoan.interestRatePercent ?? loan.interestRate);
-          const interestValue = parseCurrencyValue(foundLoan.interestAmount ?? foundLoan.totalInterest ?? loan.interest);
+  try {
+    // Get the originalTransactionId from the loan
+    const loanOriginalTransactionId = loan.originalTransactionId || loan.commonOriginalTransactionId;
+    console.log('🔍 Loan Payment History Debug:');
+    console.log('Loan object:', loan);
+    console.log('Loan originalTransactionId:', loanOriginalTransactionId);
+    console.log('Loan transactionId:', loan.transactionId);
+    console.log('Loan memberId:', loan.memberId);
 
-          setLoanDetails({
-            loanType: foundLoan.loanType || loan.loanType || 'Loan',
-            amount: amountValue ?? 0,
-            term: termValue ?? null,
-            interestRate: rateValue,
-            interest: interestValue,
-          });
-        } else {
-          const amountValue = parseCurrencyValue(loan.loanAmount ?? loan.amount);
-          const rateValue = parseCurrencyValue(loan.interestRate);
-          const interestValue = parseCurrencyValue(loan.interest);
+    setOriginalTransactionId(loanOriginalTransactionId);
 
-          setLoanDetails({
-            loanType: loan.loanType || 'Loan',
-            amount: amountValue ?? 0,
-            term: loan.term || null,
-            interestRate: rateValue,
-            interest: interestValue,
-          });
-        }
-      } catch (error) {
-        console.error('Error fetching loan details:', error);
-        const fallbackAmount = parseCurrencyValue(loan.loanAmount ?? loan.amount) ?? 0;
-        const fallbackRate = parseCurrencyValue(loan.interestRate);
-        const fallbackInterest = parseCurrencyValue(loan.interest);
-        setLoanDetails({
-          loanType: loan.loanType || 'Loan',
-          amount: fallbackAmount,
-          term: loan.term || null,
-          interestRate: fallbackRate,
-          interest: fallbackInterest,
-        });
+    const memberId = loan.memberId || loan.memberID || loan.borrowerId;
+
+    // Fetch complete loan details from Loans/PaidLoans
+    let completeLoanData = null;
+    try {
+      const paidLoansRef = ref(database, `Loans/PaidLoans/${memberId}/${loan.transactionId}`);
+      const paidLoansSnap = await get(paidLoansRef);
+      if (paidLoansSnap.exists()) {
+        completeLoanData = paidLoansSnap.val();
+        console.log('✅ Found complete loan data in Loans/PaidLoans:', completeLoanData);
+      } else {
+        console.log('❌ No loan data found at Loans/PaidLoans/' + memberId + '/' + loan.transactionId);
       }
-    };
+    } catch (error) {
+      console.log('❌ Error fetching from Loans/PaidLoans:', error.message);
+    }
+
+    // Use complete loan data if found, otherwise fall back to basic loan object
+    const loanData = completeLoanData || loan;
+
+    console.log('📊 Using loan data:', loanData);
+
+    // Extract loan details - SIMPLIFIED for your database structure
+    const amountValue = parseCurrencyValue(
+      loanData.amount ||           // Direct amount field
+      loan.amount                  // Fallback
+    );
+
+    const termValue = 
+      loanData.term ||             // Direct term field from your database
+      loan.term;                   // Fallback
+
+    const interestValue = parseCurrencyValue(
+      loanData.interest ||         // Direct interest field from your database
+      loan.interest                // Fallback
+    );
+    
+    // Look for interestRate field directly from database
+    const interestRateValue = 
+      loanData.interestRate ||     // Direct interestRate field from your database
+      loan.interestRate;           // Fallback
+
+    console.log('📊 Extracted loan details:', {
+      amount: amountValue,
+      term: termValue,
+      interest: interestValue,
+      interestRate: interestRateValue
+    });
+
+    setLoanDetails({
+      loanType: loanData.loanType || loan.loanType || 'Loan',
+      amount: amountValue ?? 0,
+      term: termValue,
+      interest: interestValue,
+      interestRate: interestRateValue, // This is the same as interest but will display with %
+    });
+
+  } catch (error) {
+    console.error('Error fetching complete loan details:', error);
+    // Fallback to basic loan data
+    const fallbackAmount = parseCurrencyValue(loan.amount) ?? 0;
+    const fallbackTerm = loan.term || null;
+    const fallbackInterest = parseCurrencyValue(loan.interest);
+
+    setLoanDetails({
+      loanType: loan.loanType || 'Loan',
+      amount: fallbackAmount,
+      term: fallbackTerm,
+      interest: fallbackInterest,
+      interestRate: fallbackInterest,
+    });
+  }
+};
 
     const fetchPayments = async () => {
-      if (!loan) { setLoading(false); return; }
+      if (!loan) {
+        setLoading(false);
+        return;
+      }
+
       try {
         const memberId = loan.memberId || loan.memberID || loan.borrowerId;
         if (!memberId) {
+          console.log('❌ No member ID found');
           setPayments([]);
+          setLoading(false);
           return;
         }
 
-        const txRef = ref(database, `Transactions/Payments/${memberId}`);
-        const txSnap = await get(txRef);
+        // Get the originalTransactionId from the loan
+        const loanOriginalTransactionId = loan.originalTransactionId || loan.commonOriginalTransactionId;
 
-        const collected = [];
-        const sameLoan = (t = {}) => {
-          const paymentLoanId = t.selectedLoanId || t.loanId || t.loan_id || t.selectedLoan || null;
-          if (loan.loanId && paymentLoanId) {
-            return String(paymentLoanId) === String(loan.loanId);
-          }
-
-          const relatedId =
-            t.relatedLoanId ||
-            t.loanTransactionId ||
-            t.loanTxnId ||
-            t.transactionLoanId ||
-            t.loanReferenceId ||
-            null;
-
-          if (loan.transactionId && relatedId) {
-            return String(relatedId) === String(loan.transactionId);
-          }
-
-          const transactionMatch =
-            t.transactionId ||
-            t.txnId ||
-            t.paymentTransactionId ||
-            t.referenceId ||
-            t.paymentId;
-
-          if (loan.transactionId && transactionMatch) {
-            return String(transactionMatch) === String(loan.transactionId);
-          }
-
-          return false;
-        };
-
-        const pushPayment = ({ source, id, payload }) => {
-          const { displayDate, timestamp } = extractDateInfo(payload);
-          const status = String(payload.status || payload.paymentStatus || '').toLowerCase();
-          const isApproved = status === 'approved' || status === 'paid' || status === '';
-
-          collected.push({
-            source,
-            id,
-            amount: parseCurrencyValue(
-              payload.amountPaid ||
-              payload.amountApproved ||
-              payload.approvedAmount ||
-              payload.amountToBePaid ||
-              payload.amount
-            ) ?? 0,
-            displayDate,
-            timestamp,
-            status: isApproved ? 'paid' : status,
-            paymentOption: payload.paymentOption || payload.modeOfPayment || payload.method,
-            receiptNumber:
-              payload.referenceNumber ||
-              payload.paymentReference ||
-              payload.referenceId ||
-              payload.receiptNumber ||
-              payload.receipt,
-            appliedToLoan: payload.appliedToLoan,
-          });
-        };
-
-        if (txSnap?.exists()) {
-          const data = txSnap.val();
-          Object.entries(data).forEach(([id, payload]) => {
-            if (!sameLoan(payload)) return;
-            const status = String(payload.status || payload.paymentStatus || '').toLowerCase();
-            if (status && status !== 'approved' && status !== 'paid') return;
-            pushPayment({ source: 'transaction', id, payload });
-          });
+        if (!loanOriginalTransactionId) {
+          console.log('❌ No originalTransactionId found in loan');
+          setPayments([]);
+          setLoading(false);
+          return;
         }
 
-        const approvedOnly = collected.filter((payment) => payment.status === 'paid');
-        // Filter to only include payments with the common appliedToLoan
-        const filteredPayments = approvedOnly.filter((payment) => {
-          const commonId = loan.commonOriginalTransactionId;
-          return commonId && payment.appliedToLoan === commonId;
-        });
-        filteredPayments.sort((a, b) => b.timestamp - a.timestamp);
-        setPayments(filteredPayments);
+        console.log('📦 Fetching payments for:');
+        console.log('Member ID:', memberId);
+        console.log('Looking for appliedToLoan =', loanOriginalTransactionId);
+
+        // Fetch from Payments/ApprovedPayments/{memberId}
+        const paymentsRef = ref(database, `Payments/ApprovedPayments/${memberId}`);
+        const paymentsSnap = await get(paymentsRef);
+
+        const collected = [];
+
+        if (paymentsSnap?.exists()) {
+          const paymentsData = paymentsSnap.val();
+          console.log('✅ Found payments data:', paymentsData);
+
+          // Find all payments where appliedToLoan matches the loan's originalTransactionId
+          Object.entries(paymentsData).forEach(([paymentId, paymentData]) => {
+            if (!paymentData || typeof paymentData !== 'object') return;
+
+            const paymentAppliedToLoan = paymentData.appliedToLoan;
+
+            console.log(`🔍 Checking payment ${paymentId}:`);
+            console.log('  paymentAppliedToLoan:', paymentAppliedToLoan);
+            console.log('  loanOriginalTransactionId:', loanOriginalTransactionId);
+
+            // DIRECT MATCH: appliedToLoan === originalTransactionId
+            const matchesLoan = paymentAppliedToLoan &&
+              String(paymentAppliedToLoan) === String(loanOriginalTransactionId);
+
+            console.log('  ✅ MATCHES:', matchesLoan);
+
+            if (!matchesLoan) return;
+
+            const status = String(paymentData.status || paymentData.paymentStatus || '').toLowerCase();
+            if (status && status !== 'approved' && status !== 'paid') {
+              console.log('  ❌ Skipping - status not approved/paid:', status);
+              return;
+            }
+
+            const { displayDate, timestamp } = extractDateInfo(paymentData);
+
+            const payment = {
+              source: 'payment',
+              id: paymentId,
+              transactionId: paymentId,
+              amount: parseCurrencyValue(
+                paymentData.amountPaid ||
+                paymentData.amountApproved ||
+                paymentData.approvedAmount ||
+                paymentData.amountToBePaid ||
+                paymentData.amount
+              ) ?? 0,
+              displayDate,
+              timestamp,
+              status: 'paid',
+              paymentOption: paymentData.paymentOption || paymentData.modeOfPayment || paymentData.method,
+              receiptNumber:
+                paymentData.referenceNumber ||
+                paymentData.paymentReference ||
+                paymentData.referenceId ||
+                paymentData.receiptNumber ||
+                paymentData.receipt,
+              appliedToLoan: paymentData.appliedToLoan,
+              amountToBePaid: parseCurrencyValue(paymentData.amountToBePaid),
+              dateApplied: paymentData.dateApplied,
+              dateApproved: paymentData.dateApproved,
+              interestPaid: parseCurrencyValue(paymentData.interestPaid),
+              originalTransactionId: paymentData.originalTransactionId,
+            };
+
+            collected.push(payment);
+            console.log('  ✅ Added payment to collection');
+          });
+        } else {
+          console.log('❌ No payments found at Payments/ApprovedPayments/' + memberId);
+        }
+
+        console.log('📊 Final payments collection:', collected);
+        collected.sort((a, b) => b.timestamp - a.timestamp);
+        setPayments(collected);
       } catch (e) {
-        console.error('Error fetching payments:', e);
+        console.error('❌ Error fetching payments:', e);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchLoanData();
-    fetchPayments();
+    // Fetch both loan details and payments
+    Promise.all([fetchCompleteLoanDetails(), fetchPayments()]).finally(() => {
+      setLoading(false);
+    });
   }, [loan]);
+
+  // Calculate total paid amount
+  const totalPaid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
   return (
     <View style={styles.container}>
@@ -325,18 +371,37 @@ export default function LoanPaymentHistory() {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Term</Text>
-            <Text style={styles.summaryValue}>{loanDetails.term ? `${loanDetails.term} months` : 'N/A'}</Text>
+            <Text style={styles.summaryValue}>
+              {loanDetails.term ? `${loanDetails.term} ${loanDetails.term === 1 ? 'month' : 'months'}` : 'N/A'}
+            </Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Interest</Text>
             <Text style={styles.summaryValue}>
-              {loanDetails.interestRate ? `${Number(loanDetails.interestRate).toFixed(2)}%` : (loanDetails.interest ? formatCurrency(loanDetails.interest) : 'N/A')}
+              {loanDetails.interest ? formatCurrency(loanDetails.interest) : 'N/A'}
             </Text>
           </View>
+          {loanDetails.interestRate && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Interest Rate</Text>
+              <Text style={styles.summaryValue}>
+                {Number(loanDetails.interestRate).toFixed(2)}%
+              </Text>
+            </View>
+          )}
+          {payments.length > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Total Paid</Text>
+              <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatCurrency(totalPaid)}</Text>
+            </View>
+          )}
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Payments</Text>
+
+      <Text style={styles.sectionTitle}>
+        Payments ({payments.length})
+      </Text>
 
       {/* Payments list */}
       {loading ? (
@@ -345,31 +410,69 @@ export default function LoanPaymentHistory() {
         <ScrollView contentContainerStyle={styles.listContainer}>
           {payments.length > 0 ? (
             payments.map((p, index) => (
-              <View key={`${p.source}-${p.id ?? p.timestamp ?? index}`} style={styles.paymentRow}>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.paymentTitle}>{p.status === 'paid' ? 'Paid' : (p.status || 'Pending')}</Text>
-                  {!!p.displayDate && (
-                    <Text style={styles.paymentSub}>Date: {formatDate(p.displayDate)}</Text>
-                  )}
-                  {!!p.paymentOption && (
-                    <Text style={styles.paymentSub}>Method: {p.paymentOption}</Text>
-                  )}
+              <View key={`${p.source}-${p.id ?? p.timestamp ?? index}`} style={styles.paymentCard}>
+                <Text style={styles.paymentTitle}>Payment ID: {p.transactionId}</Text>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Applied To Loan</Text>
+                  <Text style={styles.paymentValue}>{p.appliedToLoan || 'N/A'}</Text>
                 </View>
-                <Text style={[styles.paymentAmount, { color: p.status === 'paid' ? '#4CAF50' : '#FFA000' }]}>
-                  {p.status === 'paid' ? '+' : ''}{formatCurrency(p.amount)}
-                </Text>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Amount to Be Paid</Text>
+                  <Text style={styles.paymentValue}>{p.amountToBePaid !== null ? formatCurrency(p.amountToBePaid) : 'N/A'}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Date Applied</Text>
+                  <Text style={styles.paymentValue}>{p.dateApplied ? formatDate(p.dateApplied) : 'N/A'}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Date Approved</Text>
+                  <Text style={styles.paymentValue}>{p.dateApproved ? formatDate(p.dateApproved) : 'N/A'}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Interest Paid</Text>
+                  <Text style={styles.paymentValue}>{p.interestPaid !== null ? formatCurrency(p.interestPaid) : 'N/A'}</Text>
+                </View>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Payment Amount</Text>
+                  <Text style={[styles.paymentValue, { color: '#4CAF50' }]}>
+                    +{formatCurrency(p.amount)}
+                  </Text>
+                </View>
+                
+                {!!p.displayDate && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Payment Date</Text>
+                    <Text style={styles.paymentValue}>{formatDate(p.displayDate)}</Text>
+                  </View>
+                )}
+                
+                {!!p.paymentOption && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Method</Text>
+                    <Text style={styles.paymentValue}>{p.paymentOption}</Text>
+                  </View>
+                )}
               </View>
             ))
           ) : (
-            <Text style={styles.emptyText}>
-              No payments found for this loan{loan?.commonOriginalTransactionId ? `. Original Transaction ID: ${loan.commonOriginalTransactionId}` : ''}
-            </Text>
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>
+                No payments found for this loan
+              </Text>
+              {originalTransactionId && (
+                <Text style={styles.emptySubText}>
+                  Looking for payments with "appliedToLoan" = {originalTransactionId}
+                </Text>
+              )}
+            </View>
           )}
         </ScrollView>
-      )}
-
-      {payments.length > 0 && loan?.commonOriginalTransactionId && (
-        <Text style={styles.originalIdText}>Original Transaction ID: {loan.commonOriginalTransactionId}</Text>
       )}
     </View>
   );
@@ -396,7 +499,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     padding: 16,
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 12,
     elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -412,6 +515,27 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { fontSize: 14, color: '#64748B' },
   summaryValue: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  originalIdContainer: {
+    backgroundColor: '#E8F1FB',
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#1E3A5F',
+  },
+  originalIdText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#1E3A5F',
+    textAlign: 'center',
+  },
+  originalIdSubText: {
+    fontSize: 12,
+    color: '#64748B',
+    textAlign: 'center',
+    marginTop: 4,
+  },
   sectionTitle: {
     marginHorizontal: 16,
     marginBottom: 8,
@@ -420,17 +544,39 @@ const styles = StyleSheet.create({
     color: '#1E3A5F',
   },
   listContainer: { paddingHorizontal: 16, paddingBottom: 20 },
+  paymentCard: {
+    backgroundColor: '#fff',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.08,
+    shadowRadius: 2,
+  },
   paymentRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E2E8F0',
+    alignItems: 'center',
+    marginBottom: 8,
   },
-  paymentTitle: { fontSize: 14, fontWeight: '700', color: '#0F172A' },
-  paymentSub: { fontSize: 12, color: '#64748B', marginTop: 2 },
-  paymentAmount: { fontSize: 14, fontWeight: '700', marginLeft: 12 },
-  emptyText: { textAlign: 'center', color: '#64748B', marginTop: 16 },
-  originalIdText: { textAlign: 'center', color: '#64748B', marginTop: 8, fontSize: 12 },
+  paymentTitle: { fontSize: 16, fontWeight: '600', color: '#1E3A5F', marginBottom: 10 },
+  paymentLabel: { fontSize: 14, color: '#64748B' },
+  paymentValue: { fontSize: 15, fontWeight: '700', color: '#0F172A' },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 20,
+  },
+  emptyText: { 
+    textAlign: 'center', 
+    color: '#64748B', 
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  emptySubText: {
+    textAlign: 'center',
+    color: '#94A3B8',
+    fontSize: 14,
+  },
 });

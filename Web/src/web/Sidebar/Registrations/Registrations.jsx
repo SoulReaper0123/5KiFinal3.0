@@ -31,38 +31,14 @@ const styles = {
     flex: 1,
     fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
-loadingOverlay: {
-  position: 'fixed',
-  top: 0,
-  left: 0,
-  right: 0,
-  bottom: 0,
-  backgroundColor: 'rgba(15, 23, 42, 0.8)',
-  display: 'flex',
-  justifyContent: 'center',
-  alignItems: 'center',
-  zIndex: 1500,
-  backdropFilter: 'blur(4px)',
-},
-spinner: {
-  border: '3px solid rgba(59, 130, 246, 0.3)',
-  borderTop: '3px solid #3B82F6',
-  borderRadius: '50%',
-  width: '36px',
-  height: '36px',
-  animation: 'spin 1s linear infinite'
-},
-loadingContent: {
-  display: 'flex',
-  flexDirection: 'column',
-  alignItems: 'center',
-  gap: '14px',
-},
-loadingText: {
-  color: 'white',
-  fontSize: '14px',
-  fontWeight: '500'
-},
+  spinner: {
+    border: '4px solid #f3f4f6',
+    borderLeft: '4px solid #2563eb',
+    borderRadius: '50%',
+    width: '40px',
+    height: '40px',
+    animation: 'spin 1s linear infinite'
+  },
   tableContainer: {
     borderRadius: '12px',
     overflow: 'hidden',
@@ -734,7 +710,6 @@ const Registrations = ({
     blazeface: null
   });
   const [pendingApiCall, setPendingApiCall] = useState(null);
-  const [pendingRemovalId, setPendingRemovalId] = useState(null);
   const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
 
   useEffect(() => {
@@ -1605,7 +1580,7 @@ const Registrations = ({
   };
 
   const removeFromPendingRegistrations = async (id) => {
-    try {
+    try { 
      await database.ref(`Registrations/RegistrationApplications/${id}`).remove();
     } catch (error) {
       console.error('Error removing from pending registrations:', error);
@@ -1659,72 +1634,70 @@ const Registrations = ({
     await processAction(selectedRegistration, 'reject', selectedReason === "Other" ? customReason : selectedReason);
   };
 
-const processAction = async (registration, action, rejectionReason = '') => {
-  // Show loading immediately
-  setActionInProgress(true);
-  setIsProcessing(true);
-  setCurrentAction(action);
+  const processAction = async (registration, action, rejectionReason = '') => {
+    // Defer DB writes and refresh to success modal OK
+    setActionInProgress(true);
+    setIsProcessing(true);
+    setCurrentAction(action);
 
-  try {
-    if (action === 'approve') {
-      setSuccessMessage('Registration approved successfully!');
+    try {
+      if (action === 'approve') {
+        setSuccessMessage('Registration approved successfully!');
 
-      const approveData = {
-        ...registration,
-        dateApproved: formatDate(new Date()),
-        approvedTime: formatTime(new Date())
-      };
+        const approveData = {
+          ...registration,
+          dateApproved: formatDate(new Date()),
+          approvedTime: formatTime(new Date()),
+          amount: registration.registrationFee || 0 
+        };
 
-      // Local preview only; do not touch DB yet
-      setSelectedRegistration(prev => ({
-        ...prev,
-        dateApproved: approveData.dateApproved,
-        approvedTime: approveData.approvedTime,
-        status: 'approved'
-      }));
+        // Local preview only; do not touch DB yet
+        setSelectedRegistration(prev => ({
+          ...prev,
+          dateApproved: approveData.dateApproved,
+          approvedTime: approveData.approvedTime,
+          status: 'approved'
+        }));
 
-      setPendingApiCall({
-        type: 'approve',
-        data: approveData
-      });
+        setPendingApiCall({
+          type: 'approve',
+          data: approveData
+        });
+      } else {
+        setSuccessMessage('Registration rejected successfully!');
 
-    } else {
-      setSuccessMessage('Registration rejected successfully!');
+        const rejectData = {
+          ...registration,
+          dateRejected: formatDate(new Date()),
+          rejectedTime: formatTime(new Date()),
+          rejectionReason
+        };
 
-      const rejectData = {
-        ...registration,
-        dateRejected: formatDate(new Date()),
-        rejectedTime: formatTime(new Date()),
-        rejectionReason
-      };
+        // Local preview only; do not touch DB yet
+        setSelectedRegistration(prev => ({
+          ...prev,
+          dateRejected: rejectData.dateRejected,
+          rejectedTime: rejectData.rejectedTime,
+          rejectionReason,
+          status: 'rejected'
+        }));
 
-      // Local preview only; do not touch DB yet
-      setSelectedRegistration(prev => ({
-        ...prev,
-        dateRejected: rejectData.dateRejected,
-        rejectedTime: rejectData.rejectedTime,
-        rejectionReason,
-        status: 'rejected'
-      }));
+        setPendingApiCall({
+          type: 'reject',
+          data: rejectData
+        });
+      }
 
-      setPendingApiCall({
-        type: 'reject',
-        data: rejectData
-      });
+      setSuccessMessageModalVisible(true);
+    } catch (error) {
+      console.error('Error preparing action:', error);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
+      setErrorModalVisible(true);
+      // Hide loading on error
+      setIsProcessing(false);
+      setActionInProgress(false);
     }
-
-    // Show success modal immediately
-    setSuccessMessageModalVisible(true);
-  } catch (error) {
-    console.error('Error preparing action:', error);
-    setErrorMessage(error.message || 'An error occurred. Please try again.');
-    setErrorModalVisible(true);
-  } finally {
-    // Hide loading
-    setIsProcessing(false);
-    setActionInProgress(false);
-  }
-};
+  };
 
   const updateRegistrationStatus = async (id, status) => {
     try {
@@ -1899,7 +1872,8 @@ const processDatabaseApprove = async (reg) => {
           email,
           memberId: parseInt(samePersonCheck.id),
           status: 'approved',
-          description: 'Registration approved for existing Admin'
+          description: 'Registration approved for existing Admin',
+          amount: registrationFee || 0 
         });
       }
 
@@ -1990,7 +1964,7 @@ const processDatabaseApprove = async (reg) => {
       lastName,
       email,
       transactionId: `REG-${Date.now()}`,
-      description: 'Registration fee payment'
+      description: 'Registration fee payment',
     };
 
     await database.ref(`Members/${newId}`).set({
@@ -2005,7 +1979,8 @@ const processDatabaseApprove = async (reg) => {
       balance: initialBalance,
       investment: initialBalance,
       loans: 0.0,
-      status: 'active'
+      status: 'active',
+      amount: registrationFee || 0 
     });
 
     await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
@@ -2023,7 +1998,8 @@ const processDatabaseApprove = async (reg) => {
         email,
         memberId: newId,
         status: 'approved',
-        description: 'Registration approved for Admin'
+        description: 'Registration approved for Admin',
+        amount: registrationFee || 0 
       });
     }
 
@@ -2056,7 +2032,7 @@ const processDatabaseApprove = async (reg) => {
       const now = new Date();
       const rejectedDate = formatDate(now);
       const rejectedTime = formatTime(now);
-      
+
       await database.ref(`Registrations/RejectedRegistrations/${id}`).set({
         ...rest,
         dateRejected: rejectedDate,
@@ -2064,6 +2040,8 @@ const processDatabaseApprove = async (reg) => {
         status: 'rejected',
         rejectionReason: rejectionReason || 'Rejected by admin'
       });
+
+      await removeFromPendingRegistrations(id);
     } catch (err) {
       console.error('Rejection DB error:', err);
       throw new Error(err.message || 'Failed to reject registration');
@@ -2073,15 +2051,16 @@ const processDatabaseApprove = async (reg) => {
 const callApiApprove = async (reg) => {
   try {
     console.log('Sending approval email in background...');
-    const response = await ApproveRegistration({
-      firstName: reg.firstName,
-      lastName: reg.lastName,
-      email: reg.email,
-      password: reg.password,
-      dateApproved: reg.dateApproved,
-      approvedTime: reg.approvedTime,
-      memberId: reg.memberId
-    });
+const response = await ApproveRegistration({
+  email: reg.email,
+  firstName: reg.firstName,
+  lastName: reg.lastName,
+  amount: reg.registrationFee || 0, 
+  dateApproved: reg.dateApproved,
+  approvedTime: reg.approvedTime,
+  memberId: reg.memberId || 'pending' ,
+   password: reg.password 
+});
     
     if (!response.ok) {
       console.warn('Background: Failed to send approval email');
@@ -2117,43 +2096,51 @@ const callApiReject = async (reg) => {
   }
 };
 
-const handleSuccessOk = async () => {
-  // Close success modal
-  setSuccessMessageModalVisible(false);
-  
-  // If a pending removal is scheduled (reject flow), perform it now upon user confirmation
-  if (pendingRemovalId) {
-    try {
-      await removeFromPendingRegistrations(pendingRemovalId);
-    } catch (e) {
-      console.error('Failed to remove from pending after action:', e);
-    } finally {
-      setPendingRemovalId(null);
-    }
-  }
-  
-  // Clean up state
-  closeModal();
-  setSelectedRegistration(null);
-  setCurrentAction(null);
-  
-  // Trigger background email
-  try {
-    if (pendingApiCall) {
-      if (pendingApiCall.type === 'approve') {
-        callApiApprove(pendingApiCall.data);
-      } else if (pendingApiCall.type === 'reject') {
-        callApiReject(pendingApiCall.data);
-      }
-    }
-  } catch (error) {
-    console.error('Error calling API:', error);
-  }
+  const handleSuccessOk = async () => {
+    // Show loading spinner and hide success modal
+    setIsProcessing(true);
+    setSuccessMessageModalVisible(false);
 
-  // Clean up and refresh
-  setPendingApiCall(null);
-  refreshData();
-};
+    try {
+      // Finalize DB changes
+      if (pendingApiCall) {
+        if (pendingApiCall.type === 'approve') {
+          await processDatabaseApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          await processDatabaseReject(pendingApiCall.data, pendingApiCall.data.rejectionReason || 'Rejected by admin');
+        }
+      }
+    } catch (err) {
+      console.error('Finalize DB on OK error:', err);
+      // Optionally show error modal here if needed
+    }
+
+    // Trigger background email after DB success; do not block UI
+    try {
+      if (pendingApiCall) {
+        if (pendingApiCall.type === 'approve') {
+          callApiApprove(pendingApiCall.data);
+        } else if (pendingApiCall.type === 'reject') {
+          callApiReject(pendingApiCall.data);
+        }
+      }
+    } catch (error) {
+      console.error('Error calling API:', error);
+    } finally {
+      setPendingApiCall(null);
+    }
+
+    // Close modal and clean state
+    closeModal();
+    setSelectedRegistration(null);
+    setCurrentAction(null);
+
+    // Finally refresh
+    refreshData();
+
+    // Hide loading spinner
+    setIsProcessing(false);
+  };
 
   const openImageViewer = (url, label, index) => {
     const images = [];
@@ -2228,7 +2215,7 @@ const handleSuccessOk = async () => {
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Contact</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
@@ -2650,15 +2637,10 @@ const handleSuccessOk = async () => {
         </div>
       )}
 
-{/* Loading Overlay - Same design as logout */}
+{/* Loading Spinner */}
 {isProcessing && (
-  <div style={styles.loadingOverlay}>
-    <div style={styles.loadingContent}>
-      <div style={styles.spinner}></div>
-      <div style={styles.loadingText}>
-        {currentAction === 'approve' ? 'Approving registration...' : 'Rejecting registration...'}
-      </div>
-    </div>
+  <div style={styles.modalOverlay}>
+    <div style={styles.spinner}></div>
   </div>
 )}
 
