@@ -103,7 +103,7 @@ const styles = {
     border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
+    background: 'linear-gradient(90deg, #1e3a8a 0%, #2563eb 100%)',
     color: 'white',
     padding: '1.5rem 2rem',
     display: 'flex',

@@ -1431,6 +1431,7 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount) => {
         status: 'approved',
         interestRate: (interestRate * 100).toFixed(2) + '%',
         interest: (amount * interestRate).toFixed(2),
+        totalInterest: totalInterest.toFixed(2), 
         monthlyPayment: monthlyPrincipal.toFixed(2),
         totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
         totalTermPayment: totalTermPayment.toFixed(2),

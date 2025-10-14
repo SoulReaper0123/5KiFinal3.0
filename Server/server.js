@@ -1467,6 +1467,8 @@ app.post('/approveLoans', async (req, res) => {
         timeApproved,
         interestRate,
         interest,
+        totalInterest,
+        principal,
         monthlyPayment,
         totalMonthlyPayment,
         totalTermPayment,
@@ -1521,6 +1523,10 @@ app.post('/approveLoans', async (req, res) => {
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Interest Rate</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${interestRate}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Interest</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(totalInterest)}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Principal</td>

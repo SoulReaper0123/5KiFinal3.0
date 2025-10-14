@@ -123,7 +123,7 @@ const styles = {
     border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     padding: '1.5rem 2rem',
     display: 'flex',
@@ -571,7 +571,7 @@ const styles = {
     fontWeight: '600'
   },
   primaryButton: {
-    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
     color: 'white',
     '&:hover': {
       transform: 'translateY(-1px)',
@@ -2218,9 +2218,8 @@ const callApiReject = async (reg) => {
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Contact</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -2233,9 +2232,6 @@ const callApiReject = async (reg) => {
       </td>
       <td style={styles.tableCell}>{item.email}</td>
       <td style={styles.tableCell}>{item.phoneNumber}</td>
-      <td style={styles.tableCell}>
-        {item.dateApplied || item.dateCreated || 'N/A'}
-      </td>
       <td style={styles.tableCell}>
         <span style={{
           ...styles.statusBadge,

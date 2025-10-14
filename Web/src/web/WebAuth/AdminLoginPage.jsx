@@ -494,7 +494,7 @@ const AdminLoginPage = () => {
                 <input
                   style={styles.input}
                   type="email"
-                  placeholder="admin@5kibanking.com"
+                  placeholder="Enter your email address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   onFocus={() => setFocusedInput('email')}

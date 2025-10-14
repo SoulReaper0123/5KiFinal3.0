@@ -1377,8 +1377,7 @@ const ApplyDeposits = ({
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Option</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Applied</th>
@@ -1395,7 +1394,6 @@ const ApplyDeposits = ({
                     {item.firstName} {item.lastName}
                   </div>
                 </td>
-                <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountToBeDeposited)}</td>
                 <td style={styles.tableCell}>{item.depositOption}</td>
                 <td style={styles.tableCell}>{item.dateApplied}</td>

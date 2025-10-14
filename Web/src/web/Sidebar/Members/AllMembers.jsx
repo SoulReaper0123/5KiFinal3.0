@@ -674,13 +674,11 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Member ID</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Investment</th>
-              <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Savings</th>
-              <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Loans</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Role</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Investment</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Savings</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
@@ -688,7 +686,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
             {members.map((member, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>
-                  <strong>#{member.id || 'N/A'}</strong>
+                  <strong>{member.id || 'N/A'}</strong>
                 </td>
                 <td style={styles.tableCell}>
                   <div style={{ fontWeight: '500' }}>
@@ -719,23 +717,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                 }}>
                   ₱{formatNumber(loansTotals[member.id] || 0)}
                 </td>
-                <td style={styles.tableCell}>
-                  <span style={{
-                    ...styles.statusBadge,
-                    ...(member.status === 'active' ? styles.statusActive : styles.statusInactive)
-                  }}>
-                    {member.status || 'N/A'}
-                  </span>
-                </td>
-                <td style={styles.tableCell}>
-                  <span style={{
-                    ...styles.roleBadge,
-                    ...(member.role === 'admin' ? styles.roleAdmin : 
-                         member.role === 'coadmin' ? styles.roleCoadmin : styles.roleMember)
-                  }}>
-                    {member.role || 'Member'}
-                  </span>
-                </td>
+
                 <td style={styles.tableCell}>
                   <button 
                     style={styles.viewButton}

@@ -105,7 +105,7 @@ const styles = {
     border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
+    background: 'linear-gradient(135deg, #DC2626 0%, #EF4444 100%)',
     color: 'white',
     padding: '1.5rem 2rem',
     display: 'flex',
@@ -446,22 +446,28 @@ const RejectedRegistrations = ({
         <table style={styles.table}>
           <thead>
             <tr style={styles.tableHeader}>
-              <th style={{ ...styles.tableHeaderCell, width: '22%' }}>Email</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Contact</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Full Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Date Applied</th>
-              <th style={{ ...styles.tableHeaderCell, width: '14%' }}>Date Rejected</th>
-              <th style={{ ...styles.tableHeaderCell, width: '8%' }}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Full Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Contact</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
             {rejectedRegistrations.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
+                  <td style={styles.tableCell}>{item.firstName || ''} {item.lastName || ''}</td>  
                 <td style={styles.tableCell}>{item.email || ''}</td>
                 <td style={styles.tableCell}>{item.phoneNumber || ''}</td>
-                <td style={styles.tableCell}>{item.firstName || ''} {item.lastName || ''}</td>
-                <td style={styles.tableCell}>{item.dateCreated || ''}</td>
-                <td style={styles.tableCell}>{item.dateRejected || ''}</td>
+                      <td style={styles.tableCell}>
+        <span style={{
+          ...styles.statusBadge,
+          ...(item.status === 'approved' ? styles.statusApproved : 
+               item.status === 'rejected' ? styles.statusRejected : styles.statusPending)
+        }}>
+          {item.status || 'pending'}
+        </span>
+      </td>
                 <td style={styles.tableCell}>
                   <button 
                     style={styles.viewButton}
