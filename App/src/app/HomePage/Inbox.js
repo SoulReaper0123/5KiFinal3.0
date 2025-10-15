@@ -124,155 +124,166 @@ export default function Inbox() {
     }
   };
 
-  const parseMessages = (data) => {
-    const parsed = [];
-    
-    for (const [type, members] of Object.entries(data)) {
-      for (const [memberId, transactions] of Object.entries(members)) {
-        for (const [transactionId, details] of Object.entries(transactions)) {
-          try {
-            const status = (details.status || 'pending').toLowerCase();
-            let displayDate, timestamp;
+// In Inbox.js - Update the parseMessages function
+const parseMessages = (data) => {
+  const parsed = [];
+  
+  for (const [type, members] of Object.entries(data)) {
+    for (const [memberId, transactions] of Object.entries(members)) {
+      for (const [transactionId, details] of Object.entries(transactions)) {
+        try {
+          const status = (details.status || 'pending').toLowerCase();
+          let displayDate, timestamp;
 
-            // Get the appropriate date based on status and create reliable timestamp
-            const getReliableTimestamp = (dateObj, details) => {
-              // First, check if there's already a timestamp field from web approval
-              if (details.timestamp && typeof details.timestamp === 'number') {
-                return details.timestamp;
-              }
-              
-              if (!dateObj) return Date.now();
-              
-              // Handle Firebase timestamp objects
-              if (typeof dateObj === 'object' && dateObj.seconds) {
-                return dateObj.seconds * 1000;
-              }
-              
-              // Handle string dates
-              if (typeof dateObj === 'string') {
-                const parsed = new Date(dateObj);
-                return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
-              }
-              
-              // Handle Date objects
-              if (dateObj instanceof Date) {
-                return dateObj.getTime();
-              }
-              
-              return new Date(dateObj).getTime() || Date.now();
-            };
-
-            if (status === 'approved') {
-              displayDate = getRawDateFromFirebase(details.dateApproved);
-              timestamp = getReliableTimestamp(details.dateApproved, details);
-            } else if (status === 'rejected') {
-              displayDate = getRawDateFromFirebase(details.dateRejected);
-              timestamp = getReliableTimestamp(details.dateRejected, details);
-            } else {
-              // For pending items, show the date applied instead of a placeholder
-              displayDate = getRawDateFromFirebase(details.dateApplied);
-              timestamp = getReliableTimestamp(details.dateApplied, details);
+          // Get the appropriate date based on status and create reliable timestamp
+          const getReliableTimestamp = (dateObj, details) => {
+            // First, check if there's already a timestamp field from web approval
+            if (details.timestamp && typeof details.timestamp === 'number') {
+              return details.timestamp;
             }
-
-            // normalized payload for each message item
-            let amount = 0;
-            let title = '';
-            let label = '';
-            let method = null; // payment/deposit/withdraw option
-            let message = '';
-            let rejectionReason = details.rejectionReason || 'No reason provided';
-
-            switch (type) {
-              case 'Deposits':
-                amount = Number(details.amountToBeDeposited || 0);
-                title = 'Deposit';
-                label = 'Deposit';
-                method = details.depositOption || null;
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'deposit', rejectionReason);
-                break;
-              case 'Loans':
-                amount = Number(details.loanAmount || 0);
-                const monthlyPayment = Number(details.monthlyPayment || 0).toFixed(2);
-                title = 'Loan';
-                label = 'Loan';
-                message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
-                
-                if (status === 'approved' && details.dueDate) {
-                  const dueDate = getRawDateFromFirebase(details.dueDate);
-                  parsed.push({
-                    id: `${type}-${transactionId}-reminder`,
-                    title: 'Loan Payment Reminder',
-                    label: 'Loan Payment Reminder',
-                    message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
-                    timestamp: getReliableTimestamp(details.dueDate, details), // Use due date timestamp for proper sorting
-                    displayDate: 'Reminder',
-                    email: details.email,
-                    icon: 'alarm',
-                    color: '#FF9800',
-                    status: 'reminder',
-                    transactionId,
-                  });
-                }
-                break;
-              case 'Withdrawals':
-                amount = Number(details.amountWithdrawn || 0);
-                title = 'Withdrawal';
-                label = 'Withdrawal';
-                method = details.withdrawOption || null;
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'withdrawal', rejectionReason);
-                break;
-              case 'Payments':
-                amount = Number(details.amountToBePaid || 0);
-                title = 'Payment';
-                label = 'Loan Payment';
-                method = details.paymentOption || null;
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'payment', rejectionReason);
-                break;
-              case 'Registrations':
-                amount = Number(details.amount || details.registrationFee || 0);
-                title = 'Registration';
-                label = 'Registration';
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'registration', rejectionReason);
-                break;
-              default:
-                title = type;
-                label = type;
-                message = `${type} update`;
+            
+            if (!dateObj) return Date.now();
+            
+            // Handle Firebase timestamp objects
+            if (typeof dateObj === 'object' && dateObj.seconds) {
+              return dateObj.seconds * 1000;
             }
+            
+            // Handle string dates
+            if (typeof dateObj === 'string') {
+              const parsed = new Date(dateObj);
+              return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+            }
+            
+            // Handle Date objects
+            if (dateObj instanceof Date) {
+              return dateObj.getTime();
+            }
+            
+            return new Date(dateObj).getTime() || Date.now();
+          };
 
-            parsed.push({
-              id: `${type}-${transactionId}`,
-              title,
-              label,
-              type: title,
-              message,
-              timestamp,
-              displayDate,
-              email: details.email,
-              icon: getIcon(status),
-              color: getColor(status),
-              rejectionReason,
-              status,
-              amount,
-              paymentOption: details.paymentOption,
-              depositOption: details.depositOption,
-              withdrawOption: details.withdrawOption,
-              // Bare DB key for this Transactions entry
-              transactionId,
-              // Preserve originalTransactionId if explicitly stored in DB; fallback to details.transactionId or the key
-              originalTransactionId: details.originalTransactionId || details.transactionId || transactionId,
-              dateApplied: details.dateApplied || null,
-              dateApproved: details.dateApproved || null,
-              dateRejected: details.dateRejected || null,
-            });
-          } catch (error) {
-            console.error(`Error parsing ${type} transaction ${transactionId}:`, error);
+          if (status === 'approved') {
+            displayDate = getRawDateFromFirebase(details.dateApproved);
+            timestamp = getReliableTimestamp(details.dateApproved, details);
+          } else if (status === 'rejected') {
+            displayDate = getRawDateFromFirebase(details.dateRejected);
+            timestamp = getReliableTimestamp(details.dateRejected, details);
+          } else {
+            // For pending items, show the date applied instead of a placeholder
+            displayDate = getRawDateFromFirebase(details.dateApplied);
+            timestamp = getReliableTimestamp(details.dateApplied, details);
           }
+
+          // normalized payload for each message item
+          let amount = 0;
+          let title = '';
+          let label = '';
+          let method = null;
+          let message = '';
+          let rejectionReason = details.rejectionReason || 'No reason provided';
+
+          switch (type) {
+            case 'Deposits':
+              amount = Number(details.amountToBeDeposited || 0);
+              title = 'Deposit';
+              label = 'Deposit';
+              method = details.depositOption || null;
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'deposit', rejectionReason);
+              break;
+            case 'Loans':
+              amount = Number(details.loanAmount || 0);
+              const monthlyPayment = Number(details.monthlyPayment || 0).toFixed(2);
+              title = 'Loan';
+              label = 'Loan';
+              message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
+              
+              if (status === 'approved' && details.dueDate) {
+                const dueDate = getRawDateFromFirebase(details.dueDate);
+                parsed.push({
+                  id: `${type}-${transactionId}-reminder`,
+                  title: 'Loan Payment Reminder',
+                  label: 'Loan Payment Reminder',
+                  message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
+                  timestamp: getReliableTimestamp(details.dueDate, details),
+                  displayDate: 'Reminder',
+                  email: details.email,
+                  icon: 'alarm',
+                  color: '#FF9800',
+                  status: 'reminder',
+                  transactionId,
+                });
+              }
+              break;
+            case 'Withdrawals':
+              amount = Number(details.amountWithdrawn || 0);
+              title = 'Withdrawal';
+              label = 'Withdrawal';
+              method = details.withdrawOption || null;
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'withdrawal', rejectionReason);
+              break;
+            case 'Payments':
+              amount = Number(details.amountToBePaid || 0);
+              title = 'Payment';
+              label = 'Loan Payment';
+              method = details.paymentOption || null;
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'payment', rejectionReason);
+              break;
+            case 'Registrations':
+              amount = Number(details.amount || details.registrationFee || 0);
+              title = 'Registration';
+              label = 'Registration';
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'registration', rejectionReason);
+              break;
+            case 'MembershipWithdrawals': // ADD THIS NEW CASE
+              amount = Number(details.balance || 0);
+              title = 'Membership Withdrawal';
+              label = 'Membership Withdrawal';
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'membership withdrawal', rejectionReason);
+              break;
+            default:
+              title = type;
+              label = type;
+              message = `${type} update`;
+          }
+
+          parsed.push({
+            id: `${type}-${transactionId}`,
+            title,
+            label,
+            type: title,
+            message,
+            timestamp,
+            displayDate,
+            email: details.email,
+            icon: getIcon(status),
+            color: getColor(status),
+            rejectionReason,
+            status,
+            amount,
+            paymentOption: details.paymentOption,
+            depositOption: details.depositOption,
+            withdrawOption: details.withdrawOption,
+            transactionId,
+            originalTransactionId: details.originalTransactionId || details.transactionId || transactionId,
+            dateApplied: details.dateApplied || null,
+            dateApproved: details.dateApproved || null,
+            dateRejected: details.dateRejected || null,
+            // Add specific fields for MembershipWithdrawals
+            balance: details.balance,
+            reason: details.reason,
+            dateJoined: details.dateJoined,
+            dateSubmitted: details.dateSubmitted,
+            hasExistingLoan: details.hasExistingLoan,
+          });
+        } catch (error) {
+          console.error(`Error parsing ${type} transaction ${transactionId}:`, error);
         }
       }
     }
-    return parsed;
-  };
+  }
+  return parsed;
+};
 
   const fetchMessages = async () => {
     if (!userEmail) {

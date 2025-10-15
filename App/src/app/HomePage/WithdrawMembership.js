@@ -52,7 +52,7 @@ export default function WithdrawMembership() {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.navigate('Home');
+      navigation.navigate('AppHome');
       return true;
     };
 
@@ -307,6 +307,7 @@ export default function WithdrawMembership() {
         }).replace(',', '')
           .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
           .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+        timestamp: new Date().getTime(),
         status: 'Pending'
       });
 
@@ -533,7 +534,7 @@ export default function WithdrawMembership() {
                   style={styles.okButton} 
                   onPress={() => {
                     setModalVisible(false);
-                    navigation.navigate('Home');
+                    navigation.navigate('AppHome');
                   }}
                 >
                   <Text style={styles.okButtonText}>OK</Text>

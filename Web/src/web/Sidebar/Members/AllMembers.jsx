@@ -64,7 +64,7 @@ const styles = {
   },
   tableHeaderCell: {
     padding: '1rem 0.75rem',
-    textAlign: 'left',
+    textAlign: 'center',
     whiteSpace: 'nowrap',
     fontSize: '0.875rem',
     fontWeight: '600'
@@ -79,6 +79,8 @@ const styles = {
   },
   tableCell: {
     padding: '0.75rem',
+    textAlign: 'center',
+    justifyContent: 'center',
     fontSize: '0.875rem',
     color: '#374151',
     borderBottom: '1px solid #f1f5f9',
@@ -337,24 +339,27 @@ const styles = {
       boxShadow: 'none'
     }
   },
-  viewButton: {
-    background: 'transparent',
-    color: '#2563eb',
-    border: '1px solid #2563eb',
-    borderRadius: '6px',
-    padding: '0.375rem 0.75rem',
-    fontSize: '0.75rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.25rem',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      background: '#2563eb',
-      color: 'white'
-    }
-  },
+viewButton: {
+  background: 'transparent',
+  color: '#2563eb',
+  border: '1px solid #2563eb',
+  borderRadius: '6px',
+  padding: '0.375rem 0.75rem',
+  fontSize: '0.75rem',
+  fontWeight: '500',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center', // Add this
+  gap: '0.25rem',
+  transition: 'all 0.2s ease',
+  width: '50%', // Add this to take full cell width
+  margin: '0 auto', // Add this for extra centering
+  '&:hover': {
+    background: '#2563eb',
+    color: 'white'
+  }
+},
   alertModal: {
     background: 'white',
     borderRadius: '12px',

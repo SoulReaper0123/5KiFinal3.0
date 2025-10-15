@@ -83,7 +83,7 @@ loadingText: {
   },
   tableHeaderCell: {
     padding: '1rem 0.75rem',
-    textAlign: 'left',
+    textAlign: 'center',
     whiteSpace: 'nowrap',
     fontSize: '0.875rem',
     fontWeight: '600'
@@ -94,6 +94,7 @@ loadingText: {
     borderBottom: '1px solid #f1f5f9'
   },
   tableCell: {
+    textAlign: 'center',
     padding: '0.75rem',
     fontSize: '0.875rem',
     color: '#374151',
@@ -332,24 +333,27 @@ loadingText: {
       boxShadow: 'none'
     }
   },
-  viewButton: {
-    background: 'transparent',
-    color: '#2563eb',
-    border: '1px solid #2563eb',
-    borderRadius: '6px',
-    padding: '0.375rem 0.75rem',
-    fontSize: '0.75rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.25rem',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      background: '#2563eb',
-      color: 'white'
-    }
-  },
+viewButton: {
+  background: 'transparent',
+  color: '#2563eb',
+  border: '1px solid #2563eb',
+  borderRadius: '6px',
+  padding: '0.375rem 0.75rem',
+  fontSize: '0.75rem',
+  fontWeight: '500',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center', // Add this
+  gap: '0.25rem',
+  transition: 'all 0.2s ease',
+  width: '40%', // Add this to take full cell width
+  margin: '0 auto', // Add this for extra centering
+  '&:hover': {
+    background: '#2563eb',
+    color: 'white'
+  }
+},
   modalCardSmall: {
     width: '300px',
     backgroundColor: 'white',
@@ -1752,12 +1756,11 @@ const handleSuccessOk = async () => {
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '20%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Payment Method</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Status</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Method</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -1769,7 +1772,6 @@ const handleSuccessOk = async () => {
                     {item.firstName} {item.lastName}
                   </div>
                 </td>
-                <td style={styles.tableCell}>{item.transactionId}</td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid)}</td>
                 <td style={styles.tableCell}>{item.paymentOption}</td>
                 <td style={styles.tableCell}>

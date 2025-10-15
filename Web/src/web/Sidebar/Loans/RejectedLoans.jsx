@@ -43,7 +43,7 @@ const styles = {
   },
   tableHeaderCell: {
     padding: '1rem 0.75rem',
-    textAlign: 'left',
+    textAlign: 'center',
     whiteSpace: 'nowrap',
     fontSize: '0.875rem',
     fontWeight: '600'
@@ -63,7 +63,9 @@ const styles = {
     borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    textAlign: 'center',
+    justifyContent: 'center'
   },
   noDataContainer: {
     display: 'flex',
@@ -243,24 +245,27 @@ const styles = {
     fontWeight: '500',
     color: '#374151'
   },
-  viewButton: {
-    background: 'transparent',
-    color: '#2563eb',
-    border: '1px solid #2563eb',
-    borderRadius: '6px',
-    padding: '0.375rem 0.75rem',
-    fontSize: '0.75rem',
-    fontWeight: '500',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.25rem',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      background: '#2563eb',
-      color: 'white'
-    }
-  },
+viewButton: {
+  background: 'transparent',
+  color: '#2563eb',
+  border: '1px solid #2563eb',
+  borderRadius: '6px',
+  padding: '0.375rem 0.75rem',
+  fontSize: '0.75rem',
+  fontWeight: '500',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center', // Add this
+  gap: '0.25rem',
+  transition: 'all 0.2s ease',
+  width: '40%', // Add this to take full cell width
+  margin: '0 auto', // Add this for extra centering
+  '&:hover': {
+    background: '#2563eb',
+    color: 'white'
+  }
+},
   imageViewerModal: {
     position: 'fixed',
     top: 0,
@@ -483,14 +488,11 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Term</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loan Amount</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Disbursement</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Rejected</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -502,11 +504,9 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     {item.firstName} {item.lastName}
                   </div>
                 </td>
-                <td style={styles.tableCell}>{item.transactionId}</td>
+
                 <td style={styles.tableCell}>{formatCurrency(item.loanAmount)}</td>
-                <td style={styles.tableCell}>{item.term} months</td>
-                <td style={styles.tableCell}>{item.disbursement}</td>
-                <td style={styles.tableCell}>{item.dateRejected}</td>
+                        <td style={styles.tableCell}>{item.disbursement}</td>
                 <td style={styles.tableCell}>
                   <span style={{
                     ...styles.statusBadge,
@@ -515,6 +515,7 @@ const RejectedLoans = ({ loans, currentPage, totalPages, onPageChange }) => {
                     rejected
                   </span>
                 </td>
+                
                 <td style={styles.tableCell}>
                   <button 
                     style={styles.viewButton}

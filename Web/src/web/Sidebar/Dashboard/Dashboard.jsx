@@ -1094,11 +1094,6 @@ const Dashboard = () => {
     }
   };
 
-  const filteredLoans = loanData.filter(loan => 
-    loan.memberId.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    loan.transactionId.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
   // Enhanced professional styles matching the Settings component design
   const styles = {
     container: {
@@ -2116,96 +2111,6 @@ const Dashboard = () => {
                       </td>
                     </tr>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        {/* Active Loans Management Section */}
-        <div style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Active Loans Portfolio</h2>
-            <div style={styles.searchBox}>
-              <FaSearch style={styles.searchIcon} />
-              <input
-                type="text"
-                placeholder="Search by Member ID or Transaction ID..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                style={styles.searchInput}
-                onFocus={(e) => e.target.style.borderColor = '#3B82F6'}
-                onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-              />
-            </div>
-          </div>
-          
-          <div style={styles.loansSection}>
-            <div style={styles.tableContainer}>
-              <table style={styles.loansTable}>
-                <thead>
-                  <tr>
-                    <th style={styles.tableHeader}>Member ID</th>
-                    <th style={styles.tableHeader}>Transaction ID</th>
-                    <th style={styles.tableHeader}>Amount</th>
-                    <th style={styles.tableHeader}>Outstanding</th>
-                    <th style={styles.tableHeader}>Term</th>
-                    <th style={styles.tableHeader}>Interest</th>
-                    <th style={styles.tableHeader}>Monthly</th>
-                    <th style={styles.tableHeader}>Total Monthly</th>
-                    <th style={styles.tableHeader}>Penalty</th>
-                    <th style={styles.tableHeader}>New Total Monthly</th>
-                    <th style={styles.tableHeader}>Due Date</th>
-                    <th style={styles.tableHeader}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredLoans.length > 0 ? (
-                    filteredLoans.map((loan, index) => (
-                      <tr key={`${loan.memberId}-${loan.transactionId}`}>
-                        <td style={styles.tableCell}>{loan.memberId}</td>
-                        <td style={styles.tableCell}>{loan.transactionId}</td>
-                        <td style={styles.tableCell}>₱{formatCurrency(loan.loanAmount)}</td>
-                        <td style={styles.tableCell}>₱{formatCurrency(loan.outstandingBalance)}</td>
-                        <td style={styles.tableCell}>{loan.term}</td>
-                        <td style={styles.tableCell}>{loan.interest}</td>
-                        <td style={styles.tableCell}>₱{formatCurrency(loan.monthlyPayment)}</td>
-                        <td style={styles.tableCell}>₱{formatCurrency(loan.totalMonthlyPayment)}</td>
-                        {(() => {
-                          const { penalty, newTotalMonthly } = computePenaltyAndNewTotal(loan);
-                          return (
-                            <>
-                              <td style={styles.tableCell}>₱{formatCurrency(penalty)}</td>
-                              <td style={styles.tableCell}>₱{formatCurrency(newTotalMonthly)}</td>
-                            </>
-                          );
-                        })()}
-                        <td style={styles.tableCell}>
-                          <span style={loan.isOverdue ? styles.overdueDate : null}>
-                            {formatDisplayDate(loan.dueDate)}
-                          </span>
-                          {loan.isOverdue && <span style={styles.overdueBadge}>Overdue</span>}
-                        </td>
-                        <td style={styles.tableCell}>
-                          <button 
-                            onClick={() => handleResendClick(loan)}
-                            style={styles.resendButton}
-                            onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
-                            onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
-                          >
-                            <FaExchangeAlt />
-                            Resend Reminder
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="12" style={styles.noResults}>
-                        No loans found matching your search criteria
-                      </td>
-                    </tr>
-                  )}
                 </tbody>
               </table>
             </div>

@@ -78,7 +78,8 @@ const Withdraw = () => {
       console.error('Error fetching user data:', error);
     }
   };
- const resetFormFields = () => {
+
+  const resetFormFields = () => {
     setWithdrawOption('');
     setAccountNumber('');
     setAccountName('');
@@ -87,6 +88,7 @@ const Withdraw = () => {
     setDateReceived('');
     setPendingApiData(null);
   };
+
   useEffect(() => {
     const initializeUserData = async () => {
       try {
@@ -154,57 +156,56 @@ const Withdraw = () => {
     }
   };
 
-const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
+  const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
-useEffect(() => {
-  // For Cash withdrawals, only check withdrawOption and withdrawAmount
-  // For Bank/GCash, also check accountName and accountNumber
-  const hasEmptyFields = !withdrawOption || !withdrawAmount ||
-    (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
-  
-  const amount = parseFloat(withdrawAmount);
-  const insufficientBalance = amount > balance;
-  const belowMinimum = !isNaN(amount) && amount < 5000;
-  
-  setIsSubmitDisabled(hasEmptyFields || insufficientBalance || belowMinimum);
-}, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
+  useEffect(() => {
+    // Convert withdrawAmount to number for proper comparison
+    const amount = parseFloat(withdrawAmount) || 0;
+    
+    // Check for empty fields
+    const hasEmptyFields = !withdrawOption || !withdrawAmount ||
+      (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
+    
+    // Check balance - NEW LOGIC: balance after withdrawal must be at least ₱5,000
+    const balanceAfterWithdrawal = balance - amount;
+    const insufficientBalance = balanceAfterWithdrawal < 5000;
+    const invalidAmount = isNaN(amount) || amount <= 0;
+    
+    // Enable button only when all conditions are met
+    setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
+  }, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
 
- const handleSubmit = async () => {
-  const missingFields = !withdrawOption || !withdrawAmount ||
-    (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
-  
-  if (missingFields) {
-    setAlertMessage('All fields are required');
-    setAlertType('error');
-    setAlertModalVisible(true);
-    return;
-  }
+  const handleSubmit = async () => {
+    const missingFields = !withdrawOption || !withdrawAmount ||
+      (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
+    
+    if (missingFields) {
+      setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
 
-  const amount = parseFloat(withdrawAmount);
-  if (isNaN(amount) || amount <= 0) {
-    setAlertMessage('Please enter a valid amount');
-    setAlertType('error');
-    setAlertModalVisible(true);
-    return;
-  }
+    const amount = parseFloat(withdrawAmount);
+    if (isNaN(amount) || amount <= 0) {
+      setAlertMessage('Please enter a valid amount');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
 
-  if (amount < 5000) {
-    setAlertMessage('Minimum withdrawal amount is ₱5,000');
-    setAlertType('error');
-    setAlertModalVisible(true);
-    return;
-  }
+    // NEW VALIDATION: Check if balance after withdrawal is at least ₱5,000
+    const balanceAfterWithdrawal = balance - amount;
+    if (balanceAfterWithdrawal < 5000) {
+      setAlertMessage(`Withdrawal not allowed. Your balance after withdrawal would be ${formatCurrency(balanceAfterWithdrawal)}, which is below the minimum required balance of ₱5,000.`);
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
 
-  if (amount > balance) {
-    setAlertMessage('Insufficient balance');
-    setAlertType('error');
-    setAlertModalVisible(true);
-    return;
-  }
-
-  // Show confirmation modal
-  setConfirmModalVisible(true);
-};
+    // Show confirmation modal
+    setConfirmModalVisible(true);
+  };
 
   const formatCurrency = (amount) => {
     return `₱${parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
@@ -214,152 +215,162 @@ useEffect(() => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
   
-  const submitWithdrawal = async () => {
+const submitWithdrawal = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
     
     try {
-      const transactionId = generateTransactionId();
-      const currentDate = new Date().toISOString();
+        const transactionId = generateTransactionId();
+        const currentDate = new Date().toISOString();
 
-      // Prepare withdrawal data
-      const withdrawalData = {
-        transactionId,
-        id: memberId,
-        email,
-        firstName,
-        lastName,
-        withdrawOption,
-        accountName,
-        accountNumber,
-        amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
-        dateApplied: new Date().toLocaleString('en-US', {
-          month: 'long',
-          day: '2-digit',
-          year: 'numeric',
-        })
-        .replace(',', '')
-        .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-        .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
-        status: 'Pending',
-      };
+        // Prepare withdrawal data
+        const withdrawalData = {
+            transactionId,
+            id: memberId,
+            email,
+            firstName,
+            lastName,
+            withdrawOption,
+            accountName,
+            accountNumber,
+            amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
+            dateApplied: new Date().toLocaleString('en-US', {
+                month: 'long',
+                day: '2-digit',
+                year: 'numeric',
+            })
+            .replace(',', '')
+            .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
+            .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+            timestamp: currentDate.getTime(),
+            status: 'pending',
+        };
 
-      // Save to Firebase first
-      const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
-      await set(newWithdrawRef, withdrawalData);
+        // Save to Firebase first
+        const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
+        await set(newWithdrawRef, withdrawalData);
 
-      // Also log into Transactions for unified feed (Applications table)
-      const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
-      await set(txnRef, {
-        ...withdrawalData,
-        label: 'Withdraw',
-        type: 'Withdrawals',
-      });
+        // Also log into Transactions for unified feed (Applications table)
+        const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
+        await set(txnRef, {
+            ...withdrawalData,
+            label: 'Withdraw',
+            type: 'Withdrawals',
+        });
 
-      // Prepare withdrawal data for API call to run when user clicks OK
-      const apiData = {
-        email,
-        firstName,
-        lastName,
-        amount: parseFloat(withdrawAmount),
-        date: currentDate,
-        recipientAccount: accountNumber,
-        referenceNumber: transactionId,
-        withdrawOption,
-        accountName
-      };
+        // Prepare withdrawal data for API call
+        const apiData = {
+            email,
+            firstName,
+            lastName,
+            amount: parseFloat(withdrawAmount),
+            date: currentDate,
+            recipientAccount: accountNumber, // This is what the server expects
+            accountNumber: accountNumber,    // This is what you're sending
+            referenceNumber: transactionId,
+            withdrawOption,
+            accountName,
+            websiteLink: 'https://fivekiapp.onrender.com',
+            facebookLink: 'https://www.facebook.com/5KiFS'
+        };
 
-      // Store withdrawal data to be used when user clicks OK
-      setPendingApiData(apiData);
+        // DEBUG: Log what we're sending
+        console.log('[DEBUG] Sending withdrawal API data:', apiData);
 
-      // Show success modal
-      setAlertMessage('Your withdrawal request has been submitted successfully. It will be processed shortly.');
-      setAlertType('success');
-      setAlertModalVisible(true);
+        // Store withdrawal data to be used when user clicks OK
+        setPendingApiData(apiData);
+
+        // Show success modal
+        setAlertMessage('Your withdrawal request has been submitted successfully. It will be processed shortly.');
+        setAlertType('success');
+        setAlertModalVisible(true);
 
     } catch (error) {
-      console.error('Error during withdrawal submission:', error);
-      setAlertMessage('An unexpected error occurred. Please try again later.');
-      setAlertType('error');
-      setAlertModalVisible(true);
+        console.error('Error during withdrawal submission:', error);
+        setAlertMessage('An unexpected error occurred. Please try again later.');
+        setAlertType('error');
+        setAlertModalVisible(true);
     } finally {
-      setIsLoading(false);
+        setIsLoading(false);
     }
-  };
+};
 
   return (
     <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.container}
-          >
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Header with centered title and left back button using invisible spacers */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Withdraw</Text>
-        <View style={styles.headerSide} />
-      </View>
-      <View style={styles.content}>
-
-
-        <Text style={styles.label}>Balance</Text>
-        <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
-
-        <Text style={styles.label}>Disbursement<Text style={styles.required}>*</Text></Text>
-        <ModalSelector
-          data={withdrawOptions}
-          initValue="Select Withdraw Option"
-          onChange={handleWithdrawOptionChange}
-          style={styles.picker}
-          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-          overlayStyle={{ justifyContent: 'flex-end' }}
-        >
-          <TouchableOpacity style={styles.pickerContainer}>
-            <Text style={styles.pickerText}>{withdrawOption || 'Select Withdraw Option'}</Text>
-            <MaterialIcons name="arrow-drop-down" size={24} color="black" /> 
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.container}
+    >
+      <ScrollView contentContainerStyle={styles.container}>
+        {/* Header with centered title and left back button using invisible spacers */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
           </TouchableOpacity>
-        </ModalSelector>
+          <Text style={styles.headerTitle}>Withdraw</Text>
+          <View style={styles.headerSide} />
+        </View>
+        <View style={styles.content}>
 
-        {withdrawOption !== 'Cash' && (
-          <>
-            <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
-            <TextInput
-              value={accountName}
-              editable={false}
-              style={[styles.input, { backgroundColor: '#F3F4F6' }]}
-              placeholder="Auto-filled from your profile"
-            />
+          <Text style={styles.label}>Balance</Text>
+          <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-            <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
-            <TextInput
-              value={accountNumber}
-              editable={false}
-              style={[styles.input, { backgroundColor: '#F3F4F6' }]}
-              keyboardType="numeric"
-              placeholder="Auto-filled from your profile"
-            />
-          </>
-        )}
+          <Text style={styles.label}>Disbursement<Text style={styles.required}>*</Text></Text>
+          <ModalSelector
+            data={withdrawOptions}
+            initValue="Select Withdraw Option"
+            onChange={handleWithdrawOptionChange}
+            style={styles.picker}
+            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+            overlayStyle={{ justifyContent: 'flex-end' }}
+          >
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>{withdrawOption || 'Select Withdraw Option'}</Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" /> 
+            </TouchableOpacity>
+          </ModalSelector>
 
-        <Text style={styles.label}>Withdraw Amount<Text style={styles.required}>*</Text></Text>
-        <TextInput
-          placeholder="Enter Amount"
-          value={withdrawAmount}
-          onChangeText={setWithdrawAmount}
-          style={styles.input}
-          keyboardType="numeric"
-        />
+          {withdrawOption !== 'Cash' && (
+            <>
+              <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
+              <TextInput
+                value={accountName}
+                editable={false}
+                style={[styles.input, { backgroundColor: '#F3F4F6' }]}
+                placeholder="Auto-filled from your profile"
+              />
 
-        <TouchableOpacity 
-          style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
-          onPress={handleSubmit}
-          disabled={isSubmitDisabled}
-        >
-          <Text style={styles.submitButtonText}>Submit</Text>
-        </TouchableOpacity>
-      </View>
+              <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
+              <TextInput
+                value={accountNumber}
+                editable={false}
+                style={[styles.input, { backgroundColor: '#F3F4F6' }]}
+                keyboardType="numeric"
+                placeholder="Auto-filled from your profile"
+              />
+            </>
+          )}
+
+          <Text style={styles.label}>Withdraw Amount<Text style={styles.required}>*</Text></Text>
+          <TextInput
+            placeholder="Enter Amount"
+            value={withdrawAmount}
+            onChangeText={setWithdrawAmount}
+            style={styles.input}
+            keyboardType="numeric"
+          />
+
+          <Text style={styles.noteText}>
+            Note: Your balance after withdrawal must be at least ₱5,000
+          </Text>
+
+          <TouchableOpacity 
+            style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
+            onPress={handleSubmit}
+            disabled={isSubmitDisabled}
+          >
+            <Text style={styles.submitButtonText}>Submit</Text>
+          </TouchableOpacity>
+        </View>
       </ScrollView>
 
       {/* Confirmation Modal */}
@@ -369,11 +380,12 @@ useEffect(() => {
             <MaterialIcons name="help-outline" size={40} color="#2C5282" style={styles.modalIcon} />
             <Text style={styles.modalTitle}>Confirm Withdrawal</Text>
             <View style={styles.modalContent}>
-              <Text style={styles.modalText}>Balance: {formatCurrency(balance)}</Text>
+              <Text style={styles.modalText}>Current Balance: {formatCurrency(balance)}</Text>
               <Text style={styles.modalText}>Withdraw Option: {withdrawOption}</Text>
               <Text style={styles.modalText}>Account Name: {accountName}</Text>
               <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
               <Text style={styles.modalText}>Amount to be Withdrawn: {formatCurrency(withdrawAmount)}</Text>
+              <Text style={styles.modalText}>Balance After Withdrawal: {formatCurrency(balance - parseFloat(withdrawAmount))}</Text>
             </View>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity 
@@ -407,7 +419,7 @@ useEffect(() => {
               onPress={() => {
                 setSuccessModalVisible(false);
                 resetFormFields();
-                navigation.navigate('Home');
+                navigation.navigate('AppHome');
               }}
             >
               <Text style={styles.confirmButtonText}>OK</Text>
@@ -451,7 +463,7 @@ useEffect(() => {
           if (alertType === 'success' && pendingApiData) {
             // Navigate immediately and run API in background
             resetFormFields();
-            navigation.navigate('Home');
+            navigation.navigate('AppHome');
             
             // Run API call in background after navigation
             setTimeout(async () => {
@@ -470,7 +482,7 @@ useEffect(() => {
         message={alertMessage}
         type={alertType}
       />
-      </KeyboardAvoidingView>
+    </KeyboardAvoidingView>
   );
 };
 
@@ -555,6 +567,14 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     marginBottom: 15,
+  },
+  noteText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    marginTop: -10,
+    marginBottom: 10,
+    textAlign: 'center',
   },
   submitButton: {
     backgroundColor: '#4FE7AF',

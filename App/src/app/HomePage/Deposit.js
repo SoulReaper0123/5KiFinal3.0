@@ -89,7 +89,7 @@ const Deposit = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.navigate('Home');
+      navigation.navigate('AppHome');
       return true;
     };
 
@@ -147,12 +147,12 @@ const Deposit = () => {
   const depositOptions = [
     { key: 'Bank', label: 'Bank' },
     { key: 'GCash', label: 'GCash' },
-    { key: 'Cash', label: 'Cash' },
+    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
   ];
 
   const handleDepositOptionChange = (option) => {
     setDepositOption(option.key);
-    if (option.key === 'Cash') {
+    if (option.key === 'Cash-on-Hand') {
       setAccountNumber('');
       setAccountName('');
       return;
@@ -276,7 +276,7 @@ const Deposit = () => {
     }
 
     // Proof of deposit is only required for non-cash deposits
-    if (depositOption !== 'Cash' && !proofOfDeposit) {
+    if (depositOption !== 'Cash-on-Hand' && !proofOfDeposit) {
       setAlertMessage('All fields are required');
       setAlertType('error');
       setAlertModalVisible(true);
@@ -304,7 +304,7 @@ const Deposit = () => {
 
       // Proof of deposit is only required for non-cash deposits
       let proofOfDepositUrl = null;
-      if (depositOption !== 'Cash') {
+      if (depositOption !== 'Cash-on-Hand' && proofOfDeposit) {
         proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs');
       }
 
@@ -407,7 +407,7 @@ const Deposit = () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        {depositOption !== 'Cash' && (
+        {depositOption !== 'Cash-on-Hand' && (
           <>
             <Text style={styles.label}>Account Name</Text>
             <TextInput
@@ -438,7 +438,7 @@ const Deposit = () => {
           keyboardType="numeric"
         />
 
-        {depositOption !== 'Cash' && (
+        {depositOption !== 'Cash-on-Hand' && (
           <>
             <Text style={styles.label}>
               Proof of Deposit <Text style={styles.required}>*</Text>
@@ -464,7 +464,7 @@ const Deposit = () => {
               !amountToBeDeposited ||
               isNaN(parseFloat(amountToBeDeposited)) ||
               parseFloat(amountToBeDeposited) <= 0 ||
-              (depositOption !== 'Cash' && !proofOfDeposit) ||
+              (depositOption !== 'Cash-on-Hand' && !proofOfDeposit) ||
               loading
             ) && styles.disabledButton
           ]}
@@ -474,7 +474,7 @@ const Deposit = () => {
             !amountToBeDeposited ||
             isNaN(parseFloat(amountToBeDeposited)) ||
             parseFloat(amountToBeDeposited) <= 0 ||
-            (depositOption !== 'Cash' && !proofOfDeposit) ||
+            (depositOption !== 'Cash-on-Hand' && !proofOfDeposit) ||
             loading
           }
         >
@@ -529,7 +529,7 @@ const Deposit = () => {
           if (alertType === 'success' && pendingDepositData) {
             // Navigate immediately and run API in background
             resetFormFields();
-            navigation.navigate('Home');
+            navigation.navigate('AppHome');
             
             // Run API call in background after navigation
             setTimeout(async () => {
@@ -546,7 +546,7 @@ const Deposit = () => {
           } else if (alertType === 'success') {
             // Fallback for success without pending data
             resetFormFields();
-            navigation.navigate('Home');
+            navigation.navigate('AppHome');
           }
         }}
         message={alertMessage}

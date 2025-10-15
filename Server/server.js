@@ -1091,24 +1091,44 @@ app.post('/rejectDeposits', async (req, res) => {
 
 app.post('/withdraw', async (req, res) => {
     console.log('[NOTIFICATION] Initiating withdrawal notification emails', req.body);
-    const { email, firstName, lastName, amount, date, recipientAccount, referenceNumber } = req.body;
-    const fullName = `${firstName} ${lastName}`;
+    const { 
+        email, 
+        firstName, 
+        lastName, 
+        amount, 
+        date, 
+        recipientAccount, 
+        accountNumber, // Add this line to accept accountNumber
+        referenceNumber, 
+        withdrawOption,
+        accountName,
+        websiteLink,
+        facebookLink
+    } = req.body;
 
-    if (!email || !firstName || !lastName || !amount || !date || !recipientAccount || !referenceNumber) {
+    // Use recipientAccount if provided, otherwise fall back to accountNumber
+    const recipientAcc = recipientAccount || accountNumber;
+
+    if (!email || !firstName || !lastName || !amount || !date || !referenceNumber) {
         console.log('[NOTIFICATION ERROR] Missing required fields for withdrawal notification');
-        return res.status(400).json({ message: 'Missing required fields' });
+        return res.status(400).json({ 
+            success: false,
+            message: 'Missing required fields: email, firstName, lastName, amount, date, and referenceNumber are required' 
+        });
     }
 
     try {
         console.log('[NOTIFICATION] Sending withdrawal notification to owner');
+        
+        // Email to system owner
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
-            subject: 'Withdrawal Request Received',
+            subject: 'New Withdrawal Request Received',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
                     <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
-                        Withdrawal Request Received
+                        New Withdrawal Request
                     </h2>
                     
                     <p>Dear Admin,</p>
@@ -1119,23 +1139,35 @@ app.post('/withdraw', async (req, res) => {
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${firstName} ${lastName}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Amount</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Withdrawal Method</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${withdrawOption}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Recipient Account</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${recipientAccount}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${accountName || 'N/A'}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Number</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${recipientAcc || 'N/A'}</td>
                         </tr>
                         <tr>
                             <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reference No.</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${referenceNumber}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Submitted</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
                         </tr>
                     </table>
                     
@@ -1143,7 +1175,7 @@ app.post('/withdraw', async (req, res) => {
                         <a href="${DASHBOARD_LINK}" 
                            style="display: inline-block; background-color: #3498db; color: white; 
                                   padding: 10px 20px; text-decoration: none; border-radius: 4px;">
-                            Verify and Take Action
+                            Review Application
                         </a>
                     </p>
                     
@@ -1155,43 +1187,53 @@ app.post('/withdraw', async (req, res) => {
         });
 
         console.log('[NOTIFICATION] Sending withdrawal confirmation to user');
+        
+        // Email to member
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
-            subject: 'Withdrawal Successful',
+            subject: 'Withdrawal Application Received',
             html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-                    <h2 style="color: #2c3e50; border-bottom: 2px solid #2ecc71; padding-bottom: 10px;">
-                        Withdrawal Successful
+                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
+                        Withdrawal Application Received
                     </h2>
                     
                     <p>Hi ${firstName},</p>
                     
-                    <div style="background-color: #e8f8f5; padding: 15px; border-left: 4px solid #2ecc71; margin: 20px 0;">
-                        <p style="font-weight: bold; color: #27ae60; margin: 0;">
-                            Your withdrawal request for ₱${formatAmount(amount)} has been processed on ${formatDisplayDate(date)}.
-                        </p>
-                    </div>
+                    <p>We have received your withdrawal application for <strong>₱${formatAmount(amount)}</strong> via <strong>${withdrawOption}</strong>.</p>
                     
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Transaction Details:</h3>
+                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Application Details:</h3>
                     <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Amount</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(amount)}</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Withdrawal Method</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${withdrawOption}</td>
+                        </tr>
+                        ${accountName ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Name</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${accountName}</td>
+                        </tr>
+                        ` : ''}
+                        ${recipientAcc ? `
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Number</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${recipientAcc}</td>
+                        </tr>
+                        ` : ''}
+                        <tr>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reference Number</td>
+                            <td style="padding: 8px; border: 1px solid #ddd;">${referenceNumber}</td>
                         </tr>
                         <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Recipient Account</td>
-                            <td style="padding: 8px; border: 1px solid #ddd;">${recipientAccount}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Transaction Date</td>
+                            <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Submitted</td>
                             <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
                         </tr>
                     </table>
                     
-                    <p>The funds were sent to your recipient account (${recipientAccount}).</p>
+                    <p>Our team will process your request and notify you once completed. This typically takes 1-2 business days.</p>
                     
-                    <p>Thank you for using 5Ki Financial Services.</p>
+                    <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
@@ -1203,10 +1245,17 @@ app.post('/withdraw', async (req, res) => {
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Withdrawal notification emails sent successfully');
-        res.status(200).json({ message: 'Emails sent successfully' });
+        res.status(200).json({ 
+            success: true,
+            message: 'Withdrawal notification emails sent successfully' 
+        });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending withdrawal notification emails:', error);
-        res.status(500).json({ message: 'Failed to send emails', error: error.message });
+        res.status(500).json({ 
+            success: false,
+            message: 'Failed to send withdrawal notification emails',
+            error: error.message 
+        });
     }
 });
 

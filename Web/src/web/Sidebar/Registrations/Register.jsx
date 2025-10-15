@@ -1318,9 +1318,9 @@ const Register = () => {
               {activeSection === 'members' && (
                 <AllMembers members={paginatedData} />
               )}
-              {activeSection === 'permanentWithdrawals' && (
-                <PermanentWithdrawals withdrawals={paginatedData} />
-              )}
+{activeSection === 'permanentWithdrawals' && (
+  <PermanentWithdrawals withdrawals={paginatedData} refreshData={fetchAllData} />
+)}
             </>
           )}
         </div>

@@ -1,65 +1,87 @@
 import React, { useState } from 'react';
-import { FaCheckCircle, FaTimes, FaImage, FaChevronLeft, FaChevronRight } from 'react-icons/fa';
+import { 
+  FaCheckCircle, 
+  FaTimes, 
+  FaImage, 
+  FaChevronLeft, 
+  FaChevronRight,
+  FaEye,
+  FaUser,
+  FaMoneyBillWave,
+  FaIdCard,
+  FaCalendarAlt,
+  FaPhone,
+  FaEnvelope,
+  FaUniversity,
+  FaBuilding,
+  FaCreditCard,
+  FaReceipt
+} from 'react-icons/fa';
 
 const styles = {
   container: {
     flex: 1,
-  },
-  loadingView: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%'
+    fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif"
   },
   tableContainer: {
-    borderRadius: '8px',
-    overflow: 'auto',
-    boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+    borderRadius: '12px',
+    overflow: 'hidden',
+    boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+    border: '1px solid #e2e8f0',
+    background: 'white'
   },
   table: {
     width: '100%',
     borderCollapse: 'collapse',
     tableLayout: 'fixed',
-    minWidth: '800px'
+    minWidth: '1000px'
   },
   tableHeader: {
-    backgroundColor: '#2D5783',
-    color: '#fff',
-    height: '50px',
-    textAlign: 'center',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
+    color: 'white',
+    height: '56px',
+    fontWeight: '600',
+    fontSize: '0.875rem'
   },
   tableHeaderCell: {
-    whiteSpace: 'nowrap'
+    padding: '1rem 0.75rem',
+    textAlign: 'center',
+    whiteSpace: 'nowrap',
+    fontSize: '0.875rem',
+    fontWeight: '600'
   },
   tableRow: {
-    height: '50px',
-    '&:nth-child(even)': {
-      backgroundColor: '#f5f5f5'
-    },
-    '&:nth-child(odd)': {
-      backgroundColor: '#ddd'
+    height: '52px',
+    transition: 'background-color 0.2s ease',
+    borderBottom: '1px solid #f1f5f9',
+    '&:hover': {
+      backgroundColor: '#f8fafc'
     }
   },
   tableCell: {
-    textAlign: 'center',
-    fontSize: '14px',
-    borderBottom: '1px solid #ddd',
+    padding: '0.75rem',
+    fontSize: '0.875rem',
+    color: '#374151',
+    borderBottom: '1px solid #f1f5f9',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    textAlign: 'center'
   },
-  statusApproved: {
-    color: 'green'
+  noDataContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '200px',
+    flexDirection: 'column',
+    gap: '1rem',
+    color: '#6b7280'
   },
-  noDataMessage: {
-    textAlign: 'center',
-    marginTop: '50px',
-    fontSize: '16px',
-    color: 'gray'
+  noDataIcon: {
+    fontSize: '3rem',
+    opacity: '0.5'
   },
-  centeredModal: {
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -69,155 +91,178 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000
+    zIndex: 1000,
+    padding: '2rem',
+    backdropFilter: 'blur(4px)'
   },
   modalCard: {
-    width: '40%',
-    maxWidth: '900px',
     backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
-    height: '80vh',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  modalCardSingleColumn: {
-    width: '40%',
-    maxWidth: '600px',
-    backgroundColor: 'white',
-    borderRadius: '8px',
-    padding: '20px',
-    position: 'relative',
-    boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-    maxHeight: '90vh',
-    height: 'auto',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  modalContent: {
-    paddingBottom: '12px',
-    overflowY: 'auto',
-    flex: 1
-  },
-  columns: {
-    display: 'flex',
-    flexDirection: 'row',
-    gap: '30px'
-  },
-  leftColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  rightColumn: {
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-  },
-  modalTitle: {
-    fontSize: '18px',
-    fontWeight: 'bold',
-    marginBottom: '16px',
-    color: '#2D5783',
-    textAlign: 'center'
-  },
-  modalDetailText: {
-    fontSize: '13px',
-    marginBottom: '6px',
-    color: '#333',
-    wordBreak: 'break-word',
-    lineHeight: '1.3'
-  },
-  imageGrid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(2, 1fr)',
-    marginBottom: '12px',
-    gap: '10px'
-  },
-  imageBlock: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'flex-start'
-  },
-  imageLabel: {
-    fontSize: '13px',
-    fontWeight: 'bold',
-    color: '#333',
-    width: '100%',
-    textAlign: 'left',
-    marginLeft: 0,
-    paddingLeft: 0
-  },
-  imageThumbnail: {
+    borderRadius: '16px',
     width: '90%',
-    height: '120px',
-    borderRadius: '4px',
-    border: '1px solid #ddd',
-    objectFit: 'cover',
-    cursor: 'pointer',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
-  },
-  closeButton: {
-    position: 'absolute',
-    top: '10px',
-    right: '10px',
-    cursor: 'pointer',
-    fontSize: '18px',
-    color: 'grey',
-    backgroundColor: 'transparent',
-    border: 'none',
-    padding: '4px',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none',
-      boxShadow: 'none'
-    }
-  },
-  viewText: {
-    color: '#2D5783',
-    fontSize: '14px',
-    textDecoration: 'underline',
-    cursor: 'pointer',
-    fontWeight: '500',
-    '&:hover': {
-      color: '#1a3d66'
-    },
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    maxWidth: '900px',
+    maxHeight: '90vh',
+    overflow: 'hidden',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    display: 'flex',
+    flexDirection: 'column',
+    border: '1px solid #F1F5F9'
   },
   modalHeader: {
-    borderBottom: '1px solid #eee',
-    paddingBottom: '12px',
-    marginBottom: '12px'
+    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
+    color: 'white',
+    padding: '1.5rem 2rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    borderBottom: '1px solid #E5E7EB'
   },
-  compactField: {
+  modalTitle: {
+    fontSize: '1.5rem',
+    fontWeight: '700',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.75rem'
+  },
+  closeButton: {
+    background: 'rgba(255, 255, 255, 0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    color: 'white',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.2s ease',
+    backdropFilter: 'blur(10px)',
+    '&:hover': {
+      background: 'rgba(255, 255, 255, 0.2)',
+      transform: 'rotate(90deg)'
+    }
+  },
+  modalContent: {
+    padding: '2rem',
+    overflowY: 'auto',
+    flex: 1,
+    minHeight: 0
+  },
+  columnsContainer: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '2rem',
+    marginBottom: '1.5rem'
+  },
+  column: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '1rem'
+  },
+  section: {
+    background: '#f8fafc',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  sectionTitle: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#1e3a8a',
+    marginBottom: '1rem',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem',
+    paddingBottom: '0.5rem',
+    borderBottom: '2px solid #e2e8f0'
+  },
+  fieldGroup: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: '6px',
-    gap: '8px'
+    marginBottom: '0.75rem',
+    padding: '0.5rem 0'
   },
   fieldLabel: {
-    fontWeight: 'bold',
-    color: '#555',
-    fontSize: '13px',
-    minWidth: '100px'
+    fontWeight: '500',
+    color: '#64748b',
+    fontSize: '0.875rem',
+    minWidth: '120px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '0.5rem'
   },
   fieldValue: {
     textAlign: 'right',
     flex: 1,
     wordBreak: 'break-word',
-    color: '#333',
-    fontSize: '13px'
+    color: '#1f2937',
+    fontSize: '0.875rem',
+    fontWeight: '500'
   },
+  statusBadge: {
+    padding: '0.25rem 0.75rem',
+    borderRadius: '20px',
+    fontSize: '0.75rem',
+    fontWeight: '600',
+    textTransform: 'uppercase'
+  },
+  statusApproved: {
+    background: '#d1fae5',
+    color: '#065f46'
+  },
+  documentsGrid: {
+    display: 'grid',
+    gridTemplateColumns: '1fr',
+    gap: '1rem',
+    marginTop: '1rem'
+  },
+  documentCard: {
+    background: 'white',
+    borderRadius: '8px',
+    padding: '1rem',
+    border: '1px solid #e2e8f0',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    '&:hover': {
+      borderColor: '#2563eb',
+      transform: 'translateY(-2px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.1)'
+    }
+  },
+  documentImage: {
+    width: '100%',
+    height: '120px',
+    borderRadius: '6px',
+    objectFit: 'cover',
+    marginBottom: '0.5rem',
+    border: '1px solid #e2e8f0'
+  },
+  documentLabel: {
+    fontSize: '0.875rem',
+    fontWeight: '500',
+    color: '#374151'
+  },
+viewButton: {
+  background: 'transparent',
+  color: '#2563eb',
+  border: '1px solid #2563eb',
+  borderRadius: '6px',
+  padding: '0.375rem 0.75rem',
+  fontSize: '0.75rem',
+  fontWeight: '500',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center', // Add this
+  gap: '0.25rem',
+  transition: 'all 0.2s ease',
+  width: '40%', // Add this to take full cell width
+  margin: '0 auto', // Add this for extra centering
+  '&:hover': {
+    background: '#2563eb',
+    color: 'white'
+  }
+},
   imageViewerModal: {
     position: 'fixed',
     top: 0,
@@ -228,7 +273,8 @@ const styles = {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2000
+    zIndex: 2000,
+    padding: '2rem'
   },
   imageViewerContent: {
     position: 'relative',
@@ -242,66 +288,124 @@ const styles = {
     maxWidth: '100%',
     maxHeight: '70vh',
     objectFit: 'contain',
-    borderRadius: '4px'
+    borderRadius: '8px',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
   },
   imageViewerLabel: {
     color: 'white',
-    fontSize: '18px',
-    marginTop: '16px',
-    textAlign: 'center'
-  },
-  imageViewerClose: {
-    position: 'absolute',
-    top: '-40px',
-    right: '80px',
-    color: 'white',
-    fontSize: '24px',
-    cursor: 'pointer',
-    padding: '8px',
-    backgroundColor: 'transparent',
-    border: 'none',
-    outline: 'none',
-    '&:focus': {
-      outline: 'none'
-    }
+    fontSize: '1.125rem',
+    marginTop: '1rem',
+    textAlign: 'center',
+    fontWeight: '500'
   },
   imageViewerNav: {
     position: 'absolute',
     top: '50%',
     transform: 'translateY(-50%)',
     color: 'white',
-    fontSize: '24px',
+    fontSize: '2rem',
     cursor: 'pointer',
-    padding: '16px',
-    backgroundColor: 'transparent',
+    padding: '1rem',
+    background: 'rgba(255,255,255,0.1)',
     border: 'none',
-    outline: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
     '&:hover': {
-      color: '#2D5783'
-    },
-    '&:focus': {
-      outline: 'none'
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'translateY(-50%) scale(1.1)'
     }
   },
   prevButton: {
-    left: '50px'
+    left: '2rem'
   },
-  nextButton: { 
-    right: '50px'
+  nextButton: {
+    right: '2rem'
   },
-  sectionTitle: {
-    fontSize: '16px',
-    fontWeight: 'bold',
-    color: '#2D5783',
-    margin: '12px 0 8px 0',
-    paddingBottom: '4px',
-    borderBottom: '1px solid #eee'
+  imageViewerClose: {
+    position: 'absolute',
+    top: '2rem',
+    right: '2rem',
+    color: 'white',
+    fontSize: '1.5rem',
+    cursor: 'pointer',
+    padding: '0.5rem',
+    background: 'rgba(255,255,255,0.1)',
+    border: 'none',
+    borderRadius: '8px',
+    transition: 'all 0.2s ease',
+    '&:hover': {
+      background: 'rgba(255,255,255,0.2)',
+      transform: 'scale(1.1)'
+    }
   },
-  noDocumentsMessage: {
-    textAlign: 'center',
-    margin: '20px 0',
-    color: '#666',
-    fontStyle: 'italic'
+  withdrawalCard: {
+    background: 'linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%)',
+    border: '1px solid #6ee7b7',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
+  },
+  withdrawalItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem 0'
+  },
+  withdrawalLabel: {
+    fontSize: '0.875rem',
+    color: '#065f46',
+    fontWeight: '500'
+  },
+  withdrawalValue: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#065f46'
+  },
+  approvalCard: {
+    background: 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)',
+    border: '1px solid #7dd3fc',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
+  },
+  approvalItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem 0'
+  },
+  approvalLabel: {
+    fontSize: '0.875rem',
+    color: '#0369a1',
+    fontWeight: '500'
+  },
+  approvalValue: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#0369a1'
+  },
+  bankCard: {
+    background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
+    border: '1px solid #fcd34d',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
+  },
+  bankItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem 0'
+  },
+  bankLabel: {
+    fontSize: '0.875rem',
+    color: '#92400e',
+    fontWeight: '500'
+  },
+  bankValue: {
+    fontSize: '1rem',
+    fontWeight: '600',
+    color: '#92400e'
   }
 };
 
@@ -319,26 +423,6 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
       currency: 'PHP',
       minimumFractionDigits: 2,
     }).format(amount || 0);
-
-  const formatTime = (date) => {
-    let hours = date.getHours();
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    const seconds = date.getSeconds().toString().padStart(2, '0');
-    const ampm = hours >= 12 ? 'PM' : 'AM';
-    
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    
-    return `${hours}:${minutes}:${seconds} ${ampm}`;
-  };
-
-  const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
-    });
-  };
 
   const openModal = (withdraw) => {
     setSelectedWithdraw(withdraw);
@@ -385,14 +469,12 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
     setCurrentImage(availableImages[newIndex]);
   };
 
-  const hasDocuments = (withdraw) => {
-    return withdraw.proofOfWithdrawalUrl;
-  };
-
   if (!withdraws.length) {
-    // Show only the text, no container box
     return (
-      <p style={styles.noDataMessage}>No approved withdrawals available.</p>
+      <div style={styles.noDataContainer}>
+        <FaMoneyBillWave style={styles.noDataIcon} />
+        <div>No approved withdrawals available</div>
+      </div>
     );
   }
 
@@ -403,11 +485,9 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
           <thead>
             <tr style={styles.tableHeader}>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Transaction ID</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Bank Details</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Date Approved</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Withdrawal Amount</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Disbursement</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -416,25 +496,29 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
             {withdraws.map((item, index) => (
               <tr key={index} style={styles.tableRow}>
                 <td style={styles.tableCell}>{item.id}</td>
-                <td style={styles.tableCell}>{`${item.firstName} ${item.lastName}`}</td>
-                <td style={styles.tableCell}>{item.transactionId}</td>
+                <td style={styles.tableCell}>
+                  <div style={{ fontWeight: '500' }}>
+                    {item.firstName} {item.lastName}
+                  </div>
+                </td>
                 <td style={styles.tableCell}>{formatCurrency(item.amountWithdrawn)}</td>
-                <td style={styles.tableCell}>{`${item.accountName} (${item.accountNumber})`}</td>
-                <td style={styles.tableCell}>{item.dateApproved}</td>
-                <td style={{
-                  ...styles.tableCell,
-                  ...styles.statusApproved
-                }}>
-                  approved
+                <td style={styles.tableCell}>{item.withdrawOption}</td>
+                <td style={styles.tableCell}>
+                  <span style={{
+                    ...styles.statusBadge,
+                    ...styles.statusApproved
+                  }}>
+                    approved
+                  </span>
                 </td>
                 <td style={styles.tableCell}>
-                  <span 
-                    style={styles.viewText} 
+                  <button 
+                    style={styles.viewButton}
                     onClick={() => openModal(item)}
-                    onFocus={(e) => e.target.style.outline = 'none'}
                   >
+                    <FaEye />
                     View
-                  </span>
+                  </button>
                 </td>
               </tr>
             ))}
@@ -442,166 +526,206 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
         </table>
       </div>
 
+      {/* Withdrawal Details Modal */}
       {modalVisible && selectedWithdraw && (
-        <div style={styles.centeredModal}>
-          <div style={hasDocuments(selectedWithdraw) ? styles.modalCard : styles.modalCardSingleColumn}>
-            <button 
-              style={styles.closeButton} 
-              onClick={closeModal}
-              aria-label="Close modal"
-              onFocus={(e) => e.target.style.outline = 'none'}
-            >
-              <FaTimes />
-            </button>
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCard}>
             <div style={styles.modalHeader}>
-              <h2 style={styles.modalTitle}>Withdrawal Details</h2>
+              <h2 style={styles.modalTitle}>
+                <FaCheckCircle />
+                Approved Withdrawal Details
+              </h2>
+              <button 
+                style={styles.closeButton}
+                onClick={closeModal}
+              >
+                <FaTimes />
+              </button>
             </div>
+            
             <div style={styles.modalContent}>
-              {hasDocuments(selectedWithdraw) ? (
-                <div style={styles.columns}>
-                  <div style={styles.leftColumn}>
-                    <div style={styles.sectionTitle}>Member Information</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Member ID:</span>
+              <div style={styles.columnsContainer}>
+                {/* Left Column - Member & Withdrawal Information */}
+                <div style={styles.column}>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaUser />
+                      Member Information
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUser />
+                        Member ID:
+                      </span>
                       <span style={styles.fieldValue}>{selectedWithdraw.id || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Name:</span>
-                      <span style={styles.fieldValue}>{`${selectedWithdraw.firstName || ''} ${selectedWithdraw.lastName || ''}`}</span>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUser />
+                        Full Name:
+                      </span>
+                      <span style={styles.fieldValue}>
+                        {selectedWithdraw.firstName} {selectedWithdraw.lastName}
+                      </span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Email:</span>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaEnvelope />
+                        Email:
+                      </span>
                       <span style={styles.fieldValue}>{selectedWithdraw.email || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Contact:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.phoneNumber || 'N/A'}</span>
-                    </div>
+                  </div>
 
-                    <div style={styles.sectionTitle}>Withdrawal Details</div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Transaction ID:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
+                  <div style={styles.bankCard}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaUniversity />
+                      Bank Details
+                    </h3>
+                    <div style={styles.bankItem}>
+                      <span style={styles.bankLabel}>Bank Name:</span>
+                      <span style={styles.bankValue}>{selectedWithdraw.bankName || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Amount:</span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
+                    <div style={styles.bankItem}>
+                      <span style={styles.bankLabel}>Account Name:</span>
+                      <span style={styles.bankValue}>{selectedWithdraw.accountName || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Bank Name:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.bankName || 'N/A'}</span>
+                    <div style={styles.bankItem}>
+                      <span style={styles.bankLabel}>Account Number:</span>
+                      <span style={styles.bankValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Account Name:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.accountName || 'N/A'}</span>
+                    <div style={styles.bankItem}>
+                      <span style={styles.bankLabel}>Transaction ID:</span>
+                      <span style={styles.bankValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
                     </div>
-                    <div style={styles.compactField}>
-                      <span style={styles.fieldLabel}>Account Number:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
-                    </div>
-                    <div style={styles.compactField}>
+                  </div>
+
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaCalendarAlt />
+                      Application Timeline
+                    </h3>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Date Applied:</span>
                       <span style={styles.fieldValue}>{selectedWithdraw.dateApplied || 'N/A'}</span>
                     </div>
-
-                    <div style={styles.sectionTitle}>Approval Information</div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Date Approved:</span>
                       <span style={styles.fieldValue}>{selectedWithdraw.dateApproved}</span>
                     </div>
-                    <div style={styles.compactField}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Time Approved:</span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.timeApproved}</span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.timeApproved || 'N/A'}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Status:</span>
+                      <span style={{
+                        ...styles.statusBadge,
+                        ...styles.statusApproved
+                      }}>
+                        approved
+                      </span>
                     </div>
                   </div>
-                  <div style={styles.rightColumn}>
-                    <div style={styles.sectionTitle}>Proof of Withdrawal</div>
-                    <div style={styles.imageGrid}>
+                </div>
+
+                {/* Right Column - Financial & Documents */}
+                <div style={styles.column}>
+                  <div style={styles.withdrawalCard}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaMoneyBillWave />
+                      Withdrawal Information
+                    </h3>
+                    <div style={styles.withdrawalItem}>
+                      <span style={styles.withdrawalLabel}>Amount Withdrawn:</span>
+                      <span style={styles.withdrawalValue}>
+                        {formatCurrency(selectedWithdraw.amountWithdrawn)}
+                      </span>
+                    </div>
+                    <div style={styles.withdrawalItem}>
+                      <span style={styles.withdrawalLabel}>Transaction Type:</span>
+                      <span style={styles.withdrawalValue}>
+                        Withdrawal
+                      </span>
+                    </div>
+                    <div style={styles.withdrawalItem}>
+                      <span style={styles.withdrawalLabel}>Payment Method:</span>
+                      <span style={styles.withdrawalValue}>
+                        Bank Transfer
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={styles.approvalCard}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaReceipt />
+                      Transaction Summary
+                    </h3>
+                    <div style={styles.approvalItem}>
+                      <span style={styles.approvalLabel}>Processed Amount:</span>
+                      <span style={styles.approvalValue}>
+                        {formatCurrency(selectedWithdraw.amountWithdrawn)}
+                      </span>
+                    </div>
+                    <div style={styles.approvalItem}>
+                      <span style={styles.approvalLabel}>Transaction Status:</span>
+                      <span style={styles.approvalValue}>
+                        Successfully Processed
+                      </span>
+                    </div>
+                    <div style={styles.approvalItem}>
+                      <span style={styles.approvalLabel}>Funds Disbursed:</span>
+                      <span style={styles.approvalValue}>
+                        {formatCurrency(selectedWithdraw.amountWithdrawn)}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaIdCard />
+                      Proof of Withdrawal
+                    </h3>
+                    <div style={styles.documentsGrid}>
                       {selectedWithdraw.proofOfWithdrawalUrl && (
-                        <div style={styles.imageBlock}>
-                          <p style={styles.imageLabel}>Proof of Withdrawal</p>
+                        <div 
+                          style={styles.documentCard}
+                          onClick={() => openImageViewer(selectedWithdraw.proofOfWithdrawalUrl, 'Proof of Withdrawal', 0)}
+                        >
                           <img
                             src={selectedWithdraw.proofOfWithdrawalUrl}
                             alt="Proof of Withdrawal"
-                            style={styles.imageThumbnail}
-                            onClick={() => openImageViewer(selectedWithdraw.proofOfWithdrawalUrl, 'Proof of Withdrawal', 0)}
-                            onFocus={(e) => e.target.style.outline = 'none'}
+                            style={styles.documentImage}
                           />
+                          <div style={styles.documentLabel}>Proof of Withdrawal</div>
+                        </div>
+                      )}
+                      {!selectedWithdraw.proofOfWithdrawalUrl && (
+                        <div style={{ 
+                          textAlign: 'center', 
+                          color: '#6b7280', 
+                          fontStyle: 'italic',
+                          padding: '2rem'
+                        }}>
+                          No proof of withdrawal document available
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-              ) : (
-                <div style={styles.leftColumn}>
-                  <div style={styles.sectionTitle}>Member Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Member ID:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.id || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Name:</span>
-                    <span style={styles.fieldValue}>{`${selectedWithdraw.firstName || ''} ${selectedWithdraw.lastName || ''}`}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Email:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.email || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Contact:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.phoneNumber || 'N/A'}</span>
-                  </div>
-
-                  <div style={styles.sectionTitle}>Withdrawal Details</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Transaction ID:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Amount:</span>
-                    <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Bank Name:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.bankName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Name:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.accountName || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Account Number:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Applied:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.dateApplied || 'N/A'}</span>
-                  </div>
-
-                  <div style={styles.sectionTitle}>Approval Information</div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Date Approved:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.dateApproved}</span>
-                  </div>
-                  <div style={styles.compactField}>
-                    <span style={styles.fieldLabel}>Time Approved:</span>
-                    <span style={styles.fieldValue}>{selectedWithdraw.timeApproved}</span>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Image Viewer Modal */}
+      {/* Image Viewer */}
       {imageViewerVisible && (
         <div style={styles.imageViewerModal}>
           <div style={styles.imageViewerContent}>
             <button 
               style={{ ...styles.imageViewerNav, ...styles.prevButton }}
               onClick={() => navigateImages('prev')}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaChevronLeft />
             </button>
@@ -613,15 +737,12 @@ const ApprovedWithdraws = ({ withdraws, currentPage, totalPages, onPageChange })
             <button 
               style={{ ...styles.imageViewerNav, ...styles.nextButton }}
               onClick={() => navigateImages('next')}
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaChevronRight />
             </button>
             <button 
               style={styles.imageViewerClose} 
               onClick={closeImageViewer}
-              aria-label="Close image viewer"
-              onFocus={(e) => e.target.style.outline = 'none'}
             >
               <FaTimes />
             </button>
