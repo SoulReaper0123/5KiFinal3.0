@@ -506,7 +506,7 @@ const ExistingLoan = () => {
           </View>
         )}
 
-        <Text style={styles.sectionTitle}>Payment History (Approved Payments)</Text>
+        <Text style={styles.sectionTitle}>Payment History</Text>
         {transactionHistory.length > 0 ? (
           transactionHistory.map((transaction) => (
             <View key={transaction.transactionId} style={styles.transactionCard}>

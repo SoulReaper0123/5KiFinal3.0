@@ -10,10 +10,9 @@ import { ConfirmModal, SuccessModal } from '../components/Modals';
 const SystemSettings = () => {
   const [activeSection, setActiveSection] = useState('general');
 
-  // Handle section change and reset edit mode
+  // Handle section change
   const handleSectionChange = (section) => {
     setActiveSection(section);
-    setEditMode(false); // Reset edit mode when switching sections
   };
 
   const [settings, setSettings] = useState({
@@ -61,12 +60,10 @@ const SystemSettings = () => {
   const [addLoanTypeModalVisible, setAddLoanTypeModalVisible] = useState(false);
   const [deleteLoanTypeModalVisible, setDeleteLoanTypeModalVisible] = useState(false);
   const [loanTypeToDelete, setLoanTypeToDelete] = useState('');
-  const [editMode, setEditMode] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [loading, setLoading] = useState(true);
   const [orientationCopied, setOrientationCopied] = useState(false);
-  const [confirmationModalVisible, setConfirmationModalVisible] = useState(false);
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
   const [termToDelete, setTermToDelete] = useState('');
@@ -549,106 +546,6 @@ const SystemSettings = () => {
     } finally {
       setActionInProgress(false);
     }
-  };
-
-  const handleSave = () => setConfirmationModalVisible(true);
-
-  const confirmSave = async () => {
-    // Validate dividend percentages before saving
-    if (!validateDividendPercentages()) {
-      showMessage('Error', 'Please ensure all dividend percentages total exactly 100% before saving.', true);
-      setConfirmationModalVisible(false);
-      return;
-    }
-
-    setActionInProgress(true);
-    try {
-      const settingsRef = ref(db, 'Settings/');
-
-      const parsedInterest = {};
-      for (let key in settings.InterestRate) {
-        const val = parseFloat(settings.InterestRate[key]);
-        if (!isNaN(val)) parsedInterest[key] = val;
-      }
-
-      const parsedByType = {};
-      Object.entries(settings.InterestRateByType || {}).forEach(([lt, map]) => {
-        parsedByType[lt] = {};
-        Object.entries(map || {}).forEach(([term, rate]) => {
-          const v = parseFloat(rate);
-          if (!isNaN(v)) parsedByType[lt][term] = v;
-        });
-      });
-
-      const safeParseFloat = (value, defaultValue = 0) => {
-        const parsed = parseFloat(value);
-        return isNaN(parsed) ? defaultValue : parsed;
-      };
-
-      const membersDividend = safeParseFloat(settings.MembersDividendPercentage, 0);
-      const fiveKiEarnings = safeParseFloat(settings.FiveKiEarningsPercentage, 0);
-      const investmentShare = safeParseFloat(settings.InvestmentSharePercentage, 0);
-      const patronageShare = safeParseFloat(settings.PatronageSharePercentage, 0);
-      const activeMonths = safeParseFloat(settings.ActiveMonthsPercentage, 0);
-      
-      // Final validation check with rounded values
-      const distTotal = Math.round((membersDividend + fiveKiEarnings) * 10) / 10;
-      const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 10) / 10;
-      
-      if (distTotal !== 100) {
-        throw new Error('Dividend Distribution must total exactly 100%.');
-      }
-      if (breakdownTotal !== 100) {
-        throw new Error('Members Dividend Breakdown must total exactly 100%.');
-      }
-
-      const loanTypesNested = Object.fromEntries(
-        Object.entries(parsedByType).map(([lt, map]) => [lt, Object.fromEntries(Object.entries(map || {}).map(([k, v]) => [String(k), Number(v)]))])
-      );
-
-      const updatedData = {
-        LoanPercentage: safeParseFloat(settings.LoanPercentage, 80),
-        Funds: parseFloat(parseFloat(settings.Funds || 0).toFixed(2)),
-        Savings: parseFloat(parseFloat(settings.Savings || 0).toFixed(2)),
-        InterestRate: parsedInterest,
-        InterestRateByType: parsedByType,
-        LoanReminderDays: parseInt(settings.LoanReminderDays || 7, 10),
-        DividendDate: settings.DividendDate,
-        MembersDividendPercentage: membersDividend,
-        FiveKiEarningsPercentage: fiveKiEarnings,
-        InvestmentSharePercentage: investmentShare,
-        PatronageSharePercentage: patronageShare,
-        ActiveMonthsPercentage: activeMonths,
-        ProcessingFee: parseFloat(parseFloat(settings.ProcessingFee || 0).toFixed(2)),
-        RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 5000).toFixed(2)),
-        LoanTypes: loanTypesNested,
-        OrientationCode: settings.OrientationCode,
-        Accounts: settings.Accounts,
-        TermsAndConditions: settings.TermsAndConditions,
-        PrivacyPolicy: settings.PrivacyPolicy,
-        AboutUs: settings.AboutUs,
-        ContactUs: settings.ContactUs
-      };
-
-      await update(settingsRef, updatedData);
-      setConfirmationModalVisible(false);
-      setEditMode(false);
-      showSuccessMessage('Settings updated successfully!');
-    } catch (error) {
-      showMessage('Error', error.message || ('Failed to update settings: ' + error.message), true);
-    } finally {
-      setActionInProgress(false);
-    }
-  };
-
-  const handleSaveWithConfirmation = () => {
-    showConfirmModal(
-      'Are you sure you want to save all system settings changes?',
-      confirmSave,
-      () => {
-        setConfirmationModalVisible(false);
-      }
-    );
   };
 
   const handleDateChange = (date) => {
@@ -1786,18 +1683,6 @@ const SystemSettings = () => {
             </div>
           </div>
         )}
-
-        {/* Save All Settings Button */}
-        <div style={styles.saveAllContainer}>
-          <button
-            style={styles.saveAllButton}
-            onClick={handleSaveWithConfirmation}
-            disabled={actionInProgress}
-          >
-            <FaSave style={{ marginRight: 8 }} />
-            {actionInProgress ? 'Saving...' : 'Save All Settings'}
-          </button>
-        </div>
       </div>
 
       {/* Confirmation Modal */}
@@ -2609,30 +2494,6 @@ const styles = {
     gap: '8px',
     transition: 'all 0.3s ease',
     boxShadow: '0 4px 12px rgba(30, 64, 175, 0.3)'
-  },
-  saveAllContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    marginTop: '32px',
-    paddingTop: '24px',
-    borderTop: '2px solid #e2e8f0'
-  },
-  saveAllButton: {
-    backgroundColor: '#10b981',
-    color: 'white',
-    border: 'none',
-    borderRadius: '12px',
-    padding: '16px 32px',
-    cursor: 'pointer',
-    fontSize: '16px',
-    fontWeight: '600',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    transition: 'all 0.3s ease',
-    boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
-    minWidth: '200px',
-    justifyContent: 'center'
   },
   accountGrid: {
     display: 'grid',

@@ -208,7 +208,7 @@ const AdminHome = () => {
       deposits: database.ref('Deposits/DepositApplications'),
       loans: database.ref('Loans/LoanApplications'),
       payments: database.ref('Payments/PaymentApplications'),
-      withdraws: database.ref('Withdraws/WithdrawApplications'),
+      withdraws: database.ref('Withdrawals/WithdrawalApplications'),
     };
 
     const computePending = (root) => {
