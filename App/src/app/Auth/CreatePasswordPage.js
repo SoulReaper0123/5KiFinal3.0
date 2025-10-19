@@ -37,12 +37,8 @@ const CreatePasswordPage = () => {
 
   const registrationData = route.params;
 
-  // Password requirements
+  // Password requirements - only minimum length
   const minLength = password.length >= 8;
-  const hasSpecial = /[!@#$%^&*(),.?":{}|<>_]/.test(password);
-  const hasNumber = /\d/.test(password);
-  const hasLower = /[a-z]/.test(password);
-  const hasUpper = /[A-Z]/.test(password);
 
   const hashPassword = async (password) => {
     try {
@@ -96,8 +92,8 @@ const CreatePasswordPage = () => {
       return false;
     }
 
-    if (!minLength || !hasSpecial || !hasNumber || !hasLower || !hasUpper) {
-      setErrorMessage('Please meet all password requirements.');
+    if (!minLength) {
+      setErrorMessage('Password must be at least 8 characters long.');
       return false;
     }
 
@@ -130,9 +126,7 @@ const CreatePasswordPage = () => {
       // Prepare all upload promises
       const uploadPromises = [
         uploadImageToFirebase(registrationData.selfie, `users/${sanitizedEmail}/selfie`),
-        uploadImageToFirebase(registrationData.validIdFront, `users/${sanitizedEmail}/id_front`),
-        uploadImageToFirebase(registrationData.validIdBack, `users/${sanitizedEmail}/id_back`),
-        uploadImageToFirebase(registrationData.selfieWithId, `users/${sanitizedEmail}/selfie_with_id`)
+        uploadImageToFirebase(registrationData.validIdFront, `users/${sanitizedEmail}/id_front`)
       ];
 
       // Add payment proof if exists
@@ -143,7 +137,7 @@ const CreatePasswordPage = () => {
       }
 
       // Execute all uploads
-      const [selfieUrl, validIdFrontUrl, validIdBackUrl, selfieWithIdUrl, paymentProofUrl] = 
+      const [selfieUrl, validIdFrontUrl, paymentProofUrl] =
         await Promise.all(uploadPromises);
 
       // Prepare user data
@@ -155,16 +149,11 @@ const CreatePasswordPage = () => {
         address: registrationData.address,
         governmentId: registrationData.governmentId,
         validIdFront: validIdFrontUrl,
-        validIdBack: validIdBackUrl,
         selfie: selfieUrl,
-        selfieWithId: selfieWithIdUrl,
         phoneNumber: registrationData.phoneNumber,
         password: password,
         hashedPassword: hashedPassword,
-        gender: registrationData.gender,
-        civilStatus: registrationData.civilStatus,
         placeOfBirth: registrationData.placeOfBirth,
-        age: registrationData.age,
         dateOfBirth: formatDate(new Date(registrationData.dateOfBirth)),
         dateCreated: formatDate(now),
         timeCreated: formatTime(now),
@@ -269,7 +258,7 @@ const CreatePasswordPage = () => {
         
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.title}>Create Password</Text>
-          <Text style={styles.subLabel}>Step 5 of 5 • Secure your account</Text>
+          <Text style={styles.subLabel}>Step 4 of 4 • Secure your account</Text>
           <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
             <View style={{ width: '100%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
           </View>
@@ -312,12 +301,6 @@ const CreatePasswordPage = () => {
             
             <View style={styles.requirementsContainer}>
               <Requirement met={minLength} label="Minimum of 8 characters" />
-              <Requirement met={hasSpecial} label="At least one special character" />
-              <Requirement met={hasNumber} label="At least one numeric digit" />
-              <Requirement 
-                met={hasLower && hasUpper} 
-                label="Includes both uppercase and lowercase letters" 
-              />
             </View>
           </View>
           

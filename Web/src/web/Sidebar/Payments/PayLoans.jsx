@@ -9,7 +9,8 @@ import {
   FaCheckCircle,
   FaTimes,
   FaExclamationCircle,
-  FaFileAlt
+  FaFileAlt,
+  FaPrint
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -181,6 +182,25 @@ const styles = {
   downloadButtonHover: {
     backgroundColor: '#047857'
   },
+  printButton: {
+    padding: '10px 16px',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.2s ease',
+    gap: '8px',
+    whiteSpace: 'nowrap'
+  },
+  printButtonHover: {
+    backgroundColor: '#b91c1c'
+  },
   dataContainer: {
     backgroundColor: '#fff',
     borderRadius: '12px',
@@ -192,36 +212,36 @@ const styles = {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 16px', // Reduced from 16px 24px
+    padding: '8px 16px',
     backgroundColor: '#f8fafc',
     borderBottom: '1px solid #e2e8f0',
     flexWrap: 'wrap',
-    gap: '8px', // Reduced from 12px
-    minHeight: '40px' // Add fixed height to prevent layout shifts
+    gap: '8px',
+    minHeight: '40px'
   },
   paginationInfo: {
-    fontSize: '12px', // Reduced from 14px
+    fontSize: '12px',
     color: '#64748b',
     whiteSpace: 'nowrap'
   },
   paginationControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px' // Reduced from 8px
+    gap: '4px'
   },
   paginationButton: {
-    padding: '4px 8px', // Reduced from 8px 12px
+    padding: '4px 8px',
     backgroundColor: '#fff',
     border: '1px solid #d1d5db',
-    borderRadius: '4px', // Reduced from 6px
+    borderRadius: '4px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
-    fontSize: '10px', // Reduced from 12px
-    minWidth: '24px', // Add fixed width
-    minHeight: '24px' // Add fixed height
+    fontSize: '10px',
+    minWidth: '24px',
+    minHeight: '24px'
   },
   paginationButtonDisabled: {
     backgroundColor: '#f3f4f6',
@@ -459,6 +479,35 @@ const styles = {
   noDataText: {
     fontSize: '16px',
     margin: 0
+  },
+  printModalContent: {
+    padding: '24px',
+    textAlign: 'center'
+  },
+  printOption: {
+    padding: '16px',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    marginBottom: '12px',
+    width: '100%'
+  },
+  printOptionHover: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#eff6ff'
+  },
+  printOptionText: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#374151',
+    margin: 0
+  },
+  printOptionDescription: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: '4px 0 0 0'
   }
 };
 
@@ -497,6 +546,10 @@ const PayLoans = () => {
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isHovered, setIsHovered] = useState({});
+  
+  // Print Modal State
+  const [printModalVisible, setPrintModalVisible] = useState(false);
+  const [printing, setPrinting] = useState(false);
 
   const pageSize = 10;
 
@@ -536,6 +589,23 @@ const PayLoans = () => {
       .hover-lift:hover {
         transform: translateY(-2px);
         boxShadow: 0 10px 25px rgba(0,0,0,0.1);
+      }
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        .print-content, .print-content * {
+          visibility: visible;
+        }
+        .print-content {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+        .no-print {
+          display: none !important;
+        }
       }
     `;
     document.head.appendChild(styleElement);
@@ -639,6 +709,277 @@ const PayLoans = () => {
 
     setNoMatch(filtered.length === 0);
     setFilteredData(filtered);
+  };
+
+  const handlePrint = (format = 'print') => {
+    setPrinting(true);
+    
+    try {
+      const sectionTitle = 
+        activeSection === 'pendingPayments' ? 'Pending Payments' :
+        activeSection === 'completedPayments' ? 'Approved Payments' :
+        'Rejected Payments';
+
+      // Get the data that's currently displayed in the table (paginated)
+      const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+      const printContent = document.createElement('div');
+      printContent.className = 'print-content';
+      printContent.style.padding = '20px';
+      printContent.style.fontFamily = 'Arial, sans-serif';
+
+      // Header
+      const header = document.createElement('div');
+      header.style.borderBottom = '2px solid #333';
+      header.style.paddingBottom = '10px';
+      header.style.marginBottom = '20px';
+      
+      const title = document.createElement('h1');
+      title.textContent = `${sectionTitle} Report`;
+      title.style.margin = '0';
+      title.style.color = '#333';
+      
+      const date = document.createElement('p');
+      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      date.style.margin = '5px 0 0 0';
+      date.style.color = '#666';
+      
+      const count = document.createElement('p');
+      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
+      count.style.margin = '5px 0 0 0';
+      count.style.color = '#666';
+      
+      header.appendChild(title);
+      header.appendChild(date);
+      header.appendChild(count);
+      printContent.appendChild(header);
+
+      // Table
+      if (displayedData.length > 0) {
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginTop = '20px';
+
+        // Table Header - Define columns based on active section
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.style.backgroundColor = '#f8f9fa';
+        
+        // Define columns for each section
+        let headers = [];
+        
+        switch(activeSection) {
+          case 'pendingPayments':
+            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Status'];
+            break;
+          case 'completedPayments':
+            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Date Approved'];
+            break;
+          case 'failedPayments':
+            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Rejection Reason'];
+            break;
+          default:
+            headers = [];
+        }
+
+        // Create header cells
+        headers.forEach(headerText => {
+          const th = document.createElement('th');
+          th.textContent = headerText;
+          th.style.padding = '12px 8px';
+          th.style.border = '1px solid #ddd';
+          th.style.textAlign = 'left';
+          th.style.fontWeight = 'bold';
+          th.style.backgroundColor = '#e9ecef';
+          headerRow.appendChild(th);
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Table Body
+        const tbody = document.createElement('tbody');
+        displayedData.forEach((item, index) => {
+          const row = document.createElement('tr');
+          row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+          
+          headers.forEach(header => {
+            const td = document.createElement('td');
+            let cellValue = '';
+            
+            // Handle data extraction based on header and active section
+            switch(header) {
+              case 'Member ID':
+                cellValue = item.id || '';
+                break;
+              case 'Full Name':
+                cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                break;
+              case 'Payment Amount':
+                cellValue = formatCurrency(item.amountToBePaid || 0);
+                break;
+              case 'Payment Method':
+                cellValue = item.paymentOption || '';
+                break;
+              case 'Status':
+                cellValue = item.status || 'pending';
+                break;
+              case 'Date Approved':
+                cellValue = item.dateApproved || '';
+                break;
+              case 'Rejection Reason':
+                cellValue = item.rejectionReason || '';
+                break;
+              default:
+                cellValue = item[header] || '';
+            }
+            
+            td.textContent = cellValue;
+            td.style.padding = '10px 8px';
+            td.style.border = '1px solid #ddd';
+            td.style.fontSize = '12px';
+            row.appendChild(td);
+          });
+          
+          tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        printContent.appendChild(table);
+      } else {
+        const noData = document.createElement('p');
+        noData.textContent = 'No data available';
+        noData.style.textAlign = 'center';
+        noData.style.color = '#666';
+        noData.style.fontStyle = 'italic';
+        printContent.appendChild(noData);
+      }
+
+      if (format === 'pdf') {
+        // For PDF, we'll use browser's print to PDF functionality
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      } else if (format === 'word') {
+        // For Word, create a simple HTML file that can be opened in Word
+        const htmlContent = `
+          <html>
+            <head>
+              <title>${sectionTitle}</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                h1 { color: #333; }
+              </style>
+            </head>
+            <body>
+              ${printContent.innerHTML}
+            </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else if (format === 'excel') {
+        // Export to Excel
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(sectionTitle);
+
+        if (displayedData.length > 0) {
+          // Define headers for Excel based on active section
+          let excelHeaders = [];
+          
+          switch(activeSection) {
+            case 'pendingPayments':
+              excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Status'];
+              break;
+            case 'completedPayments':
+              excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Date Approved'];
+              break;
+            case 'failedPayments':
+              excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Rejection Reason'];
+              break;
+            default:
+              excelHeaders = [];
+          }
+
+          worksheet.addRow(excelHeaders);
+
+          displayedData.forEach(item => {
+            const row = [];
+            excelHeaders.forEach(header => {
+              let cellValue = '';
+              
+              switch(header) {
+                case 'Member ID':
+                  cellValue = item.id || '';
+                  break;
+                case 'Full Name':
+                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                  break;
+                case 'Payment Amount':
+                  cellValue = parseFloat(item.amountToBePaid) || 0;
+                  break;
+                case 'Payment Method':
+                  cellValue = item.paymentOption || '';
+                  break;
+                case 'Status':
+                  cellValue = item.status || 'pending';
+                  break;
+                case 'Date Approved':
+                  cellValue = item.dateApproved || '';
+                  break;
+                case 'Rejection Reason':
+                  cellValue = item.rejectionReason || '';
+                  break;
+                default:
+                  cellValue = item[header] || '';
+              }
+              
+              row.push(cellValue);
+            });
+            worksheet.addRow(row);
+          });
+        }
+
+        workbook.xlsx.writeBuffer().then(buffer => {
+          const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        });
+      } else {
+        // Direct print
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      }
+
+      setPrintModalVisible(false);
+    } catch (error) {
+      console.error('Error printing data:', error);
+      setErrorMessage('Failed to print data');
+      setErrorModalVisible(true);
+    } finally {
+      setPrinting(false);
+    }
   };
 
   const handleDownload = async () => {
@@ -887,8 +1228,9 @@ const PayLoans = () => {
         memberId: paymentData.id,
         transactionId: paymentData.transactionId,
         amount: paymentData.amountToBePaid,
-        dateApproved: paymentData.dateApproved,
-        timeApproved: paymentData.timeApproved,
+        paymentMethod: paymentData.paymentOption,
+        dateApproved: paymentData.dateApproved || formatDate(new Date()),
+        timeApproved: paymentData.timeApproved || formatTime(new Date()),
         email: paymentData.email,
         firstName: paymentData.firstName,
         lastName: paymentData.lastName,
@@ -965,7 +1307,7 @@ const PayLoans = () => {
               })}
             </div>
 
-            {/* Search and Download - Right side */}
+            {/* Search, Download, Print - Right side */}
             <div style={styles.searchDownloadContainer}>
               <div style={styles.searchContainer}>
                 <FaSearch style={styles.searchIcon} />
@@ -984,16 +1326,17 @@ const PayLoans = () => {
 
               <button 
                 style={{
-                  ...styles.downloadButton,
-                  ...(isHovered.download ? styles.downloadButtonHover : {})
+                  ...styles.printButton,
+                  ...(isHovered.print ? styles.printButtonHover : {})
                 }}
-                onMouseEnter={() => handleMouseEnter('download')}
-                onMouseLeave={() => handleMouseLeave('download')}
-                onClick={handleDownload}
-                title="Export to Excel"
+                onMouseEnter={() => handleMouseEnter('print')}
+                onMouseLeave={() => handleMouseLeave('print')}
+                onClick={() => setPrintModalVisible(true)}
+                title="Print/Export Options"
               >
-                <FaDownload />
+                <FaPrint />
               </button>
+
             </div>
           </div>
         </div>
@@ -1087,6 +1430,99 @@ const PayLoans = () => {
           >
             <FaPlus />
           </button>
+        )}
+
+        {/* Print Modal */}
+        {printModalVisible && (
+          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Print/Export Options</h2>
+                <button 
+                  onClick={() => setPrintModalVisible(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closePrintModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closePrintModal')}
+                  onMouseLeave={() => handleMouseLeave('closePrintModal')}
+                  disabled={printing}
+                >
+                  <AiOutlineClose />
+                </button>
+              </div>
+
+              <div style={styles.printModalContent}>
+                <p style={{margin: '0 0 20px 0', color: '#64748b'}}>
+                  Choose how you want to export the currently displayed {paginatedData.length} records:
+                </p>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printDirect ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printDirect')}
+                  onMouseLeave={() => handleMouseLeave('printDirect')}
+                  onClick={() => handlePrint('print')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Print Directly</p>
+                  <p style={styles.printOptionDescription}>
+                    Send directly to your printer
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printPDF ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printPDF')}
+                  onMouseLeave={() => handleMouseLeave('printPDF')}
+                  onClick={() => handlePrint('pdf')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Save as PDF</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as PDF file
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printWord ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printWord')}
+                  onMouseLeave={() => handleMouseLeave('printWord')}
+                  onClick={() => handlePrint('word')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Word</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Word document
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printExcel ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printExcel')}
+                  onMouseLeave={() => handleMouseLeave('printExcel')}
+                  onClick={() => handlePrint('excel')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Excel</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Excel spreadsheet
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Add Payment Modal */}

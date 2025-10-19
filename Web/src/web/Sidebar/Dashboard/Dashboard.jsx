@@ -430,7 +430,7 @@ const Dashboard = () => {
 
       Object.entries(currentLoansData).forEach(([memberId, loans]) => {
         Object.entries(loans).forEach(([transactionId, loan]) => {
-          const outstandingBalance = parseFloat(loan.loanAmount) || 0;
+          const outstandingBalance = parseFloat(loan.remainingBalance) || 0;
           const originalLoan = approvedLoansData[memberId]?.[transactionId];
           const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
           
@@ -1381,7 +1381,8 @@ const Dashboard = () => {
       maxWidth: '900px',
       border: '1px solid #e2e8f0',
       maxHeight: '80vh',
-      overflow: 'auto'
+      overflow: 'auto',
+        position: 'relative' 
     },
     modalCardSmall: {
       backgroundColor: 'white',

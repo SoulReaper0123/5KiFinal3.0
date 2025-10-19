@@ -82,6 +82,8 @@ const ApplyLoan = () => {
   const [disbursement, setDisbursement] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [bankType, setBankType] = useState('');
+  const [customBankName, setCustomBankName] = useState('');
   // Saved accounts from Members
   const [bankAccName, setBankAccName] = useState('');
   const [bankAccNum, setBankAccNum] = useState('');
@@ -140,6 +142,14 @@ const ApplyLoan = () => {
     { key: 'Cash', label: 'Cash' },
   ];
 
+  const bankTypeOptions = [
+    { key: 'BDO', label: 'BDO' },
+    { key: 'Security Bank', label: 'Security Bank' },
+    { key: 'BPI', label: 'BPI' },
+    { key: 'ChinaBank', label: 'ChinaBank' },
+    { key: 'Others', label: 'Others' },
+  ];
+
   const collateralOptions = [
     { key: 'Property', label: 'Property' },
     { key: 'Vehicle', label: 'Vehicle' },
@@ -162,7 +172,16 @@ const ApplyLoan = () => {
   // Check if all required fields are filled
   const isFormValid = () => {
     const disb = disbursement;
-    const accountsOk = disb === 'Cash' || (accountName && accountNumber);
+    let accountsOk = false;
+
+    if (disb === 'Cash') {
+      accountsOk = true;
+    } else if (disb === 'Bank') {
+      accountsOk = accountName && accountNumber && bankType && (bankType !== 'Others' || customBankName);
+    } else {
+      accountsOk = accountName && accountNumber;
+    }
+
     const basicFieldsValid =
       loanAmount &&
       term &&
@@ -508,23 +527,18 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
     const transactionId = generateTransactionId();
     const now = new Date();
     
-    // Format date exactly as "August 01, 2025 at 20:15"
-    const dateApplied = now.toLocaleString('en-US', {
+    // Format date exactly as "October 19, 2025" or "October 9, 2025"
+    const dateApplied = now.toLocaleDateString('en-US', {
       month: 'long',
-      day: '2-digit',
+      day: 'numeric',
       year: 'numeric',
-    }).replace(',', '').replace(/(\d{1,2}):(\d{2})/, (match, h, m) => {
-      // Ensure 2-digit hour and minute
-      const hours = h.padStart(2, '0');
-      const minutes = m.padStart(2, '0');
-      return `${hours}:${minutes}`;
-    }).replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2');
+    });
 
-    // Also capture a separate time and a numeric timestamp for consistency with approvals
-    const timeApplied = now.toLocaleString('en-US', {
-      hour: '2-digit',
+    // Also capture time as 12-hour format like "11:59 PM" or "1:05 PM"
+    const timeApplied = now.toLocaleTimeString('en-US', {
+      hour: 'numeric',
       minute: '2-digit',
-      hour12: false
+      hour12: true
     });
     const timestamp = now.getTime();
 
@@ -605,6 +619,7 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       disbursement,
       accountName,
       accountNumber,
+      bankType: disbursement === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
       // Store percent value (e.g., 3 for 3%) from canonical LoanTypes only
       interestRate: Number(interestRatesByType?.[loanType]?.[term]) || 0,
       firstName,
@@ -677,8 +692,14 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
       `Processing Fee: ₱${processingFeeNum.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `Release Amount: ₱${releaseAmount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n` +
       `Term: ${term} ${term === '1' ? 'Month' : 'Months'}\n` +
-      `Disbursement: ${disbursement}` +
-      (disbursement === 'Cash' ? '' : `\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}`);
+      `Disbursement: ${disbursement}`;
+
+    if (disbursement !== 'Cash') {
+      message += `\nAccount Name: ${accountName}\nAccount Number: ${accountNumber}`;
+      if (disbursement === 'Bank') {
+        message += `\nBank Type: ${bankType === 'Others' ? customBankName : bankType}`;
+      }
+    }
 
     // Include collateral details if required
     if (requiresCollateral) {
@@ -895,20 +916,11 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           onChange={(option) => {
             const key = option.key;
             setDisbursement(key);
-            // Auto-fill from saved accounts, clear for Cash
-            if (key === 'Bank') {
-              setAccountName(bankAccName || '');
-              setAccountNumber((bankAccNum || '').toString());
-            } else if (key === 'GCash') {
-              setAccountName(gcashAccName || '');
-              setAccountNumber((gcashAccNum || '').toString());
-            } else if (key === 'Cash') {
-              setAccountName('');
-              setAccountNumber('');
-            } else {
-              setAccountName('');
-              setAccountNumber('');
-            }
+            // Clear all account fields when changing disbursement method
+            setAccountName('');
+            setAccountNumber('');
+            setBankType('');
+            setCustomBankName('');
           }}
           style={styles.picker}
           modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
@@ -922,23 +934,65 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
           </TouchableOpacity>
         </ModalSelector>
 
-        <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
-        <TextInput 
-          value={accountName} 
-          editable={false}
-          style={[styles.input, { backgroundColor: '#F3F4F6' }]} 
-          placeholder={disbursement === 'Cash' ? 'Not required for Cash' : 'Auto-filled from your profile'}
-        />
+        {disbursement !== 'Cash' && (
+          <>
+            <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
+            <TextInput
+              value={accountName}
+              onChangeText={setAccountName}
+              style={styles.input}
+              placeholder="Enter account name"
+            />
 
-        <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
-        <TextInput
-          value={accountNumber}
-          editable={false}
-          style={[styles.input, { backgroundColor: '#F3F4F6' }]}
-          keyboardType="numeric"
-          ref={accountNumberInput}
-          placeholder={disbursement === 'Cash' ? 'Not required for Cash' : 'Auto-filled from your profile'}
-        />
+            <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
+            <TextInput
+              value={accountNumber}
+              onChangeText={handleAccountNumberChange}
+              style={styles.input}
+              keyboardType="numeric"
+              ref={accountNumberInput}
+              placeholder="Enter account number"
+            />
+
+            {disbursement === 'Bank' && (
+              <>
+                <Text style={styles.label}><RequiredField>Type of Bank</RequiredField></Text>
+                <ModalSelector
+                  data={bankTypeOptions}
+                  initValue="Select Bank Type"
+                  onChange={(option) => {
+                    const key = option.key;
+                    setBankType(key);
+                    if (key !== 'Others') {
+                      setCustomBankName('');
+                    }
+                  }}
+                  style={styles.picker}
+                  modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                  overlayStyle={{ justifyContent: 'flex-end' }}
+                >
+                  <TouchableOpacity style={styles.pickerContainer}>
+                    <Text style={styles.pickerText}>
+                      {bankType === 'Others' && customBankName ? `Others: ${customBankName}` : (bankType || 'Select Bank Type')}
+                    </Text>
+                    <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                  </TouchableOpacity>
+                </ModalSelector>
+
+                {bankType === 'Others' && (
+                  <View style={{ marginTop: 8 }}>
+                    <TextInput
+                      placeholder="Please specify the bank name"
+                      value={customBankName}
+                      onChangeText={setCustomBankName}
+                      style={styles.input}
+                    />
+                  </View>
+                )}
+              </>
+            )}
+          </>
+        )}
 
         {/* Collateral Modal */}
         <Modal
@@ -1124,8 +1178,15 @@ const storeLoanApplicationInDatabase = async (applicationData) => {
                   <Text style={styles.modalText}>Term: {term} {term === '1' ? 'Month' : 'Months'}</Text>
                   <Text style={styles.modalText}>Interest Rate: {(Number(interestRate) * 100).toFixed(1)}%</Text>
                   <Text style={styles.modalText}>Disbursement: {disbursement}</Text>
-                  <Text style={styles.modalText}>Account Name: {accountName}</Text>
-                  <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+                  {disbursement !== 'Cash' && (
+                    <>
+                      <Text style={styles.modalText}>Account Name: {accountName}</Text>
+                      <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+                      {disbursement === 'Bank' && (
+                        <Text style={styles.modalText}>Bank Type: {bankType === 'Others' ? customBankName : bankType}</Text>
+                      )}
+                    </>
+                  )}
                   {requiresCollateral && (
                     <>
                       <Text style={[styles.modalText, { marginTop: 8, fontWeight: '700', color: '#2C5282' }]}>Collateral Details</Text>

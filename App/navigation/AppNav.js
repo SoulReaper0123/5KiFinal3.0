@@ -312,7 +312,6 @@ const AppNav = () => (
       <Stack.Screen name="Register" component={RegisterPage} options={{ headerShown: false }} />
       <Stack.Screen name="Register2" component={RegisterPage2} options={{ headerShown: false }} />
       <Stack.Screen name="CreatePassword" component={CreatePasswordPage} options={{ headerShown: false }} />
-      <Stack.Screen name="AccountDetails" component={require('../src/app/Auth/AccountDetailsPage').default} options={{ headerShown: false }} />
       <Stack.Screen name="DrawerNav" component={AppHome} options={{ headerShown: false }} />
       <Stack.Screen name="AppHome" component={AppHome} options={{ headerShown: false }} />
       <Stack.Screen name="ApplyLoan" component={ApplyLoan} options={{ headerShown: false }} />

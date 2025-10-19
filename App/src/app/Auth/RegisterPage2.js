@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  Button, 
-  StyleSheet, 
-  TouchableOpacity, 
-  Image, 
-  Alert, 
+import {
+  View,
+  Text,
+  Button,
+  StyleSheet,
+  TouchableOpacity,
+  Image,
+  Alert,
   ScrollView,
-  Modal 
+  Modal,
+  TextInput
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
 import ImagePickerModal from '../../components/ImagePickerModal';
@@ -16,18 +17,18 @@ import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
+import ModalSelector from 'react-native-modal-selector';
 
 const RegisterPage2 = () => {
     const route = useRoute();
     const navigation = useNavigation();
+    const [governmentId, setGovernmentId] = useState('');
+    const [isOtherGovernmentId, setIsOtherGovernmentId] = useState(false);
+    const [otherGovernmentId, setOtherGovernmentId] = useState('');
     const [validIdFront, setValidIdFront] = useState(null);
-    const [validIdBack, setValidIdBack] = useState(null);
     const [selfie, setSelfie] = useState(null);
-    const [selfieWithId, setSelfieWithId] = useState(null);
     const [showIdFrontOptions, setShowIdFrontOptions] = useState(false);
-    const [showIdBackOptions, setShowIdBackOptions] = useState(false);
     const [showSelfieOptions, setShowSelfieOptions] = useState(false);
-    const [showSelfieWithIdOptions, setShowSelfieWithIdOptions] = useState(false);
     // State for crop options modal
     const [showCropOptions, setShowCropOptions] = useState(false);
     const [selectedImageUri, setSelectedImageUri] = useState(null);
@@ -38,18 +39,11 @@ const RegisterPage2 = () => {
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
 
-    useEffect(() => {
-        if (route.params?.selfieWithId) {
-            setSelfieWithId(route.params.selfieWithId);
-        }
-        if (route.params?.selfie) {
-            setSelfie(route.params.selfie);
-        }
-    }, [route.params]);
+
 
     const {
-        firstName, middleName, lastName, email, phoneNumber, gender, civilStatus, placeOfBirth,
-        address, governmentId, age, dateOfBirth,
+        firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
+        address, dateOfBirth,
     } = route.params;
 
     const handleSelectImage = async (source, setImageFunction, imageType) => {
@@ -62,9 +56,7 @@ const RegisterPage2 = () => {
         
         // Close all option modals first
         setShowIdFrontOptions(false);
-        setShowIdBackOptions(false);
         setShowSelfieOptions(false);
-        setShowSelfieWithIdOptions(false);
         
         // Save the current set function and image type for later use
         setCurrentSetFunction(() => setImageFunction);
@@ -184,8 +176,8 @@ const RegisterPage2 = () => {
     };
 
     const handleNext = () => {
-        if (!validIdFront || !validIdBack || !selfie || !selfieWithId) {
-            setModalMessage('Please upload all required images');
+        if (!governmentId || !validIdFront || !selfie) {
+            setModalMessage('Please select government ID and upload all required images');
             setModalType('error');
             setModalVisible(true);
             return;
@@ -193,10 +185,9 @@ const RegisterPage2 = () => {
 
         navigation.navigate('RegistrationFee', {
             ...route.params,
+            governmentId: isOtherGovernmentId ? otherGovernmentId : governmentId,
             validIdFront,
-            validIdBack,
-            selfie,
-            selfieWithId
+            selfie
         });
     };
 
@@ -262,32 +253,62 @@ const RegisterPage2 = () => {
 
                 <View style={{ marginBottom: 16 }}>
                     <Text style={styles.title}>Identity Verification</Text>
-                    <Text style={styles.subLabel}>Step 2 of 5 • Provide ID and selfie</Text>
+                    <Text style={styles.subLabel}>Step 2 of 4 • Provide ID and selfie</Text>
                     <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
                         <View style={{ width: '40%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
                     </View>
                 </View>
 
                 <View style={styles.card}>
+                    <View style={styles.inputContainer}>
+                        <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
+                        <ModalSelector
+                            data={governmentIdOptions}
+                            initValue="Select Government ID"
+                            cancelText="Cancel"
+                            onChange={(option) => {
+                                const isOther = option.key === 'other';
+                                setIsOtherGovernmentId(isOther);
+                                if (isOther) {
+                                    setGovernmentId('Other');
+                                    setOtherGovernmentId('');
+                                } else {
+                                    setGovernmentId(option.label);
+                                    setOtherGovernmentId('');
+                                }
+                            }}
+                            style={styles.picker}
+                            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                            overlayStyle={{ justifyContent: 'flex-end' }}
+                        >
+                            <TouchableOpacity style={styles.pickerContainer}>
+                                <Text style={styles.pickerText}>
+                                    {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
+                                </Text>
+                                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                            </TouchableOpacity>
+                        </ModalSelector>
+                        {isOtherGovernmentId && (
+                            <View style={{ marginTop: 8 }}>
+                                <TextInput
+                                    placeholder="Please specify your Government ID"
+                                    value={otherGovernmentId}
+                                    onChangeText={(text) => {
+                                        setOtherGovernmentId(text);
+                                        setGovernmentId(text);
+                                    }}
+                                    style={styles.input}
+                                />
+                            </View>
+                        )}
+                    </View>
+
                     <View style={styles.grid}>
                         <View style={styles.tile}>
                             <Text style={styles.label}>Valid ID - Front</Text>
                             <TouchableOpacity onPress={() => setShowIdFrontOptions(true)} style={styles.imagePreviewContainer}>
                                 {validIdFront ? (
                                     <Image source={{ uri: validIdFront }} style={styles.imagePreview} />
-                                ) : (
-                                    <View style={styles.iconContainer}>
-                                        <Icon name="add" size={40} color="#1E3A5F" />
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        </View>
-
-                        <View style={styles.tile}>
-                            <Text style={styles.label}>Valid ID - Back</Text>
-                            <TouchableOpacity onPress={() => setShowIdBackOptions(true)} style={styles.imagePreviewContainer}>
-                                {validIdBack ? (
-                                    <Image source={{ uri: validIdBack }} style={styles.imagePreview} />
                                 ) : (
                                     <View style={styles.iconContainer}>
                                         <Icon name="add" size={40} color="#1E3A5F" />
@@ -308,19 +329,6 @@ const RegisterPage2 = () => {
                                 )}
                             </TouchableOpacity>
                         </View>
-
-                        <View style={styles.tile}>
-                            <Text style={styles.label}>Selfie with ID</Text>
-                            <TouchableOpacity onPress={() => setShowSelfieWithIdOptions(true)} style={styles.imagePreviewContainer}>
-                                {selfieWithId ? (
-                                    <Image source={{ uri: selfieWithId }} style={styles.imagePreview} />
-                                ) : (
-                                    <View style={styles.iconContainer}>
-                                        <Icon name="photo-camera" size={40} color="#1E3A5F" />
-                                    </View>
-                                )}
-                            </TouchableOpacity>
-                        </View>
                     </View>
                 </View>
 
@@ -329,9 +337,9 @@ const RegisterPage2 = () => {
                         onPress={handleNext}
                         style={[
                             styles.primaryButton,
-                            (!validIdFront || !validIdBack || !selfie || !selfieWithId) && styles.buttonDisabled
+                            (!governmentId || !validIdFront || !selfie) && styles.buttonDisabled
                         ]}
-                        disabled={!validIdFront || !validIdBack || !selfie || !selfieWithId}
+                        disabled={!governmentId || !validIdFront || !selfie}
                     >
                         <Text style={styles.primaryButtonText}>Next</Text>
                     </TouchableOpacity>
@@ -349,33 +357,12 @@ const RegisterPage2 = () => {
                 />
 
                 <ImagePickerModal
-                    visible={showIdBackOptions}
-                    onClose={() => setShowIdBackOptions(false)}
-                    onImageSelected={(imageUri) => {
-                        setValidIdBack(imageUri);
-                    }}
-                    title="Select ID Back Source"
-                    showCropOptions={true}
-                />
-
-                <ImagePickerModal
                     visible={showSelfieOptions}
                     onClose={() => setShowSelfieOptions(false)}
                     onImageSelected={(imageUri) => {
                         setSelfie(imageUri);
                     }}
                     title="Take Selfie"
-                    showCropOptions={false}
-                    cameraOnly={true}
-                />
-
-                <ImagePickerModal
-                    visible={showSelfieWithIdOptions}
-                    onClose={() => setShowSelfieWithIdOptions(false)}
-                    onImageSelected={(imageUri) => {
-                        setSelfieWithId(imageUri);
-                    }}
-                    title="Take Selfie with ID"
                     showCropOptions={false}
                     cameraOnly={true}
                 />
@@ -589,6 +576,44 @@ const styles = StyleSheet.create({
         marginBottom: 12,
         paddingHorizontal: 10,
     },
+    inputContainer: {
+        marginBottom: 15,
+    },
+    input: {
+        height: 50,
+        borderColor: '#ccc',
+        borderWidth: 1,
+        borderRadius: 8,
+        paddingHorizontal: 10,
+    },
+    picker: {
+        marginBottom: 10,
+    },
+    pickerContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        padding: 10,
+        borderColor: '#ccc',
+        height: 50,
+        borderWidth: 1,
+        borderRadius: 10,
+    },
+    pickerText: {
+        fontSize: 14,
+        color: 'grey',
+    },
+    required: {
+        color: 'red',
+    },
 });
+
+const governmentIdOptions = [
+    { key: 'national', label: 'National ID (PhilSys)' },
+    { key: 'sss', label: 'SSS ID' },
+    { key: 'philhealth', label: 'PhilHealth ID' },
+    { key: 'drivers_license', label: 'Drivers License' },
+    { key: 'other', label: 'Others' },
+];
 
 export default RegisterPage2;

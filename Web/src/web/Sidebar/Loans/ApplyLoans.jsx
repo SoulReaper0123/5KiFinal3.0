@@ -1709,15 +1709,6 @@ const handleSuccessOk = async () => {
                       </span>
                       <span style={styles.fieldValue}>{memberBalance !== null ? formatCurrency(memberBalance) : 'Loading...'}</span>
                     </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaFileInvoiceDollar />
-                        Existing Loan:
-                      </span>
-                      <span style={styles.fieldValue}>
-                        {existingLoanInfo.hasExisting ? `Yes — Outstanding: ${formatCurrency(existingLoanInfo.outstanding)}` : 'No'}
-                      </span>
-                    </div>
                   </div>
 
                   <div style={styles.section}>
@@ -1741,6 +1732,7 @@ const handleSuccessOk = async () => {
                       <span style={styles.fieldLabel}>Disbursement:</span>
                       <span style={styles.fieldValue}>{selectedLoan.disbursement || 'N/A'}</span>
                     </div>
+
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>
                         <FaCalendarAlt />
@@ -1765,6 +1757,10 @@ const handleSuccessOk = async () => {
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Account Number:</span>
                       <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
+                    </div>
+                                      <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Type of Bank:</span>
+                      <span style={styles.fieldValue}>{selectedLoan.bankType || 'N/A'}</span>
                     </div>
                   </div>
 

@@ -493,7 +493,7 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Method</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Mode of Payment</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -587,7 +587,7 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                   <div style={styles.methodCard}>
                     <h3 style={styles.sectionTitle}>
                       <FaCreditCard />
-                      Payment Method
+                      Mode of Payment
                     </h3>
                     <div style={styles.methodItem}>
                       <span style={styles.methodLabel}>Payment Option:</span>

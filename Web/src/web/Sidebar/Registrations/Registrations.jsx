@@ -2062,7 +2062,7 @@ const response = await ApproveRegistration({
   amount: reg.registrationFee || 0, 
   dateApproved: reg.dateApproved,
   approvedTime: reg.approvedTime,
-  memberId: reg.memberId || 'pending' ,
+  memberId: reg.memberId,
    password: reg.password 
 });
     
@@ -2109,7 +2109,8 @@ const callApiReject = async (reg) => {
       // Finalize DB changes
       if (pendingApiCall) {
         if (pendingApiCall.type === 'approve') {
-          await processDatabaseApprove(pendingApiCall.data);
+          const memberId = await processDatabaseApprove(pendingApiCall.data);
+          pendingApiCall.data.memberId = memberId;
         } else if (pendingApiCall.type === 'reject') {
           await processDatabaseReject(pendingApiCall.data, pendingApiCall.data.rejectionReason || 'Rejected by admin');
         }
@@ -2309,20 +2310,6 @@ const callApiReject = async (reg) => {
                       </span>
                       <span style={styles.fieldValue}>{selectedRegistration.phoneNumber}</span>
                     </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaVenusMars />
-                        Gender:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedRegistration.gender}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaHeart />
-                        Civil Status:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedRegistration.civilStatus}</span>
-                    </div>
                   </div>
 
                   <div style={styles.section}>
@@ -2336,10 +2323,6 @@ const callApiReject = async (reg) => {
                         Date of Birth:
                       </span>
                       <span style={styles.fieldValue}>{selectedRegistration.dateOfBirth}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>Age:</span>
-                      <span style={styles.fieldValue}>{selectedRegistration.age}</span>
                     </div>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>

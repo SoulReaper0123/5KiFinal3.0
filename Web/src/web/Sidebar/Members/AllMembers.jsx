@@ -314,31 +314,6 @@ const styles = {
     minWidth: '140px',
     justifyContent: 'center'
   },
-  activateButton: {
-    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
-    }
-  },
-  deactivateButton: {
-    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
-    }
-  },
-  disabledButton: {
-    background: '#9ca3af',
-    cursor: 'not-allowed',
-    opacity: '0.7',
-    '&:hover': {
-      transform: 'none',
-      boxShadow: 'none'
-    }
-  },
 viewButton: {
   background: 'transparent',
   color: '#2563eb',
@@ -520,13 +495,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
   const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [availableImages, setAvailableImages] = useState([]);
-  const [showStatusConfirmation, setShowStatusConfirmation] = useState(false);
-  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
-  const [errorModalVisible, setErrorModalVisible] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [actionInProgress, setActionInProgress] = useState(false);
   const [loansTotals, setLoansTotals] = useState({});
 
   useEffect(() => {
@@ -578,8 +546,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
 
   const closeModal = () => {
     setModalVisible(false);
-    setErrorModalVisible(false);
-    setSuccessMessageModalVisible(false);
   };
 
   const openImageViewer = (url, label, index) => {
@@ -634,37 +600,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
     setShowStatusConfirmation(true);
   };
 
-  const confirmStatusChange = async () => {
-    setShowStatusConfirmation(false);
-    setActionInProgress(true);
-    setIsProcessing(true);
-
-    try {
-      const newStatus = selectedMember.status === 'active' ? 'inactive' : 'active';
-      
-      await database.ref(`Members/${selectedMember.id}/status`).set(newStatus);
-      
-      setSuccessMessage(`Member successfully ${newStatus === 'active' ? 'activated' : 'deactivated'}`);
-      setSuccessMessageModalVisible(true);
-      
-      setSelectedMember(prev => ({
-        ...prev,
-        status: newStatus
-      }));
-
-      refreshData();
-    } catch (error) {
-      setErrorMessage('Failed to update member status');
-      setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
-      setActionInProgress(false);
-    }
-  };
-
-  const cancelStatusChange = () => {
-    setShowStatusConfirmation(false);
-  };
 
   if (!members || members.length === 0) return (
     <div style={styles.noDataContainer}>
@@ -785,21 +720,7 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                         <FaPhone />
                         Contact:
                       </span>
-                      <span style={styles.fieldValue}>{selectedMember.phoneNumber}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaVenusMars />
-                        Gender:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedMember.gender}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaHeart />
-                        Civil Status:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedMember.civilStatus}</span>
+                      <span style={styles.fieldValue}>{selectedMember.phoneNumber || selectedMember.contactNumber}</span>
                     </div>
                   </div>
 
@@ -814,10 +735,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
                         Date of Birth:
                       </span>
                       <span style={styles.fieldValue}>{selectedMember.dateOfBirth}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>Age:</span>
-                      <span style={styles.fieldValue}>{selectedMember.age}</span>
                     </div>
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>
@@ -946,115 +863,6 @@ const AllMembers = ({ members, currentPage, totalPages, onPageChange, refreshDat
               </div>
             </div>
 
-            <div style={styles.modalActions}>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...(selectedMember.status === 'active' ? styles.deactivateButton : styles.activateButton),
-                  ...(isProcessing ? styles.disabledButton : {})
-                }}
-                onClick={toggleStatus}
-                disabled={isProcessing}
-              >
-                {isProcessing ? (
-                  <>
-                    <div style={{ 
-                      width: '16px', 
-                      height: '16px', 
-                      border: '2px solid transparent', 
-                      borderTop: '2px solid white', 
-                      borderRadius: '50%', 
-                      animation: 'spin 1s linear infinite' 
-                    }} />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    {selectedMember.status === 'active' ? 'Deactivate Member' : 'Activate Member'}
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Status Change Confirmation Modal */}
-      {showStatusConfirmation && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.alertModal}>
-            <FaExclamationCircle style={{ ...styles.alertIcon, ...styles.warningIcon }} />
-            <h3 style={styles.alertTitle}>Confirm Status Change</h3>
-            <p style={styles.alertMessage}>
-              Are you sure you want to {selectedMember?.status === 'active' ? 'deactivate' : 'activate'} this member? 
-              {selectedMember?.status === 'active' && ' The member will lose access to their account.'}
-            </p>
-            <div style={styles.alertActions}>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.secondaryButton
-                }}
-                onClick={cancelStatusChange}
-                disabled={actionInProgress}
-              >
-                Cancel
-              </button>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...(selectedMember?.status === 'active' ? styles.deactivateButton : styles.activateButton)
-                }}
-                onClick={confirmStatusChange}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Confirm'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Success Message Modal */}
-      {successMessageModalVisible && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.alertModal}>
-            <FaCheckCircle style={{ ...styles.alertIcon, ...styles.successIcon }} />
-            <h3 style={styles.alertTitle}>Success</h3>
-            <p style={styles.alertMessage}>{successMessage}</p>
-            <div style={styles.alertActions}>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }}
-                onClick={closeModal}
-              >
-                Continue
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error Message Modal */}
-      {errorModalVisible && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.alertModal}>
-            <FaExclamationCircle style={{ ...styles.alertIcon, ...styles.errorIcon }} />
-            <h3 style={styles.alertTitle}>Error</h3>
-            <p style={styles.alertMessage}>{errorMessage}</p>
-            <div style={styles.alertActions}>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }}
-                onClick={() => setErrorModalVisible(false)}
-              >
-                Try Again
-              </button>
-            </div>
           </div>
         </div>
       )}

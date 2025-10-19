@@ -465,7 +465,7 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Deposit Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Deposit Option</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Mode of Deposit</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -598,7 +598,7 @@ const ApprovedDeposits = ({ deposits, currentPage, totalPages, onPageChange }) =
                       <span style={styles.financialValue}>{selectedDeposit.transactionId || 'N/A'}</span>
                     </div>
                     <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Deposit Option:</span>
+                      <span style={styles.financialLabel}>Mode of Deposit:</span>
                       <span style={styles.financialValue}>{selectedDeposit.depositOption || 'N/A'}</span>
                     </div>
                   </div>

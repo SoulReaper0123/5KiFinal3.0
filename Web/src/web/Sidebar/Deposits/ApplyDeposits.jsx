@@ -1383,7 +1383,7 @@ const ApplyDeposits = ({
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Deposit Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Deposit Option</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Mode of Deposit</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -1765,6 +1765,7 @@ const ApplyDeposits = ({
       {isProcessing && (
         <div style={styles.modalOverlay}>
           <div style={styles.spinner}></div>
+          
         </div>
       )}
 

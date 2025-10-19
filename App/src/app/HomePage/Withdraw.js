@@ -15,6 +15,8 @@ const Withdraw = () => {
   const [withdrawOption, setWithdrawOption] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accountNumber, setAccountNumber] = useState('');
+  const [bankType, setBankType] = useState('');
+  const [customBankName, setCustomBankName] = useState('');
   // Saved accounts from Members
   const [bankAccName, setBankAccName] = useState('');
   const [bankAccNum, setBankAccNum] = useState('');
@@ -44,6 +46,14 @@ const Withdraw = () => {
     { key: 'GCash', label: 'GCash' },
     { key: 'Bank', label: 'Bank' },
     { key: 'Cash', label: 'Cash' },
+  ];
+
+  const bankTypeOptions = [
+    { key: 'BDO', label: 'BDO' },
+    { key: 'Security Bank', label: 'Security Bank' },
+    { key: 'BPI', label: 'BPI' },
+    { key: 'ChinaBank', label: 'ChinaBank' },
+    { key: 'Others', label: 'Others' },
   ];
 
   const fetchUserData = async (userEmail) => {
@@ -76,6 +86,24 @@ const Withdraw = () => {
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
+    }
+  };
+
+  // Check if user has any existing pending withdrawal application
+  const hasAnyPendingWithdrawal = async (memberId) => {
+    try {
+      const applicationsRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}`);
+      const snapshot = await get(applicationsRef);
+      if (!snapshot.exists()) return false;
+      const apps = snapshot.val();
+      for (const id in apps) {
+        const a = apps[id];
+        if ((a?.status || 'pending') === 'pending') return true;
+      }
+      return false;
+    } catch (e) {
+      console.error('Error checking pending withdrawals:', e);
+      return false;
     }
   };
 
@@ -140,20 +168,11 @@ const Withdraw = () => {
   const handleWithdrawOptionChange = (option) => {
     const key = option.key;
     setWithdrawOption(key);
-    // Auto-fill from saved accounts
-    if (key === 'Bank') {
-      setAccountName(bankAccName || '');
-      setAccountNumber((bankAccNum || '').toString());
-    } else if (key === 'GCash') {
-      setAccountName(gcashAccName || '');
-      setAccountNumber((gcashAccNum || '').toString());
-    } else if (key === 'Cash') {
-      setAccountName('');
-      setAccountNumber('');
-    } else {
-      setAccountName('');
-      setAccountNumber('');
-    }
+    // Clear all account fields when changing withdrawal option
+    setAccountName('');
+    setAccountNumber('');
+    setBankType('');
+    setCustomBankName('');
   };
 
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
@@ -161,24 +180,30 @@ const Withdraw = () => {
   useEffect(() => {
     // Convert withdrawAmount to number for proper comparison
     const amount = parseFloat(withdrawAmount) || 0;
-    
+
     // Check for empty fields
-    const hasEmptyFields = !withdrawOption || !withdrawAmount ||
-      (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
-    
+    let hasEmptyFields = false;
+    if (withdrawOption === 'Cash') {
+      hasEmptyFields = !withdrawOption || !withdrawAmount;
+    } else if (withdrawOption === 'Bank') {
+      hasEmptyFields = !withdrawOption || !withdrawAmount || !accountName || !accountNumber || !bankType || (bankType === 'Others' && !customBankName);
+    } else {
+      hasEmptyFields = !withdrawOption || !withdrawAmount || !accountName || !accountNumber;
+    }
+
     // Check balance - NEW LOGIC: balance after withdrawal must be at least ₱5,000
     const balanceAfterWithdrawal = balance - amount;
     const insufficientBalance = balanceAfterWithdrawal < 5000;
     const invalidAmount = isNaN(amount) || amount <= 0;
-    
+
     // Enable button only when all conditions are met
     setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
-  }, [withdrawOption, accountName, accountNumber, withdrawAmount, balance]);
+  }, [withdrawOption, accountName, accountNumber, bankType, customBankName, withdrawAmount, balance]);
 
   const handleSubmit = async () => {
     const missingFields = !withdrawOption || !withdrawAmount ||
       (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
-    
+
     if (missingFields) {
       setAlertMessage('All fields are required');
       setAlertType('error');
@@ -203,6 +228,17 @@ const Withdraw = () => {
       return;
     }
 
+    // Check if user has any existing pending withdrawal application
+    if (memberId) {
+      const exists = await hasAnyPendingWithdrawal(memberId);
+      if (exists) {
+        setAlertMessage('You already have a pending withdrawal application. Please wait for it to be processed before submitting another.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+        return;
+      }
+    }
+
     // Show confirmation modal
     setConfirmModalVisible(true);
   };
@@ -218,10 +254,10 @@ const Withdraw = () => {
 const submitWithdrawal = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
-    
+
     try {
         const transactionId = generateTransactionId();
-        const currentDate = new Date().toISOString();
+        const currentDate = new Date();
 
         // Prepare withdrawal data
         const withdrawalData = {
@@ -233,15 +269,18 @@ const submitWithdrawal = async () => {
             withdrawOption,
             accountName,
             accountNumber,
+            bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
             amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
-            dateApplied: new Date().toLocaleString('en-US', {
+            dateApplied: currentDate.toLocaleDateString('en-US', {
                 month: 'long',
-                day: '2-digit',
+                day: 'numeric',
                 year: 'numeric',
-            })
-            .replace(',', '')
-            .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-            .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+            }),
+            timeApplied: currentDate.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+            }),
             timestamp: currentDate.getTime(),
             status: 'pending',
         };
@@ -264,12 +303,13 @@ const submitWithdrawal = async () => {
             firstName,
             lastName,
             amount: parseFloat(withdrawAmount),
-            date: currentDate,
+            date: currentDate.toISOString(),
             recipientAccount: accountNumber, // This is what the server expects
             accountNumber: accountNumber,    // This is what you're sending
             referenceNumber: transactionId,
             withdrawOption,
             accountName,
+            bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
             websiteLink: 'https://fivekiapp.onrender.com',
             facebookLink: 'https://www.facebook.com/5KiFS'
         };
@@ -334,19 +374,57 @@ const submitWithdrawal = async () => {
               <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
               <TextInput
                 value={accountName}
-                editable={false}
-                style={[styles.input, { backgroundColor: '#F3F4F6' }]}
-                placeholder="Auto-filled from your profile"
+                onChangeText={setAccountName}
+                style={styles.input}
+                placeholder="Enter account name"
               />
 
               <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
               <TextInput
                 value={accountNumber}
-                editable={false}
-                style={[styles.input, { backgroundColor: '#F3F4F6' }]}
+                onChangeText={setAccountNumber}
+                style={styles.input}
                 keyboardType="numeric"
-                placeholder="Auto-filled from your profile"
+                placeholder="Enter account number"
               />
+
+              {withdrawOption === 'Bank' && (
+                <>
+                  <Text style={styles.label}>Type of Bank<Text style={styles.required}>*</Text></Text>
+                  <ModalSelector
+                    data={bankTypeOptions}
+                    initValue="Select Bank Type"
+                    onChange={(option) => {
+                      const key = option.key;
+                      setBankType(key);
+                      if (key !== 'Others') {
+                        setCustomBankName('');
+                      }
+                    }}
+                    style={styles.picker}
+                    modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                    overlayStyle={{ justifyContent: 'flex-end' }}
+                  >
+                    <TouchableOpacity style={styles.pickerContainer}>
+                      <Text style={styles.pickerText}>
+                        {bankType === 'Others' && customBankName ? `Others: ${customBankName}` : (bankType || 'Select Bank Type')}
+                      </Text>
+                      <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                    </TouchableOpacity>
+                  </ModalSelector>
+
+                  {bankType === 'Others' && (
+                    <View style={{ marginTop: 8 }}>
+                      <TextInput
+                        placeholder="Please specify the bank name"
+                        value={customBankName}
+                        onChangeText={setCustomBankName}
+                        style={styles.input}
+                      />
+                    </View>
+                  )}
+                </>
+              )}
             </>
           )}
 
@@ -382,8 +460,15 @@ const submitWithdrawal = async () => {
             <View style={styles.modalContent}>
               <Text style={styles.modalText}>Current Balance: {formatCurrency(balance)}</Text>
               <Text style={styles.modalText}>Withdraw Option: {withdrawOption}</Text>
-              <Text style={styles.modalText}>Account Name: {accountName}</Text>
-              <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+              {withdrawOption !== 'Cash' && (
+                <>
+                  <Text style={styles.modalText}>Account Name: {accountName}</Text>
+                  <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+                  {withdrawOption === 'Bank' && (
+                    <Text style={styles.modalText}>Bank Type: {bankType === 'Others' ? customBankName : bankType}</Text>
+                  )}
+                </>
+              )}
               <Text style={styles.modalText}>Amount to be Withdrawn: {formatCurrency(withdrawAmount)}</Text>
               <Text style={styles.modalText}>Balance After Withdrawal: {formatCurrency(balance - parseFloat(withdrawAmount))}</Text>
             </View>

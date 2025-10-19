@@ -16,6 +16,7 @@ import {
 import CustomModal from '../../components/CustomModal';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import ModalSelector from 'react-native-modal-selector';
 import { ref as dbRef, get, set } from 'firebase/database';
 import { database, auth } from '../../firebaseConfig';
 import { KeyboardAvoidingView, Platform } from 'react-native';
@@ -33,7 +34,10 @@ export default function WithdrawMembership() {
     joined: '',
     reason: '',
     hasLoan: '',
-    otherReason: ''
+    otherReason: '',
+    disbursementAccountName: '',
+    disbursementAccountNumber: '',
+    disbursementBankType: ''
   });
   const [agreed, setAgreed] = useState(false);
   const [modalVisible, setModalVisible] = useState(false);
@@ -49,6 +53,25 @@ export default function WithdrawMembership() {
   const [hasExistingLoan, setHasExistingLoan] = useState(false);
   const [showOtherReasonInput, setShowOtherReasonInput] = useState(false);
   const [hasPendingWithdrawal, setHasPendingWithdrawal] = useState(false);
+  const [bankAccName, setBankAccName] = useState('');
+  const [bankAccNum, setBankAccNum] = useState('');
+  const [gcashAccName, setGcashAccName] = useState('');
+  const [gcashAccNum, setGcashAccNum] = useState('');
+  const [disbursementOption, setDisbursementOption] = useState('');
+  const [customBankName, setCustomBankName] = useState('');
+
+  const disbursementOptions = [
+    { key: 'GCash', label: 'GCash' },
+    { key: 'Bank', label: 'Bank' },
+  ];
+
+  const bankTypeOptions = [
+    { key: 'BDO', label: 'BDO' },
+    { key: 'Security Bank', label: 'Security Bank' },
+    { key: 'BPI', label: 'BPI' },
+    { key: 'ChinaBank', label: 'ChinaBank' },
+    { key: 'Others', label: 'Others' },
+  ];
 
   useEffect(() => {
     const handleBackPress = () => {
@@ -169,7 +192,13 @@ export default function WithdrawMembership() {
           setBalance(member.balance || 0);
           await checkExistingLoans(member.id);
           const hasPending = await checkPendingWithdrawal(member.id);
-          
+
+          // Capture saved disbursement accounts
+          setBankAccName(member.bankAccName || '');
+          setBankAccNum(member.bankAccNum || '');
+          setGcashAccName(member.gcashAccName || '');
+          setGcashAccNum(member.gcashAccNum || '');
+
           if (hasPending) {
             setEmailError('You already have a pending withdrawal request');
           } else {
@@ -179,7 +208,7 @@ export default function WithdrawMembership() {
               lastName: member.lastName || '',
               joined: member.dateApproved || '',
               address: member.address || '',
-              contact: member.contact || ''
+              contact: member.phoneNumber || ''
             }));
           }
         } else {
@@ -204,6 +233,12 @@ export default function WithdrawMembership() {
     setBalance(0);
     setHasExistingLoan(false);
     setHasPendingWithdrawal(false);
+    setBankAccName('');
+    setBankAccNum('');
+    setGcashAccName('');
+    setGcashAccNum('');
+    setDisbursementOption('');
+    setCustomBankName('');
     setForm(prev => ({
       ...prev,
       firstName: '',
@@ -213,7 +248,10 @@ export default function WithdrawMembership() {
       contact: '',
       hasLoan: '',
       reason: '',
-      otherReason: ''
+      otherReason: '',
+      disbursementAccountName: '',
+      disbursementAccountNumber: '',
+      disbursementBankType: ''
     }));
   };
 
@@ -237,6 +275,19 @@ export default function WithdrawMembership() {
       otherReason: reason === 'Others' ? '' : prev.otherReason
     }));
     setShowOtherReasonInput(reason === 'Others');
+  };
+
+  const handleDisbursementOptionChange = (option) => {
+    const key = option.key;
+    setDisbursementOption(key);
+    // Clear all account fields when changing disbursement option
+    setForm(prev => ({
+      ...prev,
+      disbursementAccountName: '',
+      disbursementAccountNumber: '',
+      disbursementBankType: ''
+    }));
+    setCustomBankName('');
   };
 
   const handleSubmit = async () => {
@@ -268,6 +319,28 @@ export default function WithdrawMembership() {
       return;
     }
 
+    // Check disbursement fields
+    if (!disbursementOption) {
+      setAlertMessage('Please select a disbursement option');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    if (!form.disbursementAccountName || !form.disbursementAccountNumber) {
+      setAlertMessage('Please provide disbursement account name and number');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    if (disbursementOption === 'Bank' && !form.disbursementBankType && !customBankName) {
+      setAlertMessage('Please select or specify the bank type');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
     const finalReason = form.reason === 'Others' ? form.otherReason : form.reason;
 
     setConfirmModalVisible(true);
@@ -293,20 +366,27 @@ export default function WithdrawMembership() {
         reason: finalReason,
         balance: balance,
         date: currentDate,
-        hasExistingLoan
+        hasExistingLoan,
+        disbursementOption,
+        disbursementAccountName: form.disbursementAccountName,
+        disbursementAccountNumber: form.disbursementAccountNumber,
+        disbursementBankType: disbursementOption === 'Bank' ? (form.disbursementBankType === 'Others' ? customBankName : form.disbursementBankType) : null
       };
 
       // Save to Firebase
       const withdrawalRef = dbRef(database, `MembershipWithdrawal/PendingWithdrawals/${memberId}`);
       await set(withdrawalRef, {
         ...withdrawalData,
-        dateSubmitted: new Date().toLocaleString('en-US', {
+        dateSubmitted: new Date().toLocaleDateString('en-US', {
           month: 'long',
-          day: '2-digit',
+          day: 'numeric',
           year: 'numeric',
-        }).replace(',', '')
-          .replace(/(\d{1,2}):(\d{2})/, (match, h, m) => `${h.padStart(2,'0')}:${m.padStart(2,'0')}`)
-          .replace(/(\d{4}) (\d{2}:\d{2})/, '$1 at $2'),
+        }),
+        timeSubmitted: new Date().toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }),
         timestamp: new Date().getTime(),
         status: 'Pending'
       });
@@ -340,7 +420,10 @@ export default function WithdrawMembership() {
       joined: '',
       reason: '',
       hasLoan: '',
-      otherReason: ''
+      otherReason: '',
+      disbursementAccountName: '',
+      disbursementAccountNumber: '',
+      disbursementBankType: ''
     });
     setMemberId('');
     setAgreed(false);
@@ -349,14 +432,20 @@ export default function WithdrawMembership() {
     setHasExistingLoan(false);
     setShowOtherReasonInput(false);
     setHasPendingWithdrawal(false);
+    setDisbursementOption('');
+    setCustomBankName('');
   };
 
-  const isSubmitDisabled = !memberId || 
-                         !form.reason || 
-                         (form.reason === 'Others' && !form.otherReason) || 
+  const isSubmitDisabled = !memberId ||
+                         !form.reason ||
+                         (form.reason === 'Others' && !form.otherReason) ||
                          !agreed ||
                          hasExistingLoan ||
-                         hasPendingWithdrawal;
+                         hasPendingWithdrawal ||
+                         !disbursementOption ||
+                         !form.disbursementAccountName ||
+                         !form.disbursementAccountNumber ||
+                         (disbursementOption === 'Bank' && !form.disbursementBankType && !customBankName);
 
   return (
     <KeyboardAvoidingView
@@ -412,15 +501,15 @@ export default function WithdrawMembership() {
                 <Text style={styles.label}>Address</Text>
                 <TextInput
                   value={form.address}
-                  onChangeText={(text) => setForm({...form, address: text})}
-                  style={styles.input}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
                 />
 
                 <Text style={styles.label}>Contact Number</Text>
                 <TextInput
                   value={form.contact}
-                  onChangeText={(text) => setForm({...form, contact: text})}
-                  style={styles.input}
+                  editable={false}
+                  style={[styles.input, styles.disabledInput]}
                   keyboardType="phone-pad"
                 />
 
@@ -472,6 +561,84 @@ export default function WithdrawMembership() {
                     />
                   )}
                 </View>
+
+                <Text style={styles.sectionTitle}>Disbursement Account *</Text>
+                <Text style={styles.label}>Disbursement Option<Text style={styles.required}>*</Text></Text>
+                <ModalSelector
+                  data={disbursementOptions}
+                  initValue="Select Disbursement Option"
+                  onChange={handleDisbursementOptionChange}
+                  style={styles.picker}
+                  modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                  overlayStyle={{ justifyContent: 'flex-end' }}
+                >
+                  <TouchableOpacity style={styles.pickerContainer}>
+                    <Text style={styles.pickerText}>{disbursementOption || 'Select Disbursement Option'}</Text>
+                    <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                  </TouchableOpacity>
+                </ModalSelector>
+
+                {disbursementOption && (
+                  <>
+                    <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
+                    <TextInput
+                      value={form.disbursementAccountName}
+                      onChangeText={(text) => setForm({...form, disbursementAccountName: text})}
+                      style={styles.input}
+                      placeholder="Enter account name"
+                    />
+
+                    <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
+                    <TextInput
+                      value={form.disbursementAccountNumber}
+                      onChangeText={(text) => setForm({...form, disbursementAccountNumber: text})}
+                      style={styles.input}
+                      keyboardType="numeric"
+                      placeholder="Enter account number"
+                    />
+
+                    {disbursementOption === 'Bank' && (
+                      <>
+                        <Text style={styles.label}>Type of Bank<Text style={styles.required}>*</Text></Text>
+                        <ModalSelector
+                          data={bankTypeOptions}
+                          initValue="Select Bank Type"
+                          onChange={(option) => {
+                            const key = option.key;
+                            setForm(prev => ({
+                              ...prev,
+                              disbursementBankType: key
+                            }));
+                            if (key !== 'Others') {
+                              setCustomBankName('');
+                            }
+                          }}
+                          style={styles.picker}
+                          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                          overlayStyle={{ justifyContent: 'flex-end' }}
+                        >
+                          <TouchableOpacity style={styles.pickerContainer}>
+                            <Text style={styles.pickerText}>
+                              {form.disbursementBankType === 'Others' && customBankName ? `Others: ${customBankName}` : (form.disbursementBankType || 'Select Bank Type')}
+                            </Text>
+                            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                          </TouchableOpacity>
+                        </ModalSelector>
+
+                        {form.disbursementBankType === 'Others' && (
+                          <View style={{ marginTop: 8 }}>
+                            <TextInput
+                              placeholder="Please specify the bank name"
+                              value={customBankName}
+                              onChangeText={setCustomBankName}
+                              style={styles.input}
+                            />
+                          </View>
+                        )}
+                      </>
+                    )}
+                  </>
+                )}
 
                 <TouchableOpacity
                   style={styles.checkboxContainer}

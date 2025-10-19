@@ -1788,10 +1788,14 @@ const SystemSettings = () => {
       {/* Enhanced Add Loan Type Wizard Modal */}
       {addLoanTypeWizardVisible && (
         <div style={styles.centeredModal}>
-          <div style={styles.enhancedModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '700px'}}>
             <h3 style={styles.enhancedModalTitle}>{isEditingLoanType ? 'Edit Loan Type' : 'Add Loan Type'}</h3>
+            
+            {/* Loan Type Name Input */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Loan Type Name</label>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+                Loan Type Name
+              </label>
               <input
                 style={styles.enhancedModalInput}
                 placeholder="e.g., Emergency Loan"
@@ -1800,33 +1804,61 @@ const SystemSettings = () => {
               />
             </div>
 
+            {/* Terms and Interest Rates Section */}
             <div style={{ marginBottom: 20 }}>
-              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Terms and Interest Rates</label>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 16, color: '#374151' }}>
+                Terms and Interest Rates
+              </label>
+              
+              {/* Column Headers */}
+              <div style={styles.termsHeaderRow}>
+                <div style={styles.columnHeader}>Terms/Months</div>
+                <div style={styles.columnHeader}>Interest Rates</div>
+                <div style={styles.columnHeader}>Action</div>
+              </div>
+              
+              {/* Input Rows */}
               {wizardRows.map((row, idx) => (
-                <div key={idx} style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 12 }}>
-                  <input
-                    style={styles.enhancedModalInput}
-                    placeholder="Months (e.g., 6)"
-                    type="number"
-                    value={row.term}
-                    onChange={(e) => updateWizardRow(idx, 'term', e.target.value)}
-                  />
-                  <input
-                    style={styles.enhancedModalInput}
-                    placeholder="Interest Rate % (e.g., 3.5)"
-                    type="number"
-                    value={row.rate}
-                    onChange={(e) => updateWizardRow(idx, 'rate', e.target.value)}
-                  />
-                  <button
-                    style={styles.removeButton}
-                    onClick={() => removeWizardRow(idx)}
-                    disabled={wizardRows.length === 1}
-                  >
-                    Remove
-                  </button>
+                <div key={idx} style={styles.termsInputRow}>
+                  {/* Terms/Months Input */}
+                  <div style={styles.inputWithLabel}>
+                    <input
+                      style={styles.enhancedModalInput}
+                      placeholder="e.g., 6"
+                      type="number"
+                      value={row.term}
+                      onChange={(e) => updateWizardRow(idx, 'term', e.target.value)}
+                    />
+                  </div>
+                  
+                  {/* Interest Rate Input with % symbol */}
+                  <div style={styles.inputWithLabel}>
+                    <div style={styles.interestRateContainer}>
+                      <input
+                        style={styles.interestRateInput}
+                        placeholder="e.g., 3.5"
+                        type="number"
+                        value={row.rate}
+                        onChange={(e) => updateWizardRow(idx, 'rate', e.target.value)}
+                      />
+                      <span style={styles.percentSymbol}>%</span>
+                    </div>
+                  </div>
+                  
+                  {/* Remove Button */}
+                  <div style={styles.removeButtonContainer}>
+                    <button
+                      style={styles.removeButton}
+                      onClick={() => removeWizardRow(idx)}
+                      disabled={wizardRows.length === 1}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
               ))}
+              
+              {/* Add Row Button */}
               <button
                 style={styles.addRowButton}
                 onClick={addWizardRow}
@@ -1908,7 +1940,7 @@ const SystemSettings = () => {
       {/* Enhanced Terms and Conditions Edit Modal */}
       {editTermsModal && (
         <div style={styles.centeredModal}>
-          <div style={styles.enhancedModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '700px'}}>
             <h3 style={styles.enhancedModalTitle}>Edit Terms and Conditions</h3>
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
@@ -1967,7 +1999,7 @@ const SystemSettings = () => {
       {/* Enhanced Privacy Policy Edit Modal */}
       {editPrivacyModal && (
         <div style={styles.centeredModal}>
-          <div style={styles.enhancedModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '700px'}}>
             <h3 style={styles.enhancedModalTitle}>Edit Privacy Policy</h3>
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
@@ -2026,7 +2058,7 @@ const SystemSettings = () => {
       {/* Enhanced About Us Edit Modal */}
       {editAboutModal && (
         <div style={styles.centeredModal}>
-          <div style={styles.enhancedModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '700px'}}>
             <h3 style={styles.enhancedModalTitle}>Edit About Us</h3>
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
@@ -2085,7 +2117,7 @@ const SystemSettings = () => {
       {/* Enhanced Contact Us Edit Modal */}
       {editContactModal && (
         <div style={styles.centeredModal}>
-          <div style={styles.enhancedModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '700px'}}>
             <h3 style={styles.enhancedModalTitle}>Edit Contact Us</h3>
             <div style={{ marginBottom: 20 }}>
               <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Title</label>
@@ -2947,7 +2979,7 @@ const styles = {
     border: '2px solid #e5e7eb',
     borderRadius: '10px',
     fontSize: '15px',
-    marginBottom: '20px',
+    marginBottom: '0',
     boxSizing: 'border-box',
     transition: 'all 0.3s ease'
   },
@@ -3004,7 +3036,8 @@ const styles = {
     cursor: 'pointer',
     fontWeight: '600',
     transition: 'all 0.3s ease',
-    minWidth: '100px'
+    width: '100%',
+    minWidth: '80px'
   },
   addRowButton: {
     padding: '12px 20px', 
@@ -3026,6 +3059,58 @@ const styles = {
     padding: '12px 16px',
     borderRadius: '8px',
     border: '1px solid #fecaca'
+  },
+  // New styles for the loan type wizard
+  termsHeaderRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 100px',
+    gap: '12px',
+    marginBottom: '12px',
+    padding: '0 4px'
+  },
+  columnHeader: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151',
+    textAlign: 'left'
+  },
+  termsInputRow: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr 100px',
+    gap: '12px',
+    alignItems: 'center',
+    marginBottom: '12px'
+  },
+  inputWithLabel: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  interestRateContainer: {
+    position: 'relative',
+    display: 'flex',
+    alignItems: 'center'
+  },
+  interestRateInput: {
+    width: '100%',
+    padding: '14px 16px',
+    border: '2px solid #e5e7eb',
+    borderRadius: '10px',
+    fontSize: '15px',
+    boxSizing: 'border-box',
+    transition: 'all 0.3s ease',
+    paddingRight: '40px' // Make space for % symbol
+  },
+  percentSymbol: {
+    position: 'absolute',
+    right: '16px',
+    fontSize: '15px',
+    fontWeight: '600',
+    color: '#6b7280',
+    pointerEvents: 'none' // Make it non-interactive
+  },
+  removeButtonContainer: {
+    display: 'flex',
+    justifyContent: 'center'
   }
 };
 

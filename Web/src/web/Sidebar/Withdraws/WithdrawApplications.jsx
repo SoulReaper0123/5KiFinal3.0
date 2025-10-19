@@ -1,26 +1,17 @@
 import React, { useState } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApproveWithdraws, RejectWithdraws } from '../../../../../Server/api';
-import { 
-  FaCheckCircle, 
-  FaTimes, 
-  FaExclamationCircle, 
-  FaImage, 
-  FaChevronLeft, 
-  FaChevronRight, 
-  FaSpinner,
+import {
+  FaCheckCircle,
+  FaTimes,
+  FaExclamationCircle,
   FaEye,
   FaUser,
   FaMoneyBillWave,
   FaIdCard,
   FaCalendarAlt,
-  FaPhone,
   FaEnvelope,
-  FaMapMarkerAlt,
-  FaCreditCard,
   FaReceipt,
-  FaCalendarCheck,
-  FaBan,
   FaBuilding,
   FaUniversity
 } from 'react-icons/fa';
@@ -609,13 +600,9 @@ const WithdrawApplications = ({
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [imageViewerVisible, setImageViewerVisible] = useState(false);
-  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [showRejectionModal, setShowRejectionModal] = useState(false);
   const [selectedReason, setSelectedReason] = useState('');
   const [customReason, setCustomReason] = useState('');
-  const [availableImages, setAvailableImages] = useState([]);
   const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
@@ -641,11 +628,21 @@ const WithdrawApplications = ({
   };
 
   const formatDate = (date) => {
-    return date.toLocaleDateString('en-US', { 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
     });
+  };
+
+  const openImageViewer = (url, label) => {
+    setCurrentImage({ url, label });
+    setImageViewerVisible(true);
+  };
+
+  const closeImageViewer = () => {
+    setImageViewerVisible(false);
+    setCurrentImage({ url: '', label: '' });
   };
 
   const openModal = (withdraw) => {
@@ -764,91 +761,108 @@ const WithdrawApplications = ({
     }
   };
 
-  const processDatabaseApprove = async (withdraw) => {
-    try {
-      const { id, transactionId, amountWithdrawn } = withdraw;
-      
-      // 1. Verify member details
-      const memberRef = database.ref(`Members/${id}`);
-      const memberSnap = await memberRef.once('value');
-      const memberData = memberSnap.val();
+const processDatabaseApprove = async (withdraw) => {
+  try {
+    const { id, transactionId, amountWithdrawn } = withdraw;
+    
+    // 1. Verify member details
+    const memberRef = database.ref(`Members/${id}`);
+    const memberSnap = await memberRef.once('value');
+    const memberData = memberSnap.val();
 
-      if (!memberData || 
-          memberData.email !== withdraw.email ||
-          memberData.firstName !== withdraw.firstName || 
-          memberData.lastName !== withdraw.lastName) {
-        throw new Error('Member details do not match our records');
-      }
-
-      // Check if member has sufficient balance
-      const currentBalance = parseFloat(memberData.balance || 0);
-      const withdrawAmount = parseFloat(amountWithdrawn);
-      
-      if (currentBalance < withdrawAmount) {
-        throw new Error('Member has insufficient balance for this withdrawal');
-      }
-
-      // Generate a new transaction ID for approved/transactions records
-      const originalTransactionId = transactionId;
-      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-      // Database references
-      const withdrawRef = database.ref(`Withdrawals/WithdrawalApplications/${id}/${originalTransactionId}`);
-      const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${id}/${newTransactionId}`);
-      const transactionRef = database.ref(`Transactions/Withdrawals/${id}/${newTransactionId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      
-      // Fetch data
-      const [withdrawSnap, fundsSnap] = await Promise.all([
-        withdrawRef.once('value'),
-        fundsRef.once('value')
-      ]);
-
-      if (!withdrawSnap.exists()) throw new Error('Withdrawal data not found');
-
-      const withdrawData = withdrawSnap.val();
-      const currentFunds = parseFloat(fundsSnap.val()) || 0;
-
-      // Update all databases
-      const now = new Date();
-      
-      // Update funds and member balance
-      const newBalance = currentBalance - withdrawAmount;
-      const newFunds = currentFunds - withdrawAmount;
-      
-      await fundsRef.set(newFunds);
-      
-      // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
-      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
-      await fundsHistoryRef.set(newFunds);
-      
-      await memberRef.update({ balance: newBalance });
-
-      // Create withdrawal record
-      const approvedData = {
-        ...withdrawData,
-        transactionId: newTransactionId,
-        originalTransactionId: originalTransactionId,
-        dateApproved: formatDate(now),
-        timeApproved: formatTime(now),
-        timestamp: now.getTime(),
-        status: 'approved'
-      };
-
-      // Finalize operations
-      await approvedRef.set(approvedData);
-      await transactionRef.set(approvedData);
-      await withdrawRef.remove();
-
-      return newTransactionId;
-
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve withdrawal');
+    if (!memberData || 
+        memberData.email !== withdraw.email ||
+        memberData.firstName !== withdraw.firstName || 
+        memberData.lastName !== withdraw.lastName) {
+      throw new Error('Member details do not match our records');
     }
-  };
 
+    // Check if member has sufficient balance AND investment
+    const currentBalance = parseFloat(memberData.balance || 0);
+    const currentInvestment = parseFloat(memberData.investment || 0);
+    const withdrawAmount = parseFloat(amountWithdrawn);
+    
+    // Check if both balance and investment are sufficient
+    if (currentBalance < withdrawAmount) {
+      throw new Error('Member has insufficient balance for this withdrawal');
+    }
+    
+    if (currentInvestment < withdrawAmount) {
+      throw new Error('Member has insufficient investment for this withdrawal');
+    }
+
+    // Calculate new balances (deduct same amount from both)
+    const newBalance = currentBalance - withdrawAmount;
+    const newInvestment = currentInvestment - withdrawAmount;
+
+    // Generate a new transaction ID for approved/transactions records
+    const originalTransactionId = transactionId;
+    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Database references
+    const withdrawRef = database.ref(`Withdrawals/WithdrawalApplications/${id}/${originalTransactionId}`);
+    const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${id}/${newTransactionId}`);
+    const transactionRef = database.ref(`Transactions/Withdrawals/${id}/${newTransactionId}`);
+    const fundsRef = database.ref('Settings/Funds');
+    
+    // Fetch data
+    const [withdrawSnap, fundsSnap] = await Promise.all([
+      withdrawRef.once('value'),
+      fundsRef.once('value')
+    ]);
+
+    if (!withdrawSnap.exists()) throw new Error('Withdrawal data not found');
+
+    const withdrawData = withdrawSnap.val();
+    const currentFunds = parseFloat(fundsSnap.val()) || 0;
+
+    // Update all databases
+    const now = new Date();
+    
+    // Update funds and member balances
+    const newFunds = currentFunds - withdrawAmount;
+    
+    await fundsRef.set(newFunds);
+    
+    // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
+    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+    await fundsHistoryRef.set(newFunds);
+    
+    // Update member's balance AND investment (both reduced by same amount)
+    await memberRef.update({ 
+      balance: newBalance,
+      investment: newInvestment 
+    });
+
+    // Create withdrawal record with deduction breakdown
+    const approvedData = {
+      ...withdrawData,
+      transactionId: newTransactionId,
+      originalTransactionId: originalTransactionId,
+      dateApproved: formatDate(now),
+      timeApproved: formatTime(now),
+      timestamp: now.getTime(),
+      status: 'approved',
+      deductionBreakdown: {
+        fromBalance: withdrawAmount,
+        fromInvestment: withdrawAmount,
+        totalWithdrawn: withdrawAmount
+      }
+    };
+
+    // Finalize operations
+    await approvedRef.set(approvedData);
+    await transactionRef.set(approvedData);
+    await withdrawRef.remove();
+
+    return newTransactionId;
+
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve withdrawal');
+  }
+};
   const processDatabaseReject = async (withdraw, rejectionReason) => {
     try {
       const { id, transactionId } = withdraw;
@@ -1010,15 +1024,7 @@ const WithdrawApplications = ({
     setIsProcessing(false);
   };
 
-  const openImageViewer = (url, label) => {
-    setCurrentImage({ url, label });
-    setImageViewerVisible(true);
-  };
 
-  const closeImageViewer = () => {
-    setImageViewerVisible(false);
-    setCurrentImage({ url: '', label: '' });
-  };
 
   if (!withdraws.length) return (
     <div style={styles.noDataContainer}>
@@ -1095,7 +1101,7 @@ const WithdrawApplications = ({
             
             <div style={styles.modalContent}>
               <div style={styles.columnsContainer}>
-                {/* Left Column - Member & Withdrawal Information */}
+                {/* Left Column - Member Information */}
                 <div style={styles.column}>
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>
@@ -1122,55 +1128,6 @@ const WithdrawApplications = ({
                         Email:
                       </span>
                       <span style={styles.fieldValue}>{selectedWithdraw.email || 'N/A'}</span>
-                    </div>
-                  </div>
-
-                  <div style={styles.section}>
-                    <h3 style={styles.sectionTitle}>
-                      <FaMoneyBillWave />
-                      Withdrawal Details
-                    </h3>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaReceipt />
-                        Transaction ID:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaMoneyBillWave />
-                        Amount:
-                      </span>
-                      <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaBuilding />
-                        Bank Name:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.bankName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaUser />
-                        Account Name:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.accountName || 'N/A'}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaUniversity />
-                        Account Number:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
-                    </div>
-                    <div style={styles.fieldGroup}>
-                      <span style={styles.fieldLabel}>
-                        <FaCalendarAlt />
-                        Date Applied:
-                      </span>
-                      <span style={styles.fieldValue}>{selectedWithdraw.dateApplied || 'N/A'}</span>
                     </div>
                   </div>
 
@@ -1213,27 +1170,54 @@ const WithdrawApplications = ({
                   )}
                 </div>
 
-                {/* Right Column - Documents */}
+                {/* Right Column - Withdrawal Details */}
                 <div style={styles.column}>
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>
-                      <FaIdCard />
-                      Proof of Withdrawal
+                      <FaMoneyBillWave />
+                      Withdrawal Details
                     </h3>
-                    <div style={styles.documentsGrid}>
-                      {selectedWithdraw.proofOfWithdrawalUrl && (
-                        <div 
-                          style={styles.documentCard}
-                          onClick={() => openImageViewer(selectedWithdraw.proofOfWithdrawalUrl, 'Proof of Withdrawal')}
-                        >
-                          <img
-                            src={selectedWithdraw.proofOfWithdrawalUrl}
-                            alt="Proof of Withdrawal"
-                            style={styles.documentImage}
-                          />
-                          <div style={styles.documentLabel}>Proof of Withdrawal</div>
-                        </div>
-                      )}
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaReceipt />
+                        Transaction ID:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaMoneyBillWave />
+                        Amount:
+                      </span>
+                      <span style={styles.fieldValue}>{formatCurrency(selectedWithdraw.amountWithdrawn)}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaBuilding />
+                        Bank Name:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.bankType || 'N/A'}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUser />
+                        Account Name:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.accountName || 'N/A'}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaUniversity />
+                        Account Number:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.accountNumber || 'N/A'}</span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>
+                        <FaCalendarAlt />
+                        Date Applied:
+                      </span>
+                      <span style={styles.fieldValue}>{selectedWithdraw.dateApplied || 'N/A'}</span>
                     </div>
                   </div>
                 </div>
@@ -1440,25 +1424,7 @@ const WithdrawApplications = ({
         </div>
       )}
 
-      {/* Image Viewer */}
-      {imageViewerVisible && (
-        <div style={styles.imageViewerModal}>
-          <div style={styles.imageViewerContent}>
-            <img
-              src={currentImage.url}
-              alt={currentImage.label}
-              style={styles.largeImage}
-            />
-            <button 
-              style={styles.imageViewerClose} 
-              onClick={closeImageViewer}
-            >
-              <FaTimes />
-            </button>
-            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
-          </div>
-        </div>
-      )}
+
     </div>
   );
 };

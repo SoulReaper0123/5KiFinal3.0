@@ -1,18 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { 
   FaSearch, 
-  FaDownload, 
   FaFilter, 
   FaChevronLeft, 
   FaChevronRight,
   FaPlus,
   FaCheckCircle,
-  FaTimes,
   FaExclamationCircle,
   FaUser,
   FaUserCheck,
   FaUserTimes,
-  FaFileAlt
+  FaFileAlt,
+  FaPrint
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -76,13 +75,17 @@ const styles = {
     flex: 1,
     backgroundColor: '#f8fafc',
     minHeight: '100vh',
-    padding: '0'
+    padding: '0',
+    overflow: 'hidden'
   },
   mainContainer: {
     padding: '24px',
     maxWidth: '1400px',
     margin: '0 auto',
-    position: 'relative'
+    position: 'relative',
+    height: '100vh',
+    display: 'flex',
+    flexDirection: 'column'
   },
   headerSection: {
     display: 'flex',
@@ -90,7 +93,8 @@ const styles = {
     alignItems: 'center',
     marginBottom: '32px',
     paddingBottom: '16px',
-    borderBottom: '1px solid #e2e8f0'
+    borderBottom: '1px solid #e2e8f0',
+    flexShrink: 0
   },
   headerText: {
     fontSize: '32px',
@@ -103,30 +107,30 @@ const styles = {
     color: '#64748b',
     marginTop: '4px'
   },
-controlsSection: {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '16px',
-
-},
-controlsRow: {
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  gap: '16px',
-  flexWrap: 'wrap',
-  width: '100%'
-},
-tabContainer: {
-  display: 'flex',
-  backgroundColor: 'transparent', // ← Changed to transparent
-  borderRadius: '12px',
-  padding: '4px',
-  gap: '4px',
-  flexWrap: 'wrap',
-  flex: '1',
-  minWidth: '0'
-},
+  controlsSection: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '16px',
+    flexShrink: 0
+  },
+  controlsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: '16px',
+    flexWrap: 'wrap',
+    width: '100%'
+  },
+  tabContainer: {
+    display: 'flex',
+    backgroundColor: 'transparent',
+    borderRadius: '12px',
+    padding: '4px',
+    gap: '4px',
+    flexWrap: 'wrap',
+    flex: '1',
+    minWidth: '0'
+  },
   tabButton: {
     padding: '12px 20px',
     borderRadius: '8px',
@@ -151,16 +155,15 @@ tabContainer: {
   tabIcon: {
     fontSize: '16px'
   },
-searchDownloadContainer: {
-  display: 'flex',
-  alignItems: 'center',
-  gap: '12px',
-  flexWrap: 'wrap',
-  position: 'relative',
-  zIndex: '10',
-  flexShrink: '0'
-  // Remove marginLeft: 'auto'
-},
+  searchPrintContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px',
+    flexWrap: 'wrap',
+    position: 'relative',
+    zIndex: '10',
+    flexShrink: '0'
+  },
   filterContainer: {
     position: 'relative'
   },
@@ -240,9 +243,9 @@ searchDownloadContainer: {
     color: '#9ca3af',
     zIndex: '1'
   },
-  downloadButton: {
-    padding: '10px 12px',
-    backgroundColor: '#059669',
+  printButton: {
+    padding: '10px 16px',
+    backgroundColor: '#dc2626',
     color: '#fff',
     border: 'none',
     borderRadius: '8px',
@@ -253,54 +256,62 @@ searchDownloadContainer: {
     fontSize: '14px',
     fontWeight: '500',
     transition: 'background-color 0.2s ease',
-    width: '40px',
-    height: '40px',
-    flexShrink: '0'
+    gap: '8px',
+    whiteSpace: 'nowrap'
   },
-  downloadButtonHover: {
-    backgroundColor: '#047857'
+  printButtonHover: {
+    backgroundColor: '#b91c1c'
   },
   dataContainer: {
     backgroundColor: '#fff',
     borderRadius: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     overflow: 'hidden',
-    marginBottom: '80px'
+    marginBottom: '80px',
+    flex: 1,
+    display: 'flex',
+    flexDirection: 'column',
+    minHeight: 0
+  },
+  dataContent: {
+    flex: 1,
+    overflow: 'auto'
   },
   paginationContainer: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: '8px 16px', // Reduced from 16px 24px
+    padding: '8px 16px',
     backgroundColor: '#f8fafc',
     borderBottom: '1px solid #e2e8f0',
     flexWrap: 'wrap',
-    gap: '8px', // Reduced from 12px
-    minHeight: '40px' // Add fixed height to prevent layout shifts
+    gap: '8px',
+    minHeight: '40px',
+    flexShrink: 0
   },
   paginationInfo: {
-    fontSize: '12px', // Reduced from 14px
+    fontSize: '12px',
     color: '#64748b',
     whiteSpace: 'nowrap'
   },
   paginationControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: '4px' // Reduced from 8px
+    gap: '4px'
   },
   paginationButton: {
-    padding: '4px 8px', // Reduced from 8px 12px
+    padding: '4px 8px',
     backgroundColor: '#fff',
     border: '1px solid #d1d5db',
-    borderRadius: '4px', // Reduced from 6px
+    borderRadius: '4px',
     cursor: 'pointer',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
     transition: 'all 0.2s ease',
-    fontSize: '10px', // Reduced from 12px
-    minWidth: '24px', // Add fixed width
-    minHeight: '24px' // Add fixed height
+    fontSize: '10px',
+    minWidth: '24px',
+    minHeight: '24px'
   },
   paginationButtonDisabled: {
     backgroundColor: '#f3f4f6',
@@ -342,14 +353,13 @@ searchDownloadContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '20px',
-    overflowY: 'auto'
+    padding: '20px'
   },
   modalCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
     width: '90%',
-    maxWidth: '900px',
+    maxWidth: '500px',
     maxHeight: '90vh',
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
@@ -389,8 +399,8 @@ searchDownloadContainer: {
   },
   modalContent: {
     padding: '24px',
-    overflowY: 'auto',
-    flex: 1
+    flex: 1,
+    overflowY: 'auto'
   },
   formGrid: {
     display: 'grid',
@@ -539,25 +549,34 @@ searchDownloadContainer: {
     fontSize: '16px',
     margin: 0
   },
-  responsiveControls: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '16px',
+  printModalContent: {
+    padding: '24px',
+    textAlign: 'center'
+  },
+  printOption: {
+    padding: '16px',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    marginBottom: '12px',
     width: '100%'
   },
-  topControls: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '16px'
+  printOptionHover: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#eff6ff'
   },
-  bottomControls: {
-    display: 'flex',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: '12px'
+  printOptionText: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#374151',
+    margin: 0
+  },
+  printOptionDescription: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: '4px 0 0 0'
   }
 };
 
@@ -576,7 +595,6 @@ const Register = () => {
   const [memberFilter, setMemberFilter] = useState('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isHovered, setIsHovered] = useState({});
-  const pageSize = 10;
 
   // Add Member Modal State
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -608,10 +626,12 @@ const Register = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [pendingAdd, setPendingAdd] = useState(null);
-  const [imageViewerVisible, setImageViewerVisible] = useState(false);
-  const [currentImage, setCurrentImage] = useState({ url: '', label: '' });
-  const [currentImageIndex, setCurrentImageIndex] = useState(0);
-  const [availableImages, setAvailableImages] = useState([]);
+
+  // Print Modal State
+  const [printModalVisible, setPrintModalVisible] = useState(false);
+  const [printing, setPrinting] = useState(false);
+
+  const pageSize = 10;
 
   // Tab configuration
   const tabs = [
@@ -655,6 +675,23 @@ const Register = () => {
       .hover-lift:hover {
         transform: translateY(-2px);
         box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      }
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        .print-content, .print-content * {
+          visibility: visible;
+        }
+        .print-content {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+        .no-print {
+          display: none !important;
+        }
       }
     `;
     document.head.appendChild(styleElement);
@@ -774,55 +811,342 @@ const Register = () => {
     setFilteredData(filtered);
   };
 
-  const handleDownload = async () => {
-    try {
-      let dataToDownload = filteredData;
-      let fileName =
-        activeSection === 'rejectedRegistrations'
-          ? 'RejectedRegistrations'
-          : activeSection === 'approvedRegistrations'
-          ? 'ApprovedRegistrations'
-          : activeSection === 'members'
-          ? 'Members'
-          : activeSection === 'permanentWithdrawals'
-          ? 'PermanentWithdrawals'
-          : 'Registrations';
+const handlePrint = (format = 'print') => {
+  setPrinting(true);
+  
+  try {
+    const sectionTitle = 
+      activeSection === 'registrations' ? 'Pending Registrations' :
+      activeSection === 'rejectedRegistrations' ? 'Rejected Registrations' :
+      activeSection === 'approvedRegistrations' ? 'Approved Registrations' :
+      activeSection === 'members' ? 'Members' : 'Permanent Withdrawals';
 
-      if (dataToDownload.length === 0) {
-        console.log('No data to download');
-        return;
+    // Get the data that's currently displayed in the table (paginated)
+    const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+
+    const printContent = document.createElement('div');
+    printContent.className = 'print-content';
+    printContent.style.padding = '20px';
+    printContent.style.fontFamily = 'Arial, sans-serif';
+
+    // Header
+    const header = document.createElement('div');
+    header.style.borderBottom = '2px solid #333';
+    header.style.paddingBottom = '10px';
+    header.style.marginBottom = '20px';
+    
+    const title = document.createElement('h1');
+    title.textContent = `${sectionTitle} Report`;
+    title.style.margin = '0';
+    title.style.color = '#333';
+    
+    const date = document.createElement('p');
+    date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+    date.style.margin = '5px 0 0 0';
+    date.style.color = '#666';
+    
+    const count = document.createElement('p');
+    count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
+    count.style.margin = '5px 0 0 0';
+    count.style.color = '#666';
+    
+    header.appendChild(title);
+    header.appendChild(date);
+    header.appendChild(count);
+    printContent.appendChild(header);
+
+    // Table
+    if (displayedData.length > 0) {
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.marginTop = '20px';
+
+      // Table Header - Define columns based on active section (excluding Action column)
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.backgroundColor = '#f8f9fa';
+      
+      // Define columns for each section (excluding the Action/View column)
+      let headers = [];
+      
+      switch(activeSection) {
+        case 'registrations':
+          headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+          break;
+        case 'rejectedRegistrations':
+          headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+          break;
+        case 'approvedRegistrations':
+          headers = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
+          break;
+        case 'members':
+          headers = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
+          break;
+        case 'permanentWithdrawals':
+          headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
+          break;
+        default:
+          headers = [];
       }
 
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(fileName);
-
-      const headers = Object.keys(dataToDownload[0]);
-      worksheet.addRow(headers);
-
-      dataToDownload.forEach(item => {
-        const row = headers.map(header => item[header]);
-        worksheet.addRow(row);
+      // Create header cells
+      headers.forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText;
+        th.style.padding = '12px 8px';
+        th.style.border = '1px solid #ddd';
+        th.style.textAlign = 'left';
+        th.style.fontWeight = 'bold';
+        th.style.backgroundColor = '#e9ecef';
+        headerRow.appendChild(th);
       });
-
-      const buffer = await workbook.xlsx.writeBuffer();
       
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Table Body
+      const tbody = document.createElement('tbody');
+      displayedData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+        
+        headers.forEach(header => {
+          const td = document.createElement('td');
+          let cellValue = '';
+          
+          // Handle data extraction based on header and active section
+          switch(header) {
+            case 'Full Name':
+              cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+              break;
+            case 'Name':
+              cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+              break;
+            case 'Email Address':
+            case 'Email':
+              cellValue = item.email || '';
+              break;
+            case 'Contact Number':
+            case 'Contact':
+              cellValue = item.phoneNumber || '';
+              break;
+            case 'Status':
+              cellValue = item.status || 'pending';
+              break;
+            case 'First Name':
+              cellValue = item.firstName || '';
+              break;
+            case 'Last Name':
+              cellValue = item.lastName || '';
+              break;
+            case 'Date Applied':
+              cellValue = item.dateCreated || item.dateApplied || '';
+              break;
+            case 'Date Approved':
+              cellValue = item.dateApproved || '';
+              break;
+            case 'Member ID':
+              cellValue = item.memberId || item.id || '';
+              break;
+            case 'Investment':
+              cellValue = `₱${(parseFloat(item.investment) || 0).toFixed(2)}`;
+              break;
+            case 'Savings':
+              cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
+              break;
+            case 'Loans':
+              // For members tab, you might need to calculate loans from your state
+              cellValue = `₱${(parseFloat(item.loans) || 0).toFixed(2)}`;
+              break;
+            case 'Balance':
+              cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
+              break;
+            case 'Reason':
+              cellValue = item.reason || '';
+              break;
+            default:
+              cellValue = item[header] || '';
+          }
+          
+          td.textContent = cellValue;
+          td.style.padding = '10px 8px';
+          td.style.border = '1px solid #ddd';
+          td.style.fontSize = '12px';
+          row.appendChild(td);
+        });
+        
+        tbody.appendChild(row);
       });
-      const url = window.URL.createObjectURL(blob);
+      
+      table.appendChild(tbody);
+      printContent.appendChild(table);
+    } else {
+      const noData = document.createElement('p');
+      noData.textContent = 'No data available';
+      noData.style.textAlign = 'center';
+      noData.style.color = '#666';
+      noData.style.fontStyle = 'italic';
+      printContent.appendChild(noData);
+    }
+
+    if (format === 'pdf') {
+      // For PDF, we'll use browser's print to PDF functionality
+      document.body.appendChild(printContent);
+      window.print();
+      document.body.removeChild(printContent);
+    } else if (format === 'word') {
+      // For Word, create a simple HTML file that can be opened in Word
+      const htmlContent = `
+        <html>
+          <head>
+            <title>${sectionTitle}</title>
+            <style>
+              body { font-family: Arial, sans-serif; margin: 20px; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+              th { background-color: #f2f2f2; font-weight: bold; }
+              h1 { color: #333; }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+        </html>
+      `;
+      
+      const blob = new Blob([htmlContent], { type: 'application/msword' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${fileName}.xlsx`;
+      link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading data:', error);
-      setErrorMessage('Failed to export data');
-      setErrorModalVisible(true);
+      URL.revokeObjectURL(url);
+    } else if (format === 'excel') {
+      // Export to Excel
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(sectionTitle);
+
+      if (displayedData.length > 0) {
+        // Define headers for Excel based on active section
+        let excelHeaders = [];
+        
+        switch(activeSection) {
+          case 'registrations':
+            excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+            break;
+          case 'rejectedRegistrations':
+            excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+            break;
+          case 'approvedRegistrations':
+            excelHeaders = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
+            break;
+          case 'members':
+            excelHeaders = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
+            break;
+          case 'permanentWithdrawals':
+            excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
+            break;
+          default:
+            excelHeaders = [];
+        }
+
+        worksheet.addRow(excelHeaders);
+
+        displayedData.forEach(item => {
+          const row = [];
+          excelHeaders.forEach(header => {
+            let cellValue = '';
+            
+            switch(header) {
+              case 'Full Name':
+                cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                break;
+              case 'Name':
+                cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                break;
+              case 'Email Address':
+              case 'Email':
+                cellValue = item.email || '';
+                break;
+              case 'Contact Number':
+              case 'Contact':
+                cellValue = item.phoneNumber || '';
+                break;
+              case 'Status':
+                cellValue = item.status || 'pending';
+                break;
+              case 'First Name':
+                cellValue = item.firstName || '';
+                break;
+              case 'Last Name':
+                cellValue = item.lastName || '';
+                break;
+              case 'Date Applied':
+                cellValue = item.dateCreated || item.dateApplied || '';
+                break;
+              case 'Date Approved':
+                cellValue = item.dateApproved || '';
+                break;
+              case 'Member ID':
+                cellValue = item.memberId || item.id || '';
+                break;
+              case 'Investment':
+                cellValue = parseFloat(item.investment) || 0;
+                break;
+              case 'Savings':
+                cellValue = parseFloat(item.balance) || 0;
+                break;
+              case 'Loans':
+                cellValue = parseFloat(item.loans) || 0;
+                break;
+              case 'Balance':
+                cellValue = parseFloat(item.balance) || 0;
+                break;
+              case 'Reason':
+                cellValue = item.reason || '';
+                break;
+              default:
+                cellValue = item[header] || '';
+            }
+            
+            row.push(cellValue);
+          });
+          worksheet.addRow(row);
+        });
+      }
+
+      workbook.xlsx.writeBuffer().then(buffer => {
+        const blob = new Blob([buffer], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      });
+    } else {
+      // Direct print
+      document.body.appendChild(printContent);
+      window.print();
+      document.body.removeChild(printContent);
     }
-  };
+
+    setPrintModalVisible(false);
+  } catch (error) {
+    console.error('Error printing data:', error);
+    setErrorMessage('Failed to print data');
+    setErrorModalVisible(true);
+  } finally {
+    setPrinting(false);
+  }
+};
 
   const handleTabSwitch = (section) => {
     setActiveSection(section);
@@ -1193,66 +1517,66 @@ const Register = () => {
           </div>
         </div>
 
-{/* Controls Section */}
-<div style={styles.controlsSection}>
-  {/* Single row containing both tabs and search/filter/download */}
-  <div style={styles.controlsRow}>
-    {/* Tabs - Left side */}
-    <div style={styles.tabContainer}>
-      {tabs.map((tab) => {
-        const isActive = activeSection === tab.key;
-        const IconComponent = tab.icon;
-        return (
-          <button
-            key={tab.key}
-            onClick={() => handleTabSwitch(tab.key)}
-            style={{
-              ...styles.tabButton,
-              ...(isActive ? styles.activeTabButton : {})
-            }}
-            className="hover-lift"
-          >
-            <IconComponent style={styles.tabIcon} />
-            <span>{tab.label}</span>
-          </button>
-        );
-      })}
-    </div>
+        {/* Controls Section */}
+        <div style={styles.controlsSection}>
+          <div style={styles.controlsRow}>
+            {/* Tabs - Left side */}
+            <div style={styles.tabContainer}>
+              {tabs.map((tab) => {
+                const isActive = activeSection === tab.key;
+                const IconComponent = tab.icon;
+                return (
+                  <button
+                    key={tab.key}
+                    onClick={() => handleTabSwitch(tab.key)}
+                    style={{
+                      ...styles.tabButton,
+                      ...(isActive ? styles.activeTabButton : {})
+                    }}
+                    className="hover-lift"
+                  >
+                    <IconComponent style={styles.tabIcon} />
+                    <span>{tab.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-    {/* Search, Filter, Download - Right side but aligned */}
-    <div style={styles.searchDownloadContainer}>
-      {renderMemberFilter()}
-      
-      <div style={styles.searchContainer}>
-        <FaSearch style={styles.searchIcon} />
-        <input
-          style={{
-            ...styles.searchInput,
-            ...(isHovered.search ? styles.searchInputFocus : {})
-          }}
-          placeholder="Search by name or email..."
-          value={searchQuery}
-          onChange={(e) => handleSearch(e.target.value)}
-          onFocus={() => handleMouseEnter('search')}
-          onBlur={() => handleMouseLeave('search')}
-        />
-      </div>
+            {/* Search, Filter, Print - Right side */}
+            <div style={styles.searchPrintContainer}>
+              {renderMemberFilter()}
+              
+              <div style={styles.searchContainer}>
+                <FaSearch style={styles.searchIcon} />
+                <input
+                  style={{
+                    ...styles.searchInput,
+                    ...(isHovered.search ? styles.searchInputFocus : {})
+                  }}
+                  placeholder="Search by name or email..."
+                  value={searchQuery}
+                  onChange={(e) => handleSearch(e.target.value)}
+                  onFocus={() => handleMouseEnter('search')}
+                  onBlur={() => handleMouseLeave('search')}
+                />
+              </div>
 
-      <button 
-        style={{
-          ...styles.downloadButton,
-          ...(isHovered.download ? styles.downloadButtonHover : {})
-        }}
-        onMouseEnter={() => handleMouseEnter('download')}
-        onMouseLeave={() => handleMouseLeave('download')}
-        onClick={handleDownload}
-        title="Export to Excel"
-      >
-        <FaDownload />
-      </button>
-    </div>
-  </div>
-</div>
+              <button 
+                style={{
+                  ...styles.printButton,
+                  ...(isHovered.print ? styles.printButtonHover : {})
+                }}
+                onMouseEnter={() => handleMouseEnter('print')}
+                onMouseLeave={() => handleMouseLeave('print')}
+                onClick={() => setPrintModalVisible(true)}
+                title="Print/Export Options"
+              >
+                <FaPrint />
+        
+              </button>
+            </div>
+          </div>
+        </div>
 
         {/* Data Container */}
         <div style={styles.dataContainer}>
@@ -1288,41 +1612,43 @@ const Register = () => {
             </div>
           )}
 
-          {noMatch ? (
-            <div style={styles.noDataContainer}>
-              <FaSearch style={styles.noDataIcon} />
-              <p style={styles.noDataText}>No matches found for your search</p>
-            </div>
-          ) : filteredData.length === 0 ? (
-            <div style={styles.noDataContainer}>
-              <FaFileAlt style={styles.noDataIcon} />
-              <p style={styles.noDataText}>No data available</p>
-            </div>
-          ) : (
-            <>
-              {activeSection === 'registrations' && (
-                <Registrations 
-                  registrations={paginatedData} 
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  refreshData={fetchAllData}
-                />
-              )}
-              {activeSection === 'rejectedRegistrations' && (
-                <RejectedRegistrations rejectedRegistrations={paginatedData} />
-              )}
-              {activeSection === 'approvedRegistrations' && (
-                <ApprovedRegistrations approvedRegistrations={paginatedData} />
-              )}
-              {activeSection === 'members' && (
-                <AllMembers members={paginatedData} />
-              )}
-{activeSection === 'permanentWithdrawals' && (
-  <PermanentWithdrawals withdrawals={paginatedData} refreshData={fetchAllData} />
-)}
-            </>
-          )}
+          <div style={styles.dataContent}>
+            {noMatch ? (
+              <div style={styles.noDataContainer}>
+                <FaSearch style={styles.noDataIcon} />
+                <p style={styles.noDataText}>No matches found for your search</p>
+              </div>
+            ) : filteredData.length === 0 ? (
+              <div style={styles.noDataContainer}>
+                <FaFileAlt style={styles.noDataIcon} />
+                <p style={styles.noDataText}>No data available</p>
+              </div>
+            ) : (
+              <>
+                {activeSection === 'registrations' && (
+                  <Registrations 
+                    registrations={paginatedData} 
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    refreshData={fetchAllData}
+                  />
+                )}
+                {activeSection === 'rejectedRegistrations' && (
+                  <RejectedRegistrations rejectedRegistrations={paginatedData} />
+                )}
+                {activeSection === 'approvedRegistrations' && (
+                  <ApprovedRegistrations approvedRegistrations={paginatedData} />
+                )}
+                {activeSection === 'members' && (
+                  <AllMembers members={paginatedData} />
+                )}
+                {activeSection === 'permanentWithdrawals' && (
+                  <PermanentWithdrawals withdrawals={paginatedData} refreshData={fetchAllData} />
+                )}
+              </>
+            )}
+          </div>
         </div>
 
         {/* Add Member Button - Only show on Members tab */}
@@ -1339,6 +1665,99 @@ const Register = () => {
           >
             <FaPlus />
           </button>
+        )}
+
+        {/* Print Modal */}
+        {printModalVisible && (
+          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Print/Export Options</h2>
+                <button 
+                  onClick={() => setPrintModalVisible(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closePrintModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closePrintModal')}
+                  onMouseLeave={() => handleMouseLeave('closePrintModal')}
+                  disabled={printing}
+                >
+                  <AiOutlineClose />
+                </button>
+              </div>
+
+              <div style={styles.printModalContent}>
+                <p style={{margin: '0 0 20px 0', color: '#64748b'}}>
+                  Choose how you want to export the currently displayed {paginatedData.length} records:
+                </p>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printDirect ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printDirect')}
+                  onMouseLeave={() => handleMouseLeave('printDirect')}
+                  onClick={() => handlePrint('print')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Print Directly</p>
+                  <p style={styles.printOptionDescription}>
+                    Send directly to your printer
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printPDF ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printPDF')}
+                  onMouseLeave={() => handleMouseLeave('printPDF')}
+                  onClick={() => handlePrint('pdf')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Save as PDF</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as PDF file
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printWord ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printWord')}
+                  onMouseLeave={() => handleMouseLeave('printWord')}
+                  onClick={() => handlePrint('word')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Word</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Word document
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printExcel ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printExcel')}
+                  onMouseLeave={() => handleMouseLeave('printExcel')}
+                  onClick={() => handlePrint('excel')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Excel</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Excel spreadsheet
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Add Member Modal */}

@@ -39,17 +39,11 @@ const RegisterPage = () => {
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [gender, setGender] = useState('');
-  const [civilStatus, setCivilStatus] = useState('');
   const [placeOfBirth, setPlaceOfBirth] = useState('');
   const [address, setAddress] = useState('');
-  const [age, setAge] = useState('');
   const [dateOfBirth, setDateOfBirth] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [dateText, setDateText] = useState('Select Date of Birth');
-  const [governmentId, setGovernmentId] = useState('');
-  const [isOtherGovernmentId, setIsOtherGovernmentId] = useState(false);
-  const [otherGovernmentId, setOtherGovernmentId] = useState('');
   const [attendedOrientation, setAttendedOrientation] = useState(false);
   const [orientationCode, setOrientationCode] = useState('');
   const [validOrientationCode, setValidOrientationCode] = useState('');
@@ -67,12 +61,8 @@ const RegisterPage = () => {
   const [lastNameError, setLastNameError] = useState('');
   const [emailError, setEmailError] = useState('');
   const [phoneNumberError, setPhoneNumberError] = useState('');
-  const [genderError, setGenderError] = useState('');
-  const [civilStatusError, setCivilStatusError] = useState('');
   const [placeOfBirthError, setPlaceOfBirthError] = useState('');
   const [addressError, setAddressError] = useState('');
-  const [governmentIdError, setGovernmentIdError] = useState('');
-  const [ageError, setAgeError] = useState('');
   const [orientationError, setOrientationError] = useState('');
 
   const navigation = useNavigation();
@@ -101,23 +91,7 @@ const RegisterPage = () => {
     return () => backHandler.remove();
   }, [navigation]);
 
-  useEffect(() => {
-    if (dateOfBirth) {
-      // Calculate accurate age considering full date
-      const today = new Date();
-      const birthDate = new Date(dateOfBirth);
-      let calculatedAge = today.getFullYear() - birthDate.getFullYear();
-      
-      // Check if birthday hasn't occurred this year yet
-      const monthDiff = today.getMonth() - birthDate.getMonth();
-      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-        calculatedAge--;
-      }
-      
-      setAge(calculatedAge);
-      validateAge(calculatedAge);
-    }
-  }, [dateOfBirth]);
+
 
   // Fetch the valid orientation code from Firebase
   useEffect(() => {
@@ -186,23 +160,7 @@ const RegisterPage = () => {
     return true;
   };
 
-  const validateGender = (value) => {
-    if (!value) {
-      setGenderError('Gender is required');
-      return false;
-    }
-    setGenderError('');
-    return true;
-  };
 
-  const validateCivilStatus = (value) => {
-    if (!value) {
-      setCivilStatusError('Civil status is required');
-      return false;
-    }
-    setCivilStatusError('');
-    return true;
-  };
 
   const validatePlaceOfBirth = (value) => {
     setPlaceOfBirthError('');
@@ -218,34 +176,9 @@ const RegisterPage = () => {
     return true;
   };
 
-  const validateGovernmentId = (value) => {
-    // If "Other" is selected, ensure the custom text is provided
-    if (isOtherGovernmentId) {
-      if (!otherGovernmentId || !otherGovernmentId.trim()) {
-        setGovernmentIdError('Please specify your government ID');
-        return false;
-      }
-      setGovernmentIdError('');
-      return true;
-    }
 
-    // Otherwise validate the selected option
-    if (!value || !String(value).trim()) {
-      setGovernmentIdError('Government ID is required');
-      return false;
-    }
-    setGovernmentIdError('');
-    return true;
-  };
 
-  const validateAge = (ageValue) => {
-    if (!ageValue || ageValue < 21) {
-      setAgeError('You must be at least 21 years old to register');
-      return false;
-    }
-    setAgeError('');
-    return true;
-  };
+
 
   const validateOrientation = () => {
     if (!attendedOrientation) {
@@ -277,13 +210,7 @@ const RegisterPage = () => {
     validatePhoneNumber(phoneNumber);
   }, [phoneNumber]);
 
-  useEffect(() => {
-    validateGender(gender);
-  }, [gender]);
 
-  useEffect(() => {
-    validateCivilStatus(civilStatus);
-  }, [civilStatus]);
 
   useEffect(() => {
     validatePlaceOfBirth(placeOfBirth);
@@ -293,32 +220,26 @@ const RegisterPage = () => {
     validateAddress(address);
   }, [address]);
 
-  useEffect(() => {
-    validateGovernmentId(governmentId);
-  }, [governmentId]);
 
-  useEffect(() => {
-    validateAge(age);
-  }, [age]);
+
+
 
   useEffect(() => {
     validateOrientation();
   }, [attendedOrientation, orientationCode]);
 
   const isFormComplete = () => {
-    const hasNoErrors = !firstNameError && !lastNameError && !emailError && 
-                       !phoneNumberError && !genderError && !civilStatusError && 
-                       !placeOfBirthError && !addressError && !governmentIdError && 
-                       !ageError && !orientationError;
-    
+    const hasNoErrors = !firstNameError && !lastNameError && !emailError &&
+                       !phoneNumberError && !placeOfBirthError && !addressError &&
+                       !orientationError;
+
     // Optional employment fields are NOT required for completeness
-    const basicInfoComplete = firstName && lastName && email && phoneNumber && 
-                             gender && civilStatus && placeOfBirth && address && 
-                             (isOtherGovernmentId ? otherGovernmentId : governmentId) && age >= 21;
-    
-    const orientationComplete = attendedOrientation ? 
+    const basicInfoComplete = firstName && lastName && email && phoneNumber &&
+                             placeOfBirth && address;
+
+    const orientationComplete = attendedOrientation ?
       (orientationCode && orientationCode === validOrientationCode) : true;
-    
+
     return hasNoErrors && basicInfoComplete && orientationComplete;
   };
 
@@ -359,19 +280,16 @@ const RegisterPage = () => {
 
   const handleProceedToNext = () => {
     const dateOfBirthISO = dateOfBirth.toISOString();
+
     navigation.navigate('Register2', {
       firstName,
       middleName,
       lastName,
       email,
       phoneNumber,
-      gender,
-      civilStatus,
       placeOfBirth,
       address,
-      age,
       dateOfBirth: dateOfBirthISO,
-      governmentId: isOtherGovernmentId ? otherGovernmentId : governmentId,
       attendedOrientation,
       orientationCode,
       // Optional employment fields
@@ -389,18 +307,14 @@ const RegisterPage = () => {
       validateLastName(lastName),
       validateEmail(email),
       validatePhoneNumber(phoneNumber),
-      validateGender(gender),
-      validateCivilStatus(civilStatus),
       validatePlaceOfBirth(placeOfBirth),
       validateAddress(address),
-      validateGovernmentId(governmentId),
-      validateAge(age),
       validateOrientation()
     ];
 
     // Check if all validations passed
     const isAllValid = validations.every(isValid => isValid === true);
-    
+
     if (!isAllValid) {
       return; // Don't proceed if there are validation errors
     }
@@ -428,26 +342,7 @@ const RegisterPage = () => {
     }
   };
 
-  const genderOptions = [
-    { key: 'Male', label: 'Male' },
-    { key: 'Female', label: 'Female' },
-    { key: 'Prefer not to say', label: 'Prefer not to say' },
-  ];
 
-  const civilStatusOptions = [
-    { key: 'Single', label: 'Single' },
-    { key: 'Married', label: 'Married' },
-    { key: 'Widowed', label: 'Widowed' },
-    { key: 'Separated', label: 'Separated' },
-  ];
-    
-  const governmentIdOptions = [
-    { key: 'national', label: 'National ID (PhilSys)' },
-    { key: 'sss', label: 'SSS ID' },
-    { key: 'philhealth', label: 'PhilHealth ID' },
-    { key: 'drivers_license', label: 'Drivers License' },
-    { key: 'other', label: 'Others' },
-  ];
 
   return (
     <KeyboardAvoidingView
@@ -465,7 +360,7 @@ const RegisterPage = () => {
 
         <View style={{ marginBottom: 16 }}>
           <Text style={styles.title}>Basic Information</Text>
-          <Text style={styles.subLabel}>Step 1 of 5 • Tell us about you</Text>
+          <Text style={styles.subLabel}>Step 1 of 4 • Tell us about you</Text>
           <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 999, marginTop: 8 }}>
             <View style={{ width: '20%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
           </View>
@@ -517,29 +412,7 @@ const RegisterPage = () => {
 
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Gender <Text style={styles.required}>*</Text> </Text>
-            <ModalSelector
-              data={genderOptions}
-              initValue="Select Gender"
-              cancelText="Cancel"
-              onChange={(option) => {
-                setGender(option.key);
-                validateGender(option.key);
-              }}
-              style={styles.picker}
-              modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-              overlayStyle={{ justifyContent: 'flex-end' }}
-            >
-              <TouchableOpacity style={styles.pickerContainer}>
-                <Text style={styles.pickerText}>
-                  {gender || 'Select Gender'}
-                </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-              </TouchableOpacity>
-            </ModalSelector>
 
-          </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Date of Birth <Text style={styles.required}>*</Text> </Text>
@@ -560,18 +433,7 @@ const RegisterPage = () => {
             )}
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Age</Text>
-            <TextInput
-              placeholder="Age"
-              value={age.toString()}
-              onChangeText={text => setAge(text)}
-              style={styles.input}
-              keyboardType="numeric"
-              editable={false}
-            />
-            {ageError ? <Text style={styles.errorText}>{ageError}</Text> : null}
-          </View>
+
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Place of Birth <Text style={styles.required}>*</Text> </Text>
@@ -605,29 +467,7 @@ const RegisterPage = () => {
 
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Civil Status <Text style={styles.required}>*</Text> </Text>
-            <ModalSelector
-              data={civilStatusOptions}
-              initValue="Select Civil Status"
-              cancelText="Cancel"
-              onChange={(option) => {
-                setCivilStatus(option.key);
-                validateCivilStatus(option.key);
-              }}
-              style={styles.picker}
-              modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-              overlayStyle={{ justifyContent: 'flex-end' }}
-            >
-              <TouchableOpacity style={styles.pickerContainer}>
-                <Text style={styles.pickerText}>
-                  {civilStatus || 'Select Civil Status'}
-                </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-              </TouchableOpacity>
-            </ModalSelector>
 
-          </View>
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email <Text style={styles.required}>*</Text> </Text>
@@ -727,52 +567,7 @@ const RegisterPage = () => {
             />
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
-            <ModalSelector
-              data={governmentIdOptions}
-              initValue="Select Government ID"
-              cancelText="Cancel"
-              onChange={(option) => {
-                const isOther = option.key === 'other';
-                setIsOtherGovernmentId(isOther);
-                if (isOther) {
-                  setGovernmentId('Other');
-                  setOtherGovernmentId('');
-                } else {
-                  setGovernmentId(option.label);
-                  setOtherGovernmentId('');
-                }
-                validateGovernmentId(isOther ? otherGovernmentId : option.label);
-              }}
-              style={styles.picker}
-              modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-              overlayStyle={{ justifyContent: 'flex-end' }}
-            >
-              <TouchableOpacity style={styles.pickerContainer}>
-                <Text style={styles.pickerText}>
-                  {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
-                </Text>
-                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-              </TouchableOpacity>
-            </ModalSelector>
-            {isOtherGovernmentId && (
-              <View style={{ marginTop: 8 }}>
-                <TextInput
-                  placeholder="Please specify your Government ID"
-                  value={otherGovernmentId}
-                  onChangeText={(text) => {
-                    setOtherGovernmentId(text);
-                    // Keep the main field in sync for form completeness checks
-                    setGovernmentId(text);
-                    validateGovernmentId(text);
-                  }}
-                  style={styles.input}
-                />
-              </View>
-            )}
-            {governmentIdError ? <Text style={styles.errorText}>{governmentIdError}</Text> : null}
-          </View>
+
 
           <View style={styles.radioContainer}>
             <Text style={styles.radioLabel}>

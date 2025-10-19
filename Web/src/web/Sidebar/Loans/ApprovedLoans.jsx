@@ -736,7 +736,7 @@ const checkDueDates = async () => {
 
       Object.entries(currentLoansData).forEach(([memberId, loans]) => {
         Object.entries(loans).forEach(([transactionId, loan]) => {
-          const outstandingBalance = parseFloat(loan.loanAmount) || 0;
+          const outstandingBalance = parseFloat(loan.remainingBalance) || 0;
           const originalLoan = approvedLoansData[memberId]?.[transactionId];
           const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
           const member = membersData[memberId] || {};

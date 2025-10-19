@@ -1758,7 +1758,7 @@ const handleSuccessOk = async () => {
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Member ID</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Full Name</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Amount</th>
-              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Payment Method</th>
+              <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Mode of Payment</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Status</th>
               <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Action</th>
             </tr>
@@ -1878,7 +1878,7 @@ const handleSuccessOk = async () => {
                     <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>
                         <FaCreditCard />
-                        Payment Method:
+                        Mode of Payment:
                       </span>
                       <span style={styles.fieldValue}>{selectedPayment.paymentOption || 'N/A'}</span>
                     </div>

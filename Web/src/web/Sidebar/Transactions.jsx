@@ -18,8 +18,10 @@ import {
   FaUser,
   FaUserCheck,
   FaUserTimes,
-  FaTimes
+  FaTimes,
+  FaPrint
 } from 'react-icons/fa';
+import { AiOutlineClose } from 'react-icons/ai';
 import ExcelJS from 'exceljs';
 import { database } from '../../../../Database/firebaseConfig';
 
@@ -209,6 +211,25 @@ const styles = {
   },
   downloadButtonHover: {
     backgroundColor: '#047857'
+  },
+  printButton: {
+    padding: '10px 16px',
+    backgroundColor: '#dc2626',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: '14px',
+    fontWeight: '500',
+    transition: 'background-color 0.2s ease',
+    gap: '8px',
+    whiteSpace: 'nowrap'
+  },
+  printButtonHover: {
+    backgroundColor: '#b91c1c'
   },
   dataContainer: {
     backgroundColor: '#fff',
@@ -522,6 +543,35 @@ const styles = {
   amountValue: {
     fontSize: '1rem',
     fontWeight: '700'
+  },
+  printModalContent: {
+    padding: '24px',
+    textAlign: 'center'
+  },
+  printOption: {
+    padding: '16px',
+    border: '2px solid #e2e8f0',
+    borderRadius: '8px',
+    backgroundColor: '#f8fafc',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    marginBottom: '12px',
+    width: '100%'
+  },
+  printOptionHover: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#eff6ff'
+  },
+  printOptionText: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#374151',
+    margin: 0
+  },
+  printOptionDescription: {
+    fontSize: '14px',
+    color: '#64748b',
+    margin: '4px 0 0 0'
   }
 };
 
@@ -537,6 +587,8 @@ const Transactions = () => {
   const [transactionTypeFilter, setTransactionTypeFilter] = useState('All');
   const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' });
   const [activeTransactionFilter, setActiveTransactionFilter] = useState('all');
+  const [printModalVisible, setPrintModalVisible] = useState(false);
+  const [printing, setPrinting] = useState(false);
   const pageSize = 10;
 
   // Tab configuration
@@ -585,7 +637,24 @@ const Transactions = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        boxShadow: '0 10px 25px rgba(0,0,0,0.1)';
+      }
+      @media print {
+        body * {
+          visibility: hidden;
+        }
+        .print-content, .print-content * {
+          visibility: visible;
+        }
+        .print-content {
+          position: absolute;
+          left: 0;
+          top: 0;
+          width: 100%;
+        }
+        .no-print {
+          display: none !important;
+        }
       }
     `;
     document.head.appendChild(styleElement);
@@ -720,6 +789,323 @@ const Transactions = () => {
       case 'Withdrawals': return styles.typeWithdrawal;
       case 'Registrations': return styles.typeRegistration;
       default: return {};
+    }
+  };
+
+  const handlePrint = (format = 'print') => {
+    setPrinting(true);
+    
+    try {
+      const sectionTitle = 
+        activeTransactionFilter === 'all' ? 'All Transactions' :
+        activeTransactionFilter === 'deposits' ? 'Deposit Transactions' :
+        activeTransactionFilter === 'loans' ? 'Loan Transactions' :
+        activeTransactionFilter === 'payments' ? 'Payment Transactions' :
+        'Withdrawal Transactions';
+
+      // Get the data that's currently displayed in the table (paginated)
+      const displayedData = paginatedData;
+
+      const printContent = document.createElement('div');
+      printContent.className = 'print-content';
+      printContent.style.padding = '20px';
+      printContent.style.fontFamily = 'Arial, sans-serif';
+
+      // Header
+      const header = document.createElement('div');
+      header.style.borderBottom = '2px solid #333';
+      header.style.paddingBottom = '10px';
+      header.style.marginBottom = '20px';
+      
+      const title = document.createElement('h1');
+      title.textContent = `${sectionTitle} Report`;
+      title.style.margin = '0';
+      title.style.color = '#333';
+      
+      const date = document.createElement('p');
+      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      date.style.margin = '5px 0 0 0';
+      date.style.color = '#666';
+      
+      const count = document.createElement('p');
+      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredMembers.length / pageSize)})`;
+      count.style.margin = '5px 0 0 0';
+      count.style.color = '#666';
+      
+      header.appendChild(title);
+      header.appendChild(date);
+      header.appendChild(count);
+      printContent.appendChild(header);
+
+      // Table
+      if (displayedData.length > 0) {
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginTop = '20px';
+
+        // Table Header
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.style.backgroundColor = '#f8f9fa';
+        
+        const headers = ['Member ID', 'Member Name', 'Email', 'Transaction Count', 'Latest Transaction Type', 'Latest Amount', 'Latest Date'];
+        
+        // Create header cells
+        headers.forEach(headerText => {
+          const th = document.createElement('th');
+          th.textContent = headerText;
+          th.style.padding = '12px 8px';
+          th.style.border = '1px solid #ddd';
+          th.style.textAlign = 'left';
+          th.style.fontWeight = 'bold';
+          th.style.backgroundColor = '#e9ecef';
+          headerRow.appendChild(th);
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        // Table Body
+        const tbody = document.createElement('tbody');
+        displayedData.forEach((memberId, index) => {
+          const member = members[memberId];
+          const memberTransactions = transactions[memberId] || [];
+          
+          // Filter transactions by active tab
+          const filteredTransactions = activeTransactionFilter === 'all' 
+            ? memberTransactions 
+            : memberTransactions.filter(tx => {
+                const transactionType = tx.type.toLowerCase();
+                switch (activeTransactionFilter) {
+                  case 'deposits': return transactionType === 'deposits';
+                  case 'loans': return transactionType === 'loans';
+                  case 'payments': return transactionType === 'payments';
+                  case 'withdrawals': return transactionType === 'withdrawals';
+                  default: return true;
+                }
+              });
+
+          const latestTransaction = filteredTransactions
+            .sort((a, b) => {
+              const dateA = a.dateApproved || a.dateApplied || '';
+              const dateB = b.dateApproved || b.dateApplied || '';
+              return dateB.localeCompare(dateA);
+            })[0];
+
+          const row = document.createElement('tr');
+          row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+          
+          // Member ID
+          const tdId = document.createElement('td');
+          tdId.textContent = memberId;
+          tdId.style.padding = '10px 8px';
+          tdId.style.border = '1px solid #ddd';
+          tdId.style.fontSize = '12px';
+          row.appendChild(tdId);
+
+          // Member Name
+          const tdName = document.createElement('td');
+          tdName.textContent = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
+          tdName.style.padding = '10px 8px';
+          tdName.style.border = '1px solid #ddd';
+          tdName.style.fontSize = '12px';
+          row.appendChild(tdName);
+
+          // Email
+          const tdEmail = document.createElement('td');
+          tdEmail.textContent = member?.email || 'N/A';
+          tdEmail.style.padding = '10px 8px';
+          tdEmail.style.border = '1px solid #ddd';
+          tdEmail.style.fontSize = '12px';
+          row.appendChild(tdEmail);
+
+          // Transaction Count
+          const tdCount = document.createElement('td');
+          tdCount.textContent = filteredTransactions.length;
+          tdCount.style.padding = '10px 8px';
+          tdCount.style.border = '1px solid #ddd';
+          tdCount.style.fontSize = '12px';
+          tdCount.style.textAlign = 'center';
+          row.appendChild(tdCount);
+
+          // Latest Transaction Type
+          const tdType = document.createElement('td');
+          tdType.textContent = latestTransaction?.type || 'N/A';
+          tdType.style.padding = '10px 8px';
+          tdType.style.border = '1px solid #ddd';
+          tdType.style.fontSize = '12px';
+          row.appendChild(tdType);
+
+          // Latest Amount
+          const tdAmount = document.createElement('td');
+          if (latestTransaction) {
+            const amount = latestTransaction.amountToBeDeposited || 
+                          latestTransaction.loanAmount || 
+                          latestTransaction.amount || 
+                          latestTransaction.amountWithdrawn || 
+                          latestTransaction.amountToBePaid;
+            tdAmount.textContent = formatCurrency(amount);
+          } else {
+            tdAmount.textContent = 'N/A';
+          }
+          tdAmount.style.padding = '10px 8px';
+          tdAmount.style.border = '1px solid #ddd';
+          tdAmount.style.fontSize = '12px';
+          row.appendChild(tdAmount);
+
+          // Latest Date
+          const tdDate = document.createElement('td');
+          tdDate.textContent = latestTransaction ? 
+            formatDate(latestTransaction.dateApproved || latestTransaction.dateApplied) : 
+            'N/A';
+          tdDate.style.padding = '10px 8px';
+          tdDate.style.border = '1px solid #ddd';
+          tdDate.style.fontSize = '12px';
+          row.appendChild(tdDate);
+          
+          tbody.appendChild(row);
+        });
+        
+        table.appendChild(tbody);
+        printContent.appendChild(table);
+      } else {
+        const noData = document.createElement('p');
+        noData.textContent = 'No data available';
+        noData.style.textAlign = 'center';
+        noData.style.color = '#666';
+        noData.style.fontStyle = 'italic';
+        printContent.appendChild(noData);
+      }
+
+      if (format === 'pdf') {
+        // For PDF, we'll use browser's print to PDF functionality
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      } else if (format === 'word') {
+        // For Word, create a simple HTML file that can be opened in Word
+        const htmlContent = `
+          <html>
+            <head>
+              <title>${sectionTitle}</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                h1 { color: #333; }
+              </style>
+            </head>
+            <body>
+              ${printContent.innerHTML}
+            </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else if (format === 'excel') {
+        // Export to Excel
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(sectionTitle);
+
+        if (displayedData.length > 0) {
+          // Define headers for Excel
+          const excelHeaders = [
+            'Member ID', 
+            'Member Name', 
+            'Email', 
+            'Transaction Count', 
+            'Latest Transaction Type', 
+            'Latest Amount', 
+            'Latest Date'
+          ];
+
+          worksheet.addRow(excelHeaders);
+
+          displayedData.forEach(memberId => {
+            const member = members[memberId];
+            const memberTransactions = transactions[memberId] || [];
+            
+            // Filter transactions by active tab
+            const filteredTransactions = activeTransactionFilter === 'all' 
+              ? memberTransactions 
+              : memberTransactions.filter(tx => {
+                  const transactionType = tx.type.toLowerCase();
+                  switch (activeTransactionFilter) {
+                    case 'deposits': return transactionType === 'deposits';
+                    case 'loans': return transactionType === 'loans';
+                    case 'payments': return transactionType === 'payments';
+                    case 'withdrawals': return transactionType === 'withdrawals';
+                    default: return true;
+                  }
+                });
+
+            const latestTransaction = filteredTransactions
+              .sort((a, b) => {
+                const dateA = a.dateApproved || a.dateApplied || '';
+                const dateB = b.dateApproved || b.dateApplied || '';
+                return dateB.localeCompare(dateA);
+              })[0];
+
+            const row = [
+              memberId,
+              member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
+              member?.email || 'N/A',
+              filteredTransactions.length,
+              latestTransaction?.type || 'N/A'
+            ];
+
+            if (latestTransaction) {
+              const amount = latestTransaction.amountToBeDeposited || 
+                            latestTransaction.loanAmount || 
+                            latestTransaction.amount || 
+                            latestTransaction.amountWithdrawn || 
+                            latestTransaction.amountToBePaid;
+              row.push(parseFloat(amount) || 0);
+              row.push(latestTransaction.dateApproved || latestTransaction.dateApplied || '');
+            } else {
+              row.push(0);
+              row.push('N/A');
+            }
+
+            worksheet.addRow(row);
+          });
+        }
+
+        workbook.xlsx.writeBuffer().then(buffer => {
+          const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        });
+      } else {
+        // Direct print
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      }
+
+      setPrintModalVisible(false);
+    } catch (error) {
+      console.error('Error printing data:', error);
+    } finally {
+      setPrinting(false);
     }
   };
 
@@ -917,7 +1303,7 @@ const Transactions = () => {
               })}
             </div>
 
-            {/* Search and Download - Right side */}
+            {/* Search, Download, Print - Right side */}
             <div style={styles.searchDownloadContainer}>
               <div style={styles.searchContainer}>
                 <FaSearch style={styles.searchIcon} />
@@ -936,15 +1322,15 @@ const Transactions = () => {
 
               <button 
                 style={{
-                  ...styles.downloadButton,
-                  ...(isHovered.download ? styles.downloadButtonHover : {})
+                  ...styles.printButton,
+                  ...(isHovered.print ? styles.printButtonHover : {})
                 }}
-                onMouseEnter={() => handleMouseEnter('download')}
-                onMouseLeave={() => handleMouseLeave('download')}
-                onClick={handleDownload}
-                title="Export to Excel"
+                onMouseEnter={() => handleMouseEnter('print')}
+                onMouseLeave={() => handleMouseLeave('print')}
+                onClick={() => setPrintModalVisible(true)}
+                title="Print/Export Options"
               >
-                <FaDownload />
+                <FaPrint />
               </button>
             </div>
           </div>
@@ -1114,6 +1500,99 @@ const Transactions = () => {
             </div>
           )}
         </div>
+
+        {/* Print Modal */}
+        {printModalVisible && (
+          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Print/Export Options</h2>
+                <button 
+                  onClick={() => setPrintModalVisible(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closePrintModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closePrintModal')}
+                  onMouseLeave={() => handleMouseLeave('closePrintModal')}
+                  disabled={printing}
+                >
+                  <AiOutlineClose />
+                </button>
+              </div>
+
+              <div style={styles.printModalContent}>
+                <p style={{margin: '0 0 20px 0', color: '#64748b'}}>
+                  Choose how you want to export the currently displayed {paginatedData.length} records:
+                </p>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printDirect ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printDirect')}
+                  onMouseLeave={() => handleMouseLeave('printDirect')}
+                  onClick={() => handlePrint('print')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Print Directly</p>
+                  <p style={styles.printOptionDescription}>
+                    Send directly to your printer
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printPDF ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printPDF')}
+                  onMouseLeave={() => handleMouseLeave('printPDF')}
+                  onClick={() => handlePrint('pdf')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Save as PDF</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as PDF file
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printWord ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printWord')}
+                  onMouseLeave={() => handleMouseLeave('printWord')}
+                  onClick={() => handlePrint('word')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Word</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Word document
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
+                    ...(isHovered.printExcel ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printExcel')}
+                  onMouseLeave={() => handleMouseLeave('printExcel')}
+                  onClick={() => handlePrint('excel')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Excel</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Excel spreadsheet
+                  </p>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Member Transactions Modal */}
         {memberModalVisible && selectedMember && (
