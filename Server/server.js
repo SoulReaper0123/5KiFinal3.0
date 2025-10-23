@@ -7,7 +7,7 @@ const cors = require('cors');
 console.log('GMAIL_USER:', process.env.GMAIL_USER);
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 // Constants for links
 const WEBSITE_LINK = 'https://fivekiapp.onrender.com';

@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://192.168.8.44:3000';
+const API_URL = 'http://192.168.8.38:3000';
 const WEBSITE_URL = 'https://fivekiapp.onrender.com';
 const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
