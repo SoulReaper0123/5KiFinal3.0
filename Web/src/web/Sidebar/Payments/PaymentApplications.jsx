@@ -1019,6 +1019,17 @@ const processDatabaseApprove = async (payment) => {
     // Amount left for interest/principal after penalty
     const remainingAfterPenalty = paymentAmount - penaltyPaid;
 
+// NEW: Calculate ExcessMonthlyPayment (amount beyond scheduled monthly payment)
+let currentTotalMonthlyPayment = 0;
+let scheduledMonthlyPayment = 0;
+let excessMonthlyPayment = 0;
+
+if (isLoanPayment && currentLoanData) {
+  currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
+  scheduledMonthlyPayment = currentTotalMonthlyPayment + penaltyDue;
+  excessMonthlyPayment = Math.max(0, paymentAmount - scheduledMonthlyPayment);
+}
+
     // 6. Split remaining into interest then principal
     let interestPaid = 0;
     let principalPaid = 0;
@@ -1043,9 +1054,9 @@ const processDatabaseApprove = async (payment) => {
         (currentLoanData && currentLoanData.remainingBalance) ?? (approvedLoanData && approvedLoanData.totalTermPayment) ?? 0
       ) || 0;
       const prevAmountPaid = parseFloat(currentLoanData?.amountPaid) || 0;
-      const amountPaidThisApproval = (interestPaid + principalPaid);
-      const newAmountPaid = Math.ceil((prevAmountPaid + amountPaidThisApproval) * 100) / 100;
-      const newRemainingBalance = Math.max(0, Math.ceil((prevRemainingBalance - amountPaidThisApproval) * 100) / 100);
+      const amountPaidThisApproval = (interestPaid + principalPaid); 
+      const newAmountPaid = prevAmountPaid + amountPaidThisApproval;
+      const newRemainingBalance = Math.max(0, prevRemainingBalance - amountPaidThisApproval); 
 
       if (newRemainingBalance <= 0) {
         // Fully settled: archive as paid, remove from Current/Approved, and log transaction
@@ -1297,6 +1308,7 @@ const processDatabaseApprove = async (payment) => {
       interestPaid,
       principalPaid,
       excessPayment,
+      excessMonthlyPayment,   
       investmentIncrease,
       balanceIncrease,
       isLoanPayment,

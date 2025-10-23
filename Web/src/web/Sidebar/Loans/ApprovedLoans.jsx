@@ -1163,13 +1163,13 @@ const checkDueDates = async () => {
                       Financial Breakdown
                     </h3>
                     <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Monthly Payment:</span>
+                      <span style={styles.financialLabel}>Monthly Amortization:</span>
                       <span style={styles.financialValue}>
                         ₱{formatCurrency(selectedLoan.monthlyPayment)}
                       </span>
                     </div>
                     <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Total Monthly Payment:</span>
+                      <span style={styles.financialLabel}>Total Monthly Amortization:</span>
                       <span style={styles.financialValue}>
                         ₱{formatCurrency(selectedLoan.totalMonthlyPayment)}
                       </span>
@@ -1209,7 +1209,7 @@ const checkDueDates = async () => {
                             </span>
                           </div>
                           <div style={styles.financialItem}>
-                            <span style={styles.financialLabel}>New Total Monthly:</span>
+                            <span style={styles.financialLabel}>New Total Amortization:</span>
                             <span style={styles.financialValue}>
                               ₱{formatCurrency(newTotalMonthly)}
                             </span>

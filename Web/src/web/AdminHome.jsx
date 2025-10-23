@@ -92,7 +92,33 @@ const AdminHome = () => {
 
   // Build visible UI context for the AI (display-only snapshot)
   const buildVisibleContext = () => {
-    return `UI STATE\n- Active Section: ${activeSection}\n- Pending Registrations: ${pendingCounts.registrations}\n- Pending Deposits: ${pendingCounts.deposits}\n- Pending Loans: ${pendingCounts.loans}\n- Pending Payments: ${pendingCounts.payments}\n- Pending Withdrawals: ${pendingCounts.withdraws}\n`;
+    // Capture only what is currently displayed on the Admin UI for the AI
+    const ui = {
+      activeSection,
+      pending: { ...pendingCounts },
+    };
+
+    // Pull dashboard snapshot if user is on the dashboard (display-only)
+    const dash = window.__visibleDashboard || null;
+
+    // Add a normalized, AI-friendly string focusing on labels used in UI
+    return [
+      'UI STATE',
+      `- Active Section: ${ui.activeSection}`,
+      `- Pending Registrations: ${ui.pending.registrations}`,
+      `- Pending Deposits: ${ui.pending.deposits}`,
+      `- Pending Loans: ${ui.pending.loans}`,
+      `- Pending Payments: ${ui.pending.payments}`,
+      `- Pending Withdrawals: ${ui.pending.withdraws}`,
+      dash ? 'DASHBOARD SNAPSHOT' : null,
+      dash ? `- Available Funds: ₱${Number(dash.availableFunds || 0).toLocaleString()}` : null,
+      dash ? `- Total Yields: ₱${Number(dash.totalYields || 0).toLocaleString()}` : null,
+      dash ? `- Total Loans: ₱${Number(dash.totalLoans || 0).toLocaleString()}` : null,
+      dash ? `- Total Receivables: ₱${Number(dash.totalReceivables || 0).toLocaleString()}` : null,
+      dash ? `- 5KI Savings: ₱${Number(dash.fiveKISavings || 0).toLocaleString()}` : null,
+      dash ? `- Active Borrowers: ${dash.activeBorrowers || 0}` : null,
+      dash ? `- Total Members: ${dash.totalMembers || 0}` : null,
+    ].filter(Boolean).join('\n');
   };
 
   // Test AI connection (Gemini v1beta endpoint) with dynamic model probe
@@ -375,7 +401,7 @@ const AdminHome = () => {
     const newChatId = Date.now().toString();
     const welcomeMessage = {
       type: 'ai',
-      content: 'Hi! How may I help you today? 😊\n\nI have access to your database and can help you with member information, financial data, loan applications, and more!',
+      content: 'Hi! How may I help you today?',
       timestamp: new Date().toLocaleTimeString()
     };
     

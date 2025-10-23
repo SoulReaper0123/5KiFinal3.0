@@ -664,8 +664,14 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                       <FaReceipt />
                       Financial Breakdown
                     </h3>
+                                      <div style={styles.approvalItem}>
+                      <span style={styles.approvalLabel}>Monthly Excess Payment:</span>
+                      <span style={styles.approvalValue}>
+                        {formatCurrency(selectedPayment.excessMonthlyPayment || 0)}
+                      </span>
+                    </div>
                     <div style={styles.approvalItem}>
-                      <span style={styles.approvalLabel}>Excess Payment:</span>
+                      <span style={styles.approvalLabel}>Excess Term Payment:</span>
                       <span style={styles.approvalValue}>
                         {formatCurrency(selectedPayment.excessPayment || 0)}
                       </span>

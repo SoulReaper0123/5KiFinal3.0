@@ -1,16 +1,22 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FaSearch, 
-  FaDownload, 
-  FaFilter, 
-  FaChevronLeft, 
+import {
+  FaSearch,
+  FaDownload,
+  FaFilter,
+  FaChevronLeft,
   FaChevronRight,
   FaPlus,
   FaCheckCircle,
   FaTimes,
   FaExclamationCircle,
   FaFileAlt,
-  FaPrint
+  FaPrint,
+  FaUser,
+  FaMoneyBillWave,
+  FaCreditCard,
+  FaCalendarAlt,
+  FaReceipt,
+  FaBan
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -21,12 +27,13 @@ import PendingPayments from './PaymentApplications';
 import CompletedPayments from './ApprovedPayments';
 import FailedPayments from './RejectedPayments';
 import { ApprovePayments } from '../../../../../Server/api';
+import logoImage from '../../../../../assets/logo.png';
 
 // Constants
 const paymentOptions = [
   { key: 'Bank', label: 'Bank' },
   { key: 'GCash', label: 'GCash' },
-  { key: 'Cash', label: 'Cash on Hand' }
+  { key: 'Cash-on-Hand', label: 'Cash on Hand' }
 ];
 
 const formatCurrency = (amount) => {
@@ -46,6 +53,53 @@ const formatTime = (date) => {
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
   return `${hours}:${minutes}`;
+};
+
+// FIXED: Date parsing functions from React Native component
+const parseDateTime = (dateInput) => {
+  try {
+    if (!dateInput) return null;
+    if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+      return new Date(dateInput.seconds * 1000);
+    }
+    if (typeof dateInput === 'string') {
+      if (dateInput.includes(' at ')) {
+        const [datePart, timePart] = dateInput.split(' at ');
+        if (datePart.includes('/')) {
+          const [month, day, year] = datePart.split('/');
+          const [hours, minutes] = timePart.split(':');
+          return new Date(year, month - 1, day, hours, minutes);
+        } else {
+          const parsed = new Date(dateInput.replace(' at ', ' '));
+          if (!isNaN(parsed.getTime())) return parsed;
+        }
+      }
+      if (/^[A-Za-z]+ \d{1,2}, \d{4}$/.test(dateInput)) {
+        const parsed = new Date(dateInput + ' 00:00:00');
+        if (!isNaN(parsed.getTime())) return parsed;
+      }
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
+        return new Date(dateInput + 'T00:00:00');
+      }
+      const parsed = new Date(dateInput);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    }
+    if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+const computeOverdueDays = (raw) => {
+  const d = parseDateTime(raw);
+  if (!d) return 0;
+  const today = new Date();
+  const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const startDue = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  if (startToday < startDue) return 0;
+  const diffMs = startToday.getTime() - startDue.getTime();
+  return Math.ceil(diffMs / (1000 * 60 * 60 * 24));
 };
 
 const styles = {
@@ -428,7 +482,7 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -446,17 +500,27 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
     whiteSpace: 'nowrap'
   },
   secondaryButtonHover: {
     backgroundColor: '#4b5563'
   },
+  dashboardLoadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '90vh',
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+  },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '200px'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '16px'
   },
   spinner: {
     border: '4px solid #f3f4f6',
@@ -465,6 +529,11 @@ const styles = {
     width: '40px',
     height: '40px',
     animation: 'spin 1s linear infinite'
+  },
+  loadingText: {
+    color: '#6B7280',
+    fontSize: '16px',
+    fontWeight: '500'
   },
   noDataContainer: {
     textAlign: 'center',
@@ -508,6 +577,248 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     margin: '4px 0 0 0'
+  },
+  // Loan selection styles
+  loanInfoContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: '10px',
+    padding: '15px',
+    marginBottom: '15px',
+    border: '1px solid #e9ecef'
+  },
+  sectionTitle: {
+    fontSize: '18px',
+    fontWeight: 'bold',
+    color: '#2D5783',
+    marginBottom: '10px',
+    textAlign: 'center'
+  },
+  loanSelectItem: {
+    display: 'flex',
+    alignItems: 'center',
+    padding: '12px 10px',
+    backgroundColor: '#fff',
+    borderRadius: '8px',
+    border: '1px solid #e5e7eb',
+    marginBottom: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  loanSelectItemActive: {
+    borderColor: '#2D5783',
+    backgroundColor: '#F1F5F9'
+  },
+  loanSelectTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#0F172A',
+    marginBottom: '4px'
+  },
+  loanSelectSub: {
+    fontSize: '12px',
+    color: '#475569'
+  },
+  checkboxArea: {
+    paddingLeft: '12px',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  // Confirmation modal styles (matching PaymentApplications)
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px'
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  // Financial info styles
+  financialCard: {
+    backgroundImage: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
+    backgroundColor: '#f0f9ff',
+    border: '1px solid #bae6fd',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginBottom: '1rem'
+  },
+  financialItem: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem 0'
+  },
+  financialLabel: {
+    fontSize: '0.875rem',
+    color: '#0369a1',
+    fontWeight: '500'
+  },
+  financialValue: {
+    fontSize: '1rem',
+    fontWeight: '600'
+  },
+  // Loading overlay
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+    backdropFilter: 'blur(4px)',
+  },
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  loadingTextOverlay: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
+  // Error text styles
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px',
+    fontWeight: '500'
+  },
+  // Loan Details Modal Styles - FIXED: Removed conflicting CSS properties
+  loanDetailsModal: {
+    maxWidth: '600px',
+    maxHeight: '80vh'
+  },
+  loanDetailsContent: {
+    padding: '0'
+  },
+  loanDetailsHeader: {
+    backgroundColor: '#E8F1FB',
+    padding: '16px',
+    borderRadius: '14px 14px 0 0',
+    marginBottom: '0'
+  },
+  loanDetailsBody: {
+    padding: '20px'
+  },
+  loanDetailsRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '12px 0',
+    borderBottom: '1px solid #E2E8F0'
+  },
+  loanDetailsLabel: {
+    color: '#64748B',
+    fontSize: '14px',
+    fontWeight: '600',
+    flex: 1
+  },
+  loanDetailsValue: {
+    color: '#0F172A',
+    fontSize: '16px',
+    fontWeight: '700',
+    textAlign: 'right',
+    flex: 1
+  },
+  loanDetailsValueOverdue: {
+    color: '#D32F2F'
+  },
+  overdueBadge: {
+    color: '#D32F2F',
+    fontSize: '12px',
+    fontWeight: '700',
+    marginTop: '4px'
+  },
+  paymentSummarySection: {
+    backgroundColor: '#F8FAFC',
+    padding: '16px',
+    marginTop: '16px',
+    borderRadius: '8px',
+    borderBottom: '1px solid #E2E8F0'
+  },
+  totalDueRow: {
+    backgroundColor: '#F1F5F9',
+    borderTop: '2px solid #E2E8F0',
+    padding: '16px',
+    marginTop: '16px',
+    borderRadius: '0 0 8px 8px'
+  },
+  totalDueLabel: {
+    color: '#1E3A5F',
+    fontSize: '16px',
+    fontWeight: '700'
+  },
+  totalDueValue: {
+    color: '#1E3A5F',
+    fontSize: '18px',
+    fontWeight: '800'
+  },
+  overdueWarning: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#FFE6E6',
+    border: '1px solid #D32F2F',
+    borderRadius: '8px',
+    padding: '12px',
+    marginTop: '16px'
+  },
+  overdueWarningText: {
+    color: '#D32F2F',
+    fontSize: '14px',
+    fontWeight: '600',
+    marginLeft: '8px',
+    flex: 1
+  },
+  viewDetailsButton: {
+    backgroundColor: 'transparent',
+    border: '1px solid #2D5783',
+    color: '#2D5783',
+    padding: '6px 12px',
+    borderRadius: '6px',
+    fontSize: '12px',
+    fontWeight: '600',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease',
+    marginLeft: '8px'
+  },
+  viewDetailsButtonHover: {
+    backgroundColor: '#2D5783',
+    color: 'white'
   }
 };
 
@@ -542,14 +853,53 @@ const PayLoans = () => {
   const [paymentAccounts, setPaymentAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' },
-    Cash: { accountName: '', accountNumber: '' }
+    'Cash-on-Hand': { accountName: '', accountNumber: '' }
   });
   const [isProcessing, setIsProcessing] = useState(false);
   const [isHovered, setIsHovered] = useState({});
   
+  // New states for loan selection
+  const [activeLoans, setActiveLoans] = useState([]);
+  const [selectedLoanId, setSelectedLoanId] = useState(null);
+  const [currentLoan, setCurrentLoan] = useState(null);
+  const [penaltyAmount, setPenaltyAmount] = useState(0);
+  const [totalAmountDue, setTotalAmountDue] = useState(0);
+  const [overdueDays, setOverdueDays] = useState(0);
+  const [balance, setBalance] = useState(0);
+  
+  // Member validation states
+  const [memberNotFound, setMemberNotFound] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
+  
+  // Loan Details Modal State
+  const [loanDetailsModalVisible, setLoanDetailsModalVisible] = useState(false);
+  const [selectedLoanForDetails, setSelectedLoanForDetails] = useState(null);
+  
   // Print Modal State
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
+
+  // View Details button hover states
+  const [viewDetailsHovered, setViewDetailsHovered] = useState({});
+
+  // Admin data for print report
+  const [adminData, setAdminData] = useState(null);
+
+  // Utility function to convert image to base64
+  const getImageAsBase64 = async (imageSrc) => {
+    try {
+      const response = await fetch(imageSrc);
+      const blob = await response.blob();
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.readAsDataURL(blob);
+      });
+    } catch (error) {
+      console.error('Error converting image to base64:', error);
+      return null;
+    }
+  };
 
   const pageSize = 10;
 
@@ -575,7 +925,7 @@ const PayLoans = () => {
     }
   ];
 
-  // Create style element and append to head
+  // Create style element and append to head - FIXED CSS with print header/footer removal
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
@@ -588,9 +938,46 @@ const PayLoans = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
       }
+      
+      /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
+        /* Remove browser default headers and footers */
+        @page {
+          margin: 0.5in !important;
+          size: auto;
+          margin-header: 0 !important;
+          margin-footer: 0 !important;
+        }
+        
+        /* Target Webkit browsers (Chrome, Safari) */
+        @page :first {
+          margin-top: 0;
+        }
+        
+        @page :left {
+          margin-left: 0.5in;
+          margin-right: 0.5in;
+        }
+        
+        @page :right {
+          margin-left: 0.5in;
+          margin-right: 0.5in;
+        }
+        
+        /* Hide URL, page numbers, and date in print */
+        body::before,
+        body::after {
+          display: none !important;
+        }
+        
+        /* Hide any browser-generated content */
+        .print-header:empty,
+        .print-footer:empty {
+          display: none;
+        }
+        
         body * {
           visibility: hidden;
         }
@@ -602,17 +989,66 @@ const PayLoans = () => {
           left: 0;
           top: 0;
           width: 100%;
+          padding: 20px;
+          background: white;
+          margin: 0 !important;
         }
         .no-print {
           display: none !important;
+        }
+        .print-header {
+          display: block !important;
+        }
+        .component-header {
+          display: none !important;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
         }
       }
     `;
     document.head.appendChild(styleElement);
 
     return () => {
-      document.head.removeChild(styleElement);
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
     };
+  }, []);
+
+  // Fetch admin data for print report
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        
+        const adminRef = database.ref(`${node}/${adminId}`);
+        const snapshot = await adminRef.once('value');
+        
+        if (snapshot.exists()) {
+          setAdminData(snapshot.val());
+        }
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      }
+    };
+
+    fetchAdminData();
   }, []);
 
   const fetchAllData = async () => {
@@ -711,6 +1147,250 @@ const PayLoans = () => {
     setFilteredData(filtered);
   };
 
+  // Fetch member data when member ID is entered - AUTO FETCH
+  const fetchMemberData = async (memberId) => {
+    if (!memberId) {
+      // Reset form if member ID is cleared
+      setFormData(prev => ({
+        ...prev,
+        firstName: '',
+        lastName: '',
+        email: ''
+      }));
+      setMemberNotFound(false);
+      setActiveLoans([]);
+      setSelectedLoanId(null);
+      setCurrentLoan(null);
+      setBalance(0);
+      return;
+    }
+    
+    setMemberLoading(true);
+    setMemberNotFound(false);
+    
+    try {
+      const memberRef = database.ref(`Members/${memberId}`);
+      const memberSnap = await memberRef.once('value');
+      
+      if (memberSnap.exists()) {
+        const memberData = memberSnap.val();
+        setFormData(prev => ({
+          ...prev,
+          firstName: memberData.firstName || '',
+          lastName: memberData.lastName || '',
+          email: memberData.email || ''
+        }));
+        setBalance(memberData.balance || 0);
+        setMemberNotFound(false);
+        
+        // Fetch active loans for this member
+        await fetchActiveLoans(memberId);
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          firstName: '',
+          lastName: '',
+          email: ''
+        }));
+        setActiveLoans([]);
+        setSelectedLoanId(null);
+        setCurrentLoan(null);
+        setMemberNotFound(true);
+      }
+    } catch (error) {
+      console.error('Error fetching member data:', error);
+      setMemberNotFound(true);
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  // Fetch active loans for member
+  const fetchActiveLoans = async (memberId) => {
+    try {
+      const currentLoansRef = database.ref(`Loans/CurrentLoans/${memberId}`);
+      const snapshot = await currentLoansRef.once('value');
+      
+      const found = [];
+      if (snapshot.exists()) {
+        const loans = snapshot.val();
+        for (const loanId in loans) {
+          const loan = loans[loanId];
+          found.push({ 
+            ...loan, 
+            _loanId: loanId,
+            // Ensure all required fields have fallbacks
+            loanType: loan.loanType || 'Personal Loan',
+            loanAmount: loan.loanAmount || loan.amount || 0,
+            outstandingBalance: loan.outstandingBalance || loan.loanAmount || loan.amount || 0,
+            interestRate: loan.interestRate || 0,
+            interest: loan.interest || 0,
+            term: loan.term || loan.loanTerm || 0,
+            monthlyPayment: loan.monthlyPayment || 0,
+            totalMonthlyPayment: loan.totalMonthlyPayment || loan.monthlyPayment || 0,
+            dueDate: loan.dueDate || loan.nextDueDate,
+            dateApplied: loan.dateApplied,
+            dateApproved: loan.dateApproved,
+            transactionId: loan.transactionId || loanId
+          });
+        }
+      }
+
+      if (found.length > 0) {
+        setActiveLoans(found);
+        const first = found[0];
+        setSelectedLoanId(first._loanId);
+        setCurrentLoan(first);
+        calculatePenaltyAndTotal(first);
+      } else {
+        setActiveLoans([]);
+        setSelectedLoanId(null);
+        setCurrentLoan(null);
+        setPenaltyAmount(0);
+        setTotalAmountDue(0);
+        setOverdueDays(0);
+      }
+    } catch (error) {
+      console.error('Error fetching active loans:', error);
+      setActiveLoans([]);
+    }
+  };
+
+  // Calculate penalty and total amount due - FIXED with proper date parsing
+  const calculatePenaltyAndTotal = (loan) => {
+    if (!loan) {
+      setPenaltyAmount(0);
+      setTotalAmountDue(0);
+      setOverdueDays(0);
+      return;
+    }
+
+    try {
+      const currentDueDate = loan.dueDate || loan.nextDueDate;
+      const overdueDays = computeOverdueDays(currentDueDate);
+      setOverdueDays(overdueDays);
+      
+      const loanInterest = parseFloat(loan.interest) || 0;
+      const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
+      setPenaltyAmount(penalty);
+      
+      const monthlyPayment = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
+      const total = monthlyPayment + penalty;
+      setTotalAmountDue(total);
+    } catch (error) {
+      console.error('Error calculating penalty:', error);
+      setPenaltyAmount(0);
+      setTotalAmountDue(loan?.totalMonthlyPayment || loan?.monthlyPayment || 0);
+      setOverdueDays(0);
+    }
+  };
+
+  // Calculate penalty for loan details modal - FIXED with proper date parsing
+  const calculateLoanDetails = (loan) => {
+    if (!loan) {
+      return { penalty: 0, totalDue: 0, overdueDays: 0, isOverdue: false };
+    }
+
+    try {
+      const currentDueDate = loan.dueDate || loan.nextDueDate;
+      const overdueDays = computeOverdueDays(currentDueDate);
+      const loanInterest = parseFloat(loan.interest) || 0;
+      const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
+      const monthlyPayment = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
+      const total = monthlyPayment + penalty;
+      
+      return { 
+        penalty, 
+        totalDue: total, 
+        overdueDays, 
+        isOverdue: overdueDays > 0 
+      };
+    } catch (error) {
+      console.error('Error calculating loan details:', error);
+      return { penalty: 0, totalDue: loan?.totalMonthlyPayment || loan?.monthlyPayment || 0, overdueDays: 0, isOverdue: false };
+    }
+  };
+
+  // Format display date for loans - FIXED to match React Native component
+  const formatDisplayDate = (dateInput) => {
+    try {
+      if (!dateInput) return 'N/A';
+
+      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
+        const date = new Date(dateInput.seconds * 1000);
+        return date.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+
+      if (typeof dateInput === 'string') {
+        const parsedDate = parseDateTime(dateInput);
+        if (parsedDate && !isNaN(parsedDate.getTime())) {
+          return parsedDate.toLocaleDateString('en-US', {
+            month: 'long',
+            day: 'numeric',
+            year: 'numeric'
+          });
+        }
+        return dateInput;
+      }
+
+      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) {
+        return dateInput.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      }
+
+      return 'N/A';
+    } catch (error) {
+      console.warn('Date formatting error:', error);
+      return 'N/A';
+    }
+  };
+
+  // Open loan details modal - FIXED with proper error handling
+  const openLoanDetails = (loan) => {
+    try {
+      console.log('Opening loan details for:', loan);
+      // Ensure loan has all required properties with fallbacks
+      const safeLoan = {
+        ...loan,
+        loanType: loan.loanType || 'Personal Loan',
+        loanAmount: loan.loanAmount || loan.amount || 0,
+        outstandingBalance: loan.outstandingBalance || loan.loanAmount || loan.amount || 0,
+        interestRate: loan.interestRate || 0,
+        interest: loan.interest || 0,
+        term: loan.term || loan.loanTerm || 0,
+        monthlyPayment: loan.monthlyPayment || 0,
+        totalMonthlyPayment: loan.totalMonthlyPayment || loan.monthlyPayment || 0,
+        dueDate: loan.dueDate || loan.nextDueDate,
+        dateApplied: loan.dateApplied,
+        dateApproved: loan.dateApproved,
+        transactionId: loan.transactionId || loan._loanId
+      };
+      
+      setSelectedLoanForDetails(safeLoan);
+      setLoanDetailsModalVisible(true);
+    } catch (error) {
+      console.error('Error opening loan details:', error);
+      setErrorMessage('Failed to open loan details');
+      setErrorModalVisible(true);
+    }
+  };
+
+  // Handle view details button hover
+  const handleViewDetailsHover = (loanId, isHovering) => {
+    setViewDetailsHovered(prev => ({
+      ...prev,
+      [loanId]: isHovering
+    }));
+  };
+
+  // FIXED PRINT FUNCTION - Removed browser headers and footers
   const handlePrint = (format = 'print') => {
     setPrinting(true);
     
@@ -727,31 +1407,95 @@ const PayLoans = () => {
       printContent.className = 'print-content';
       printContent.style.padding = '20px';
       printContent.style.fontFamily = 'Arial, sans-serif';
+      printContent.style.boxSizing = 'border-box';
+      printContent.style.margin = '0';
 
-      // Header
+      // Create your custom header
       const header = document.createElement('div');
+      header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '10px';
+      header.style.paddingBottom = '15px';
       header.style.marginBottom = '20px';
-      
-      const title = document.createElement('h1');
-      title.textContent = `${sectionTitle} Report`;
-      title.style.margin = '0';
-      title.style.color = '#333';
-      
-      const date = document.createElement('p');
-      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      date.style.margin = '5px 0 0 0';
-      date.style.color = '#666';
-      
-      const count = document.createElement('p');
-      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
-      count.style.margin = '5px 0 0 0';
-      count.style.color = '#666';
-      
-      header.appendChild(title);
-      header.appendChild(date);
-      header.appendChild(count);
+      header.style.boxSizing = 'border-box';
+
+      // Logo and Report Title (Centered)
+      const logoSection = document.createElement('div');
+      logoSection.style.textAlign = 'center';
+      logoSection.style.marginBottom = '15px';
+
+      // Add logo image
+      const logoImg = document.createElement('img');
+      logoImg.src = logoImage;
+      logoImg.style.width = '80px';
+      logoImg.style.height = '80px';
+      logoImg.style.marginBottom = '5px';
+      logoImg.style.display = 'block';
+      logoImg.style.marginLeft = 'auto';
+      logoImg.style.marginRight = 'auto';
+
+      const logo = document.createElement('div');
+      logo.textContent = '5Ki Financial Services';
+      logo.style.fontSize = '24px';
+      logo.style.fontWeight = 'bold';
+      logo.style.color = '#1e40af';
+      logo.style.marginBottom = '5px';
+
+      const reportTitle = document.createElement('div');
+      reportTitle.textContent = `${sectionTitle} Report`;
+      reportTitle.style.fontSize = '20px';
+      reportTitle.style.fontWeight = 'bold';
+      reportTitle.style.marginBottom = '15px';
+
+      logoSection.appendChild(logoImg);
+      logoSection.appendChild(logo);
+      logoSection.appendChild(reportTitle);
+
+      // Info Row (Generated Date on left, Prepared By on right)
+      const infoRow = document.createElement('div');
+      infoRow.style.display = 'flex';
+      infoRow.style.justifyContent = 'space-between';
+      infoRow.style.alignItems = 'flex-start';
+      infoRow.style.fontSize = '14px';
+      infoRow.style.marginBottom = '10px';
+      infoRow.style.boxSizing = 'border-box';
+
+      // Left side - Generated Date
+      const generatedDate = document.createElement('div');
+      generatedDate.style.textAlign = 'left';
+      generatedDate.style.flex = '1';
+      generatedDate.innerHTML = `
+        <strong>Generated as of:</strong><br>
+        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      `;
+
+      // Right side - Prepared By
+      const preparedBy = document.createElement('div');
+      preparedBy.style.textAlign = 'right';
+      preparedBy.style.flex = '1';
+      const adminFirstName = adminData?.firstName || 'Admin';
+      const adminRole = localStorage.getItem('userRole') || 'Admin';
+      preparedBy.innerHTML = `
+        <strong>Prepared by:</strong><br>
+        <span style="font-weight: bold;">${adminFirstName}</span><br>
+        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
+      `;
+
+      infoRow.appendChild(generatedDate);
+      infoRow.appendChild(preparedBy);
+
+      // Report Details
+      const reportDetails = document.createElement('div');
+      reportDetails.style.textAlign = 'center';
+      reportDetails.style.marginBottom = '15px';
+      reportDetails.style.fontSize = '14px';
+      reportDetails.style.color = '#666';
+      reportDetails.innerHTML = `
+        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
+      `;
+
+      header.appendChild(logoSection);
+      header.appendChild(infoRow);
+      header.appendChild(reportDetails);
       printContent.appendChild(header);
 
       // Table
@@ -760,6 +1504,7 @@ const PayLoans = () => {
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
         table.style.marginTop = '20px';
+        table.style.boxSizing = 'border-box';
 
         // Table Header - Define columns based on active section
         const thead = document.createElement('thead');
@@ -771,13 +1516,13 @@ const PayLoans = () => {
         
         switch(activeSection) {
           case 'pendingPayments':
-            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Status'];
+            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Status', 'Date Applied'];
             break;
           case 'completedPayments':
-            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Date Approved'];
+            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Date Approved', 'Transaction ID'];
             break;
           case 'failedPayments':
-            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Rejection Reason'];
+            headers = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Rejection Reason', 'Date Rejected'];
             break;
           default:
             headers = [];
@@ -792,6 +1537,7 @@ const PayLoans = () => {
           th.style.textAlign = 'left';
           th.style.fontWeight = 'bold';
           th.style.backgroundColor = '#e9ecef';
+          th.style.boxSizing = 'border-box';
           headerRow.appendChild(th);
         });
         
@@ -825,11 +1571,20 @@ const PayLoans = () => {
               case 'Status':
                 cellValue = item.status || 'pending';
                 break;
+              case 'Date Applied':
+                cellValue = item.dateApplied || '';
+                break;
               case 'Date Approved':
                 cellValue = item.dateApproved || '';
                 break;
+              case 'Transaction ID':
+                cellValue = item.transactionId || '';
+                break;
               case 'Rejection Reason':
                 cellValue = item.rejectionReason || '';
+                break;
+              case 'Date Rejected':
+                cellValue = item.dateRejected || '';
                 break;
               default:
                 cellValue = item[header] || '';
@@ -839,6 +1594,7 @@ const PayLoans = () => {
             td.style.padding = '10px 8px';
             td.style.border = '1px solid #ddd';
             td.style.fontSize = '12px';
+            td.style.boxSizing = 'border-box';
             row.appendChild(td);
           });
           
@@ -856,128 +1612,192 @@ const PayLoans = () => {
         printContent.appendChild(noData);
       }
 
-      if (format === 'pdf') {
-        // For PDF, we'll use browser's print to PDF functionality
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
-      } else if (format === 'word') {
-        // For Word, create a simple HTML file that can be opened in Word
-        const htmlContent = `
-          <html>
-            <head>
-              <title>${sectionTitle}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                h1 { color: #333; }
-              </style>
-            </head>
-            <body>
-              ${printContent.innerHTML}
-            </body>
-          </html>
-        `;
-        
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else if (format === 'excel') {
-        // Export to Excel
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet(sectionTitle);
-
-        if (displayedData.length > 0) {
-          // Define headers for Excel based on active section
-          let excelHeaders = [];
-          
-          switch(activeSection) {
-            case 'pendingPayments':
-              excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Status'];
-              break;
-            case 'completedPayments':
-              excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Date Approved'];
-              break;
-            case 'failedPayments':
-              excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Rejection Reason'];
-              break;
-            default:
-              excelHeaders = [];
-          }
-
-          worksheet.addRow(excelHeaders);
-
-          displayedData.forEach(item => {
-            const row = [];
-            excelHeaders.forEach(header => {
-              let cellValue = '';
-              
-              switch(header) {
-                case 'Member ID':
-                  cellValue = item.id || '';
-                  break;
-                case 'Full Name':
-                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                  break;
-                case 'Payment Amount':
-                  cellValue = parseFloat(item.amountToBePaid) || 0;
-                  break;
-                case 'Payment Method':
-                  cellValue = item.paymentOption || '';
-                  break;
-                case 'Status':
-                  cellValue = item.status || 'pending';
-                  break;
-                case 'Date Approved':
-                  cellValue = item.dateApproved || '';
-                  break;
-                case 'Rejection Reason':
-                  cellValue = item.rejectionReason || '';
-                  break;
-                default:
-                  cellValue = item[header] || '';
-              }
-              
-              row.push(cellValue);
-            });
-            worksheet.addRow(row);
-          });
-        }
-
-        workbook.xlsx.writeBuffer().then(buffer => {
-          const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-          });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        });
-      } else {
-        // Direct print
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
+      // Create a hidden iframe for printing to avoid browser headers
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.visibility = 'hidden';
+      
+      document.body.appendChild(printFrame);
+      
+      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+      if (printDocument.document) {
+        printDocument = printDocument.document;
       }
 
-      setPrintModalVisible(false);
+      // Write the print content to the iframe with CSS to remove headers/footers
+      printDocument.open();
+      printDocument.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${sectionTitle} Report</title>
+            <style>
+              /* Reset all margins and remove browser headers/footers */
+              @page {
+                margin: 0.5in !important;
+                size: auto;
+                margin-header: 0 !important;
+                margin-footer: 0 !important;
+              }
+              
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+                font-family: Arial, sans-serif;
+                -webkit-print-color-adjust: exact;
+              }
+              
+              .print-content {
+                margin: 0 !important;
+                padding: 20px;
+              }
+              
+              /* Hide any potential browser elements */
+              header, footer, .header, .footer {
+                display: none !important;
+              }
+              
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              
+              th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+              }
+              
+              th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+        </html>
+      `);
+      printDocument.close();
+
+      // Wait for content to load then print
+      printFrame.onload = function() {
+        try {
+          if (format === 'pdf') {
+            printFrame.contentWindow.print();
+
+            // Export to Excel
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet(sectionTitle);
+
+            if (displayedData.length > 0) {
+              // Define headers for Excel based on active section
+              let excelHeaders = [];
+              
+              switch(activeSection) {
+                case 'pendingPayments':
+                  excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Status', 'Date Applied'];
+                  break;
+                case 'completedPayments':
+                  excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Date Approved', 'Transaction ID'];
+                  break;
+                case 'failedPayments':
+                  excelHeaders = ['Member ID', 'Full Name', 'Payment Amount', 'Payment Method', 'Rejection Reason', 'Date Rejected'];
+                  break;
+                default:
+                  excelHeaders = [];
+              }
+
+              worksheet.addRow(excelHeaders);
+
+              displayedData.forEach(item => {
+                const row = [];
+                excelHeaders.forEach(header => {
+                  let cellValue = '';
+                  
+                  switch(header) {
+                    case 'Member ID':
+                      cellValue = item.id || '';
+                      break;
+                    case 'Full Name':
+                      cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                      break;
+                    case 'Payment Amount':
+                      cellValue = parseFloat(item.amountToBePaid) || 0;
+                      break;
+                    case 'Payment Method':
+                      cellValue = item.paymentOption || '';
+                      break;
+                    case 'Status':
+                      cellValue = item.status || 'pending';
+                      break;
+                    case 'Date Applied':
+                      cellValue = item.dateApplied || '';
+                      break;
+                    case 'Date Approved':
+                      cellValue = item.dateApproved || '';
+                      break;
+                    case 'Transaction ID':
+                      cellValue = item.transactionId || '';
+                      break;
+                    case 'Rejection Reason':
+                      cellValue = item.rejectionReason || '';
+                      break;
+                    case 'Date Rejected':
+                      cellValue = item.dateRejected || '';
+                      break;
+                    default:
+                      cellValue = item[header] || '';
+                  }
+                  
+                  row.push(cellValue);
+                });
+                worksheet.addRow(row);
+              });
+            }
+
+            workbook.xlsx.writeBuffer().then(buffer => {
+              const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+              });
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            });
+          } else {
+            // Direct print
+            printFrame.contentWindow.print();
+          }
+          
+          // Clean up after printing
+          setTimeout(() => {
+            document.body.removeChild(printFrame);
+            setPrintModalVisible(false);
+            setPrinting(false);
+          }, 1000);
+        } catch (error) {
+          console.error('Print error:', error);
+          document.body.removeChild(printFrame);
+          setPrinting(false);
+        }
+      };
+
     } catch (error) {
       console.error('Error printing data:', error);
       setErrorMessage('Failed to print data');
       setErrorModalVisible(true);
-    } finally {
       setPrinting(false);
     }
   };
@@ -1062,6 +1882,15 @@ const PayLoans = () => {
       amount: '',
     });
     setProofOfPaymentFile(null);
+    setActiveLoans([]);
+    setSelectedLoanId(null);
+    setCurrentLoan(null);
+    setPenaltyAmount(0);
+    setTotalAmountDue(0);
+    setOverdueDays(0);
+    setBalance(0);
+    setMemberNotFound(false);
+    setMemberLoading(false);
   };
 
   const handleInputChange = (name, value) => {
@@ -1071,12 +1900,23 @@ const PayLoans = () => {
     }));
 
     if (name === 'paymentOption' && value) {
-      const selectedAccount = paymentAccounts[value];
+      // FIX: Safely access paymentAccounts with fallback
+      const selectedAccount = paymentAccounts[value] || { accountName: '', accountNumber: '' };
       setFormData(prev => ({
         ...prev,
         accountName: selectedAccount.accountName || '',
         accountNumber: selectedAccount.accountNumber || ''
       }));
+
+      // Clear proof of payment for Cash-on-Hand
+      if (value === 'Cash-on-Hand') {
+        setProofOfPaymentFile(null);
+      }
+    }
+
+    // AUTO FETCH member data when member ID is entered
+    if (name === 'memberId') {
+      fetchMemberData(value);
     }
   };
 
@@ -1090,6 +1930,11 @@ const PayLoans = () => {
   const validateFields = () => {
     if (!formData.memberId) {
       setErrorMessage('Member ID is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (memberNotFound) {
+      setErrorMessage('Member not found. Please check the Member ID');
       setErrorModalVisible(true);
       return false;
     }
@@ -1118,8 +1963,9 @@ const PayLoans = () => {
       setErrorModalVisible(true);
       return false;
     }
-    if (!proofOfPaymentFile) {
-      setErrorMessage('Proof of payment is required');
+    // Only require proof of payment for non-Cash-on-Hand payments
+    if (formData.paymentOption !== 'Cash-on-Hand' && !proofOfPaymentFile) {
+      setErrorMessage('Proof of payment is required for non-cash payments');
       setErrorModalVisible(true);
       return false;
     }
@@ -1149,10 +1995,15 @@ const PayLoans = () => {
     setIsProcessing(true);
 
     try {
-      const proofOfPaymentUrl = await uploadImageToStorage(
-        proofOfPaymentFile, 
-        `proofsOfPayment/${formData.memberId}_${Date.now()}`
-      );
+      let proofOfPaymentUrl = '';
+      
+      // Only upload proof of payment for non-Cash-on-Hand payments
+      if (formData.paymentOption !== 'Cash-on-Hand' && proofOfPaymentFile) {
+        proofOfPaymentUrl = await uploadImageToStorage(
+          proofOfPaymentFile, 
+          `proofsOfPayment/${formData.memberId}_${Date.now()}`
+        );
+      }
 
       const transactionId = generateTransactionId();
       const now = new Date();
@@ -1175,7 +2026,13 @@ const PayLoans = () => {
         timeApplied: approvalTime,
         dateApproved: approvalDate,
         timeApproved: approvalTime,
-        status: 'approved'
+        status: 'approved',
+        selectedLoanId: selectedLoanId,
+        // Include penalty information if applicable
+        ...(penaltyAmount > 0 && { 
+          penalty: penaltyAmount,
+          overdueDays: overdueDays 
+        })
       };
 
       const approvedRef = database.ref(`Payments/ApprovedPayments/${formData.memberId}/${transactionId}`);
@@ -1260,8 +2117,15 @@ const PayLoans = () => {
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
+      <div style={styles.safeAreaView}>
+        <div style={styles.mainContainer}>
+          <div style={styles.dashboardLoadingContainer}>
+            <div style={styles.loadingContainer}>
+              <div style={styles.spinner}></div>
+              <div style={styles.loadingText}>Loading payment data...</div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1270,7 +2134,7 @@ const PayLoans = () => {
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
-    <div style={styles.safeAreaView}>
+    <div style={styles.safeAreaView} className="component-header">
       <div style={styles.mainContainer}>
         {/* Header Section */}
         <div style={styles.headerSection}>
@@ -1434,7 +2298,7 @@ const PayLoans = () => {
 
         {/* Print Modal */}
         {printModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+          <div style={styles.modalOverlay}>
             <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <h2 style={styles.modalTitle}>Print/Export Options</h2>
@@ -1489,21 +2353,7 @@ const PayLoans = () => {
                   </p>
                 </button>
 
-                <button
-                  style={{
-                    ...styles.printOption,
-                    ...(isHovered.printWord ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printWord')}
-                  onMouseLeave={() => handleMouseLeave('printWord')}
-                  onClick={() => handlePrint('word')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Export to Word</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as Word document
-                  </p>
-                </button>
+
 
                 <button
                   style={{
@@ -1553,12 +2403,25 @@ const PayLoans = () => {
                         Member ID<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(memberNotFound && { borderColor: '#dc2626' })
+                        }}
                         placeholder="Enter member ID"
                         value={formData.memberId}
                         onChange={(e) => handleInputChange('memberId', e.target.value)}
                         type="text"
                       />
+                      {memberLoading && (
+                        <p style={{...styles.errorText, color: '#3b82f6'}}>
+                          Loading member data...
+                        </p>
+                      )}
+                      {memberNotFound && (
+                        <p style={styles.errorText}>
+                          Member not found. Please check the Member ID.
+                        </p>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1571,6 +2434,7 @@ const PayLoans = () => {
                         value={formData.firstName}
                         onChange={(e) => handleInputChange('firstName', e.target.value)}
                         autoCapitalize="words"
+                        readOnly
                       />
                     </div>
 
@@ -1618,6 +2482,7 @@ const PayLoans = () => {
                         value={formData.lastName}
                         onChange={(e) => handleInputChange('lastName', e.target.value)}
                         autoCapitalize="words"
+                        readOnly
                       />
                     </div>
 
@@ -1632,6 +2497,7 @@ const PayLoans = () => {
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         type="email"
                         autoCapitalize="none"
+                        readOnly
                       />
                     </div>
 
@@ -1665,35 +2531,145 @@ const PayLoans = () => {
                   </div>
                 </div>
 
-                {/* Proof of Payment Upload */}
-                <div style={styles.formSection}>
-                  <label style={styles.formLabel}>
-                    Proof of Payment<span style={styles.requiredAsterisk}>*</span>
-                  </label>
-                  <div 
-                    style={{
-                      ...styles.fileUploadSection,
-                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
-                    }}
-                    onMouseEnter={() => handleMouseEnter('proofOfPayment')}
-                    onMouseLeave={() => handleMouseLeave('proofOfPayment')}
-                    onClick={() => document.getElementById('proofOfPayment').click()}
-                  >
-                    <input
-                      id="proofOfPayment"
-                      style={styles.fileInput}
-                      type="file"
-                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
-                      accept="image/*"
-                    />
-                    <p style={styles.fileUploadText}>
-                      {proofOfPaymentFile ? 'Change file' : 'Click to upload proof of payment'}
-                    </p>
-                    {proofOfPaymentFile && (
-                      <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
+                {/* Loan Selection Section */}
+                {activeLoans.length > 0 && (
+                  <div style={styles.loanInfoContainer}>
+                    <h3 style={styles.sectionTitle}>Select Loan to Pay</h3>
+                    {activeLoans.map((loan) => {
+                      const loanDetails = calculateLoanDetails(loan);
+                      return (
+                        <div
+                          key={loan._loanId}
+                          style={{
+                            ...styles.loanSelectItem,
+                            ...(selectedLoanId === loan._loanId ? styles.loanSelectItemActive : {})
+                          }}
+                        >
+                          <div 
+                            style={{ flex: 1, cursor: 'pointer' }}
+                            onClick={() => {
+                              setSelectedLoanId(loan._loanId);
+                              setCurrentLoan(loan);
+                              calculatePenaltyAndTotal(loan);
+                            }}
+                          >
+                            <div style={styles.loanSelectTitle}>{loan.loanType || 'Loan'}</div>
+                            <div style={styles.loanSelectSub}>
+                              Amount: {formatCurrency(loan.loanAmount || 0)}
+                            </div>
+                            <div style={styles.loanSelectSub}>
+                              Due: {formatDisplayDate(loan.dueDate)}
+                            </div>
+                            {loanDetails.isOverdue && (
+                              <div style={{...styles.loanSelectSub, color: '#dc2626', fontWeight: 'bold'}}>
+                                Overdue: {loanDetails.overdueDays} days
+                              </div>
+                            )}
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <button
+                              style={{
+                                ...styles.viewDetailsButton,
+                                ...(viewDetailsHovered[loan._loanId] ? styles.viewDetailsButtonHover : {})
+                              }}
+                              onMouseEnter={() => handleViewDetailsHover(loan._loanId, true)}
+                              onMouseLeave={() => handleViewDetailsHover(loan._loanId, false)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openLoanDetails(loan);
+                              }}
+                            >
+                              View Details
+                            </button>
+                            <div style={styles.checkboxArea}>
+                              {selectedLoanId === loan._loanId ? (
+                                <FaCheckCircle style={{color: '#2D5783', fontSize: '18px'}} />
+                              ) : (
+                                <div style={{width: '18px', height: '18px', border: '2px solid #94A3B8', borderRadius: '3px'}} />
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    
+                    {/* Financial Summary */}
+                    {currentLoan && (
+                      <div style={styles.financialCard}>
+                        <div style={styles.financialItem}>
+                          <span style={styles.financialLabel}>Monthly Payment:</span>
+                          <span style={styles.financialValue}>
+                            {formatCurrency(currentLoan.totalMonthlyPayment || currentLoan.monthlyPayment || 0)}
+                          </span>
+                        </div>
+                        {penaltyAmount > 0 && (
+                          <div style={styles.financialItem}>
+                            <span style={{...styles.financialLabel, color: '#dc2626'}}>Penalty:</span>
+                            <span style={{...styles.financialValue, color: '#dc2626'}}>
+                              {formatCurrency(penaltyAmount)}
+                            </span>
+                          </div>
+                        )}
+                        <div style={styles.financialItem}>
+                          <span style={styles.financialLabel}>Total Amount Due:</span>
+                          <span style={styles.financialValue}>
+                            {formatCurrency(totalAmountDue)}
+                          </span>
+                        </div>
+                      </div>
                     )}
                   </div>
-                </div>
+                )}
+
+                {/* Proof of Payment Upload - Only show for non-Cash-on-Hand payments */}
+                {formData.paymentOption !== 'Cash-on-Hand' && (
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Proof of Payment<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <div 
+                      style={{
+                        ...styles.fileUploadSection,
+                        ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
+                      }}
+                      onMouseEnter={() => handleMouseEnter('proofOfPayment')}
+                      onMouseLeave={() => handleMouseLeave('proofOfPayment')}
+                      onClick={() => document.getElementById('proofOfPayment').click()}
+                    >
+                      <input
+                        id="proofOfPayment"
+                        style={styles.fileInput}
+                        type="file"
+                        onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                        accept="image/*"
+                      />
+                      <p style={styles.fileUploadText}>
+                        {proofOfPaymentFile ? 'Change file' : 'Click to upload proof of payment'}
+                      </p>
+                      {proofOfPaymentFile && (
+                        <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Show message for Cash-on-Hand */}
+                {formData.paymentOption === 'Cash-on-Hand' && (
+                  <div style={styles.formSection}>
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <FaCheckCircle style={{color: '#059669', marginRight: '8px'}} />
+                      <span style={{color: '#0369a1', fontWeight: '500'}}>
+                        Proof of payment not required for Cash-on-Hand payments
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={styles.modalActions}>
@@ -1717,7 +2693,7 @@ const PayLoans = () => {
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
                   onClick={handleSubmitConfirmation}
-                  disabled={uploading}
+                  disabled={uploading || memberNotFound || memberLoading}
                 >
                   {uploading ? (
                     <>
@@ -1736,70 +2712,278 @@ const PayLoans = () => {
           </div>
         )}
 
-        {/* Confirmation Modal */}
-        {confirmModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Payment</h2>
+        {/* FIXED Loan Details Modal - Proper data handling */}
+        {loanDetailsModalVisible && selectedLoanForDetails && (
+          <div style={styles.modalOverlay} onClick={() => setLoanDetailsModalVisible(false)}>
+            <div style={{...styles.modalCard, ...styles.loanDetailsModal}} onClick={(e) => e.stopPropagation()}>
+              <div style={{...styles.modalHeader, ...styles.loanDetailsHeader}}>
+                <h2 style={styles.modalTitle}>Loan Details</h2>
+                <button 
+                  onClick={() => setLoanDetailsModalVisible(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closeLoanDetails ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeLoanDetails')}
+                  onMouseLeave={() => handleMouseLeave('closeLoanDetails')}
+                >
+                  <AiOutlineClose />
+                </button>
               </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to add this payment? This action cannot be undone.
-                </p>
+
+              <div style={{...styles.modalContent, padding: 0}}>
+                <div style={{padding: '20px'}}>
+                  {/* Loan Information */}
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Loan ID</span>
+                    <span style={styles.loanDetailsValue}>
+                      {selectedLoanForDetails.transactionId || selectedLoanForDetails._loanId || 'N/A'}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Loan Type</span>
+                    <span style={styles.loanDetailsValue}>
+                      {selectedLoanForDetails.loanType || 'N/A'}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Approved Amount</span>
+                    <span style={styles.loanDetailsValue}>
+                      {formatCurrency(selectedLoanForDetails.loanAmount)}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Outstanding Balance</span>
+                    <span style={styles.loanDetailsValue}>
+                      {formatCurrency(selectedLoanForDetails.outstandingBalance)}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Date Applied</span>
+                    <span style={styles.loanDetailsValue}>
+                      {formatDisplayDate(selectedLoanForDetails.dateApplied)}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Date Approved</span>
+                    <span style={styles.loanDetailsValue}>
+                      {formatDisplayDate(selectedLoanForDetails.dateApproved)}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Interest Rate</span>
+                    <span style={styles.loanDetailsValue}>
+                      {Number(selectedLoanForDetails.interestRate || 0).toFixed(2)}%
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Total Interest</span>
+                    <span style={styles.loanDetailsValue}>
+                      {formatCurrency(selectedLoanForDetails.interest)}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Terms</span>
+                    <span style={styles.loanDetailsValue}>
+                      {selectedLoanForDetails.term ? `${selectedLoanForDetails.term} months` : 'N/A'}
+                    </span>
+                  </div>
+                  <div style={styles.loanDetailsRow}>
+                    <span style={styles.loanDetailsLabel}>Monthly Payment</span>
+                    <span style={styles.loanDetailsValue}>
+                      {formatCurrency(selectedLoanForDetails.monthlyPayment)}
+                    </span>
+                  </div>
+
+                  {/* Due Date with overdue indicator */}
+                  {(() => {
+                    const dueDate = selectedLoanForDetails.dueDate;
+                    const loanDetails = calculateLoanDetails(selectedLoanForDetails);
+                    return (
+                      <div style={styles.loanDetailsRow}>
+                        <span style={styles.loanDetailsLabel}>Due Date</span>
+                        <div style={{ maxWidth: '60%', alignItems: 'flex-end', display: 'flex', flexDirection: 'column' }}>
+                          <span style={{
+                            ...styles.loanDetailsValue,
+                            ...(loanDetails.isOverdue && styles.loanDetailsValueOverdue)
+                          }}>
+                            {formatDisplayDate(dueDate)}
+                          </span>
+                          {loanDetails.isOverdue && (
+                            <span style={styles.overdueBadge}>Overdue</span>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })()}
+
+                  {/* Payment Summary */}
+                  <div style={styles.paymentSummarySection}>
+                    <h3 style={{...styles.sectionTitle, textAlign: 'left', marginBottom: '16px'}}>Payment Summary</h3>
+                    
+                    {(() => {
+                      const loanDetails = calculateLoanDetails(selectedLoanForDetails);
+                      return (
+                        <>
+                          <div style={styles.loanDetailsRow}>
+                            <span style={styles.loanDetailsLabel}>Monthly Payment</span>
+                            <span style={styles.loanDetailsValue}>
+                              {formatCurrency(selectedLoanForDetails.totalMonthlyPayment || selectedLoanForDetails.monthlyPayment || 0)}
+                            </span>
+                          </div>
+
+                          {loanDetails.isOverdue && (
+                            <>
+                              <div style={styles.loanDetailsRow}>
+                                <span style={styles.loanDetailsLabel}>Late Fee</span>
+                                <div style={{ maxWidth: '60%', alignItems: 'flex-end', display: 'flex', flexDirection: 'column' }}>
+                                  <span style={[styles.loanDetailsValue, styles.loanDetailsValueOverdue]}>
+                                    {formatCurrency(loanDetails.penalty)}
+                                  </span>
+                                  <span style={{color: '#94A3B8', fontSize: '12px', marginTop: '2px'}}>
+                                    ({formatCurrency(selectedLoanForDetails.interest || 0)} × {loanDetails.overdueDays}/30 days)
+                                  </span>
+                                </div>
+                              </div>
+                              
+                              {/* Total Amount Due - Highlighted */}
+                              <div style={styles.totalDueRow}>
+                                <span style={styles.totalDueLabel}>Total Amount Due</span>
+                                <span style={styles.totalDueValue}>
+                                  {formatCurrency(loanDetails.totalDue)}
+                                </span>
+                              </div>
+                              
+                              {/* Overdue Warning */}
+                              <div style={styles.overdueWarning}>
+                                <FaExclamationCircle style={{color: '#D32F2F', fontSize: '20px'}} />
+                                <span style={styles.overdueWarningText}>
+                                  This loan is {loanDetails.overdueDays} day{loanDetails.overdueDays > 1 ? 's' : ''} overdue. Please pay immediately to avoid additional penalties.
+                                </span>
+                              </div>
+                            </>
+                          )}
+
+                          {!loanDetails.isOverdue && (
+                            <div style={styles.totalDueRow}>
+                              <span style={styles.totalDueLabel}>Total Amount Due</span>
+                              <span style={styles.totalDueValue}>
+                                {formatCurrency(selectedLoanForDetails.totalMonthlyPayment || selectedLoanForDetails.monthlyPayment || 0)}
+                              </span>
+                            </div>
+                          )}
+                        </>
+                      );
+                    })()}
+                  </div>
+                </div>
               </div>
+
               <div style={styles.modalActions}>
                 <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmModalVisible(false)}
+                  style={{
+                    ...styles.secondaryButton,
+                    ...(isHovered.closeDetailsButton ? styles.secondaryButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeDetailsButton')}
+                  onMouseLeave={() => handleMouseLeave('closeDetailsButton')}
+                  onClick={() => setLoanDetailsModalVisible(false)}
                 >
-                  Cancel
+                  Close
                 </button>
                 <button
-                  style={styles.primaryButton}
-                  onClick={submitPayment}
+                  style={{
+                    ...styles.primaryButton,
+                    ...(isHovered.selectLoanButton ? styles.primaryButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('selectLoanButton')}
+                  onMouseLeave={() => handleMouseLeave('selectLoanButton')}
+                  onClick={() => {
+                    setSelectedLoanId(selectedLoanForDetails._loanId);
+                    setCurrentLoan(selectedLoanForDetails);
+                    calculatePenaltyAndTotal(selectedLoanForDetails);
+                    setLoanDetailsModalVisible(false);
+                  }}
                 >
-                  Confirm Payment
+                  <FaCheckCircle />
+                  Select This Loan
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal */}
+        {/* Confirmation Modal - Fixed centering */}
+        {confirmModalVisible && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+                <p style={styles.modalText}>Are you sure you want to add this payment?</p>
+                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <button 
+                    style={{
+                      ...styles.secondaryButton,
+                      flex: 1
+                    }} 
+                    onClick={() => setConfirmModalVisible(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    style={{
+                      ...styles.primaryButton,
+                      flex: 1
+                    }}
+                    onClick={submitPayment}
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Success Modal - Fixed centering */}
         {successModalVisible && (
-          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
+                <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
+                <p style={styles.modalText}>
                   {successMessage}
                 </p>
                 <button
-                  style={styles.primaryButton}
+                  style={{
+                    ...styles.primaryButton,
+                    width: '100%'
+                  }}
                   onClick={handleSuccessOk}
                 >
-                  Continue
+                  OK
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Error Modal */}
+        {/* Error Modal - Fixed centering and styling issues */}
         {errorModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
+                <h2 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: '0 0 10px 0'}}>Error</h2>
+                <p style={styles.modalText}>
                   {errorMessage}
                 </p>
                 <button
-                  style={styles.primaryButton}
+                  style={{
+                    ...styles.primaryButton,
+                    width: '100%'
+                  }}
                   onClick={() => setErrorModalVisible(false)}
                 >
                   Try Again
@@ -1811,9 +2995,10 @@ const PayLoans = () => {
 
         {/* Processing Overlay */}
         {isProcessing && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.loadingContainer}>
+          <div style={styles.loadingOverlay}>
+            <div style={styles.loadingContent}>
               <div style={styles.spinner}></div>
+              <div style={styles.loadingTextOverlay}>Processing payment...</div>
             </div>
           </div>
         )}

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FaSearch, 
-  FaDownload, 
-  FaFilter, 
-  FaChevronLeft, 
+import {
+  FaSearch,
+  FaDownload,
+  FaFilter,
+  FaChevronLeft,
   FaChevronRight,
   FaPlus,
   FaCheckCircle,
@@ -19,23 +19,20 @@ import ApplyLoans from './ApplyLoans';
 import ApprovedLoans from './ApprovedLoans';
 import RejectedLoans from './RejectedLoans';
 import { database } from '../../../../../Database/firebaseConfig';
+import logoImage from '../../../../../assets/logo.png';
 
 const styles = {
   safeAreaView: {
     flex: 1,
     backgroundColor: '#f8fafc',
     minHeight: '100vh',
-    padding: '0',
-    overflow: 'hidden'
+    padding: '0'
   },
   mainContainer: {
     padding: '24px',
     maxWidth: '1400px',
     margin: '0 auto',
-    position: 'relative',
-    height: '100vh',
-    display: 'flex',
-    flexDirection: 'column'
+    position: 'relative'
   },
   headerSection: {
     display: 'flex',
@@ -43,8 +40,7 @@ const styles = {
     alignItems: 'center',
     marginBottom: '32px',
     paddingBottom: '16px',
-    borderBottom: '1px solid #e2e8f0',
-    flexShrink: 0
+    borderBottom: '1px solid #e2e8f0'
   },
   headerText: {
     fontSize: '32px',
@@ -61,7 +57,6 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     gap: '16px',
-    flexShrink: 0
   },
   controlsRow: {
     display: 'flex',
@@ -184,15 +179,7 @@ const styles = {
     borderRadius: '12px',
     boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
     overflow: 'hidden',
-    marginBottom: '80px',
-    flex: 1,
-    display: 'flex',
-    flexDirection: 'column',
-    minHeight: 0
-  },
-  dataContent: {
-    flex: 1,
-    overflow: 'auto'
+    marginBottom: '80px'
   },
   paginationContainer: {
     display: 'flex',
@@ -203,8 +190,7 @@ const styles = {
     borderBottom: '1px solid #e2e8f0',
     flexWrap: 'wrap',
     gap: '8px',
-    minHeight: '40px',
-    flexShrink: 0
+    minHeight: '40px'
   },
   paginationInfo: {
     fontSize: '12px',
@@ -270,13 +256,14 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '20px'
+    padding: '20px',
+    overflowY: 'auto'
   },
   modalCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
     width: '90%',
-    maxWidth: '500px',
+    maxWidth: '900px',
     maxHeight: '90vh',
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
@@ -316,8 +303,8 @@ const styles = {
   },
   modalContent: {
     padding: '24px',
-    flex: 1,
-    overflowY: 'auto'
+    overflowY: 'auto',
+    flex: 1
   },
   formGrid: {
     display: 'grid',
@@ -379,7 +366,7 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -397,17 +384,27 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
     whiteSpace: 'nowrap'
   },
   secondaryButtonHover: {
     backgroundColor: '#4b5563'
   },
+  dashboardLoadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '90vh',
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+  },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '200px'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '16px'
   },
   spinner: {
     border: '4px solid #f3f4f6',
@@ -416,6 +413,11 @@ const styles = {
     width: '40px',
     height: '40px',
     animation: 'spin 1s linear infinite'
+  },
+  loadingText: {
+    color: '#6B7280',
+    fontSize: '16px',
+    fontWeight: '500'
   },
   noDataContainer: {
     textAlign: 'center',
@@ -459,6 +461,188 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     margin: '4px 0 0 0'
+  },
+  // Confirmation modal styles
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px'
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  // Error text styles
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px',
+    fontWeight: '500'
+  },
+  // Loading overlay
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+    backdropFilter: 'blur(4px)',
+  },
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  loadingTextOverlay: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
+  // Collateral styles
+  collateralIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#fff3cd',
+    border: '1px solid #ffeaa7',
+    borderRadius: '8px',
+    padding: '10px',
+    marginBottom: '15px',
+    gap: '8px'
+  },
+  collateralIndicatorText: {
+    fontSize: '14px',
+    color: '#856404',
+    fontWeight: '500',
+    flex: 1
+  },
+  collateralButton: {
+    display: 'flex',
+    alignItems: 'center',
+    backgroundColor: '#EAF3FF',
+    border: '1px solid #2D5783',
+    borderRadius: '8px',
+    padding: '12px',
+    marginBottom: '15px',
+    gap: '8px',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  collateralButtonHover: {
+    backgroundColor: '#dbeafe'
+  },
+  collateralButtonText: {
+    fontSize: '14px',
+    color: '#2D5783',
+    fontWeight: '600',
+    flex: 1
+  },
+  collateralSummary: {
+    backgroundColor: '#f8f9fa',
+    border: '1px solid #dee2e6',
+    borderRadius: '8px',
+    padding: '12px',
+    marginBottom: '15px'
+  },
+  collateralSummaryTitle: {
+    fontSize: '14px',
+    fontWeight: '700',
+    color: '#2D5783',
+    marginBottom: '8px'
+  },
+  collateralSummaryText: {
+    fontSize: '13px',
+    color: '#495057',
+    marginBottom: '4px'
+  },
+  // Collateral Modal Styles
+  collateralModal: {
+    maxWidth: '600px',
+    maxHeight: '80vh'
+  },
+  collateralScreen: {
+    padding: '0'
+  },
+  collateralHeader: {
+    backgroundColor: '#E8F1FB',
+    padding: '16px',
+    borderRadius: '14px 14px 0 0',
+    marginBottom: '0'
+  },
+  collateralBody: {
+    padding: '20px'
+  },
+  descriptionHint: {
+    fontSize: '14px',
+    color: '#666',
+    marginBottom: '5px'
+  },
+  descriptionBullet: {
+    fontSize: '14px',
+    color: '#666',
+    marginLeft: '10px',
+    marginBottom: '3px'
+  },
+  uploadButton: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '8px',
+    padding: '12px',
+    border: '1px solid #2D5783',
+    borderRadius: '10px',
+    backgroundColor: '#EAF3FF',
+    cursor: 'pointer',
+    transition: 'all 0.2s ease'
+  },
+  uploadButtonHover: {
+    backgroundColor: '#dbeafe'
+  },
+  uploadButtonText: {
+    color: '#2D5783',
+    fontSize: '16px',
+    fontWeight: 'bold'
+  },
+  proofPreview: {
+    width: '100%',
+    height: '180px',
+    borderRadius: '10px',
+    border: '1px solid #ddd',
+    marginBottom: '12px',
+    objectFit: 'cover'
   }
 };
 
@@ -486,6 +670,9 @@ const Loans = () => {
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
   
+  // Admin data for print report
+  const [adminData, setAdminData] = useState(null);
+
   const [addForm, setAddForm] = useState({
     memberId: '',
     firstName: '',
@@ -501,6 +688,20 @@ const Loans = () => {
 
   const [loanTypes, setLoanTypes] = useState([]);
   const [interestByType, setInterestByType] = useState({});
+
+  // Member validation states
+  const [memberNotFound, setMemberNotFound] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
+
+  // NEW: Collateral related states
+  const [requiresCollateral, setRequiresCollateral] = useState(false);
+  const [collateralType, setCollateralType] = useState('');
+  const [collateralValue, setCollateralValue] = useState('');
+  const [collateralDescription, setCollateralDescription] = useState('');
+  const [showCollateralModal, setShowCollateralModal] = useState(false);
+  const [proofOfCollateral, setProofOfCollateral] = useState(null);
+  const [memberBalance, setMemberBalance] = useState(0);
+  const [memberInvestment, setMemberInvestment] = useState(0);
 
   const pageSize = 10;
 
@@ -526,7 +727,16 @@ const Loans = () => {
     }
   ];
 
-  // Create style element and append to head
+  // Collateral Options
+  const collateralOptions = [
+    { key: 'Property', label: 'Property' },
+    { key: 'Vehicle', label: 'Vehicle' },
+    { key: 'Jewelry', label: 'Jewelry' },
+    { key: 'Electronics', label: 'Electronics' },
+    { key: 'Other', label: 'Other' },
+  ];
+
+  // Create style element and append to head - FIXED CSS with print header/footer removal
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
@@ -539,9 +749,46 @@ const Loans = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
       }
+      
+      /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
+        /* Remove browser default headers and footers */
+        @page {
+          margin: 0.5in !important;
+          size: auto;
+          margin-header: 0 !important;
+          margin-footer: 0 !important;
+        }
+        
+        /* Target Webkit browsers (Chrome, Safari) */
+        @page :first {
+          margin-top: 0;
+        }
+        
+        @page :left {
+          margin-left: 0.5in;
+          margin-right: 0.5in;
+        }
+        
+        @page :right {
+          margin-left: 0.5in;
+          margin-right: 0.5in;
+        }
+        
+        /* Hide URL, page numbers, and date in print */
+        body::before,
+        body::after {
+          display: none !important;
+        }
+        
+        /* Hide any browser-generated content */
+        .print-header:empty,
+        .print-footer:empty {
+          display: none;
+        }
+        
         body * {
           visibility: hidden;
         }
@@ -553,17 +800,66 @@ const Loans = () => {
           left: 0;
           top: 0;
           width: 100%;
+          padding: 20px;
+          background: white;
+          margin: 0 !important;
         }
         .no-print {
           display: none !important;
+        }
+        .print-header {
+          display: block !important;
+        }
+        .component-header {
+          display: none !important;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
         }
       }
     `;
     document.head.appendChild(styleElement);
 
     return () => {
-      document.head.removeChild(styleElement);
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
     };
+  }, []);
+
+  // Fetch admin data for print report
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        
+        const adminRef = database.ref(`${node}/${adminId}`);
+        const snapshot = await adminRef.once('value');
+        
+        if (snapshot.exists()) {
+          setAdminData(snapshot.val());
+        }
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      }
+    };
+
+    fetchAdminData();
   }, []);
 
   // Load Settings for LoanTypes and InterestRateByType
@@ -597,6 +893,80 @@ const Loans = () => {
       setAddForm(prev => ({ ...prev, term: next }));
     }
   }, [addForm.loanType, interestByType]);
+
+  // Fetch member data when member ID is entered - AUTO FETCH with balance and investment
+  const fetchMemberData = async (memberId) => {
+    if (!memberId) {
+      // Reset form if member ID is cleared
+      setAddForm(prev => ({
+        ...prev,
+        firstName: '',
+        lastName: '',
+        email: ''
+      }));
+      setMemberNotFound(false);
+      setMemberBalance(0);
+      setMemberInvestment(0);
+      setRequiresCollateral(false);
+      return;
+    }
+    
+    setMemberLoading(true);
+    setMemberNotFound(false);
+    
+    try {
+      const memberRef = database.ref(`Members/${memberId}`);
+      const memberSnap = await memberRef.once('value');
+      
+      if (memberSnap.exists()) {
+        const memberData = memberSnap.val();
+        setAddForm(prev => ({
+          ...prev,
+          firstName: memberData.firstName || '',
+          lastName: memberData.lastName || '',
+          email: memberData.email || ''
+        }));
+        setMemberBalance(parseFloat(memberData.balance) || 0);
+        setMemberInvestment(parseFloat(memberData.investment) || 0);
+        setMemberNotFound(false);
+        
+        // Check if loan amount requires collateral
+        checkCollateralRequirement(addForm.loanAmount, parseFloat(memberData.balance) || 0);
+      } else {
+        setAddForm(prev => ({
+          ...prev,
+          firstName: '',
+          lastName: '',
+          email: ''
+        }));
+        setMemberBalance(0);
+        setMemberInvestment(0);
+        setMemberNotFound(true);
+      }
+    } catch (error) {
+      console.error('Error fetching member data:', error);
+      setMemberNotFound(true);
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  // Check if collateral is required based on loan amount vs member balance
+  const checkCollateralRequirement = (loanAmount, balance) => {
+    const loanAmountNum = parseFloat(loanAmount) || 0;
+    const balanceNum = parseFloat(balance) || 0;
+    
+    if (loanAmountNum > balanceNum) {
+      setRequiresCollateral(true);
+    } else {
+      setRequiresCollateral(false);
+    }
+  };
+
+  // Check if all collateral fields are filled
+  const isCollateralValid = () => {
+    return collateralType && collateralValue && collateralDescription && proofOfCollateral;
+  };
 
   const fetchLoansDataForSection = async (sectionKey = activeSection, options = {}) => {
     const { silent = false } = options;
@@ -680,13 +1050,16 @@ const Loans = () => {
         : rejectedLoans;
 
     const filtered = base.filter(item =>
-      `${item.firstName ?? ''} ${item.lastName ?? ''}`.toLowerCase().includes(text.toLowerCase())
+      `${item.firstName ?? ''} ${item.lastName ?? ''}`.toLowerCase().includes(text.toLowerCase()) ||
+      (item.id && item.id.toString().includes(text)) ||
+      (item.transactionId && item.transactionId.toString().includes(text))
     );
 
     setNoMatch(filtered.length === 0);
     setFilteredData(filtered);
   };
 
+  // FIXED PRINT FUNCTION - Following PayLoans structure
   const handlePrint = (format = 'print') => {
     setPrinting(true);
     
@@ -703,31 +1076,95 @@ const Loans = () => {
       printContent.className = 'print-content';
       printContent.style.padding = '20px';
       printContent.style.fontFamily = 'Arial, sans-serif';
+      printContent.style.boxSizing = 'border-box';
+      printContent.style.margin = '0';
 
-      // Header
+      // Create your custom header
       const header = document.createElement('div');
+      header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '10px';
+      header.style.paddingBottom = '15px';
       header.style.marginBottom = '20px';
-      
-      const title = document.createElement('h1');
-      title.textContent = `${sectionTitle} Report`;
-      title.style.margin = '0';
-      title.style.color = '#333';
-      
-      const date = document.createElement('p');
-      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      date.style.margin = '5px 0 0 0';
-      date.style.color = '#666';
-      
-      const count = document.createElement('p');
-      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
-      count.style.margin = '5px 0 0 0';
-      count.style.color = '#666';
-      
-      header.appendChild(title);
-      header.appendChild(date);
-      header.appendChild(count);
+      header.style.boxSizing = 'border-box';
+
+      // Logo and Report Title (Centered)
+      const logoSection = document.createElement('div');
+      logoSection.style.textAlign = 'center';
+      logoSection.style.marginBottom = '15px';
+
+      // Add logo image
+      const logoImg = document.createElement('img');
+      logoImg.src = logoImage;
+      logoImg.style.width = '80px';
+      logoImg.style.height = '80px';
+      logoImg.style.marginBottom = '5px';
+      logoImg.style.display = 'block';
+      logoImg.style.marginLeft = 'auto';
+      logoImg.style.marginRight = 'auto';
+
+      const logo = document.createElement('div');
+      logo.textContent = '5Ki Financial Services';
+      logo.style.fontSize = '24px';
+      logo.style.fontWeight = 'bold';
+      logo.style.color = '#1e40af';
+      logo.style.marginBottom = '5px';
+
+      const reportTitle = document.createElement('div');
+      reportTitle.textContent = `${sectionTitle} Report`;
+      reportTitle.style.fontSize = '20px';
+      reportTitle.style.fontWeight = 'bold';
+      reportTitle.style.marginBottom = '15px';
+
+      logoSection.appendChild(logoImg);
+      logoSection.appendChild(logo);
+      logoSection.appendChild(reportTitle);
+
+      // Info Row (Generated Date on left, Prepared By on right)
+      const infoRow = document.createElement('div');
+      infoRow.style.display = 'flex';
+      infoRow.style.justifyContent = 'space-between';
+      infoRow.style.alignItems = 'flex-start';
+      infoRow.style.fontSize = '14px';
+      infoRow.style.marginBottom = '10px';
+      infoRow.style.boxSizing = 'border-box';
+
+      // Left side - Generated Date
+      const generatedDate = document.createElement('div');
+      generatedDate.style.textAlign = 'left';
+      generatedDate.style.flex = '1';
+      generatedDate.innerHTML = `
+        <strong>Generated as of:</strong><br>
+        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      `;
+
+      // Right side - Prepared By
+      const preparedBy = document.createElement('div');
+      preparedBy.style.textAlign = 'right';
+      preparedBy.style.flex = '1';
+      const adminFirstName = adminData?.firstName || 'Admin';
+      const adminRole = localStorage.getItem('userRole') || 'Admin';
+      preparedBy.innerHTML = `
+        <strong>Prepared by:</strong><br>
+        <span style="font-weight: bold;">${adminFirstName}</span><br>
+        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
+      `;
+
+      infoRow.appendChild(generatedDate);
+      infoRow.appendChild(preparedBy);
+
+      // Report Details
+      const reportDetails = document.createElement('div');
+      reportDetails.style.textAlign = 'center';
+      reportDetails.style.marginBottom = '15px';
+      reportDetails.style.fontSize = '14px';
+      reportDetails.style.color = '#666';
+      reportDetails.innerHTML = `
+        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
+      `;
+
+      header.appendChild(logoSection);
+      header.appendChild(infoRow);
+      header.appendChild(reportDetails);
       printContent.appendChild(header);
 
       // Table
@@ -736,6 +1173,7 @@ const Loans = () => {
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
         table.style.marginTop = '20px';
+        table.style.boxSizing = 'border-box';
 
         // Table Header - Define columns based on active section
         const thead = document.createElement('thead');
@@ -747,13 +1185,13 @@ const Loans = () => {
         
         switch(activeSection) {
           case 'applyLoans':
-            headers = ['Member ID', 'Full Name', 'Loan Amount', 'Disbursement', 'Status'];
+            headers = ['Member ID', 'Full Name', 'Loan Amount', 'Loan Type', 'Disbursement', 'Status'];
             break;
           case 'approvedLoans':
-            headers = ['Member ID', 'Full Name', 'Loan Amount', 'Disbursement', 'Date Approved'];
+            headers = ['Member ID', 'Full Name', 'Loan Amount', 'Loan Type', 'Disbursement', 'Date Approved'];
             break;
           case 'rejectedLoans':
-            headers = ['Member ID', 'Full Name', 'Loan Amount', 'Disbursement', 'Rejection Reason'];
+            headers = ['Member ID', 'Full Name', 'Loan Amount', 'Loan Type', 'Disbursement', 'Rejection Reason'];
             break;
           default:
             headers = [];
@@ -768,6 +1206,7 @@ const Loans = () => {
           th.style.textAlign = 'left';
           th.style.fontWeight = 'bold';
           th.style.backgroundColor = '#e9ecef';
+          th.style.boxSizing = 'border-box';
           headerRow.appendChild(th);
         });
         
@@ -795,6 +1234,9 @@ const Loans = () => {
               case 'Loan Amount':
                 cellValue = formatCurrency(item.loanAmount || 0);
                 break;
+              case 'Loan Type':
+                cellValue = item.loanType || '';
+                break;
               case 'Disbursement':
                 cellValue = item.disbursement || '';
                 break;
@@ -815,6 +1257,7 @@ const Loans = () => {
             td.style.padding = '10px 8px';
             td.style.border = '1px solid #ddd';
             td.style.fontSize = '12px';
+            td.style.boxSizing = 'border-box';
             row.appendChild(td);
           });
           
@@ -832,128 +1275,186 @@ const Loans = () => {
         printContent.appendChild(noData);
       }
 
-      if (format === 'pdf') {
-        // For PDF, we'll use browser's print to PDF functionality
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
-      } else if (format === 'word') {
-        // For Word, create a simple HTML file that can be opened in Word
-        const htmlContent = `
-          <html>
-            <head>
-              <title>${sectionTitle}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                h1 { color: #333; }
-              </style>
-            </head>
-            <body>
-              ${printContent.innerHTML}
-            </body>
-          </html>
-        `;
-        
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else if (format === 'excel') {
-        // Export to Excel
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet(sectionTitle);
-
-        if (displayedData.length > 0) {
-          // Define headers for Excel based on active section
-          let excelHeaders = [];
-          
-          switch(activeSection) {
-            case 'applyLoans':
-              excelHeaders = ['Member ID', 'Full Name', 'Loan Amount', 'Disbursement', 'Status'];
-              break;
-            case 'approvedLoans':
-              excelHeaders = ['Member ID', 'Full Name', 'Loan Amount', 'Disbursement', 'Date Approved'];
-              break;
-            case 'rejectedLoans':
-              excelHeaders = ['Member ID', 'Full Name', 'Loan Amount', 'Disbursement', 'Rejection Reason'];
-              break;
-            default:
-              excelHeaders = [];
-          }
-
-          worksheet.addRow(excelHeaders);
-
-          displayedData.forEach(item => {
-            const row = [];
-            excelHeaders.forEach(header => {
-              let cellValue = '';
-              
-              switch(header) {
-                case 'Member ID':
-                  cellValue = item.id || '';
-                  break;
-                case 'Full Name':
-                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                  break;
-                case 'Loan Amount':
-                  cellValue = parseFloat(item.loanAmount) || 0;
-                  break;
-                case 'Disbursement':
-                  cellValue = item.disbursement || '';
-                  break;
-                case 'Status':
-                  cellValue = item.status || 'pending';
-                  break;
-                case 'Date Approved':
-                  cellValue = item.dateApproved || '';
-                  break;
-                case 'Rejection Reason':
-                  cellValue = item.rejectionReason || '';
-                  break;
-                default:
-                  cellValue = item[header] || '';
-              }
-              
-              row.push(cellValue);
-            });
-            worksheet.addRow(row);
-          });
-        }
-
-        workbook.xlsx.writeBuffer().then(buffer => {
-          const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-          });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        });
-      } else {
-        // Direct print
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
+      // Create a hidden iframe for printing to avoid browser headers
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.visibility = 'hidden';
+      
+      document.body.appendChild(printFrame);
+      
+      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+      if (printDocument.document) {
+        printDocument = printDocument.document;
       }
 
-      setPrintModalVisible(false);
+      // Write the print content to the iframe with CSS to remove headers/footers
+      printDocument.open();
+      printDocument.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${sectionTitle} Report</title>
+            <style>
+              /* Reset all margins and remove browser headers/footers */
+              @page {
+                margin: 0.5in !important;
+                size: auto;
+                margin-header: 0 !important;
+                margin-footer: 0 !important;
+              }
+              
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+                font-family: Arial, sans-serif;
+                -webkit-print-color-adjust: exact;
+              }
+              
+              .print-content {
+                margin: 0 !important;
+                padding: 20px;
+              }
+              
+              /* Hide any potential browser elements */
+              header, footer, .header, .footer {
+                display: none !important;
+              }
+              
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              
+              th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+              }
+              
+              th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+        </html>
+      `);
+      printDocument.close();
+
+      // Wait for content to load then print
+      printFrame.onload = function() {
+        try {
+          if (format === 'pdf') {
+            printFrame.contentWindow.print();
+
+            // Export to Excel
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet(sectionTitle);
+
+            if (displayedData.length > 0) {
+              // Define headers for Excel based on active section
+              let excelHeaders = [];
+              
+              switch(activeSection) {
+                case 'applyLoans':
+                  excelHeaders = ['Member ID', 'Full Name', 'Loan Amount', 'Loan Type', 'Disbursement', 'Status'];
+                  break;
+                case 'approvedLoans':
+                  excelHeaders = ['Member ID', 'Full Name', 'Loan Amount', 'Loan Type', 'Disbursement', 'Date Approved'];
+                  break;
+                case 'rejectedLoans':
+                  excelHeaders = ['Member ID', 'Full Name', 'Loan Amount', 'Loan Type', 'Disbursement', 'Rejection Reason'];
+                  break;
+                default:
+                  excelHeaders = [];
+              }
+
+              worksheet.addRow(excelHeaders);
+
+              displayedData.forEach(item => {
+                const row = [];
+                excelHeaders.forEach(header => {
+                  let cellValue = '';
+                  
+                  switch(header) {
+                    case 'Member ID':
+                      cellValue = item.id || '';
+                      break;
+                    case 'Full Name':
+                      cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                      break;
+                    case 'Loan Amount':
+                      cellValue = parseFloat(item.loanAmount) || 0;
+                      break;
+                    case 'Loan Type':
+                      cellValue = item.loanType || '';
+                      break;
+                    case 'Disbursement':
+                      cellValue = item.disbursement || '';
+                      break;
+                    case 'Status':
+                      cellValue = item.status || 'pending';
+                      break;
+                    case 'Date Approved':
+                      cellValue = item.dateApproved || '';
+                      break;
+                    case 'Rejection Reason':
+                      cellValue = item.rejectionReason || '';
+                      break;
+                    default:
+                      cellValue = item[header] || '';
+                  }
+                  
+                  row.push(cellValue);
+                });
+                worksheet.addRow(row);
+              });
+            }
+
+            workbook.xlsx.writeBuffer().then(buffer => {
+              const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+              });
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            });
+          } else {
+            // Direct print
+            printFrame.contentWindow.print();
+          }
+          
+          // Clean up after printing
+          setTimeout(() => {
+            document.body.removeChild(printFrame);
+            setPrintModalVisible(false);
+            setPrinting(false);
+          }, 1000);
+        } catch (error) {
+          console.error('Print error:', error);
+          document.body.removeChild(printFrame);
+          setPrinting(false);
+        }
+      };
+
     } catch (error) {
       console.error('Error printing data:', error);
       setErrorMessage('Failed to print data');
       setErrorModalVisible(true);
-    } finally {
       setPrinting(false);
     }
   };
@@ -966,6 +1467,17 @@ const Loans = () => {
     }).format(amount);
   };
 
+  const formatDate = (date) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  const formatTime = (date) => {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
   const handleTabSwitch = async (key) => {
     setActiveSection(key);
     setSearchQuery('');
@@ -974,18 +1486,49 @@ const Loans = () => {
   };
 
   const openAddModal = () => setAddModalVisible(true);
-  const closeAddModal = () => setAddModalVisible(false);
-  const updateForm = (field, value) => setAddForm(prev => ({ ...prev, [field]: value }));
-
-  const formatDate = (date) => {
-    const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
+  const closeAddModal = () => {
+    setAddModalVisible(false);
+    setAddForm({
+      memberId: '',
+      firstName: '',
+      lastName: '',
+      email: '',
+      loanType: '',
+      loanAmount: '',
+      term: '',
+      disbursement: 'GCash',
+      accountName: '',
+      accountNumber: ''
+    });
+    setMemberNotFound(false);
+    setMemberLoading(false);
+    setRequiresCollateral(false);
+    setCollateralType('');
+    setCollateralValue('');
+    setCollateralDescription('');
+    setProofOfCollateral(null);
   };
 
-  const formatTime = (date) => {
-    const h = date.getHours().toString().padStart(2, '0');
-    const m = date.getMinutes().toString().padStart(2, '0');
-    return `${h}:${m}`;
+  const updateForm = (field, value) => {
+    setAddForm(prev => ({ ...prev, [field]: value }));
+
+    // AUTO FETCH member data when member ID is entered
+    if (field === 'memberId') {
+      fetchMemberData(value);
+    }
+
+    // Check collateral requirement when loan amount changes
+    if (field === 'loanAmount') {
+      checkCollateralRequirement(value, memberBalance);
+    }
+  };
+
+  // Handle file upload for proof of collateral
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
   };
 
   const handleAddApprovedLoan = async () => {
@@ -998,6 +1541,15 @@ const Loans = () => {
       const required = ['memberId','firstName','lastName','email','loanAmount','term','disbursement'];
       for (const f of required) {
         if (!addForm[f]) throw new Error('Please fill all required fields');
+      }
+
+      if (memberNotFound) {
+        throw new Error('Member not found. Please check the Member ID');
+      }
+
+      // Check if collateral is required but not provided
+      if (requiresCollateral && !isCollateralValid()) {
+        throw new Error('Collateral is required for this loan amount. Please complete all collateral details.');
       }
 
       const memberBalanceRef = database.ref(`Members/${addForm.memberId}/balance`);
@@ -1058,6 +1610,7 @@ const Loans = () => {
         email: addForm.email,
         transactionId,
         loanAmount: amount,
+        loanType: addForm.loanType,
         term: termMonths,
         disbursement: addForm.disbursement,
         accountName: addForm.accountName,
@@ -1074,7 +1627,14 @@ const Loans = () => {
         processingFee,
         releaseAmount,
         dueDate: `${dueDate.getFullYear()}-${(dueDate.getMonth()+1).toString().padStart(2,'0')}-${dueDate.getDate().toString().padStart(2,'0')}`,
-        paymentsMade: 0
+        paymentsMade: 0,
+        requiresCollateral,
+        ...(requiresCollateral && {
+          collateralType,
+          collateralValue,
+          collateralDescription,
+          proofOfCollateral: proofOfCollateral ? URL.createObjectURL(proofOfCollateral) : null
+        })
       };
 
       await approvedRef.set(approvedData);
@@ -1124,7 +1684,13 @@ const Loans = () => {
           totalTermPayment: totalTermPayment.toFixed(2),
           releaseAmount: releaseAmount.toFixed(2),
           processingFee: processingFee.toFixed(2),
-          dueDate: approvedData.dueDate
+          dueDate: approvedData.dueDate,
+          requiresCollateral,
+          ...(requiresCollateral && {
+            collateralType,
+            collateralValue,
+            collateralDescription
+          })
         });
       } catch (e) {
         console.warn('ApproveLoans email send failed or not configured:', e?.message || e);
@@ -1133,6 +1699,7 @@ const Loans = () => {
       setSuccessMessage('Approved loan added successfully!');
       setSuccessModalVisible(true);
       setAddModalVisible(false);
+      await fetchLoansDataForSection('approvedLoans');
     } catch (err) {
       console.error('Add approved loan error:', err);
       setErrorMessage(err.message || 'Failed to add approved loan');
@@ -1152,8 +1719,15 @@ const Loans = () => {
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
+      <div style={styles.safeAreaView}>
+        <div style={styles.mainContainer}>
+          <div style={styles.dashboardLoadingContainer}>
+            <div style={styles.loadingContainer}>
+              <div style={styles.spinner}></div>
+              <div style={styles.loadingText}>Loading loans data...</div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1162,7 +1736,7 @@ const Loans = () => {
   const totalPages = Math.max(1, Math.ceil(filteredData.length / pageSize));
 
   return (
-    <div style={styles.safeAreaView}>
+    <div style={styles.safeAreaView} className="component-header">
       <div style={styles.mainContainer}>
         {/* Header Section */}
         <div style={styles.headerSection}>
@@ -1216,7 +1790,6 @@ const Loans = () => {
                 />
               </div>
 
-
               <button 
                 style={{
                   ...styles.printButton,
@@ -1267,49 +1840,47 @@ const Loans = () => {
             </div>
           )}
 
-          <div style={styles.dataContent}>
-            {noMatch ? (
-              <div style={styles.noDataContainer}>
-                <FaSearch style={styles.noDataIcon} />
-                <p style={styles.noDataText}>No matches found for your search</p>
-              </div>
-            ) : filteredData.length === 0 ? (
-              <div style={styles.noDataContainer}>
-                <FaFileAlt style={styles.noDataIcon} />
-                <p style={styles.noDataText}>No data available</p>
-              </div>
-            ) : (
-              <>
-                {activeSection === 'applyLoans' && (
-                  <ApplyLoans 
-                    loans={paginatedData} 
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    refreshData={() => fetchLoansDataForSection('applyLoans')}
-                  />
-                )}
-                {activeSection === 'approvedLoans' && (
-                  <ApprovedLoans 
-                    loans={paginatedData} 
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    refreshData={() => fetchLoansDataForSection('approvedLoans')}
-                  />
-                )}
-                {activeSection === 'rejectedLoans' && (
-                  <RejectedLoans 
-                    loans={paginatedData} 
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    refreshData={() => fetchLoansDataForSection('rejectedLoans')}
-                  />
-                )}
-              </>
-            )}
-          </div>
+          {noMatch ? (
+            <div style={styles.noDataContainer}>
+              <FaSearch style={styles.noDataIcon} />
+              <p style={styles.noDataText}>No matches found for your search</p>
+            </div>
+          ) : filteredData.length === 0 ? (
+            <div style={styles.noDataContainer}>
+              <FaFileAlt style={styles.noDataIcon} />
+              <p style={styles.noDataText}>No data available</p>
+            </div>
+          ) : (
+            <>
+              {activeSection === 'applyLoans' && (
+                <ApplyLoans 
+                  loans={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={() => fetchLoansDataForSection('applyLoans')}
+                />
+              )}
+              {activeSection === 'approvedLoans' && (
+                <ApprovedLoans 
+                  loans={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={() => fetchLoansDataForSection('approvedLoans')}
+                />
+              )}
+              {activeSection === 'rejectedLoans' && (
+                <RejectedLoans 
+                  loans={paginatedData} 
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  onPageChange={setCurrentPage}
+                  refreshData={() => fetchLoansDataForSection('rejectedLoans')}
+                />
+              )}
+            </>
+          )}
         </div>
 
         {/* Add Loan Button - Only show on Approved Loans tab */}
@@ -1330,7 +1901,7 @@ const Loans = () => {
 
         {/* Print Modal */}
         {printModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+          <div style={styles.modalOverlay}>
             <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <h2 style={styles.modalTitle}>Print/Export Options</h2>
@@ -1388,22 +1959,6 @@ const Loans = () => {
                 <button
                   style={{
                     ...styles.printOption,
-                    ...(isHovered.printWord ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printWord')}
-                  onMouseLeave={() => handleMouseLeave('printWord')}
-                  onClick={() => handlePrint('word')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Export to Word</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as Word document
-                  </p>
-                </button>
-
-                <button
-                  style={{
-                    ...styles.printOption,
                     ...(isHovered.printExcel ? styles.printOptionHover : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('printExcel')}
@@ -1449,11 +2004,25 @@ const Loans = () => {
                         Member ID<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(memberNotFound && { borderColor: '#dc2626' })
+                        }}
                         placeholder="Enter member ID"
                         value={addForm.memberId}
                         onChange={(e) => updateForm('memberId', e.target.value)}
+                        type="text"
                       />
+                      {memberLoading && (
+                        <p style={{...styles.errorText, color: '#3b82f6'}}>
+                          Loading member data...
+                        </p>
+                      )}
+                      {memberNotFound && (
+                        <p style={styles.errorText}>
+                          Member not found. Please check the Member ID.
+                        </p>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1465,6 +2034,8 @@ const Loans = () => {
                         placeholder="Enter first name"
                         value={addForm.firstName}
                         onChange={(e) => updateForm('firstName', e.target.value)}
+                        autoCapitalize="words"
+                        readOnly
                       />
                     </div>
 
@@ -1478,6 +2049,8 @@ const Loans = () => {
                         value={addForm.email}
                         onChange={(e) => updateForm('email', e.target.value)}
                         type="email"
+                        autoCapitalize="none"
+                        readOnly
                       />
                     </div>
 
@@ -1491,6 +2064,8 @@ const Loans = () => {
                         value={addForm.loanAmount}
                         onChange={(e) => updateForm('loanAmount', e.target.value)}
                         type="number"
+                        min="0"
+                        step="0.01"
                       />
                     </div>
 
@@ -1518,6 +2093,8 @@ const Loans = () => {
                         placeholder="Enter last name"
                         value={addForm.lastName}
                         onChange={(e) => updateForm('lastName', e.target.value)}
+                        autoCapitalize="words"
+                        readOnly
                       />
                     </div>
 
@@ -1584,6 +2161,62 @@ const Loans = () => {
                     </div>
                   </div>
                 </div>
+
+                {/* NEW: Collateral Section */}
+                {requiresCollateral && (
+                  <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px', border: '1px solid #e9ecef' }}>
+                    <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#2D5783', marginBottom: '10px', textAlign: 'center' }}>
+                      Collateral Required
+                    </h3>
+                    
+                    <div style={styles.collateralIndicator}>
+                      <FaExclamationCircle style={{ color: '#ff9800', fontSize: '16px' }} />
+                      <span style={styles.collateralIndicatorText}>
+                        Loan amount exceeds member's balance. Collateral is required.
+                      </span>
+                    </div>
+
+                    <button
+                      style={{
+                        ...styles.collateralButton,
+                        ...(isHovered.collateralButton ? styles.collateralButtonHover : {})
+                      }}
+                      onMouseEnter={() => handleMouseEnter('collateralButton')}
+                      onMouseLeave={() => handleMouseLeave('collateralButton')}
+                      onClick={() => setShowCollateralModal(true)}
+                    >
+                      <FaExclamationCircle style={{ color: '#2D5783', fontSize: '16px' }} />
+                      <span style={styles.collateralButtonText}>
+                        {collateralType ? 'Edit Collateral Details' : 'Add Collateral Details'}
+                      </span>
+                      <FaChevronRight style={{ color: '#2D5783', fontSize: '14px' }} />
+                    </button>
+
+                    {collateralType && (
+                      <div style={styles.collateralSummary}>
+                        <div style={styles.collateralSummaryTitle}>Collateral Summary</div>
+                        <div style={styles.collateralSummaryText}>Type: {collateralType}</div>
+                        <div style={styles.collateralSummaryText}>Value: {formatCurrency(collateralValue || 0)}</div>
+                        <div style={styles.collateralSummaryText}>Description: {collateralDescription}</div>
+                        {proofOfCollateral && (
+                          <div style={styles.collateralSummaryText}>Proof: {proofOfCollateral.name}</div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Member Balance Information */}
+                <div style={{ marginTop: '15px', padding: '10px', backgroundColor: '#f0f9ff', borderRadius: '8px', border: '1px solid #bae6fd' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '14px', color: '#0369a1', fontWeight: '500' }}>Member Balance:</span>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#1e3a5f' }}>{formatCurrency(memberBalance)}</span>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '5px' }}>
+                    <span style={{ fontSize: '14px', color: '#0369a1', fontWeight: '500' }}>Member Investment:</span>
+                    <span style={{ fontSize: '16px', fontWeight: '600', color: '#1e3a5f' }}>{formatCurrency(memberInvestment)}</span>
+                  </div>
+                </div>
               </div>
 
               <div style={styles.modalActions}>
@@ -1607,7 +2240,7 @@ const Loans = () => {
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
                   onClick={() => setShowAddLoanConfirmation(true)}
-                  disabled={isProcessing}
+                  disabled={isProcessing || memberNotFound || memberLoading || (requiresCollateral && !isCollateralValid())}
                 >
                   {isProcessing ? (
                     <>
@@ -1626,39 +2259,202 @@ const Loans = () => {
           </div>
         )}
 
+        {/* NEW: Collateral Details Modal */}
+        {showCollateralModal && (
+          <div style={styles.modalOverlay} onClick={() => setShowCollateralModal(false)}>
+            <div style={{...styles.modalCard, ...styles.collateralModal}} onClick={(e) => e.stopPropagation()}>
+              <div style={{...styles.modalHeader, ...styles.collateralHeader}}>
+                <h2 style={styles.modalTitle}>Collateral Details</h2>
+                <button 
+                  onClick={() => setShowCollateralModal(false)}
+                  style={{
+                    ...styles.closeButton,
+                    ...(isHovered.closeCollateralModal ? styles.closeButtonHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('closeCollateralModal')}
+                  onMouseLeave={() => handleMouseLeave('closeCollateralModal')}
+                >
+                  <AiOutlineClose />
+                </button>
+              </div>
+
+              <div style={{...styles.modalContent, padding: 0}}>
+                <div style={{padding: '20px'}}>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Collateral Type<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <select
+                      style={styles.formSelect}
+                      value={collateralType}
+                      onChange={(e) => setCollateralType(e.target.value)}
+                    >
+                      <option value="">Select Collateral Type</option>
+                      {collateralOptions.map((option) => (
+                        <option key={option.key} value={option.key}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Collateral Value<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter collateral value"
+                      value={collateralValue}
+                      onChange={(e) => setCollateralValue(e.target.value)}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Collateral Description<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <div style={styles.descriptionHint}>
+                      Please include the following details if applicable:
+                    </div>
+                    <div style={styles.descriptionBullet}>• Make, model, and serial number</div>
+                    <div style={styles.descriptionBullet}>• Physical condition</div>
+                    <div style={styles.descriptionBullet}>• Location</div>
+                    <div style={styles.descriptionBullet}>• Ownership documents</div>
+                    <div style={styles.descriptionBullet}>• Any identifying marks</div>
+                    <textarea
+                      placeholder="Describe your collateral in detail..."
+                      value={collateralDescription}
+                      onChange={(e) => setCollateralDescription(e.target.value)}
+                      style={{
+                        ...styles.formInput,
+                        height: '120px',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Proof of Collateral<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    {proofOfCollateral ? (
+                      <div>
+                        <img 
+                          src={URL.createObjectURL(proofOfCollateral)} 
+                          alt="Proof of Collateral" 
+                          style={styles.proofPreview}
+                        />
+                        <button
+                          style={{
+                            ...styles.uploadButton,
+                            ...(isHovered.changeProof ? styles.uploadButtonHover : {})
+                          }}
+                          onMouseEnter={() => handleMouseEnter('changeProof')}
+                          onMouseLeave={() => handleMouseLeave('changeProof')}
+                          onClick={() => document.getElementById('proofOfCollateral').click()}
+                        >
+                          <FaFileAlt style={{ color: '#2D5783', fontSize: '16px' }} />
+                          <span style={styles.uploadButtonText}>Change Photo</span>
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        style={{
+                          ...styles.uploadButton,
+                          ...(isHovered.uploadProof ? styles.uploadButtonHover : {})
+                        }}
+                        onMouseEnter={() => handleMouseEnter('uploadProof')}
+                        onMouseLeave={() => handleMouseLeave('uploadProof')}
+                        onClick={() => document.getElementById('proofOfCollateral').click()}
+                      >
+                        <FaFileAlt style={{ color: '#2D5783', fontSize: '16px' }} />
+                        <span style={styles.uploadButtonText}>Add Photo</span>
+                      </button>
+                    )}
+                    <input
+                      id="proofOfCollateral"
+                      style={{ display: 'none' }}
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleFileChange(e, setProofOfCollateral)}
+                    />
+                  </div>
+
+                  <div style={{ marginTop: '20px', display: 'flex', gap: '12px' }}>
+                    <button
+                      style={{
+                        ...styles.primaryButton,
+                        flex: 1,
+                        ...(!isCollateralValid() && { backgroundColor: '#cccccc', cursor: 'not-allowed' })
+                      }}
+                      onClick={() => {
+                        if (isCollateralValid()) {
+                          setShowCollateralModal(false);
+                          setRequiresCollateral(true);
+                        }
+                      }}
+                      disabled={!isCollateralValid()}
+                    >
+                      <FaCheckCircle />
+                      Save Collateral Details
+                    </button>
+                    
+                    <button
+                      style={{
+                        ...styles.secondaryButton,
+                        flex: 1
+                      }}
+                      onClick={() => setShowCollateralModal(false)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Confirmation Modal */}
         {showAddLoanConfirmation && (
-          <div style={styles.modalOverlay} onClick={() => setShowAddLoanConfirmation(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Loan</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to add this approved loan? This action cannot be undone.
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+                <p style={styles.modalText}>
+                  {requiresCollateral 
+                    ? 'This loan requires collateral. Are you sure you want to proceed?' 
+                    : 'Are you sure you want to add this approved loan?'}
                 </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setShowAddLoanConfirmation(false)}
-                  disabled={actionInProgress}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={styles.primaryButton}
-                  onClick={async () => { 
-                    setActionInProgress(true); 
-                    setShowAddLoanConfirmation(false); 
-                    await handleAddApprovedLoan(); 
-                    setActionInProgress(false); 
-                  }}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Confirm Loan'}
-                </button>
+                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <button 
+                    style={{
+                      ...styles.secondaryButton,
+                      flex: 1
+                    }} 
+                    onClick={() => setShowAddLoanConfirmation(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    style={{
+                      ...styles.primaryButton,
+                      flex: 1
+                    }}
+                    onClick={async () => { 
+                      setActionInProgress(true); 
+                      setShowAddLoanConfirmation(false); 
+                      await handleAddApprovedLoan(); 
+                      setActionInProgress(false); 
+                    }}
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1666,19 +2462,22 @@ const Loans = () => {
 
         {/* Success Modal */}
         {successModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setSuccessModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
+                <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
+                <p style={styles.modalText}>
                   {successMessage}
                 </p>
                 <button
-                  style={styles.primaryButton}
+                  style={{
+                    ...styles.primaryButton,
+                    width: '100%'
+                  }}
                   onClick={() => setSuccessModalVisible(false)}
                 >
-                  Continue
+                  OK
                 </button>
               </div>
             </div>
@@ -1687,21 +2486,34 @@ const Loans = () => {
 
         {/* Error Modal */}
         {errorModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
+                <h2 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: '0 0 10px 0'}}>Error</h2>
+                <p style={styles.modalText}>
                   {errorMessage}
                 </p>
                 <button
-                  style={styles.primaryButton}
+                  style={{
+                    ...styles.primaryButton,
+                    width: '100%'
+                  }}
                   onClick={() => setErrorModalVisible(false)}
                 >
                   Try Again
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Processing Overlay */}
+        {isProcessing && (
+          <div style={styles.loadingOverlay}>
+            <div style={styles.loadingContent}>
+              <div style={styles.spinner}></div>
+              <div style={styles.loadingTextOverlay}>Processing loan...</div>
             </div>
           </div>
         )}

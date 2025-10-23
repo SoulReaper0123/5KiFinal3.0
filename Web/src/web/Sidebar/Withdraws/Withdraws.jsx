@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  FaSearch, 
-  FaDownload, 
-  FaFilter, 
-  FaChevronLeft, 
+import {
+  FaSearch,
+  FaDownload,
+  FaFilter,
+  FaChevronLeft,
   FaChevronRight,
   FaPlus,
   FaCheckCircle,
@@ -21,6 +21,7 @@ import WithdrawApplications from './WithdrawApplications';
 import ApprovedWithdraws from './ApprovedWithdraws';
 import RejectedWithdraws from './RejectedWithdraws';
 import { ApproveWithdraws } from '../../../../../Server/api';
+import logoImage from '../../../../../assets/logo.png';
 
 // Constants
 const withdrawOptions = [
@@ -135,59 +136,6 @@ const styles = {
     position: 'relative',
     zIndex: '10',
     flexShrink: '0'
-  },
-  filterContainer: {
-    position: 'relative'
-  },
-  filterButton: {
-    padding: '10px 16px',
-    backgroundColor: '#fff',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px',
-    fontSize: '14px',
-    fontWeight: '500',
-    color: '#374151',
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap'
-  },
-  filterButtonHover: {
-    borderColor: '#3b82f6',
-    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-  },
-  filterDropdown: {
-    position: 'absolute',
-    top: '100%',
-    left: '0',
-    backgroundColor: '#fff',
-    border: '1px solid #e5e7eb',
-    borderRadius: '8px',
-    boxShadow: '0 10px 25px rgba(0,0,0,0.1)',
-    minWidth: '180px',
-    zIndex: '100',
-    marginTop: '4px'
-  },
-  filterOption: {
-    padding: '12px 16px',
-    border: 'none',
-    backgroundColor: 'transparent',
-    width: '100%',
-    textAlign: 'left',
-    cursor: 'pointer',
-    fontSize: '14px',
-    color: '#374151',
-    transition: 'background-color 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '8px'
-  },
-  activeFilterOption: {
-    backgroundColor: '#eff6ff',
-    color: '#1e40af',
-    fontWeight: '600'
   },
   searchContainer: {
     position: 'relative',
@@ -481,7 +429,7 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
     gap: '8px',
@@ -499,17 +447,27 @@ const styles = {
     cursor: 'pointer',
     fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
     whiteSpace: 'nowrap'
   },
   secondaryButtonHover: {
     backgroundColor: '#4b5563'
   },
+  dashboardLoadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '90vh',
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+  },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '200px'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '16px'
   },
   spinner: {
     border: '4px solid #f3f4f6',
@@ -518,6 +476,11 @@ const styles = {
     width: '40px',
     height: '40px',
     animation: 'spin 1s linear infinite'
+  },
+  loadingText: {
+    color: '#6B7280',
+    fontSize: '16px',
+    fontWeight: '500'
   },
   noDataContainer: {
     textAlign: 'center',
@@ -561,6 +524,76 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     margin: '4px 0 0 0'
+  },
+  // Confirmation modal styles
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px'
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  // Loading overlay
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+    backdropFilter: 'blur(4px)',
+  },
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  loadingTextOverlay: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
+  // Error text styles
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px',
+    fontWeight: '500'
   }
 };
 
@@ -599,9 +632,16 @@ const Withdraws = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isHovered, setIsHovered] = useState({});
   
+  // Member validation states
+  const [memberNotFound, setMemberNotFound] = useState(false);
+  const [memberLoading, setMemberLoading] = useState(false);
+  
   // Print Modal State
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
+
+  // Admin data for print report
+  const [adminData, setAdminData] = useState(null);
 
   const pageSize = 10;
 
@@ -627,7 +667,7 @@ const Withdraws = () => {
     }
   ];
 
-  // Create style element and append to head
+  // Create style element and append to head - FIXED CSS with print header/footer removal
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
@@ -642,7 +682,44 @@ const Withdraws = () => {
         transform: translateY(-2px);
         box-shadow: 0 10px 25px rgba(0,0,0,0.1);
       }
+      
+      /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
+        /* Remove browser default headers and footers */
+        @page {
+          margin: 0.5in !important;
+          size: auto;
+          margin-header: 0 !important;
+          margin-footer: 0 !important;
+        }
+        
+        /* Target Webkit browsers (Chrome, Safari) */
+        @page :first {
+          margin-top: 0;
+        }
+        
+        @page :left {
+          margin-left: 0.5in;
+          margin-right: 0.5in;
+        }
+        
+        @page :right {
+          margin-left: 0.5in;
+          margin-right: 0.5in;
+        }
+        
+        /* Hide URL, page numbers, and date in print */
+        body::before,
+        body::after {
+          display: none !important;
+        }
+        
+        /* Hide any browser-generated content */
+        .print-header:empty,
+        .print-footer:empty {
+          display: none;
+        }
+        
         body * {
           visibility: hidden;
         }
@@ -654,17 +731,66 @@ const Withdraws = () => {
           left: 0;
           top: 0;
           width: 100%;
+          padding: 20px;
+          background: white;
+          margin: 0 !important;
         }
         .no-print {
           display: none !important;
+        }
+        .print-header {
+          display: block !important;
+        }
+        .component-header {
+          display: none !important;
+        }
+        table {
+          width: '100%';
+          border-collapse: 'collapse';
+        }
+        th, td {
+          border: '1px solid #ddd';
+          padding: '8px';
+          text-align: 'left';
+        }
+        th {
+          background-color: '#f2f2f2';
+          font-weight: 'bold';
         }
       }
     `;
     document.head.appendChild(styleElement);
 
     return () => {
-      document.head.removeChild(styleElement);
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
     };
+  }, []);
+
+  // Fetch admin data for print report
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        
+        const adminRef = database.ref(`${node}/${adminId}`);
+        const snapshot = await adminRef.once('value');
+        
+        if (snapshot.exists()) {
+          setAdminData(snapshot.val());
+        }
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      }
+    };
+
+    fetchAdminData();
   }, []);
 
   const fetchAllData = async () => {
@@ -763,6 +889,54 @@ const Withdraws = () => {
     setFilteredData(filtered);
   };
 
+  // Fetch member data when member ID is entered - AUTO FETCH
+  const fetchMemberData = async (memberId) => {
+    if (!memberId) {
+      // Reset form if member ID is cleared
+      setFormData(prev => ({
+        ...prev,
+        firstName: '',
+        lastName: '',
+        email: ''
+      }));
+      setMemberNotFound(false);
+      return;
+    }
+    
+    setMemberLoading(true);
+    setMemberNotFound(false);
+    
+    try {
+      const memberRef = database.ref(`Members/${memberId}`);
+      const memberSnap = await memberRef.once('value');
+      
+      if (memberSnap.exists()) {
+        const memberData = memberSnap.val();
+        setFormData(prev => ({
+          ...prev,
+          firstName: memberData.firstName || '',
+          lastName: memberData.lastName || '',
+          email: memberData.email || ''
+        }));
+        setMemberNotFound(false);
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          firstName: '',
+          lastName: '',
+          email: ''
+        }));
+        setMemberNotFound(true);
+      }
+    } catch (error) {
+      console.error('Error fetching member data:', error);
+      setMemberNotFound(true);
+    } finally {
+      setMemberLoading(false);
+    }
+  };
+
+  // FIXED PRINT FUNCTION - Removed browser headers and footers
   const handlePrint = (format = 'print') => {
     setPrinting(true);
     
@@ -779,31 +953,95 @@ const Withdraws = () => {
       printContent.className = 'print-content';
       printContent.style.padding = '20px';
       printContent.style.fontFamily = 'Arial, sans-serif';
+      printContent.style.boxSizing = 'border-box';
+      printContent.style.margin = '0';
 
-      // Header
+      // Create your custom header
       const header = document.createElement('div');
+      header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '10px';
+      header.style.paddingBottom = '15px';
       header.style.marginBottom = '20px';
-      
-      const title = document.createElement('h1');
-      title.textContent = `${sectionTitle} Report`;
-      title.style.margin = '0';
-      title.style.color = '#333';
-      
-      const date = document.createElement('p');
-      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      date.style.margin = '5px 0 0 0';
-      date.style.color = '#666';
-      
-      const count = document.createElement('p');
-      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
-      count.style.margin = '5px 0 0 0';
-      count.style.color = '#666';
-      
-      header.appendChild(title);
-      header.appendChild(date);
-      header.appendChild(count);
+      header.style.boxSizing = 'border-box';
+
+      // Logo and Report Title (Centered)
+      const logoSection = document.createElement('div');
+      logoSection.style.textAlign = 'center';
+      logoSection.style.marginBottom = '15px';
+
+      // Add logo image
+      const logoImg = document.createElement('img');
+      logoImg.src = logoImage;
+      logoImg.style.width = '80px';
+      logoImg.style.height = '80px';
+      logoImg.style.marginBottom = '5px';
+      logoImg.style.display = 'block';
+      logoImg.style.marginLeft = 'auto';
+      logoImg.style.marginRight = 'auto';
+
+      const logo = document.createElement('div');
+      logo.textContent = '5Ki Financial Services';
+      logo.style.fontSize = '24px';
+      logo.style.fontWeight = 'bold';
+      logo.style.color = '#1e40af';
+      logo.style.marginBottom = '5px';
+
+      const reportTitle = document.createElement('div');
+      reportTitle.textContent = `${sectionTitle} Report`;
+      reportTitle.style.fontSize = '20px';
+      reportTitle.style.fontWeight = 'bold';
+      reportTitle.style.marginBottom = '15px';
+
+      logoSection.appendChild(logoImg);
+      logoSection.appendChild(logo);
+      logoSection.appendChild(reportTitle);
+
+      // Info Row (Generated Date on left, Prepared By on right)
+      const infoRow = document.createElement('div');
+      infoRow.style.display = 'flex';
+      infoRow.style.justifyContent = 'space-between';
+      infoRow.style.alignItems = 'flex-start';
+      infoRow.style.fontSize = '14px';
+      infoRow.style.marginBottom = '10px';
+      infoRow.style.boxSizing = 'border-box';
+
+      // Left side - Generated Date
+      const generatedDate = document.createElement('div');
+      generatedDate.style.textAlign = 'left';
+      generatedDate.style.flex = '1';
+      generatedDate.innerHTML = `
+        <strong>Generated as of:</strong><br>
+        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      `;
+
+      // Right side - Prepared By
+      const preparedBy = document.createElement('div');
+      preparedBy.style.textAlign = 'right';
+      preparedBy.style.flex = '1';
+      const adminFirstName = adminData?.firstName || 'Admin';
+      const adminRole = localStorage.getItem('userRole') || 'Admin';
+      preparedBy.innerHTML = `
+        <strong>Prepared by:</strong><br>
+        <span style="font-weight: bold;">${adminFirstName}</span><br>
+        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
+      `;
+
+      infoRow.appendChild(generatedDate);
+      infoRow.appendChild(preparedBy);
+
+      // Report Details
+      const reportDetails = document.createElement('div');
+      reportDetails.style.textAlign = 'center';
+      reportDetails.style.marginBottom = '15px';
+      reportDetails.style.fontSize = '14px';
+      reportDetails.style.color = '#666';
+      reportDetails.innerHTML = `
+        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
+      `;
+
+      header.appendChild(logoSection);
+      header.appendChild(infoRow);
+      header.appendChild(reportDetails);
       printContent.appendChild(header);
 
       // Table
@@ -812,6 +1050,7 @@ const Withdraws = () => {
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
         table.style.marginTop = '20px';
+        table.style.boxSizing = 'border-box';
 
         // Table Header - Define columns based on active section
         const thead = document.createElement('thead');
@@ -823,13 +1062,13 @@ const Withdraws = () => {
         
         switch(activeSection) {
           case 'withdrawApplications':
-            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status'];
+            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status', 'Date Applied'];
             break;
           case 'approvedWithdraws':
-            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved'];
+            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved', 'Transaction ID'];
             break;
           case 'rejectedWithdraws':
-            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason'];
+            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason', 'Date Rejected'];
             break;
           default:
             headers = [];
@@ -844,6 +1083,7 @@ const Withdraws = () => {
           th.style.textAlign = 'left';
           th.style.fontWeight = 'bold';
           th.style.backgroundColor = '#e9ecef';
+          th.style.boxSizing = 'border-box';
           headerRow.appendChild(th);
         });
         
@@ -877,11 +1117,20 @@ const Withdraws = () => {
               case 'Status':
                 cellValue = item.status || 'pending';
                 break;
+              case 'Date Applied':
+                cellValue = item.dateApplied || '';
+                break;
               case 'Date Approved':
                 cellValue = item.dateApproved || '';
                 break;
+              case 'Transaction ID':
+                cellValue = item.transactionId || '';
+                break;
               case 'Rejection Reason':
                 cellValue = item.rejectionReason || '';
+                break;
+              case 'Date Rejected':
+                cellValue = item.dateRejected || '';
                 break;
               default:
                 cellValue = item[header] || '';
@@ -891,6 +1140,7 @@ const Withdraws = () => {
             td.style.padding = '10px 8px';
             td.style.border = '1px solid #ddd';
             td.style.fontSize = '12px';
+            td.style.boxSizing = 'border-box';
             row.appendChild(td);
           });
           
@@ -908,178 +1158,193 @@ const Withdraws = () => {
         printContent.appendChild(noData);
       }
 
-      if (format === 'pdf') {
-        // For PDF, we'll use browser's print to PDF functionality
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
-      } else if (format === 'word') {
-        // For Word, create a simple HTML file that can be opened in Word
-        const htmlContent = `
-          <html>
-            <head>
-              <title>${sectionTitle}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                h1 { color: #333; }
-              </style>
-            </head>
-            <body>
-              ${printContent.innerHTML}
-            </body>
-          </html>
-        `;
-        
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else if (format === 'excel') {
-        // Export to Excel
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet(sectionTitle);
-
-        if (displayedData.length > 0) {
-          // Define headers for Excel based on active section
-          let excelHeaders = [];
-          
-          switch(activeSection) {
-            case 'withdrawApplications':
-              excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status'];
-              break;
-            case 'approvedWithdraws':
-              excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved'];
-              break;
-            case 'rejectedWithdraws':
-              excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason'];
-              break;
-            default:
-              excelHeaders = [];
-          }
-
-          worksheet.addRow(excelHeaders);
-
-          displayedData.forEach(item => {
-            const row = [];
-            excelHeaders.forEach(header => {
-              let cellValue = '';
-              
-              switch(header) {
-                case 'Member ID':
-                  cellValue = item.id || '';
-                  break;
-                case 'Full Name':
-                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                  break;
-                case 'Withdrawal Amount':
-                  cellValue = parseFloat(item.amountWithdrawn) || 0;
-                  break;
-                case 'Disbursement':
-                  cellValue = item.withdrawOption || '';
-                  break;
-                case 'Status':
-                  cellValue = item.status || 'pending';
-                  break;
-                case 'Date Approved':
-                  cellValue = item.dateApproved || '';
-                  break;
-                case 'Rejection Reason':
-                  cellValue = item.rejectionReason || '';
-                  break;
-                default:
-                  cellValue = item[header] || '';
-              }
-              
-              row.push(cellValue);
-            });
-            worksheet.addRow(row);
-          });
-        }
-
-        workbook.xlsx.writeBuffer().then(buffer => {
-          const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-          });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        });
-      } else {
-        // Direct print
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
+      // Create a hidden iframe for printing to avoid browser headers
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.visibility = 'hidden';
+      
+      document.body.appendChild(printFrame);
+      
+      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+      if (printDocument.document) {
+        printDocument = printDocument.document;
       }
 
-      setPrintModalVisible(false);
+      // Write the print content to the iframe with CSS to remove headers/footers
+      printDocument.open();
+      printDocument.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${sectionTitle} Report</title>
+            <style>
+              /* Reset all margins and remove browser headers/footers */
+              @page {
+                margin: 0.5in !important;
+                size: auto;
+                margin-header: 0 !important;
+                margin-footer: 0 !important;
+              }
+              
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+                font-family: Arial, sans-serif;
+                -webkit-print-color-adjust: exact;
+              }
+              
+              .print-content {
+                margin: 0 !important;
+                padding: 20px;
+              }
+              
+              /* Hide any potential browser elements */
+              header, footer, .header, .footer {
+                display: none !important;
+              }
+              
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              
+              th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+              }
+              
+              th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+        </html>
+      `);
+      printDocument.close();
+
+      // Wait for content to load then print
+      printFrame.onload = function() {
+        try {
+          if (format === 'pdf') {
+            printFrame.contentWindow.print();
+
+            // Export to Excel
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet(sectionTitle);
+
+            if (displayedData.length > 0) {
+              // Define headers for Excel based on active section
+              let excelHeaders = [];
+              
+              switch(activeSection) {
+                case 'withdrawApplications':
+                  excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status', 'Date Applied'];
+                  break;
+                case 'approvedWithdraws':
+                  excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved', 'Transaction ID'];
+                  break;
+                case 'rejectedWithdraws':
+                  excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason', 'Date Rejected'];
+                  break;
+                default:
+                  excelHeaders = [];
+              }
+
+              worksheet.addRow(excelHeaders);
+
+              displayedData.forEach(item => {
+                const row = [];
+                excelHeaders.forEach(header => {
+                  let cellValue = '';
+                  
+                  switch(header) {
+                    case 'Member ID':
+                      cellValue = item.id || '';
+                      break;
+                    case 'Full Name':
+                      cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                      break;
+                    case 'Withdrawal Amount':
+                      cellValue = parseFloat(item.amountWithdrawn) || 0;
+                      break;
+                    case 'Disbursement':
+                      cellValue = item.withdrawOption || '';
+                      break;
+                    case 'Status':
+                      cellValue = item.status || 'pending';
+                      break;
+                    case 'Date Applied':
+                      cellValue = item.dateApplied || '';
+                      break;
+                    case 'Date Approved':
+                      cellValue = item.dateApproved || '';
+                      break;
+                    case 'Transaction ID':
+                      cellValue = item.transactionId || '';
+                      break;
+                    case 'Rejection Reason':
+                      cellValue = item.rejectionReason || '';
+                      break;
+                    case 'Date Rejected':
+                      cellValue = item.dateRejected || '';
+                      break;
+                    default:
+                      cellValue = item[header] || '';
+                  }
+                  
+                  row.push(cellValue);
+                });
+                worksheet.addRow(row);
+              });
+            }
+
+            workbook.xlsx.writeBuffer().then(buffer => {
+              const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+              });
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            });
+          } else {
+            // Direct print
+            printFrame.contentWindow.print();
+          }
+          
+          // Clean up after printing
+          setTimeout(() => {
+            document.body.removeChild(printFrame);
+            setPrintModalVisible(false);
+            setPrinting(false);
+          }, 1000);
+        } catch (error) {
+          console.error('Print error:', error);
+          document.body.removeChild(printFrame);
+          setPrinting(false);
+        }
+      };
+
     } catch (error) {
       console.error('Error printing data:', error);
       setErrorMessage('Failed to print data');
       setErrorModalVisible(true);
-    } finally {
       setPrinting(false);
-    }
-  };
-
-  const handleDownload = async () => {
-    try {
-      let dataToDownload = filteredData;
-      let fileName =
-        activeSection === 'withdrawApplications'
-          ? 'PendingWithdrawals'
-          : activeSection === 'approvedWithdraws'
-          ? 'ApprovedWithdrawals'
-          : 'RejectedWithdrawals';
-
-      if (dataToDownload.length === 0) {
-        setErrorMessage('No data to export');
-        setErrorModalVisible(true);
-        return;
-      }
-
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(fileName);
-
-      const headers = Object.keys(dataToDownload[0]);
-      worksheet.addRow(headers);
-
-      dataToDownload.forEach(item => {
-        const row = headers.map(header => item[header]);
-        worksheet.addRow(row);
-      });
-
-      const buffer = await workbook.xlsx.writeBuffer();
-      const blob = new Blob([buffer], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      });
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${fileName}.xlsx`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      setSuccessMessage('Data exported successfully!');
-      setSuccessModalVisible(true);
-    } catch (error) {
-      console.error('Error downloading data:', error);
-      setErrorMessage('Failed to export data');
-      setErrorModalVisible(true);
     }
   };
 
@@ -1114,6 +1379,8 @@ const Withdraws = () => {
       amountWithdrawn: '',
     });
     setProofOfWithdrawFile(null);
+    setMemberNotFound(false);
+    setMemberLoading(false);
   };
 
   const handleInputChange = (name, value) => {
@@ -1122,19 +1389,24 @@ const Withdraws = () => {
       [name]: value
     }));
 
-    if (name === 'withdrawOption' && value && value !== 'Cash') {
-      const selectedAccount = withdrawAccounts[value];
+    if (name === 'withdrawOption' && value) {
+      // FIX: Safely access withdrawAccounts with fallback
+      const selectedAccount = withdrawAccounts[value] || { accountName: '', accountNumber: '' };
       setFormData(prev => ({
         ...prev,
         accountName: selectedAccount.accountName || '',
         accountNumber: selectedAccount.accountNumber || ''
       }));
-    } else if (name === 'withdrawOption' && value === 'Cash') {
-      setFormData(prev => ({
-        ...prev,
-        accountName: 'Cash on Hand',
-        accountNumber: 'N/A'
-      }));
+
+      // Clear proof of withdraw for Cash
+      if (value === 'Cash') {
+        setProofOfWithdrawFile(null);
+      }
+    }
+
+    // AUTO FETCH member data when member ID is entered
+    if (name === 'memberId') {
+      fetchMemberData(value);
     }
   };
 
@@ -1148,6 +1420,11 @@ const Withdraws = () => {
   const validateFields = () => {
     if (!formData.memberId) {
       setErrorMessage('Member ID is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (memberNotFound) {
+      setErrorMessage('Member not found. Please check the Member ID');
       setErrorModalVisible(true);
       return false;
     }
@@ -1204,6 +1481,7 @@ const Withdraws = () => {
     try {
       let proofOfWithdrawUrl = '';
       
+      // Only upload proof of withdraw for non-Cash withdrawals
       if (formData.withdrawOption !== 'Cash' && proofOfWithdrawFile) {
         proofOfWithdrawUrl = await uploadImageToStorage(
           proofOfWithdrawFile, 
@@ -1334,8 +1612,15 @@ const Withdraws = () => {
 
   if (loading) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
+      <div style={styles.safeAreaView}>
+        <div style={styles.mainContainer}>
+          <div style={styles.dashboardLoadingContainer}>
+            <div style={styles.loadingContainer}>
+              <div style={styles.spinner}></div>
+              <div style={styles.loadingText}>Loading withdrawal data...</div>
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -1344,7 +1629,7 @@ const Withdraws = () => {
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
-    <div style={styles.safeAreaView}>
+    <div style={styles.safeAreaView} className="component-header">
       <div style={styles.mainContainer}>
         {/* Header Section */}
         <div style={styles.headerSection}>
@@ -1507,7 +1792,7 @@ const Withdraws = () => {
 
         {/* Print Modal */}
         {printModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+          <div style={styles.modalOverlay}>
             <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <h2 style={styles.modalTitle}>Print/Export Options</h2>
@@ -1565,22 +1850,6 @@ const Withdraws = () => {
                 <button
                   style={{
                     ...styles.printOption,
-                    ...(isHovered.printWord ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printWord')}
-                  onMouseLeave={() => handleMouseLeave('printWord')}
-                  onClick={() => handlePrint('word')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Export to Word</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as Word document
-                  </p>
-                </button>
-
-                <button
-                  style={{
-                    ...styles.printOption,
                     ...(isHovered.printExcel ? styles.printOptionHover : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('printExcel')}
@@ -1626,12 +1895,25 @@ const Withdraws = () => {
                         Member ID<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(memberNotFound && { borderColor: '#dc2626' })
+                        }}
                         placeholder="Enter member ID"
                         value={formData.memberId}
                         onChange={(e) => handleInputChange('memberId', e.target.value)}
                         type="text"
                       />
+                      {memberLoading && (
+                        <p style={{...styles.errorText, color: '#3b82f6'}}>
+                          Loading member data...
+                        </p>
+                      )}
+                      {memberNotFound && (
+                        <p style={styles.errorText}>
+                          Member not found. Please check the Member ID.
+                        </p>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1644,6 +1926,7 @@ const Withdraws = () => {
                         value={formData.firstName}
                         onChange={(e) => handleInputChange('firstName', e.target.value)}
                         autoCapitalize="words"
+                        readOnly
                       />
                     </div>
 
@@ -1691,6 +1974,7 @@ const Withdraws = () => {
                         value={formData.lastName}
                         onChange={(e) => handleInputChange('lastName', e.target.value)}
                         autoCapitalize="words"
+                        readOnly
                       />
                     </div>
 
@@ -1705,6 +1989,7 @@ const Withdraws = () => {
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         type="email"
                         autoCapitalize="none"
+                        readOnly
                       />
                     </div>
 
@@ -1738,7 +2023,7 @@ const Withdraws = () => {
                   </div>
                 </div>
 
-                {/* Proof of Withdraw Upload */}
+                {/* Proof of Withdraw Upload - Only show for non-Cash withdrawals */}
                 {formData.withdrawOption && formData.withdrawOption !== 'Cash' && (
                   <div style={styles.formSection}>
                     <label style={styles.formLabel}>
@@ -1769,6 +2054,24 @@ const Withdraws = () => {
                     </div>
                   </div>
                 )}
+
+                {/* Show message for Cash */}
+                {formData.withdrawOption === 'Cash' && (
+                  <div style={styles.formSection}>
+                    <div style={{
+                      padding: '12px',
+                      backgroundColor: '#f0f9ff',
+                      border: '1px solid #bae6fd',
+                      borderRadius: '8px',
+                      textAlign: 'center'
+                    }}>
+                      <FaCheckCircle style={{color: '#059669', marginRight: '8px'}} />
+                      <span style={{color: '#0369a1', fontWeight: '500'}}>
+                        Proof of withdrawal not required for Cash withdrawals
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div style={styles.modalActions}>
@@ -1792,7 +2095,7 @@ const Withdraws = () => {
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
                   onClick={handleSubmitConfirmation}
-                  disabled={uploading}
+                  disabled={uploading || memberNotFound || memberLoading}
                 >
                   {uploading ? (
                     <>
@@ -1811,70 +2114,77 @@ const Withdraws = () => {
           </div>
         )}
 
-        {/* Confirmation Modal */}
+        {/* Confirmation Modal - Fixed centering */}
         {confirmModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Withdrawal</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to add this withdrawal? This action cannot be undone.
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmModalVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={styles.primaryButton}
-                  onClick={submitWithdraw}
-                >
-                  Confirm Withdrawal
-                </button>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+                <p style={styles.modalText}>Are you sure you want to add this withdrawal?</p>
+                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                  <button 
+                    style={{
+                      ...styles.secondaryButton,
+                      flex: 1
+                    }} 
+                    onClick={() => setConfirmModalVisible(false)}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    style={{
+                      ...styles.primaryButton,
+                      flex: 1
+                    }}
+                    onClick={submitWithdraw}
+                  >
+                    Confirm
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal */}
+        {/* Success Modal - Fixed centering */}
         {successModalVisible && (
-          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
+                <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
+                <p style={styles.modalText}>
                   {successMessage}
                 </p>
                 <button
-                  style={styles.primaryButton}
+                  style={{
+                    ...styles.primaryButton,
+                    width: '100%'
+                  }}
                   onClick={handleSuccessOk}
                 >
-                  Continue
+                  OK
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Error Modal */}
+        {/* Error Modal - Fixed centering and styling issues */}
         {errorModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+          <div style={styles.modalOverlay}>
+            <div style={styles.centeredModal}>
+              <div style={styles.modalCardSmall}>
+                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
+                <h2 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: '0 0 10px 0'}}>Error</h2>
+                <p style={styles.modalText}>
                   {errorMessage}
                 </p>
                 <button
-                  style={styles.primaryButton}
+                  style={{
+                    ...styles.primaryButton,
+                    width: '100%'
+                  }}
                   onClick={() => setErrorModalVisible(false)}
                 >
                   Try Again
@@ -1886,9 +2196,10 @@ const Withdraws = () => {
 
         {/* Processing Overlay */}
         {isProcessing && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.loadingContainer}>
+          <div style={styles.loadingOverlay}>
+            <div style={styles.loadingContent}>
               <div style={styles.spinner}></div>
+              <div style={styles.loadingTextOverlay}>Processing withdrawal...</div>
             </div>
           </div>
         )}

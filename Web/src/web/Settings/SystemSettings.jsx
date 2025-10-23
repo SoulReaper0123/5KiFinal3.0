@@ -131,27 +131,30 @@ const SystemSettings = () => {
   };
 
   // Helper function to validate dividend percentages with better precision handling
-  const validateDividendPercentages = () => {
-    const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
-    const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
-    const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
-    const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
-    const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
-    
-    // Round to 1 decimal place to avoid floating point precision issues
-    const distTotal = Math.round((membersDividend + fiveKiEarnings) * 10) / 10;
-    const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 10) / 10;
-    
-    const distributionValid = distTotal === 100;
-    const breakdownValid = breakdownTotal === 100;
-    
-    setDividendValidation({
-      distributionValid,
-      breakdownValid
-    });
-    
-    return distributionValid && breakdownValid;
-  };
+// Helper function to validate dividend percentages with better precision handling
+// Helper function to validate dividend percentages with better precision handling
+const validateDividendPercentages = () => {
+  const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
+  const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
+  const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
+  const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
+  const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
+  
+  // Use more precise rounding and handle floating point issues
+  const distTotal = Math.round((membersDividend + fiveKiEarnings) * 1000) / 1000;
+  const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 1000) / 1000;
+  
+  // Allow for very small rounding differences (0.001 tolerance)
+  const distributionValid = Math.abs(distTotal - 100) < 0.001;
+  const breakdownValid = Math.abs(breakdownTotal - 100) < 0.001;
+  
+  setDividendValidation({
+    distributionValid,
+    breakdownValid
+  });
+  
+  return distributionValid && breakdownValid;
+};
 
   const showConfirmModal = (message, onConfirm, onCancel = () => {}) => {
     setConfirmModalConfig({
@@ -240,6 +243,20 @@ const SystemSettings = () => {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+  if (editDividend) {
+    validateDividendPercentages();
+  }
+}, [
+  settings.MembersDividendPercentage, 
+  settings.FiveKiEarningsPercentage, 
+  settings.InvestmentSharePercentage, 
+  settings.PatronageSharePercentage, 
+  settings.ActiveMonthsPercentage, 
+  editDividend,
+  validateDividendPercentages // Add this dependency
+]);
+
   const generateOrientationCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
     let result = '';
@@ -272,18 +289,21 @@ const SystemSettings = () => {
     setTimeout(() => setMessageModal({ ...messageModal, visible: false }), 3000);
   };
 
-  const handleInputChange = (key, value) => {
-    const clean = value.replace(/[^0-9.]/g, '');
-    if (clean.split('.').length > 2) return;
-    
-    const newSettings = { ...settings, [key]: clean };
-    setSettings(newSettings);
-    
-    // Validate dividend percentages when relevant fields change
-    if (['MembersDividendPercentage', 'FiveKiEarningsPercentage', 'InvestmentSharePercentage', 'PatronageSharePercentage', 'ActiveMonthsPercentage'].includes(key)) {
-      setTimeout(() => validateDividendPercentages(), 0);
-    }
-  };
+const handleInputChange = (key, value) => {
+  const clean = value.replace(/[^0-9.]/g, '');
+  if (clean.split('.').length > 2) return;
+  
+  const newSettings = { ...settings, [key]: clean };
+  setSettings(newSettings);
+  
+  // Immediately validate dividend percentages when relevant fields change
+  if (['MembersDividendPercentage', 'FiveKiEarningsPercentage', 'InvestmentSharePercentage', 'PatronageSharePercentage', 'ActiveMonthsPercentage'].includes(key)) {
+    // Use setTimeout to ensure validation runs after state update
+    setTimeout(() => {
+      validateDividendPercentages();
+    }, 0);
+  }
+};
 
   const handleInterestChange = (term, value) => {
     const clean = value.replace(/[^0-9.]/g, '');

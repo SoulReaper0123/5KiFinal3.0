@@ -1,11 +1,8 @@
-import { 
-  loadAllDatabaseData as sharedLoadData, 
-  generateDatabaseSummary as sharedGenerateSummary 
-} from '../../../shared/databaseService.js';
+// Display-only AI service for Admin Web UI. No database or code access here.
 
 // Gemini configuration (single key, dynamic model selection)
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
-const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta'; // Changed from v1 to v1beta
+const GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 // Updated model names for v1beta endpoint
 const CANDIDATE_MODELS = [
@@ -78,7 +75,7 @@ const callGemini = async (apiKey, prompt) => {
       },
     ],
     generationConfig: {
-      temperature: 0.7,
+      temperature: 0.5,
       maxOutputTokens: 2048,
     }
   };
@@ -104,46 +101,38 @@ const callGemini = async (apiKey, prompt) => {
 };
 
 // Local fallback response
-const getFallbackResponse = (prompt) => {
+const getFallbackResponse = () => {
   const responses = [
     "I'm currently experiencing technical difficulties. Please try again later.",
-    "I'm here to help with your Financial Management System. Could you please rephrase your question?",
-    "I'm temporarily unavailable, but I can help you navigate the system. What specific section would you like assistance with?",
-    "I'm having trouble connecting to my AI services. In the meantime, you can explore the dashboard, manage registrations, or check pending applications.",
+    "I can help using only what is currently visible on your admin pages. What would you like to know?",
+    "I don't have background access to your database or files. Ask about what's displayed on your dashboard, loans, deposits, payments, withdrawals, or registrations.",
   ];
   return responses[Math.floor(Math.random() * responses.length)];
 };
 
-console.log('Enhanced Admin AI Service initialized (Gemini v1beta)');
+console.log('Enhanced Admin AI Service (display-only) initialized');
 
-// Generate AI response (Gemini only) with database context
+// Generate AI response strictly from provided visible context
 export const generateEnhancedAdminAIResponse = async (prompt, visibleContext = '') => {
   try {
     const finalPrompt = typeof prompt === 'string' ? prompt : '';
 
-    // Load database data for AI context
-    const databaseData = await loadAllDatabaseData();
-    const databaseSummary = databaseData ? generateDatabaseSummary(databaseData) : 'Database data unavailable.';
-
     const baseContext = `You are an AI assistant for the 5KI Financial Services Admin Web UI.
 
-RULES:
-- You have access to real-time database information below.
-- Answer questions about members, funds, loans, deposits, withdrawals, and applications using this data.
+STRICT RULES:
+- You have NO access to any database, source code, or hidden files.
+- Answer ONLY using the VISIBLE UI CONTEXT provided below (display-only snapshot).
+- If information is not present in the VISIBLE UI CONTEXT, say you don't have that information.
 - Use Philippine Peso (₱) for amounts.
+- Refer to funds as "Available Funds" (do NOT use "Net Funds").
 - Keep responses concise, structured, and professional.
-- If asked about specific data not in the summary, explain what data is available.
 
-CURRENT DATABASE STATUS:
-${databaseSummary}
-
-ADDITIONAL CONTEXT:
-${visibleContext || '(No additional context provided)'}
+VISIBLE UI CONTEXT:
+${visibleContext || '(No context captured — you must ask the user to open the relevant page or provide details visible on screen.)'}
 `;
 
     const fullPrompt = `${baseContext}\n\nAdmin Query: ${finalPrompt}`;
 
-    // Gemini only
     const { text, model } = await callGemini(GEMINI_API_KEY, fullPrompt);
     return {
       success: true,
@@ -158,32 +147,16 @@ ${visibleContext || '(No additional context provided)'}
     // Final fallback - local response
     return {
       success: true,
-      text: getFallbackResponse(String(prompt || '')),
+      text: getFallbackResponse(),
       provider: 'Local Fallback',
       usage: null,
     };
   }
 };
 
-// Database data loading for AI context
-export const loadAllDatabaseData = async () => {
-  try {
-    const { database } = await import('../../../Database/firebaseConfig');
-    return await sharedLoadData(database);
-  } catch (error) {
-    console.error('Failed to load database data:', error);
-    return null;
-  }
-};
-
-// Generate database summary for AI context
-export const generateDatabaseSummary = sharedGenerateSummary;
-
 export const getCodebaseContext = () => '';
 
 export default {
   generateEnhancedAdminAIResponse,
-  loadAllDatabaseData,
-  generateDatabaseSummary,
   getCodebaseContext,
 };

@@ -3,7 +3,7 @@ import { database } from '../../../../../Database/firebaseConfig';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
 import { SendLoanReminder } from '../../../../../Server/api';
-import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner, FaChartLine, FaMoneyBillWave, FaUsers, FaCreditCard, FaExchangeAlt, FaShieldAlt, FaSearch, FaCalendarAlt, FaFilter, FaPiggyBank, FaBusinessTime, FaPercentage, FaFileContract, FaInfoCircle, FaPhone } from 'react-icons/fa';
+import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner, FaChartLine, FaMoneyBillWave, FaUsers, FaCreditCard, FaExchangeAlt, FaShieldAlt, FaSearch, FaCalendarAlt, FaFilter, FaPiggyBank, FaBusinessTime, FaPercentage, FaFileContract, FaInfoCircle, FaPhone, FaCalendarPlus } from 'react-icons/fa';
 
 // Register Chart.js components
 Chart.register(
@@ -21,6 +21,8 @@ Chart.register(
 const Dashboard = () => {
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear.toString());
+  const [advancedYear, setAdvancedYear] = useState((currentYear + 1).toString());
+  const [isAdvancedView, setIsAdvancedView] = useState(false);
   const [loading, setLoading] = useState(true);
   const [fundsData, setFundsData] = useState({
     availableFunds: 0,
@@ -247,7 +249,7 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchDashboardData();
-  }, [selectedYear]);
+  }, [selectedYear, isAdvancedView]);
 
   const parseCustomDate = (dateString) => {
     if (!dateString) return null;
@@ -359,10 +361,37 @@ const Dashboard = () => {
     return { overdueDays, penalty, newTotalMonthly };
   };
 
+  const calculateActiveMonths = (registrationDate, targetYear, isAdvancedView) => {
+    if (!registrationDate) return 12; // Default to full year if no registration date
+    
+    const regDate = new Date(registrationDate);
+    const targetYearNum = parseInt(targetYear);
+    
+    if (isAdvancedView) {
+      // In advanced view, all members get full 12 months regardless of registration date
+      return 12;
+    }
+    
+    // For current year view, calculate based on actual registration date
+    const regYear = regDate.getFullYear();
+    const regMonthIdx = regDate.getMonth(); // 0-11
+    
+    if (regYear < targetYearNum) {
+      return 12; // Registered in previous year - full year
+    } else if (regYear > targetYearNum) {
+      return 0; // Registered in future year - no active months
+    } else {
+      // Registered in same year - calculate months from registration to end of year
+      return Math.max(0, 12 - regMonthIdx);
+    }
+  };
+
   const fetchDashboardData = async (options = {}) => {
     const { lightweight = false } = options;
     try {
       if (!lightweight) setLoading(true);
+      
+      const targetYear = isAdvancedView ? advancedYear : selectedYear;
       
       const [
         fundsSnapshot,
@@ -468,7 +497,7 @@ const Dashboard = () => {
       // Process funds history data for the selected year
       fundsHistory.forEach(item => {
         const date = new Date(item.date);
-        if (date.getFullYear() === parseInt(selectedYear)) {
+        if (date.getFullYear() === parseInt(targetYear)) {
           const month = date.getMonth();
           // Get the latest funds amount for each month (or sum if multiple entries)
           monthlyFunds[month] = Math.max(monthlyFunds[month], item.amount);
@@ -476,7 +505,7 @@ const Dashboard = () => {
       });
 
       // If no funds history data, use current available funds for current month
-      if (monthlyFunds.every(amount => amount === 0) && parseInt(selectedYear) === new Date().getFullYear()) {
+      if (monthlyFunds.every(amount => amount === 0) && parseInt(targetYear) === new Date().getFullYear()) {
         const currentMonth = new Date().getMonth();
         monthlyFunds[currentMonth] = availableFunds;
       }
@@ -524,11 +553,23 @@ const Dashboard = () => {
         availableFunds,
         fiveKISavings
       };
+
+      // Expose a display-only snapshot for the AI (no DB access by AI)
+      window.__visibleDashboard = {
+        timestamp: new Date().toISOString(),
+        availableFunds,
+        totalYields,
+        totalLoans,
+        totalReceivables,
+        fiveKISavings,
+        activeBorrowers,
+        totalMembers,
+      };
       
       setLoanData(loanItems);
       setEarningsData(formattedFunds);
       
-      // Process dividends data from real transactions
+      // Process dividends data - INCLUDE ALL MEMBERS except admin/coadmin roles
       const dividendsItems = [];
       
       // Fetch all transaction types
@@ -561,11 +602,17 @@ const Dashboard = () => {
       // Wait for all transaction types to be fetched
       await Promise.all(transactionPromises);
       
-      // Process each member's transactions
+      // Process ALL MEMBERS except admin/coadmin roles
       const memberProcessingPromises = Object.entries(membersData).map(async ([memberId, member]) => {
         // Skip members that are inactive (e.g., those who permanently withdrew)
         const status = (member?.status || '').toLowerCase();
         if (status === 'inactive') {
+          return null;
+        }
+
+        // EXCLUDE ADMIN AND COADMIN ROLES FROM DIVIDENDS
+        const role = (member?.role || '').toLowerCase();
+        if (role === 'admin' || role === 'coadmin') {
           return null;
         }
 
@@ -581,7 +628,7 @@ const Dashboard = () => {
           if (regsSnapForInvestment.exists()) {
             Object.values(regsSnapForInvestment.val()).forEach(reg => {
               const d = parseTransactionDate(reg.dateApproved || reg.date);
-              if (d && d.getFullYear() === parseInt(selectedYear)) {
+              if (d && d.getFullYear() === parseInt(targetYear)) {
                 const amt = parseFloat(reg.amount) || 0;
                 totalInvestment += amt;
               }
@@ -597,7 +644,7 @@ const Dashboard = () => {
           if (depsSnapForInvestment.exists()) {
             Object.values(depsSnapForInvestment.val()).forEach(dep => {
               const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
-              if (d && d.getFullYear() === parseInt(selectedYear)) {
+              if (d && d.getFullYear() === parseInt(targetYear)) {
                 // Only consider deposits that were approved/completed if such a field exists
                 const status = (dep.status || '').toLowerCase();
                 if (!status || status === 'approved' || status === 'completed') {
@@ -610,11 +657,29 @@ const Dashboard = () => {
         } catch (e) {
           console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
         }
+
+        try {
+          const withdrawalsSnap = await database.ref(`Transactions/Withdrawals/${memberId}`).once('value');
+          if (withdrawalsSnap.exists()) {
+            Object.values(withdrawalsSnap.val()).forEach(withdrawal => {
+              const d = parseTransactionDate(withdrawal.dateApproved || withdrawal.date);
+              if (d && d.getFullYear() === parseInt(targetYear)) {
+                const status = (withdrawal.status || '').toLowerCase();
+                if (status === 'approved' || status === 'distributed') {
+                  const amt = parseFloat(withdrawal.amountWithdrawn || withdrawal.amount) || 0;
+                  totalInvestment -= amt; // Subtract withdrawals
+                }
+              }
+            });
+          }
+        } catch (e) {
+          console.error(`Error computing withdrawal part of investment for member ${memberId}:`, e);
+        }
         
         // Filter transactions by selected year and process them
         memberTransactions.forEach(transaction => {
           const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
-          if (transactionDate && transactionDate.getFullYear() === parseInt(selectedYear)) {
+          if (transactionDate && transactionDate.getFullYear() === parseInt(targetYear)) {
             const month = transactionDate.getMonth();
 
             // Only include approved transactions for dividends (ignore any 'paid' status)
@@ -646,16 +711,6 @@ const Dashboard = () => {
                 // Fallback to generic amount field
                 amount = parseFloat(transaction.amount) || 0;
             }
-            
-            // Debug logging
-            console.log(`Processing ${transaction.type} transaction:`, {
-              originalAmount: amount,
-              fieldUsed: transaction.type === 'Deposits' ? 'amountToBeDeposited' : 
-                         transaction.type === 'Loans' ? 'loanAmount' :
-                         transaction.type === 'Payments' ? 'amountToBePaid' :
-                         transaction.type === 'Withdrawals' ? 'amountWithdrawn' : 'amount',
-              transactionData: transaction
-            });
             
             // Determine if transaction is positive or negative
             let adjustedAmount = amount;
@@ -696,7 +751,7 @@ const Dashboard = () => {
               if (loan.dateApproved) {
                 // Check if the loan was approved in the selected year
                 const approvedDate = parseTransactionDate(loan.dateApproved);
-                if (approvedDate && approvedDate.getFullYear() === parseInt(selectedYear)) {
+                if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
                   approvedLoansCount++;
                   // Add the loan amount to the total
                   const loanAmount = parseFloat(loan.loanAmount) || 0;
@@ -710,58 +765,47 @@ const Dashboard = () => {
         }
 
         // Determine Active Months based on registration dateApproved in Transactions/Registrations
-        let activeMonthsCount = 12; // default full year
+        let registrationDate = null;
         try {
           const regsSnapshot = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
           if (regsSnapshot.exists()) {
             const regs = regsSnapshot.val();
-            let earliestApprovedDate = null;
             Object.values(regs).forEach(reg => {
               const d = parseTransactionDate(reg.dateApproved);
               if (d) {
-                if (!earliestApprovedDate || d < earliestApprovedDate) {
-                  earliestApprovedDate = d;
+                if (!registrationDate || d < registrationDate) {
+                  registrationDate = d;
                 }
               }
             });
-            if (earliestApprovedDate) {
-              const regYear = earliestApprovedDate.getFullYear();
-              const regMonthIdx = earliestApprovedDate.getMonth(); // 0-11
-              const selYear = parseInt(selectedYear);
-              if (regYear < selYear) {
-                activeMonthsCount = 12;
-              } else if (regYear > selYear) {
-                activeMonthsCount = 0;
-              } else {
-                activeMonthsCount = Math.max(0, 12 - regMonthIdx);
-              }
-            }
           }
         } catch (error) {
           console.error(`Error fetching registration for member ${memberId}:`, error);
         }
         
-        // Only include members who have transactions in the selected year or have investment
-        if (totalDividends !== 0 || totalInvestment > 0) {
-          return {
-            memberId,
-            memberName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
-            investment: totalInvestment,
-            monthlyDividends,
-            monthlyTransactions, // Include the actual transactions
-            totalDividends,
-            approvedLoansCount,
-            totalLoanAmount,
-            activeMonthsCount
-          };
-        }
-        return null;
+        const activeMonthsCount = calculateActiveMonths(registrationDate, targetYear, isAdvancedView);
+        
+        // INCLUDE ALL ACTIVE MEMBERS (except admin/coadmin) regardless of transactions or investment
+        return {
+          memberId,
+          memberName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
+          investment: totalInvestment,
+          monthlyDividends,
+          monthlyTransactions, // Include the actual transactions
+          totalDividends,
+          approvedLoansCount,
+          totalLoanAmount,
+          activeMonthsCount,
+          registrationDate,
+          hasTransactions: totalDividends !== 0 || totalInvestment > 0, // Flag to identify members with actual activity
+          role: role // Include role for reference
+        };
       });
       
       // Wait for all member processing to complete
       const processedMembers = await Promise.all(memberProcessingPromises);
       
-      // Filter out null values and add to dividendsItems
+      // Filter out null values (inactive members and admin/coadmin roles)
       processedMembers.forEach(member => {
         if (member) {
           dividendsItems.push(member);
@@ -881,6 +925,10 @@ const Dashboard = () => {
     }
   };
 
+  const toggleAdvancedView = () => {
+    setIsAdvancedView(!isAdvancedView);
+  };
+
   const healthStatus = fundsData.availableFunds > fundsData.totalLoans * 1.5 
     ? 'Excellent' 
     : fundsData.availableFunds > fundsData.totalLoans 
@@ -913,7 +961,7 @@ const Dashboard = () => {
       setSelectedMonthTransactions({
         member: member,
         month: monthNames[monthIndex],
-        year: selectedYear,
+        year: isAdvancedView ? advancedYear : selectedYear,
         transactions: monthTransactions
       });
       setTransactionBreakdownModal(true);
@@ -962,7 +1010,7 @@ const Dashboard = () => {
         data: earningsData.map((_, index) => {
           const monthSavings = fundsData.savingsHistory.filter(item => {
             const date = new Date(item.date);
-            return date.getFullYear() === parseInt(selectedYear) && date.getMonth() === index;
+            return date.getFullYear() === parseInt(isAdvancedView ? advancedYear : selectedYear) && date.getMonth() === index;
           });
           return monthSavings.reduce((sum, item) => sum + item.amount, 0);
         }),
@@ -989,7 +1037,7 @@ const Dashboard = () => {
         data: earningsData.map((_, index) => {
           const monthYields = (fundsData.yieldsHistory || []).filter(item => {
             const date = new Date(item.date);
-            return date.getFullYear() === parseInt(selectedYear) && date.getMonth() === index;
+            return date.getFullYear() === parseInt(isAdvancedView ? advancedYear : selectedYear) && date.getMonth() === index;
           });
           return monthYields.reduce((sum, item) => sum + (parseFloat(item.amount) || 0), 0);
         }),
@@ -1262,6 +1310,21 @@ const Dashboard = () => {
       transition: 'all 0.3s ease',
       outline: 'none'
     },
+    advancedButton: {
+      padding: '10px 20px',
+      border: '1px solid #e2e8f0',
+      borderRadius: '8px',
+      backgroundColor: isAdvancedView ? '#1e40af' : 'white',
+      color: isAdvancedView ? 'white' : '#64748b',
+      fontSize: '14px',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.3s ease',
+      display: 'flex',
+      alignItems: 'center',
+      gap: '8px',
+      marginLeft: '12px'
+    },
     chartContainer: {
       backgroundColor: 'white',
       borderRadius: '16px',
@@ -1516,6 +1579,14 @@ const Dashboard = () => {
       cursor: 'pointer',
       border: '2px solid transparent'
     },
+    dashboardLoadingContainer: {
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  height: '90vh',
+  flexDirection: 'column',
+  backgroundColor: 'transparent',
+},
     loadingContainer: {
       display: 'flex',
       justifyContent: 'center',
@@ -1557,6 +1628,24 @@ const Dashboard = () => {
       gap: '12px',
       marginBottom: '20px',
       flexWrap: 'wrap'
+    },
+    viewBadge: {
+      padding: '4px 12px',
+      borderRadius: '20px',
+      fontSize: '12px',
+      fontWeight: '600',
+      backgroundColor: '#FEF3C7',
+      color: '#B45309',
+      marginLeft: '8px'
+    },
+    noActivityBadge: {
+      padding: '4px 8px',
+      borderRadius: '6px',
+      fontSize: '11px',
+      fontWeight: '500',
+      backgroundColor: '#F3F4F6',
+      color: '#6B7280',
+      marginLeft: '8px'
     }
   };
 
@@ -1575,18 +1664,20 @@ const Dashboard = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <div style={styles.container}>
-        <div style={styles.mainContainer}>
+if (loading) {
+  return (
+    <div style={styles.container}>
+      <div style={styles.mainContainer}>
+        <div style={styles.dashboardLoadingContainer}>
           <div style={styles.loadingContainer}>
             <div style={styles.spinner}></div>
             <div style={styles.loadingText}>Loading dashboard data...</div>
           </div>
         </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div style={styles.container}>
@@ -1597,17 +1688,29 @@ const Dashboard = () => {
             <h1 style={styles.headerText}>Financial Dashboard</h1>
             <p style={styles.headerSubtitle}>
               Monitor financial performance and manage loan operations
+              {isAdvancedView && <span style={styles.viewBadge}>Advanced View ({advancedYear})</span>}
             </p>
           </div>
-          <select 
-            value={selectedYear}
-            onChange={(e) => setSelectedYear(e.target.value)}
-            style={styles.yearSelect}
-          >
-            {generateYears().map(year => (
-              <option key={year} value={year}>{year}</option>
-            ))}
-          </select>
+          <div style={{display: 'flex', alignItems: 'center'}}>
+            <select 
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              style={styles.yearSelect}
+            >
+              {generateYears().map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+            <button 
+              onClick={toggleAdvancedView}
+              style={styles.advancedButton}
+              onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+              onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+            >
+              <FaCalendarPlus />
+              {isAdvancedView ? 'Current View' : 'Advanced View'}
+            </button>
+          </div>
         </div>
 
         {/* Primary Key Metrics Grid */}
@@ -1747,7 +1850,7 @@ const Dashboard = () => {
         {/* Financial Growth Section - Side by Side Charts */}
         <div style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Financial Growth Overview ({selectedYear})</h2>
+            <h2 style={styles.sectionTitle}>Financial Growth Overview ({isAdvancedView ? advancedYear : selectedYear})</h2>
           </div>
           
           <div style={styles.chartsGrid}>
@@ -1782,16 +1885,18 @@ const Dashboard = () => {
         {/* Dividends Distribution Section */}
         <div style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Dividends Distribution ({selectedYear})</h2>
-            <button 
-              onClick={openDividendsModal} 
-              style={styles.resendButton}
-              onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
-              onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
-            >
-              <FaExchangeAlt />
-              Distribute Dividends
-            </button>
+            <h2 style={styles.sectionTitle}>Dividends Distribution ({isAdvancedView ? advancedYear : selectedYear})</h2>
+            {!isAdvancedView && (
+              <button 
+                onClick={openDividendsModal} 
+                style={styles.resendButton}
+                onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
+                onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
+              >
+                <FaExchangeAlt />
+                Distribute Dividends
+              </button>
+            )}
           </div>
 
           {/* Distribution Summary */}
@@ -1835,7 +1940,7 @@ const Dashboard = () => {
                 const tt = new Date(today.getFullYear(), today.getMonth(), today.getDate());
                 return dd.getTime() <= tt.getTime();
               })();
-              return isDue ? (
+              return isDue && !isAdvancedView ? (
                 <span style={{ 
                   ...styles.overdueBadge, 
                   backgroundColor: '#FEF3C7', 
@@ -1895,7 +2000,7 @@ const Dashboard = () => {
                           ((fundsData.patronageSharePercentage || 0) * 100),
                           ((fundsData.activeMonthsPercentage || 0) * 100)
                         ],
-                        backgroundColor: ['#7C3AED', '#DC2626', '#059669'],
+                        backgroundColor: ['#2563EB', '#EA580C', '#059669'],
                         borderColor: ['#fff', '#fff', '#fff'],
                         borderWidth: 2
                       }
@@ -1920,6 +2025,9 @@ const Dashboard = () => {
           <div style={styles.chartContainer}>
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>Member Dividends Breakdown</h3>
+              {isAdvancedView && (
+                <span style={styles.viewBadge}>Projection View - No Distribution</span>
+              )}
             </div>
             <div style={styles.dividendsTableContainer}>
               {(() => {
@@ -1965,8 +2073,18 @@ const Dashboard = () => {
                     <tr key={member.memberId} style={styles.dividendsDataRow}>
                       <td style={styles.dividendsDataCell}>
                         <div style={styles.memberInfo}>
-                          <span style={styles.memberName}>{member.memberName}</span>
+                          <span style={styles.memberName}>
+                            {member.memberName}
+                            {!member.hasTransactions && (
+                              <span style={styles.noActivityBadge}>No Activity</span>
+                            )}
+                          </span>
                           <span style={styles.memberId}>ID: {member.memberId}</span>
+                          {member.registrationDate && (
+                            <span style={{fontSize: '11px', color: '#9CA3AF', marginTop: '2px'}}>
+                              Reg: {new Date(member.registrationDate).toLocaleDateString()}
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td style={styles.dividendsDataCell}>
@@ -2008,13 +2126,13 @@ const Dashboard = () => {
                       })}
                       <td style={styles.dividendsDataCell}>
                         <strong style={{
-                          color: member.totalDividends > 0 ? '#10B981' : member.totalDividends < 0 ? '#EF4444' : '#666'
+                          color: member.totalDividends > 0 ? '#059669' : member.totalDividends < 0 ? '#EF4444' : '#666'
                         }}>
                           {member.totalDividends > 0 ? '+' : member.totalDividends < 0 ? '-' : ''}₱{formatCurrency(Math.abs(member.totalDividends))}
                         </strong>
                       </td>
                       <td style={styles.dividendsDataCell}>
-                        <strong style={{color: '#2D5783'}}>
+                        <strong style={{color: '#2563EB'}}>
                           {member.approvedLoansCount || 0}
                         </strong>
                       </td>
@@ -2024,14 +2142,14 @@ const Dashboard = () => {
                         </strong>
                       </td>
                       <td style={styles.dividendsDataCell}>
-                        <strong style={{color: '#7C3AED'}}>
+                        <strong style={{color: '#2563EB'}}>
                           {window.totalAllMembersInvestment > 0 
                             ? ((member.investment / window.totalAllMembersInvestment) * 100).toFixed(2) + '%' 
                             : '0.00%'}
                         </strong>
                       </td>
                       <td style={styles.dividendsDataCell}>
-                        <strong style={{color: '#DC2626'}}>
+                        <strong style={{color: '#EA580C'}}>
                           {totalAllMembersLoanAmount > 0 
                             ? (((member.totalLoanAmount || 0) / totalAllMembersLoanAmount) * 100).toFixed(2) + '%' 
                             : '0.00%'}
@@ -2052,7 +2170,7 @@ const Dashboard = () => {
                         </strong>
                       </td>
                       <td style={styles.dividendsDataCell}>
-                        <strong style={{color: '#DC2626'}}>
+                        <strong style={{color: '#92400E'}}>
                           {(() => {
                             // Member shares based on totals
                             const totalInvestments = window.totalAllMembersInvestment || 0;

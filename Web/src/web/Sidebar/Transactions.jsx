@@ -371,11 +371,21 @@ const styles = {
     cursor: 'not-allowed',
     borderColor: '#e5e7eb'
   },
+  dashboardLoadingContainer: {
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    height: '90vh',
+    flexDirection: 'column',
+    backgroundColor: 'transparent',
+  },
   loadingContainer: {
     display: 'flex',
     justifyContent: 'center',
     alignItems: 'center',
-    height: '200px'
+    height: '200px',
+    flexDirection: 'column',
+    gap: '16px'
   },
   spinner: {
     border: '4px solid #f3f4f6',
@@ -384,6 +394,11 @@ const styles = {
     width: '40px',
     height: '40px',
     animation: 'spin 1s linear infinite'
+  },
+  loadingText: {
+    color: '#6B7280',
+    fontSize: '16px',
+    fontWeight: '500'
   },
   noDataContainer: {
     textAlign: 'center',
@@ -1257,13 +1272,20 @@ const Transactions = () => {
   const totalPages = Math.max(1, Math.ceil(filteredMembers.length / pageSize));
   const paginatedData = filteredMembers.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-  if (loading) {
-    return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
+if (loading) {
+  return (
+    <div style={styles.safeAreaView}>
+      <div style={styles.mainContainer}>
+        <div style={styles.dashboardLoadingContainer}>
+          <div style={styles.loadingContainer}>
+            <div style={styles.spinner}></div>
+            <div style={styles.loadingText}>Loading transaction data...</div>
+          </div>
+        </div>
       </div>
-    );
-  }
+    </div>
+  );
+}
 
   return (
     <div style={styles.safeAreaView}>
