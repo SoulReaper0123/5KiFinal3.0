@@ -3,7 +3,6 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 require('dotenv').config();
 const cors = require('cors');
-const { google } = require('googleapis');
 
 console.log('GMAIL_USER:', process.env.GMAIL_USER);
 
@@ -16,81 +15,20 @@ const DASHBOARD_LINK = 'https://fiveki.onrender.com';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
 // Middleware
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'https://fiveki.onrender.com',
-      'https://fivekiapp.onrender.com'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
-  ],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
-
-// Handle preflight requests
-// Handle preflight requests for all routes
-app.options('/*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'https://fiveki.onrender.com');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.status(204).send();
-});
+app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Create OAuth2 transporter function
-const createTransporter = async () => {
-  try {
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GMAIL_CLIENT_ID,
-      process.env.GMAIL_CLIENT_SECRET,
-      "https://developers.google.com/oauthplayground"
-    );
-
-    oauth2Client.setCredentials({
-      refresh_token: process.env.GMAIL_REFRESH_TOKEN
-    });
-
-    const accessToken = await oauth2Client.getAccessToken();
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        type: "OAuth2",
+const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    host: 'smtp.gmail.com',
+    port: 465,
+    secure: true,
+    auth: {
         user: process.env.GMAIL_USER,
-        accessToken: accessToken.token,
-        clientId: process.env.GMAIL_CLIENT_ID,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN
-      }
-    });
-
-    return transporter;
-  } catch (error) {
-    console.error('Error creating email transporter:', error);
-    throw error;
-  }
-};
+        pass: process.env.GMAIL_PASS,
+    },
+});
 
 // Helper function to format dates for display
 const formatDisplayDate = (dateString) => {
@@ -228,8 +166,6 @@ app.post('/send-admin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending admin creation notification to owner');
         const ownerMailOptions = {
@@ -325,6 +261,8 @@ app.post('/send-admin-email', async (req, res) => {
                     
                     <p>For any questions, please contact the system administrator.</p>
                     
+      
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
                     </p>
@@ -385,8 +323,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending admin deletion notification to owner');
         const ownerMailOptions = {
@@ -477,6 +413,8 @@ app.post('/send-delete-admin-email', async (req, res) => {
                         <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
                     </p>
                     
+
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
                     </p>
@@ -523,8 +461,6 @@ app.post('/register', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending new registration notification to owner');
         const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -613,8 +549,6 @@ app.post('/approveRegistrations', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending registration approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -697,8 +631,6 @@ app.post('/rejectRegistrations', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending registration rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -792,8 +724,6 @@ app.post('/send-verification-code', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         // Log the code for development purposes (mask part of it in production)
         const codeToLog = process.env.NODE_ENV === 'production' 
             ? `${verificationCode.substring(0, 3)}***` 
@@ -893,8 +823,6 @@ app.post('/deposit', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         const currentDate = dateApplied || new Date().toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
@@ -1010,6 +938,8 @@ app.post('/deposit', async (req, res) => {
                     
                     <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
+    
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -1037,8 +967,6 @@ app.post('/approveDeposits', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending deposit approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1105,8 +1033,6 @@ app.post('/rejectDeposits', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending deposit rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1172,7 +1098,7 @@ app.post('/withdraw', async (req, res) => {
         amount, 
         date, 
         recipientAccount, 
-        accountNumber,
+        accountNumber, // Add this line to accept accountNumber
         referenceNumber, 
         withdrawOption,
         accountName,
@@ -1192,8 +1118,6 @@ app.post('/withdraw', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending withdrawal notification to owner');
         
         // Email to system owner
@@ -1339,8 +1263,6 @@ app.post('/approveWithdraws', async (req, res) => {
     const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
 
     try {
-        const transporter = await createTransporter();
-
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
@@ -1411,8 +1333,6 @@ app.post('/rejectWithdraws', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending withdrawal rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1484,8 +1404,6 @@ app.post('/applyLoan', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending new loan application notification to owner');
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1614,8 +1532,6 @@ app.post('/approveLoans', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending loan approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1731,8 +1647,6 @@ app.post('/rejectLoans', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending loan rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1800,8 +1714,6 @@ app.post('/payment', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending payment notification to owner');
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1929,8 +1841,6 @@ app.post('/approvePayments', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending payment approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2028,8 +1938,6 @@ app.post('/rejectPayments', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending payment rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2090,8 +1998,6 @@ app.post('/membershipWithdrawal', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
         await transporter.sendMail({
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2184,6 +2090,110 @@ app.post('/membershipWithdrawal', async (req, res) => {
     }
 });
 
+// Add these endpoints to your server.js
+app.post('/membershipWithdrawal', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating membership withdrawal emails', req.body);
+  const { email, firstName, lastName, date, reason } = req.body;
+  const fullName = `${firstName} ${lastName}`;
+
+  if (!email || !firstName || !lastName || !date) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for membership withdrawal');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
+    await transporter.sendMail({
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: process.env.GMAIL_USER,
+      subject: 'Membership Withdrawal Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request
+          </h2>
+          
+          <p>Dear Admin,</p>
+          
+          <p>A new permanent membership withdrawal request has been received:</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Request Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Requested</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+            </tr>
+            ${reason ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${reason}</td>
+            </tr>
+            ` : ''}
+          </table>
+          
+          <p>Kindly update the records and confirm in the system.</p>
+          
+          <p>
+            <a href="${DASHBOARD_LINK}" 
+               style="display: inline-block; background-color: #3498db; color: white; 
+                      padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+              View in Dashboard
+            </a>
+          </p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            5KI Financial Services &copy; ${new Date().getFullYear()}
+          </p>
+        </div>
+      `
+    });
+
+    console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
+    await transporter.sendMail({
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Membership Withdrawal Request Received',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request Received
+          </h2>
+          
+          <p>Hi ${firstName},</p>
+          
+          <p>We have received your membership withdrawal request on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.</p>
+          
+          ${reason ? `
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Your Reason:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${reason}</td>
+            </tr>
+          </table>
+          ` : ''}
+          
+          <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Best regards,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    });
+
+    console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
+    res.status(200).json({ message: 'Emails sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending membership withdrawal emails:', error);
+    res.status(500).json({ message: 'Failed to send emails', error: error.message });
+  }
+});
+
 app.post('/approveMembershipWithdrawal', async (req, res) => {
   console.log('[NOTIFICATION] Initiating membership withdrawal approval email', req.body);
   const { email, firstName, lastName, dateApproved } = req.body;
@@ -2194,8 +2204,6 @@ app.post('/approveMembershipWithdrawal', async (req, res) => {
   }
 
   try {
-    const transporter = await createTransporter();
-
     console.log('[NOTIFICATION] Sending membership withdrawal approval to user');
     const mailOptions = {
       from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2253,8 +2261,6 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
   }
 
   try {
-    const transporter = await createTransporter();
-
     console.log('[NOTIFICATION] Sending membership withdrawal rejection to user');
     const mailOptions = {
       from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2315,7 +2321,7 @@ app.post('/send-loan-reminder', async (req, res) => {
         outstandingBalance,
         memberId,
         transactionId,
-        websiteLink,
+        websiteLink, // This is overriding your constant!
         facebookLink
     } = req.body;
 
@@ -2337,8 +2343,6 @@ app.post('/send-loan-reminder', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         const formattedDueDate = formatDisplayDate(dueDate);
         const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
         
@@ -2352,7 +2356,8 @@ app.post('/send-loan-reminder', async (req, res) => {
 
         console.log('[NOTIFICATION] Sending loan reminder to user');
         
-        const paymentWebsiteLink = WEBSITE_LINK;
+        // FIX: Always use the correct website link with "app"
+        const paymentWebsiteLink = WEBSITE_LINK; // This will always be 'https://fivekiapp.onrender.com'
         
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2422,6 +2427,7 @@ app.post('/send-loan-reminder', async (req, res) => {
                     
                     <p>For any questions about your payment, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -2432,14 +2438,14 @@ app.post('/send-loan-reminder', async (req, res) => {
 
         await transporter.sendMail(mailOptions);
         console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
-        console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`);
+        console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`); // Add this for debugging
         res.status(200).json({ 
             success: true,
             message: 'Loan reminder email sent successfully',
             data: {
                 emailSent: email,
                 daysUntilDue: daysUntilDue,
-                paymentLink: paymentWebsiteLink,
+                paymentLink: paymentWebsiteLink, // Include the link in response for verification
                 timestamp: new Date().toISOString()
             }
         });
@@ -2485,8 +2491,6 @@ app.post('/send-coadmin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending co-admin creation notification to owner');
         const ownerMailOptions = {
@@ -2627,8 +2631,6 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending co-admin deletion notification to owner');
         const ownerMailOptions = {
