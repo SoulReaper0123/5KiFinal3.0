@@ -14,8 +14,16 @@ const WEBSITE_LINK = 'https://fivekiapp.onrender.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
-// Middleware
-app.use(cors());
+// SIMPLEST CORS SOLUTION - JUST USE CORS MIDDLEWARE
+app.use(cors({
+  origin: [
+    'https://fiveki.onrender.com',
+    'https://fivekiapp.onrender.com',
+    'http://localhost:10000',
+    'http://localhost:5173'
+  ],
+  credentials: true
+}));
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
