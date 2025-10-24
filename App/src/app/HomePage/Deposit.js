@@ -147,12 +147,12 @@ const Deposit = () => {
   const depositOptions = [
     { key: 'Bank', label: 'Bank' },
     { key: 'GCash', label: 'GCash' },
-    { key: 'Cash-on-Hand', label: 'Cash-on-Hand' },
+    { key: 'Cash', label: 'Cash' },
   ];
 
   const handleDepositOptionChange = (option) => {
     setDepositOption(option.key);
-    if (option.key === 'Cash-on-Hand') {
+    if (option.key === 'Cash') {
       setAccountNumber('');
       setAccountName('');
       return;
@@ -276,7 +276,7 @@ const Deposit = () => {
     }
 
     // Proof of deposit is only required for non-cash deposits
-    if (depositOption !== 'Cash-on-Hand' && !proofOfDeposit) {
+    if (depositOption !== 'Cash' && !proofOfDeposit) {
       setAlertMessage('All fields are required');
       setAlertType('error');
       setAlertModalVisible(true);
@@ -304,7 +304,7 @@ const Deposit = () => {
 
       // Proof of deposit is only required for non-cash deposits
       let proofOfDepositUrl = null;
-      if (depositOption !== 'Cash-on-Hand' && proofOfDeposit) {
+      if (depositOption !== 'Cash') {
         proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs');
       }
 
@@ -407,7 +407,7 @@ const Deposit = () => {
           </TouchableOpacity>
         </ModalSelector>
 
-        {depositOption !== 'Cash-on-Hand' && (
+        {depositOption !== 'Cash' && (
           <>
             <Text style={styles.label}>Account Name</Text>
             <TextInput
@@ -438,7 +438,7 @@ const Deposit = () => {
           keyboardType="numeric"
         />
 
-        {depositOption !== 'Cash-on-Hand' && (
+        {depositOption !== 'Cash' && (
           <>
             <Text style={styles.label}>
               Proof of Deposit <Text style={styles.required}>*</Text>
@@ -464,7 +464,7 @@ const Deposit = () => {
               !amountToBeDeposited ||
               isNaN(parseFloat(amountToBeDeposited)) ||
               parseFloat(amountToBeDeposited) <= 0 ||
-              (depositOption !== 'Cash-on-Hand' && !proofOfDeposit) ||
+              (depositOption !== 'Cash' && !proofOfDeposit) ||
               loading
             ) && styles.disabledButton
           ]}
@@ -474,7 +474,7 @@ const Deposit = () => {
             !amountToBeDeposited ||
             isNaN(parseFloat(amountToBeDeposited)) ||
             parseFloat(amountToBeDeposited) <= 0 ||
-            (depositOption !== 'Cash-on-Hand' && !proofOfDeposit) ||
+            (depositOption !== 'Cash' && !proofOfDeposit) ||
             loading
           }
         >
@@ -493,17 +493,15 @@ const Deposit = () => {
         showCropOptions={true}
       />
 
-
-
-      {/* Loading Overlay */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
+      {/* Full-screen loading modal (keeps current overlay color) */}
+      <Modal transparent={true} visible={loading} animationType="fade">
+        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#4FE7AF" />
             <Text style={styles.loadingText}>Processing...</Text>
           </View>
         </View>
-      )}
+      </Modal>
 
       {/* Custom Confirmation Modal */}
       <CustomConfirmModal
@@ -703,7 +701,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   loadingOverlay: {
-    position: 'absolute',
+   position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
@@ -713,7 +711,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     zIndex: 999,
   },
-  loadingBox: {
+   loadingBox: {
     backgroundColor: 'white',
     padding: 30,
     borderRadius: 12,

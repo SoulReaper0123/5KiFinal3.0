@@ -20,6 +20,22 @@ const ExistingLoan = () => {
   const [statusColor, setStatusColor] = useState('#3A7F0D');
   const [activeLoans, setActiveLoans] = useState([]);
 
+  const formatCurrency = (value) => {
+    const amount = Number(value ?? 0);
+    if (Number.isNaN(amount)) {
+      return '₱0.00';
+    }
+    return `₱${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const formatPercentage = (value) => {
+    const percent = Number(value ?? 0);
+    if (Number.isNaN(percent)) {
+      return '0.00%';
+    }
+    return `${percent.toFixed(2)}%`;
+  };
+
   // Robust date formatter
   const formatDisplayDate = (dateInput) => {
     try {
@@ -176,6 +192,64 @@ const ExistingLoan = () => {
     }
   };
 
+  // Alternative simpler overdue check for debugging
+  const isSimplyOverdue = (dueDate) => {
+    try {
+      if (!dueDate) return false;
+      
+      console.log('=== SIMPLE OVERDUE CHECK START ===');
+      console.log('Input due date:', dueDate, typeof dueDate);
+      
+      // Handle different date formats
+      let dueDateObj;
+      
+      if (typeof dueDate === 'string') {
+        // Try direct parsing first
+        dueDateObj = new Date(dueDate);
+        
+        // If that fails, try manual parsing for "August 20, 2025" format
+        if (isNaN(dueDateObj.getTime())) {
+          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'];
+          
+          const parts = dueDate.split(' ');
+          if (parts.length === 3) {
+            const monthName = parts[0];
+            const day = parseInt(parts[1].replace(',', ''));
+            const year = parseInt(parts[2]);
+            const monthIndex = monthNames.indexOf(monthName);
+            
+            if (monthIndex !== -1) {
+              dueDateObj = new Date(year, monthIndex, day);
+            }
+          }
+        }
+      } else {
+        dueDateObj = new Date(dueDate);
+      }
+      
+      const today = new Date();
+      
+      // Set both dates to start of day for accurate comparison
+      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+      const dueDateStart = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
+      
+      const isOverdue = todayStart > dueDateStart;
+      
+      console.log('Due date string:', dueDate);
+      console.log('Parsed due date:', dueDateObj);
+      console.log('Due date (start of day):', dueDateStart);
+      console.log('Today (start of day):', todayStart);
+      console.log('Is overdue (simple):', isOverdue);
+      console.log('=== SIMPLE OVERDUE CHECK END ===');
+      
+      return isOverdue;
+    } catch (error) {
+      console.warn('Simple overdue check error:', error);
+      return false;
+    }
+  };
+
   useEffect(() => {
     loadUserData();
   }, [route.params]);
@@ -191,49 +265,7 @@ const ExistingLoan = () => {
     return () => backHandler.remove();
   }, [navigation]);
 
-  const fetchTransactionHistory = async (memberId) => {
-    try {
-      // Read from Transactions/Payments/memberId path where approved payments are stored
-      const paymentsRef = dbRef(database, `Transactions/Payments/${memberId}`);
-      const paymentsSnapshot = await get(paymentsRef);
-
-      const transactions = [];
-
-      if (paymentsSnapshot.exists()) {
-        const data = paymentsSnapshot.val();
-        Object.entries(data).forEach(([transactionId, payment]) => {
-          // Only include approved payments
-          if (payment.status === 'approved') {
-            const timestamp = typeof payment.timestamp === 'number'
-              ? payment.timestamp
-              : (payment.dateApproved ? new Date(payment.dateApproved).getTime() : Date.now());
-            
-            transactions.push({
-              transactionId: transactionId,
-              type: 'Payment',
-              amountToBePaid: parseFloat(payment.amountToBePaid || payment.amount || 0),
-              dateApproved: payment.dateApproved,
-              timestamp: timestamp,
-              description: payment.description || '',
-              status: payment.status,
-              paymentOption: payment.paymentOption || 'Not specified'
-            });
-          }
-        });
-
-        // Sort by timestamp in descending order (newest first)
-        transactions.sort((a, b) => b.timestamp - a.timestamp);
-      }
-
-      setTransactionHistory(transactions);
-    } catch (error) {
-      console.error('Error fetching payment history:', error);
-      setTransactionHistory([]);
-    }
-  };
-
-  // Update the fetchUserLoan function to also fetch transaction history when member ID is found
-  const fetchUserLoanWithHistory = async (userEmail) => {
+  const fetchUserLoan = async (userEmail) => {
     try {
       setLoading(true);
       
@@ -249,12 +281,10 @@ const ExistingLoan = () => {
         term: 0
       };
 
-      let memberId = null;
-
       if (approvedSnapshot.exists()) {
         const allApprovedLoans = approvedSnapshot.val();
-        for (const mid in allApprovedLoans) {
-          const loans = allApprovedLoans[mid];
+        for (const memberId in allApprovedLoans) {
+          const loans = allApprovedLoans[memberId];
           for (const loanId in loans) {
             const loan = loans[loanId];
             if (loan?.email === userEmail) {
@@ -265,11 +295,9 @@ const ExistingLoan = () => {
                 interest: parseFloat(loan.interest || 0),
                 term: parseInt(loan.term || 0)
               };
-              memberId = mid; // Store member ID for fetching payment history
               break;
             }
           }
-          if (memberId) break;
         }
       }
 
@@ -280,22 +308,21 @@ const ExistingLoan = () => {
       if (currentSnapshot.exists()) {
         const allCurrentLoans = currentSnapshot.val();
         const foundLoans = [];
-        for (const mid in allCurrentLoans) {
-          const loans = allCurrentLoans[mid];
+        for (const memberId in allCurrentLoans) {
+          const loans = allCurrentLoans[memberId];
           for (const loanId in loans) {
             const currentLoan = loans[loanId];
             if (currentLoan?.email === userEmail) {
               const loanData = {
                 ...currentLoan,
                 ...approvedData,
-                _memberId: mid,
+                _memberId: memberId,
                 _loanId: loanId,
                 outstandingBalance: currentLoan.loanAmount,
                 dateApplied: currentLoan.dateApplied,
                 dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
               };
               foundLoans.push(loanData);
-              memberId = mid; // Ensure we have the member ID
             }
           }
         }
@@ -307,12 +334,8 @@ const ExistingLoan = () => {
             return bt - at;
           });
           setActiveLoans(foundLoans);
-          
-          // Fetch payment history for this member
-          if (memberId) {
-            await fetchTransactionHistory(memberId);
-          }
-          
+          // Do not auto-select a loan; wait for user tap on Active Loans
+          setLoanDetails(null);
           return;
         }
       }
@@ -356,7 +379,7 @@ const ExistingLoan = () => {
       }
       
       if (userEmail) {
-        await fetchUserLoanWithHistory(userEmail);
+        fetchUserLoan(userEmail);
       } else {
         setLoading(false);
         setRefreshing(false);
@@ -408,6 +431,78 @@ const ExistingLoan = () => {
     }
   };
 
+ const fetchTransactionHistory = async (memberId) => {
+  try {
+    // Read from both actual write paths and merge
+    const approvedRef = dbRef(database, `Payments/ApprovedPayments/${memberId}`);
+    const txRef = dbRef(database, `Transactions/Payments/${memberId}`);
+
+    const [approvedSnap, txSnap] = await Promise.all([get(approvedRef), get(txRef)]);
+
+    const merged = [];
+
+    if (approvedSnap.exists()) {
+      const data = approvedSnap.val();
+      Object.entries(data).forEach(([id, t]) => {
+        const ts = typeof t.timestamp === 'number'
+          ? t.timestamp
+          : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+        merged.push({
+          transactionId: id,
+          type: t.type || 'Payment',
+          amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
+          dateApproved: t.dateApproved,
+          timestamp: ts,
+          description: t.description || '',
+          status: t.status || 'approved',
+          paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified'
+        });
+      });
+    }
+
+    if (txSnap.exists()) {
+      const data = txSnap.val();
+      Object.entries(data).forEach(([id, t]) => {
+        const ts = typeof t.timestamp === 'number'
+          ? t.timestamp
+          : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+        merged.push({
+          transactionId: id,
+          type: t.type || 'Payment',
+          amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
+          dateApproved: t.dateApproved,
+          timestamp: ts,
+          description: t.description || '',
+          status: t.status || 'approved',
+          paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified'
+        });
+      });
+    }
+
+    // Deduplicate by transactionId
+    const dedupedMap = new Map();
+    merged.forEach(item => {
+      dedupedMap.set(item.transactionId, item);
+    });
+    const deduped = Array.from(dedupedMap.values())
+      .filter(t => {
+        const status = String(t.status || '').toLowerCase();
+        return status === 'approved' || status === 'paid' || status === 'completed';
+      });
+
+    deduped.sort((a, b) => {
+      const at = typeof a.timestamp === 'number' ? a.timestamp : parseDateTime(a.dateApproved).getTime();
+      const bt = typeof b.timestamp === 'number' ? b.timestamp : parseDateTime(b.dateApproved).getTime();
+      return bt - at;
+    });
+
+    setTransactionHistory(deduped);
+  } catch (error) {
+    console.error('Error fetching transactions:', error);
+    setTransactionHistory([]);
+  }
+};
+
   const getStatusColor = (status) => {
     switch(String(status).toLowerCase()) {
       case 'approved':
@@ -433,15 +528,15 @@ const ExistingLoan = () => {
     );
   }
 
+
   return (
     <View style={styles.container}>
-      {/* Header with centered title and left back button using invisible spacers */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+      <View style={styles.headerBar}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
         </TouchableOpacity>
         <Text style={styles.headerTitleText}>Existing Loans</Text>
-        <View style={styles.headerSide} />
+        <View style={{ width: 22 }} />
       </View>
 
       <ScrollView 
@@ -460,85 +555,63 @@ const ExistingLoan = () => {
 
         <Text style={styles.sectionTitle}>Active Loans</Text>
         {activeLoans && activeLoans.length > 0 ? (
-          activeLoans.map((loan) => (
-            <TouchableOpacity
-              key={loan.transactionId || loan._loanId}
-              style={styles.transactionCard}
-              onPress={() => {
-                navigation.navigate('LoanDetails', {
-                  item: {
-                    ...loan,
-                    outstandingBalance: parseFloat(loan.loanAmount || 0),
-                  }
-                });
-              }}
-            >
-              {/* Display fields in requested order */}
-              <View style={styles.transactionRow}>
-                <Text style={styles.transactionLabel}>Loan Type:</Text>
-                <Text style={styles.transactionValue}>{loan.loanType || 'Loan'}</Text>
-              </View>
-              <View style={styles.transactionRow}>
-                <Text style={styles.transactionLabel}>Loan ID:</Text>
-                <Text style={styles.transactionValue}>{loan.transactionId || loan._loanId || 'N/A'}</Text>
-              </View>
-              <View style={styles.transactionRow}>
-                <Text style={styles.transactionLabel}>Outstanding Balance:</Text>
-                <Text style={styles.transactionValue}>{`₱${(parseFloat(loan.loanAmount || 0)).toFixed(2)}`}</Text>
-              </View>
-              <View style={styles.transactionRow}>
-                <Text style={styles.transactionLabel}>DueDate:</Text>
-                <View style={{ alignItems: 'flex-end' }}>
-                  <Text style={[styles.transactionValue, isDueDateOverdue(loan.dueDate || loan.nextDueDate) && { color: '#D32F2F' }]}>
-                    {formatDisplayDate(loan.dueDate || loan.nextDueDate)}
-                  </Text>
-                  {isDueDateOverdue(loan.dueDate || loan.nextDueDate) && (
-                    <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: '700', marginTop: 2 }}>Overdue</Text>
-                  )}
+          activeLoans.map((loan) => {
+            const dueDateValue = loan.dueDate || loan.nextDueDate;
+            const detailRows = [
+              { label: 'Loan Type:', value: loan.loanType || 'Loan' },
+              { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
+              { label: 'ApprovedAmount:', value: formatCurrency(loan.loanAmount) },
+              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance ?? loan.loanAmount) },
+              { label: 'Date Applied:', value: formatDisplayDate(loan.dateApplied) },
+              { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved) },
+              { label: 'Term:', value: loan.term ? `${loan.term} months` : 'N/A' },
+              { label: 'Interest Rate:', value: formatPercentage(loan.interestRate) },
+              { label: 'Interest:', value: formatCurrency(loan.interest) },
+              { label: 'Principal Amount:', value: formatCurrency(loan.monthlyPayment) },
+              { label: 'Total Amount:', value: formatCurrency(loan.totalMonthlyPayment ?? loan.totalTermPayment) }
+            ];
+            return (
+              <TouchableOpacity
+                key={loan.transactionId || loan._loanId}
+                style={styles.transactionCard}
+                onPress={() => {
+                  navigation.navigate('LoanDetails', {
+                    item: {
+                      ...loan,
+                      outstandingBalance: parseFloat(loan.loanAmount || 0),
+                      paymentHistory: transactionHistory.filter((payment) => {
+                        const appliedToLoan = payment.appliedToLoan || payment.originalTransactionId;
+                        const loanOriginalId = loan.originalTransactionId || loan.commonOriginalTransactionId;
+                        return loanOriginalId && appliedToLoan && String(appliedToLoan) === String(loanOriginalId);
+                      })
+                    }
+                  });
+                }}
+              >
+                {detailRows.map((row) => (
+                  <View style={styles.transactionRow} key={row.label}>
+                    <Text style={styles.transactionLabel}>{row.label}</Text>
+                    <Text style={styles.transactionValue}>{row.value}</Text>
+                  </View>
+                ))}
+                <View style={styles.transactionRow}>
+                  <Text style={styles.transactionLabel}>Due Date:</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    <Text style={[styles.transactionValue, isDueDateOverdue(dueDateValue) && { color: '#D32F2F' }]}>
+                      {formatDisplayDate(dueDateValue)}
+                    </Text>
+                    {isDueDateOverdue(dueDateValue) && (
+                      <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: '700', marginTop: 2 }}>Overdue</Text>
+                    )}
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          ))
+              </TouchableOpacity>
+            );
+          })
         ) : (
           <View style={styles.emptyState}>
             <MaterialIcons name="account-balance" size={48} color="#D3D3D3" />
             <Text style={styles.emptyText}>No active loans</Text>
-          </View>
-        )}
-
-        <Text style={styles.sectionTitle}>Payment History</Text>
-        {transactionHistory.length > 0 ? (
-          transactionHistory.map((transaction) => (
-            <View key={transaction.transactionId} style={styles.transactionCard}>
-              <View style={styles.transactionHeader}>
-                <Text style={styles.transactionType}>{transaction.type}</Text>
-                <Text style={[
-                  styles.transactionStatus,
-                  { color: getStatusColor(transaction.status) }
-                ]}>
-                  {String(transaction.status || '').toUpperCase()}
-                </Text>
-              </View>
-              {[
-                { label: 'Amount:', value: `₱${Number(transaction.amountToBePaid || 0).toFixed(2)}` },
-                { label: 'Transaction ID:', value: transaction.transactionId },
-                { label: 'Payment Date:', value: formatDisplayDate(transaction.dateApproved) },
-                { label: 'Mode of Payment:', value: transaction.paymentOption }
-              ].map((item, index) => (
-                <View key={index} style={styles.transactionRow}>
-                  <Text style={styles.transactionLabel}>{item.label}</Text>
-                  <Text style={styles.transactionValue}>{item.value}</Text>
-                </View>
-              ))}
-              {transaction.description ? (
-                <Text style={styles.transactionDescription}>Notes: {transaction.description}</Text>
-              ) : null}
-            </View>
-          ))
-        ) : (
-          <View style={styles.emptyState}>
-            <MaterialIcons name="receipt" size={48} color="#D3D3D3" />
-            <Text style={styles.emptyText}>No payment history found</Text>
           </View>
         )}
       </ScrollView>
@@ -550,31 +623,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-    paddingTop: 60,
+    paddingTop: 30,
     paddingHorizontal: 16,
     paddingBottom: 32,
   },
-  // Header styles for centered title with left back button
-  headerRow: {
+  headerBar: {
     marginTop: 10,
     marginBottom: 12,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    backgroundColor: '#E8F1FB',
+    borderRadius: 14,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  headerSide: {
-    width: 44,
-    height: 44,
-    justifyContent: 'center',
-    alignItems: 'flex-start',
-  },
-  headerTitleText: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0F172A',
-  },
+  backBtn: { padding: 6, borderRadius: 8 },
+  headerTitleText: { fontSize: 18, fontWeight: '700', color: '#1E3A5F' },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',

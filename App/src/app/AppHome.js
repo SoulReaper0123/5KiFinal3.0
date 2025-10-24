@@ -28,8 +28,6 @@ import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
 import LoanHistory from './HomePage/LoanHistory';
 import MarqueeData from './HomePage/MarqueeData';
-import CustomConfirmModal from '../components/CustomConfirmModal';
-import CustomModal from '../components/CustomModal';
 
 const Tab = createBottomTabNavigator();
 
@@ -54,10 +52,69 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [hasNewInboxItems, setHasNewInboxItems] = useState(false);
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
-  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [logoutLoading, setLogoutLoading] = useState(false);
-  const [successModalVisible, setSuccessModalVisible] = useState(false);
 
+  // --- new code: check for new transactions and show red dot on bell ---
+  const checkForNewTransactions = async () => {
+    try {
+      if (!email) return;
+      const db = getDatabase();
+      const txRef = ref(db, 'Transactions/Payments');
+      const approvedRef = ref(db, 'Payments/ApprovedPayments');
+      const [txSnap, approvedSnap] = await Promise.all([get(txRef), get(approvedRef)]);
+
+      let count = 0;
+      const countForEmail = (node) => {
+        if (!node) return 0;
+        // node shape: { memberId: { txId: { ... } } } or { txId: { ... } }
+        let c = 0;
+        Object.values(node).forEach((memberGroup) => {
+          if (!memberGroup) return;
+          // if memberGroup is a transaction object, check directly
+          if (typeof memberGroup.email === 'string') {
+            if (memberGroup.email === email) c++;
+            return;
+          }
+          // otherwise iterate inner transactions
+          Object.values(memberGroup).forEach((tx) => {
+            if (tx?.email === email) c++;
+          });
+        });
+        return c;
+      };
+
+      if (txSnap.exists()) {
+        count += countForEmail(txSnap.val());
+      }
+      if (approvedSnap.exists()) {
+        count += countForEmail(approvedSnap.val());
+      }
+
+      // If we've seen more transactions than before, show dot
+      if (previousInboxCount.current === 0) {
+        // first time: just initialize
+        previousInboxCount.current = count;
+        setHasNewInboxItems(false);
+      } else if (count > previousInboxCount.current) {
+        setHasNewInboxItems(true);
+        previousInboxCount.current = count;
+      } else {
+        // no increase
+        previousInboxCount.current = count;
+      }
+      lastInboxCheckRef.current = Date.now();
+    } catch (err) {
+      console.error('Error checking transactions:', err);
+    }
+  };
+
+  useEffect(() => {
+    // run once when email becomes available, then poll every 30s
+    if (!email) return;
+    checkForNewTransactions();
+    const interval = setInterval(checkForNewTransactions, 30000);
+    return () => clearInterval(interval);
+  }, [email]);
+  // --- end new code ---
 
   useEffect(() => {
     const textWidth = 600;
@@ -321,30 +378,14 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   };
 
   const handleLogoutFallback = async () => {
-    setLogoutLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 800));
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
       await auth.signOut();
-      
-      // Show success modal before navigating
-      setSuccessModalVisible(true);
-      
-      // Navigate after showing success message
-      setTimeout(() => {
-        setSuccessModalVisible(false);
-        navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-      }, 1500);
-      
+      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } catch (e) {
-      setLogoutLoading(false);
       Alert.alert('Logout Error', 'There was an error during logout. Please try again.');
     }
-  };
-
-  const showLogoutConfirmation = () => {
-    setLogoutModalVisible(true);
   };
 
   return (
@@ -659,46 +700,13 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             <View style={styles.fallbackLogoutContainer}>
               <TouchableOpacity 
                 style={styles.fallbackLogoutButton} 
-                onPress={showLogoutConfirmation}
+                onPress={handleLogoutFallback}
                 activeOpacity={0.8}
               >
                 <MaterialIcons name="logout" size={20} color="white" />
                 <Text style={styles.fallbackLogoutText}>Logout</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      )}
-
-      {/* Custom Logout Confirmation Modal */}
-      <CustomConfirmModal
-        visible={logoutModalVisible}
-        onClose={() => setLogoutModalVisible(false)}
-        title="Confirm Logout"
-        message="Are you sure you want to logout?"
-        type="warning"
-        cancelText="No"
-        confirmText="Yes"
-        onCancel={() => setLogoutModalVisible(false)}
-        onConfirm={handleLogoutFallback}
-      />
-
-      {/* Custom Success Modal */}
-      <CustomModal
-        visible={successModalVisible}
-        onClose={() => setSuccessModalVisible(false)}
-        title="Success"
-        message="You have been logged out successfully!"
-        type="success"
-        buttonText="OK"
-      />
-
-      {/* Logout Loading Overlay */}
-      {logoutLoading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#4FE7AF" />
-            <Text style={styles.loadingText}>Logging out...</Text>
           </View>
         </View>
       )}
@@ -1431,32 +1439,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Loading Overlay Styles
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  loadingBox: {
-    backgroundColor: '#1E3A5F',
-    paddingVertical: 24,
-    paddingHorizontal: 28,
-    borderRadius: 12,
-    alignItems: 'center',
-    width: 220,
-  },
-  loadingText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 12,
-  },
+
 
   // Floating AI Button styles
   floatingAIButton: {
