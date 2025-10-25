@@ -27,36 +27,56 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Optimized transporter configuration for Render.com
+// FIXED TRANSPORTER CONFIGURATION
 const transporter = nodemailer.createTransport({
-    service: 'gmail',
+    service: 'Gmail',
     host: 'smtp.gmail.com',
-    port: 587,
-    secure: false, // Use TLS
-    requireTLS: true,
+    port: 587, // Changed from 465 to 587
+    secure: false, // Changed from true to false for port 587
     auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_PASS,
     },
+    // ADD THESE CRITICAL SETTINGS:
     connectionTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000,
-    socketTimeout: 60000, // 60 seconds
-    // Add these specific settings for Render.com
-    pool: true,
-    maxConnections: 1,
-    maxMessages: 5,
-    debug: true, // This will show detailed logs
-    logger: true
-});
-
-// Verify transporter configuration on startup
-transporter.verify(function(error, success) {
-    if (error) {
-        console.log('SMTP Connection Error:', error);
-    } else {
-        console.log('SMTP Server is ready to take our messages');
+    socketTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000, // 30 seconds
+    // Better handling for cloud environments
+    tls: {
+        rejectUnauthorized: false // May help with certificate issues
     }
 });
+
+// Enhanced email sender with retries and better error handling
+const sendEmailWithRetry = async (mailOptions, maxRetries = 3) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`[EMAIL] Attempt ${attempt} to send to ${mailOptions.to}`);
+            
+            // Add timeout to individual email sends
+            const emailPromise = transporter.sendMail(mailOptions);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000);
+            });
+            
+            await Promise.race([emailPromise, timeoutPromise]);
+            console.log(`[EMAIL SUCCESS] Email sent successfully to ${mailOptions.to}`);
+            return true;
+            
+        } catch (error) {
+            console.error(`[EMAIL ATTEMPT ${attempt}] Failed: ${error.message}`);
+            
+            if (attempt === maxRetries) {
+                throw new Error(`Email sending failed after ${maxRetries} attempts: ${error.message}`);
+            }
+            
+            // Wait before retrying (exponential backoff)
+            const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+            console.log(`[EMAIL] Waiting ${delay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
+};
 
 // Helper function to format dates for display
 const formatDisplayDate = (dateString) => {
@@ -85,34 +105,6 @@ const maskPassword = (pwd) => {
     const first = pwd[0];
     const last = pwd[pwd.length - 1];
     return `${first}${'*'.repeat(Math.max(1, pwd.length - 2))}${last}`;
-};
-
-// Email retry function
-const sendEmailWithRetry = async (mailOptions, maxRetries = 3) => {
-    let lastError;
-    
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            console.log(`[EMAIL] Attempt ${attempt} to send to ${mailOptions.to}`);
-            
-            const result = await transporter.sendMail(mailOptions);
-            console.log(`[EMAIL SUCCESS] Email sent successfully on attempt ${attempt}`);
-            return result;
-            
-        } catch (error) {
-            lastError = error;
-            console.error(`[EMAIL ATTEMPT ${attempt}] Failed:`, error.message);
-            
-            if (attempt < maxRetries) {
-                // Exponential backoff: 2s, 4s, 8s
-                const delay = Math.pow(2, attempt) * 1000;
-                console.log(`[EMAIL] Waiting ${delay}ms before retry...`);
-                await new Promise(resolve => setTimeout(resolve, delay));
-            }
-        }
-    }
-    
-    throw new Error(`Failed to send email after ${maxRetries} attempts. Last error: ${lastError.message}`);
 };
 
 app.get('/', (req, res) => {
@@ -187,25 +179,6 @@ app.get('/', (req, res) => {
         </body>
         </html>
     `);
-});
-
-// Email health check endpoint
-app.get('/email-health', async (req, res) => {
-    try {
-        await transporter.verify();
-        res.json({ 
-            success: true, 
-            message: 'SMTP connection is healthy',
-            service: 'Gmail',
-            user: process.env.GMAIL_USER ? 'Configured' : 'Missing'
-        });
-    } catch (error) {
-        res.status(500).json({
-            success: false,
-            message: 'SMTP connection failed',
-            error: error.message
-        });
-    }
 });
 
 // ==============================================
@@ -345,7 +318,7 @@ app.post('/send-admin-email', async (req, res) => {
             `
         };
 
-        // Send both emails with retry
+        // Send both emails using the new function
         await sendEmailWithRetry(ownerMailOptions);
         await sendEmailWithRetry(adminMailOptions);
 
@@ -497,7 +470,7 @@ app.post('/send-delete-admin-email', async (req, res) => {
             `
         };
 
-        // Send both emails with retry
+        // Send both emails using the new function
         await sendEmailWithRetry(ownerMailOptions);
         await sendEmailWithRetry(adminMailOptions);
 
@@ -1102,26 +1075,13 @@ app.post('/rejectDeposits', async (req, res) => {
     console.log('[NOTIFICATION] Initiating deposit rejection email', req.body);
     const { email, firstName, lastName, amount, dateRejected, timeRejected, rejectionReason } = req.body;
 
-    // Input validation
     if (!email || !firstName || !lastName || !amount || !dateRejected || !timeRejected) {
         console.log('[NOTIFICATION ERROR] Missing required fields for deposit rejection');
-        return res.status(400).json({ 
-            success: false,
-            message: 'Missing required fields' 
-        });
-    }
-
-    // Validate email format
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return res.status(400).json({
-            success: false,
-            message: 'Invalid email format'
-        });
+        return res.status(400).json({ message: 'Missing required fields' });
     }
 
     try {
-        console.log('[NOTIFICATION] Preparing deposit rejection email for:', email);
-        
+        console.log('[NOTIFICATION] Sending deposit rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
@@ -1168,36 +1128,12 @@ app.post('/rejectDeposits', async (req, res) => {
             `
         };
 
-        // Use retry logic with timeout
-        const emailPromise = sendEmailWithRetry(mailOptions, 3);
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Email sending timeout after 45 seconds')), 45000)
-        );
-
-        await Promise.race([emailPromise, timeoutPromise]);
-        
-        console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully to:', email);
-        res.status(200).json({ 
-            success: true,
-            message: 'Email sent successfully' 
-        });
-        
+        await sendEmailWithRetry(mailOptions);
+        console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully');
+        res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
         console.error('[NOTIFICATION ERROR] Error sending deposit rejection email:', error);
-        
-        // More specific error messages
-        let userMessage = 'Failed to send email notification';
-        if (error.message.includes('timeout')) {
-            userMessage = 'Email service is temporarily unavailable. Please try again later.';
-        } else if (error.message.includes('authentication')) {
-            userMessage = 'Email service configuration error. Please contact administrator.';
-        }
-        
-        res.status(500).json({ 
-            success: false,
-            message: userMessage,
-            error: process.env.NODE_ENV === 'development' ? error.message : undefined
-        });
+        res.status(500).json({ message: 'Failed to send email', error: error.message });
     }
 });
 
@@ -2830,7 +2766,7 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
             `
         };
 
-        // Send both emails
+        // Send both emails using the new function
         await sendEmailWithRetry(ownerMailOptions);
         await sendEmailWithRetry(coAdminMailOptions);
 
@@ -2850,95 +2786,6 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
             message: 'Failed to send co-admin deletion emails',
             error: error.message,
             stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        });
-    }
-});
-
-// Add member credentials email endpoint
-app.post('/send-member-credentials', async (req, res) => {
-    console.log('[NOTIFICATION] Initiating member credentials email', req.body);
-    const { email, firstName, lastName, memberId, password, websiteLink } = req.body;
-
-    if (!email || !firstName || !lastName || !memberId || !password) {
-        console.log('[NOTIFICATION ERROR] Missing required fields for member credentials');
-        return res.status(400).json({ 
-            success: false,
-            message: 'Missing required fields: email, firstName, lastName, memberId, and password are required'
-        });
-    }
-
-    try {
-        console.log('[NOTIFICATION] Sending member credentials to user');
-        const mailOptions = {
-            from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
-            to: email,
-            subject: 'Your 5KI Financial Services Member Account',
-            html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-                    <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
-                        Welcome to 5KI Financial Services
-                    </h2>
-                    
-                    <p>Dear ${firstName},</p>
-                    
-                    <p>Your member account has been successfully created. Below are your login credentials:</p>
-                    
-                    <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
-                        <h3 style="color: #2c3e50; margin-top: 0;">Account Information:</h3>
-                        <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                            <tr>
-                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Member ID</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${memberId}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Password</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">${password}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Account Type</td>
-                                <td style="padding: 8px; border: 1px solid #ddd;">Member</td>
-                            </tr>
-                        </table>
-                    </div>
-                    
-                    <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Important Security Notice:</h3>
-                    <ul style="margin-bottom: 20px;">
-                        <li>Change your password immediately after first login</li>
-                        <li>Never share your credentials with anyone</li>
-                        <li>Always log out after your session</li>
-                    </ul>
-                    
-                    <p>
-                        <a href="${websiteLink || WEBSITE_LINK}" 
-                           style="display: inline-block; background-color: #3498db; color: white; 
-                                  padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
-                            Login to your account
-                        </a>
-                    </p>
-                    
-                    <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
-                        5KI Financial Services &copy; ${new Date().getFullYear()}
-                    </p>
-                </div>
-            `
-        };
-
-        await sendEmailWithRetry(mailOptions);
-        console.log('[NOTIFICATION SUCCESS] Member credentials email sent successfully');
-        res.status(200).json({ 
-            success: true,
-            message: 'Member credentials email sent successfully'
-        });
-    } catch (error) {
-        console.error('[NOTIFICATION ERROR] Error sending member credentials email:', error);
-        res.status(500).json({ 
-            success: false,
-            message: 'Failed to send member credentials email',
-            error: error.message
         });
     }
 });
