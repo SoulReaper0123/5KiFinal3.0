@@ -27,50 +27,64 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// FIXED TRANSPORTER CONFIGURATION
+// Enhanced Nodemailer Configuration with Better Timeout Settings
 const transporter = nodemailer.createTransport({
     service: 'Gmail',
     host: 'smtp.gmail.com',
-    port: 587, // Changed from 465 to 587
-    secure: false, // Changed from true to false for port 587
+    port: 587, // Use port 587 instead of 465
+    secure: false, // Use TLS instead of SSL
+    requireTLS: true,
     auth: {
         user: process.env.GMAIL_USER,
         pass: process.env.GMAIL_PASS,
     },
-    // ADD THESE CRITICAL SETTINGS:
     connectionTimeout: 30000, // 30 seconds
-    socketTimeout: 30000, // 30 seconds
-    greetingTimeout: 30000, // 30 seconds
-    // Better handling for cloud environments
-    tls: {
-        rejectUnauthorized: false // May help with certificate issues
+    greetingTimeout: 30000,   // 30 seconds
+    socketTimeout: 30000,     // 30 seconds
+    // Add retry logic
+    maxConnections: 5,
+    maxMessages: 100,
+    pool: true
+});
+
+// Verify transporter configuration
+transporter.verify(function(error, success) {
+    if (error) {
+        console.log('Transporter verification failed:', error);
+    } else {
+        console.log('Transporter is ready to send emails');
     }
 });
 
-// Enhanced email sender with retries and better error handling
-const sendEmailWithRetry = async (mailOptions, maxRetries = 3) => {
+// Enhanced email sending with retry logic
+const sendEmailWithRetry = async (mailOptions, maxRetries = 3, timeout = 30000) => {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
         try {
             console.log(`[EMAIL] Attempt ${attempt} to send to ${mailOptions.to}`);
             
-            // Add timeout to individual email sends
+            // Create a promise that rejects after timeout
             const emailPromise = transporter.sendMail(mailOptions);
             const timeoutPromise = new Promise((_, reject) => {
-                setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000);
+                setTimeout(() => reject(new Error(`Email sending timeout after ${timeout/1000} seconds`)), timeout);
             });
             
+            // Race between email sending and timeout
             await Promise.race([emailPromise, timeoutPromise]);
-            console.log(`[EMAIL SUCCESS] Email sent successfully to ${mailOptions.to}`);
-            return true;
+            
+            console.log(`[EMAIL ATTEMPT ${attempt}] Success`);
+            return { success: true };
             
         } catch (error) {
-            console.error(`[EMAIL ATTEMPT ${attempt}] Failed: ${error.message}`);
+            console.error(`[EMAIL ATTEMPT ${attempt}] Failed:`, error.message);
             
             if (attempt === maxRetries) {
-                throw new Error(`Email sending failed after ${maxRetries} attempts: ${error.message}`);
+                return { 
+                    success: false, 
+                    error: `Failed after ${maxRetries} attempts: ${error.message}` 
+                };
             }
             
-            // Wait before retrying (exponential backoff)
+            // Exponential backoff
             const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
             console.log(`[EMAIL] Waiting ${delay}ms before retry...`);
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -318,9 +332,13 @@ app.post('/send-admin-email', async (req, res) => {
             `
         };
 
-        // Send both emails using the new function
-        await sendEmailWithRetry(ownerMailOptions);
-        await sendEmailWithRetry(adminMailOptions);
+        // Send both emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const adminResult = await sendEmailWithRetry(adminMailOptions);
+
+        if (!ownerResult.success || !adminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Admin email: ${adminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Admin creation emails sent successfully');
         res.status(200).json({ 
@@ -470,9 +488,13 @@ app.post('/send-delete-admin-email', async (req, res) => {
             `
         };
 
-        // Send both emails using the new function
-        await sendEmailWithRetry(ownerMailOptions);
-        await sendEmailWithRetry(adminMailOptions);
+        // Send both emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const adminResult = await sendEmailWithRetry(adminMailOptions);
+
+        if (!ownerResult.success || !adminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Admin email: ${adminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Admin deletion emails sent successfully');
         res.status(200).json({ 
@@ -551,8 +573,6 @@ app.post('/register', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(ownerMailOptions);
-
         console.log('[NOTIFICATION] Sending registration confirmation to user');
         const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -578,7 +598,14 @@ app.post('/register', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(userMailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Registration emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
@@ -660,7 +687,11 @@ app.post('/approveRegistrations', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Registration approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -723,7 +754,11 @@ app.post('/rejectRegistrations', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Registration rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -823,7 +858,11 @@ app.post('/send-verification-code', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] 2FA verification email sent successfully');
         res.status(200).json({ 
             success: true,
@@ -879,7 +918,7 @@ app.post('/deposit', async (req, res) => {
 
         // Email to system owner
         console.log('[NOTIFICATION] Sending deposit application notification to owner');
-        await sendEmailWithRetry({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Deposit Application Received',
@@ -944,11 +983,11 @@ app.post('/deposit', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         // Email to member
         console.log('[NOTIFICATION] Sending deposit confirmation to user');
-        const mailOptions = {
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Deposit Application Received',
@@ -996,7 +1035,14 @@ app.post('/deposit', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Deposit notification emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
@@ -1062,7 +1108,11 @@ app.post('/approveDeposits', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Deposit approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1128,7 +1178,11 @@ app.post('/rejectDeposits', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1169,7 +1223,7 @@ app.post('/withdraw', async (req, res) => {
         console.log('[NOTIFICATION] Sending withdrawal notification to owner');
         
         // Email to system owner
-        await sendEmailWithRetry({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Withdrawal Request Received',
@@ -1232,12 +1286,12 @@ app.post('/withdraw', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending withdrawal confirmation to user');
         
         // Email to member
-        const mailOptions = {
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Withdrawal Application Received',
@@ -1291,7 +1345,14 @@ app.post('/withdraw', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Withdrawal notification emails sent successfully');
         res.status(200).json({ 
             success: true,
@@ -1355,7 +1416,11 @@ app.post('/approveWithdraws', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         res.status(200).json({ success: true, message: 'Email sent successfully' });
     } catch (error) {
         console.error('Error sending approval email:', error);
@@ -1428,7 +1493,11 @@ app.post('/rejectWithdraws', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Withdrawal rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1453,7 +1522,7 @@ app.post('/applyLoan', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending new loan application notification to owner');
-        await sendEmailWithRetry({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Loan Application Received',
@@ -1500,7 +1569,7 @@ app.post('/applyLoan', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending loan application confirmation to user');
         const userMailOptions = {
@@ -1543,7 +1612,14 @@ app.post('/applyLoan', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(userMailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan application emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
@@ -1664,7 +1740,11 @@ app.post('/approveLoans', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1734,7 +1814,11 @@ app.post('/rejectLoans', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1763,7 +1847,7 @@ app.post('/payment', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending payment notification to owner');
-        await sendEmailWithRetry({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Loan Payment Received',
@@ -1812,10 +1896,10 @@ app.post('/payment', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending payment confirmation to user');
-        await sendEmailWithRetry({
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Payment Application Confirmed',
@@ -1857,7 +1941,15 @@ app.post('/payment', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
+
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Payment confirmation emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
@@ -1957,7 +2049,11 @@ app.post('/approvePayments', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Payment approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -2026,7 +2122,11 @@ app.post('/rejectPayments', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Payment rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -2047,7 +2147,7 @@ app.post('/membershipWithdrawal', async (req, res) => {
 
     try {
         console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
-        await sendEmailWithRetry({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Membership Withdrawal Request',
@@ -2094,10 +2194,10 @@ app.post('/membershipWithdrawal', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
-        await sendEmailWithRetry({
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Membership Withdrawal Request Received',
@@ -2128,7 +2228,15 @@ app.post('/membershipWithdrawal', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
+
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
@@ -2151,7 +2259,7 @@ app.post('/membershipWithdrawal', async (req, res) => {
 
   try {
     console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
-    await sendEmailWithRetry({
+    const ownerMailOptions = {
       from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
       to: process.env.GMAIL_USER,
       subject: 'Membership Withdrawal Request',
@@ -2198,10 +2306,10 @@ app.post('/membershipWithdrawal', async (req, res) => {
           </p>
         </div>
       `
-    });
+    };
 
     console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
-    await sendEmailWithRetry({
+    const userMailOptions = {
       from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
       to: email,
       subject: 'Membership Withdrawal Request Received',
@@ -2232,7 +2340,15 @@ app.post('/membershipWithdrawal', async (req, res) => {
           </p>
         </div>
       `
-    });
+    };
+
+    // Send emails using retry logic
+    const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+    const userResult = await sendEmailWithRetry(userMailOptions);
+
+    if (!ownerResult.success || !userResult.success) {
+        throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+    }
 
     console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
     res.status(200).json({ message: 'Emails sent successfully' });
@@ -2290,7 +2406,11 @@ app.post('/approveMembershipWithdrawal', async (req, res) => {
       `
     };
 
-    await sendEmailWithRetry(mailOptions);
+    const result = await sendEmailWithRetry(mailOptions);
+    if (!result.success) {
+        throw new Error(result.error);
+    }
+
     console.log('[NOTIFICATION SUCCESS] Membership withdrawal approval email sent successfully');
     res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
@@ -2349,7 +2469,11 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
       `
     };
 
-    await sendEmailWithRetry(mailOptions);
+    const result = await sendEmailWithRetry(mailOptions);
+    if (!result.success) {
+        throw new Error(result.error);
+    }
+
     console.log('[NOTIFICATION SUCCESS] Membership withdrawal rejection email sent successfully');
     res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
@@ -2484,7 +2608,11 @@ app.post('/send-loan-reminder', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
         console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`); // Add this for debugging
         res.status(200).json({ 
@@ -2628,8 +2756,13 @@ app.post('/send-coadmin-email', async (req, res) => {
             `
         };
 
-        await sendEmailWithRetry(ownerMailOptions);
-        await sendEmailWithRetry(coAdminMailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const coAdminResult = await sendEmailWithRetry(coAdminMailOptions);
+
+        if (!ownerResult.success || !coAdminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Co-admin email: ${coAdminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Co-admin creation emails sent successfully');
         res.status(200).json({ 
@@ -2766,9 +2899,13 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
             `
         };
 
-        // Send both emails using the new function
-        await sendEmailWithRetry(ownerMailOptions);
-        await sendEmailWithRetry(coAdminMailOptions);
+        // Send both emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const coAdminResult = await sendEmailWithRetry(coAdminMailOptions);
+
+        if (!ownerResult.success || !coAdminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Co-admin email: ${coAdminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Co-admin deletion emails sent successfully');
         res.status(200).json({ 
@@ -2790,6 +2927,14 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        console.log('Process terminated');
+    });
 });
