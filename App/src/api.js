@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-axios.defaults.withCredentials = false; // Set to true if you need cookies
+axios.defaults.withCredentials = false; 
 
 const API_URL = 'http://192.168.8.38:10000';
 const WEBSITE_URL = 'https://fivekiapp.onrender.com';

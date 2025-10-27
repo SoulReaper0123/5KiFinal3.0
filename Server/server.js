@@ -5,6 +5,7 @@ const path = require('path');
 require('dotenv').config();
 const cors = require('cors');
 const Mailjet = require('node-mailjet');
+const fetch = require('node-fetch');
 
 console.log('MAILJET_API_KEY:', process.env.MAILJET_API_KEY ? 'Set' : 'Not Set');
 console.log('MAILJET_SECRET_KEY:', process.env.MAILJET_SECRET_KEY ? 'Set' : 'Not Set');
@@ -51,8 +52,8 @@ const createTransporter = async () => {
               Messages: [
                 {
                   From: {
-                    Email: process.env.MAILJET_FROM_EMAIL || 'louisdysarino@gmail.com',
-                    Name: process.env.MAILJET_FROM_NAME || '5KI Financial Services'
+                    Email: process.env.MAILJET_FROM_EMAIL,
+                    Name: process.env.MAILJET_FROM_NAME
                   },
                   To: [
                     {
@@ -148,7 +149,7 @@ const sendEmailWithRetry = async (mailOptions, maxRetries = 2, timeout = 15000) 
 
       const emailPromise = transporter.sendMail({
         ...mailOptions,
-        from: mailOptions.from || `"5KI Financial Services" <${process.env.MAILJET_FROM_EMAIL || 'louisdysarino@gmail.com'}>`
+        from: mailOptions.from || `"5KI Financial Services" <${process.env.MAILJET_FROM_EMAIL}>`
       });
       
       const timeoutPromise = new Promise((_, reject) => {
@@ -222,14 +223,31 @@ const maskPassword = (pwd) => {
 };
 
 // Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+// Enhanced Health check endpoint
+app.get('/health', async (req, res) => {
+  const healthcheck = {
+    status: 'OK',
     timestamp: new Date().toISOString(),
     service: '5KI Email API',
+    uptime: process.uptime(),
+    memory: process.memoryUsage(),
     email: transporter ? 'Connected' : 'Not Connected',
     provider: 'Mailjet'
-  });
+  };
+  
+  try {
+    // Test email connectivity
+    if (transporter) {
+      await transporter.verify();
+      healthcheck.email = 'Connected and Verified';
+    }
+    res.status(200).json(healthcheck);
+  } catch (error) {
+    healthcheck.status = 'Degraded';
+    healthcheck.email = 'Connection Issue';
+    healthcheck.error = error.message;
+    res.status(503).json(healthcheck);
+  }
 });
 
 app.get('/', (req, res) => {
@@ -417,7 +435,7 @@ app.get('/test-mailjet', (req, res) => {
         
         <div class="info">
           <strong>Current Configuration:</strong><br>
-          From: ${process.env.MAILJET_FROM_EMAIL || 'louisdysarino@gmail.com'}<br>
+          From: ${process.env.MAILJET_FROM_EMAIL}<br>
           Service: Mailjet<br>
           Status: ${transporter ? '✅ Connected' : '❌ Not Connected'}
         </div>
@@ -425,7 +443,7 @@ app.get('/test-mailjet', (req, res) => {
         <form id="testForm">
           <div class="form-group">
             <label for="email">Send test email to:</label>
-            <input type="email" id="email" name="email" value="louisdysarino@gmail.com" required>
+            <input type="email" id="email" name="email" value="${process.env.MAILJET_FROM_EMAIL}" required>
           </div>
           
           <div class="form-group">
@@ -492,7 +510,7 @@ app.get('/test-mailjet', (req, res) => {
 // Your existing POST endpoint for /test-mailjet (keep this as is)
 app.post('/test-mailjet', async (req, res) => {
   try {
-    const { to = 'louisdysarino@gmail.com', subject = 'Test Email from Mailjet - 5KI Financial Services' } = req.body;
+    const { to = process.env.MAILJET_FROM_EMAIL, subject = 'Test Email from Mailjet - 5KI Financial Services' } = req.body;
     
     const mailOptions = {
       to: to,
@@ -514,7 +532,7 @@ app.post('/test-mailjet', async (req, res) => {
               </tr>
               <tr>
                 <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">From</td>
-                <td style="padding: 8px; border: 1px solid #ddd;">${process.env.MAILJET_FROM_EMAIL || 'louisdysarino@gmail.com'}</td>
+                <td style="padding: 8px; border: 1px solid #ddd;">${process.env.MAILJET_FROM_EMAIL}</td>
               </tr>
               <tr>
                 <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Timestamp</td>
@@ -555,7 +573,7 @@ app.post('/test-mailjet', async (req, res) => {
 // Test endpoint for Mailjet
 app.post('/test-mailjet', async (req, res) => {
   try {
-    const { to = 'louisdysarino@gmail.com' } = req.body;
+    const { to = process.env.MAILJET_FROM_EMAIL } = req.body;
     
     const mailOptions = {
       to: to,
@@ -3208,6 +3226,23 @@ app.post('/send-member-credentials', async (req, res) => {
 });
 
 // Initialize the server
+// Add self-ping function RIGHT BEFORE startServer
+const startSelfPing = () => {
+  if (process.env.NODE_ENV === 'production') {
+    const PING_INTERVAL = 14 * 60 * 1000; // 14 minutes
+    
+    setInterval(async () => {
+      try {
+        const response = await fetch(`http://localhost:${PORT}/health`);
+        console.log(`Self-ping: ${response.status} - ${new Date().toISOString()}`);
+      } catch (error) {
+        console.log('Self-ping failed:', error.message);
+      }
+    }, PING_INTERVAL);
+  }
+};
+
+// Enhanced server initialization with auto-recovery
 const startServer = async () => {
   try {
     // Initialize email transporter
@@ -3220,19 +3255,56 @@ const startServer = async () => {
       console.log(`📧 Email service: ${transporter ? 'Mailjet Ready' : 'Console Fallback'}`);
       console.log(`📍 Health check: http://localhost:${PORT}/health`);
       console.log(`🧪 Test endpoint: http://localhost:${PORT}/test-mailjet`);
+      
+      // Start self-ping AFTER server is listening
+      startSelfPing();
     });
 
-    // Graceful shutdown
+    // Enhanced error handling for server
+    server.on('error', (error) => {
+      console.error('Server error:', error);
+      if (error.code === 'EADDRINUSE') {
+        console.log(`Port ${PORT} is busy, retrying...`);
+        setTimeout(() => {
+          server.close();
+          startServer();
+        }, 1000);
+      }
+    });
+
+    // Enhanced graceful shutdown
     process.on('SIGTERM', () => {
-      console.log('SIGTERM received, shutting down gracefully');
+      console.log('SIGTERM received, starting graceful shutdown...');
       server.close(() => {
-        console.log('Process terminated');
+        console.log('Process terminated gracefully');
+        // Don't force exit, let the platform handle it
       });
+    });
+
+    // Handle other termination signals
+    process.on('SIGINT', () => {
+      console.log('SIGINT received, shutting down...');
+      server.close(() => {
+        process.exit(0);
+      });
+    });
+
+    // Prevent uncaught exceptions from crashing the app
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught Exception:', error);
+      // Don't exit, keep the process running
+    });
+
+    process.on('unhandledRejection', (reason, promise) => {
+      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+      // Don't exit, keep the process running
     });
 
   } catch (error) {
     console.error('Failed to start server:', error);
-    process.exit(1);
+    // Retry after delay instead of exiting
+    console.log('Retrying in 5 seconds...');
+    setTimeout(startServer, 5000);
   }
 };
 

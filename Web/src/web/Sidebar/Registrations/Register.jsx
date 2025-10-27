@@ -619,9 +619,6 @@ const Register = () => {
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: '',
-    civilStatus: '',
-    age: '',
     dateOfBirth: '',
     placeOfBirth: '',
     address: '',
@@ -629,10 +626,6 @@ const Register = () => {
     registrationFee: ''
   });
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
-  const [validIdBackFile, setValidIdBackFile] = useState(null);
-  const [selfieFile, setSelfieFile] = useState(null);
-  const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
-  const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
   const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
   const [uploading, setUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -1858,23 +1851,7 @@ if (loading) {
                       />
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Gender<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <select
-                        style={styles.formSelect}
-                        value={formData.gender}
-                        onChange={(e) => handleInputChange('gender', e.target.value)}
-                      >
-                        <option value="">Select Gender</option>
-                        {genderOptions.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
