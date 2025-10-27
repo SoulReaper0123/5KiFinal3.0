@@ -1,6 +1,8 @@
 import axios from 'axios';
 
-const API_URL = 'https://five5kiapp.onrender.com';
+axios.defaults.withCredentials = false; // Set to true if you need cookies
+
+const API_URL = 'http://192.168.8.38:10000';
 const WEBSITE_URL = 'https://fivekiapp.onrender.com';
 const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 

@@ -46,8 +46,15 @@ const Terms = () => {
             const state = navigation.getState?.();
             const currentRoute = state?.routes?.[state.index];
             const fromFlag = currentRoute?.params?.from;
-            if (fromFlag === 'CreatePassword') {
-              navigation.goBack();
+            const prevRoute = state?.routes?.[state.index - 1];
+
+            if (fromFlag === 'CreatePassword' && prevRoute) {
+              const targetRoute = prevRoute.params?.resetTo ?? prevRoute.name;
+              if (targetRoute && targetRoute !== currentRoute.name) {
+                navigation.navigate(targetRoute, prevRoute.params);
+              } else {
+                navigation.goBack();
+              }
               return;
             }
 

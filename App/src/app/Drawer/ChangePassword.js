@@ -3,6 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
+  Platform,
   TouchableOpacity,
   TextInput,
   ScrollView,
@@ -101,26 +102,22 @@ const ChangePassword = () => {
 };
   return (
     <View style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        {/* top header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => {
-            const parent = navigation.getParent();
-            if (parent && parent.openDrawer) {
-              parent.openDrawer();
-            } else {
-              navigation.replace('AppHome', { openDrawer: true });
-            }
-          }} style={styles.backButton}>
-            <MaterialIcons name="arrow-back" size={30} color="white" />
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <MaterialIcons name="arrow-back" size={28} color="white" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Change Password</Text>
         </View>
 
-        <View style={styles.formContainer}>
-          {/* Current Password Field */}
-          <Text style={styles.label}>
-            Current Password <Text style={styles.required}>*</Text>
-          </Text>
+        {/* card */}
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>Create a secure password</Text>
+          <Text style={styles.cardSubtitle}>Your password must meet the requirements below.</Text>
+
+          {/* Current Password */}
+          <Text style={styles.fieldLabel}>Current Password</Text>
           <View style={styles.passwordInputContainer}>
             <TextInput
               style={styles.passwordInput}
@@ -130,22 +127,13 @@ const ChangePassword = () => {
               onChangeText={setCurrentPassword}
               autoCapitalize="none"
             />
-            <TouchableOpacity 
-              style={styles.eyeIcon} 
-              onPress={() => setShowCurrentPassword(!showCurrentPassword)}
-            >
-              <Ionicons
-                name={showCurrentPassword ? 'eye-off' : 'eye'}
-                size={24}
-                color="#666"
-              />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowCurrentPassword(!showCurrentPassword)}>
+              <Ionicons name={showCurrentPassword ? 'eye-off' : 'eye'} size={22} color="#7B8794" />
             </TouchableOpacity>
           </View>
 
-          {/* New Password Field */}
-          <Text style={styles.label}>
-            New Password <Text style={styles.required}>*</Text>
-          </Text>
+          {/* New Password */}
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>New Password</Text>
           <View style={styles.passwordInputContainer}>
             <TextInput
               style={styles.passwordInput}
@@ -155,78 +143,33 @@ const ChangePassword = () => {
               onChangeText={setNewPassword}
               autoCapitalize="none"
             />
-            <TouchableOpacity 
-              style={styles.eyeIcon} 
-              onPress={() => setShowNewPassword(!showNewPassword)}
-            >
-              <Ionicons
-                name={showNewPassword ? 'eye-off' : 'eye'}
-                size={24}
-                color="#666"
-              />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowNewPassword(!showNewPassword)}>
+              <Ionicons name={showNewPassword ? 'eye-off' : 'eye'} size={22} color="#7B8794" />
             </TouchableOpacity>
           </View>
 
-          {/* Password Requirements */}
-          <View style={styles.requirementsContainer}>
-            <View style={styles.requirementItem}>
-              <MaterialIcons
-                name={passwordValidation.requirements.minLength ? 'check-circle' : 'radio-button-unchecked'}
-                size={20}
-                color={passwordValidation.requirements.minLength ? 'green' : 'black'}
-              />
-              <Text style={[
-                styles.requirementText,
-                passwordValidation.requirements.minLength && styles.requirementMet
-              ]}>
-                Minimum of 8 characters
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <MaterialIcons
-                name={passwordValidation.requirements.hasSpecialChar ? 'check-circle' : 'radio-button-unchecked'}
-                size={20}
-                color={passwordValidation.requirements.hasSpecialChar ? 'green' : 'black'}
-              />
-              <Text style={[
-                styles.requirementText,
-                passwordValidation.requirements.hasSpecialChar && styles.requirementMet
-              ]}>
-                At least one special character (including _)
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <MaterialIcons
-                name={passwordValidation.requirements.hasNumber ? 'check-circle' : 'radio-button-unchecked'}
-                size={20}
-                color={passwordValidation.requirements.hasNumber ? 'green' : 'black'}
-              />
-              <Text style={[
-                styles.requirementText,
-                passwordValidation.requirements.hasNumber && styles.requirementMet
-              ]}>
-                At least one numeric digit
-              </Text>
-            </View>
-            <View style={styles.requirementItem}>
-              <MaterialIcons
-                name={passwordValidation.requirements.hasUpper && passwordValidation.requirements.hasLower ? 'check-circle' : 'radio-button-unchecked'}
-                size={20}
-                color={passwordValidation.requirements.hasUpper && passwordValidation.requirements.hasLower ? 'green' : 'black'}
-              />
-              <Text style={[
-                styles.requirementText,
-                passwordValidation.requirements.hasUpper && passwordValidation.requirements.hasLower && styles.requirementMet
-              ]}>
-                Includes both uppercase and lowercase letters
-              </Text>
-            </View>
+          {/* requirements (matches create password UI) */}
+          <View style={styles.requirementsBox}>
+            <RequirementItem
+              met={passwordValidation.requirements.minLength}
+              text="Minimum of 8 characters"
+            />
+            <RequirementItem
+              met={passwordValidation.requirements.hasSpecialChar}
+              text="At least one special character (including _)"
+            />
+            <RequirementItem
+              met={passwordValidation.requirements.hasNumber}
+              text="At least one numeric digit"
+            />
+            <RequirementItem
+              met={passwordValidation.requirements.hasUpper && passwordValidation.requirements.hasLower}
+              text="Includes both uppercase and lowercase letters"
+            />
           </View>
 
-          {/* Confirm Password Field */}
-          <Text style={styles.label}>
-            Confirm Password <Text style={styles.required}>*</Text>
-          </Text>
+          {/* Confirm Password */}
+          <Text style={[styles.fieldLabel, { marginTop: 12 }]}>Confirm Password</Text>
           <View style={styles.passwordInputContainer}>
             <TextInput
               style={styles.passwordInput}
@@ -236,46 +179,24 @@ const ChangePassword = () => {
               onChangeText={setConfirmPassword}
               autoCapitalize="none"
             />
-            <TouchableOpacity 
-              style={styles.eyeIcon} 
-              onPress={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              <Ionicons
-                name={showConfirmPassword ? 'eye-off' : 'eye'}
-                size={24}
-                color="#666"
-              />
+            <TouchableOpacity style={styles.eyeIcon} onPress={() => setShowConfirmPassword(!showConfirmPassword)}>
+              <Ionicons name={showConfirmPassword ? 'eye-off' : 'eye'} size={22} color="#7B8794" />
             </TouchableOpacity>
           </View>
 
-          {/* Password Match Indicator */}
           {confirmPassword.length > 0 && (
-            <View style={styles.requirementItem}>
-              <MaterialIcons
-                name={passwordsMatch ? 'check-circle' : 'radio-button-unchecked'}
-                size={20}
-                color={passwordsMatch ? 'green' : 'black'}
-              />
-              <Text style={[
-                styles.requirementText,
-                passwordsMatch && styles.requirementMet
-              ]}>
-                Passwords match
-              </Text>
+            <View style={{ marginTop: 8 }}>
+              <RequirementItem met={passwordsMatch} text="Passwords match" />
             </View>
           )}
 
-          {/* Submit Button */}
+          {/* Submit */}
           <TouchableOpacity
             onPress={handleChangePassword}
-            style={[styles.changeButton, !isFormValid && styles.disabledButton]}
+            style={[styles.primaryButton, (!isFormValid || loading) && styles.disabledButton]}
             disabled={!isFormValid || loading}
           >
-            {loading ? (
-              <ActivityIndicator color="white" />
-            ) : (
-              <Text style={styles.changeButtonText}>Next</Text>
-            )}
+            {loading ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Change Password</Text>}
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -296,6 +217,14 @@ const ChangePassword = () => {
   );
 };
 
+/* Small requirement row used by Create Password UI */
+const RequirementItem = ({ met, text }) => (
+  <View style={styles.requirementRow}>
+    <MaterialIcons name={met ? 'check-circle' : 'radio-button-unchecked'} size={20} color={met ? '#16A34A' : '#9CA3AF'} />
+    <Text style={[styles.requirementText, met && styles.requirementMet]}>{text}</Text>
+  </View>
+);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -303,84 +232,100 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 30,
+    marginTop: 26,
+    marginBottom: 12,
   },
   backButton: {
-    marginRight: 20,
+    marginRight: 12,
   },
   headerTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: '700',
     color: 'white',
   },
-  formContainer: {
+  card: {
     backgroundColor: 'white',
-    borderRadius: 10,
-    padding: 20,
-    elevation: 2,
+    borderRadius: 12,
+    padding: 18,
+    elevation: 3,
   },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 5,
-    color: 'black',
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: '#0F172A',
   },
-  required: {
-    color: 'red',
+  cardSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginTop: 6,
+    marginBottom: 12,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    color: '#0F172A',
+    fontWeight: '700',
+    marginBottom: 6,
   },
   passwordInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    marginBottom: 15,
+    borderColor: '#E6EEF6',
+    borderRadius: 8,
+    paddingHorizontal: 8,
+    backgroundColor: '#FAFBFD',
   },
   passwordInput: {
     flex: 1,
-    padding: 10,
-    color: 'black',
+    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    paddingHorizontal: 6,
+    color: '#0F172A',
   },
   eyeIcon: {
-    padding: 10,
+    padding: 8,
   },
-  requirementsContainer: {
-    marginVertical: 15,
-    padding: 10,
+  requirementsBox: {
+    marginTop: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    backgroundColor: '#FBFDFF',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#EEF2F7',
   },
-  requirementItem: {
+  requirementRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 3,
+    paddingVertical: 6,
   },
   requirementText: {
-    marginLeft: 5,
-    color: 'black',
+    marginLeft: 10,
+    color: '#6B7280',
+    fontSize: 13,
   },
   requirementMet: {
-    color: 'green',
+    color: '#16A34A',
+    fontWeight: '700',
   },
-  changeButton: {
-    backgroundColor: '#4FE7AF',
+  primaryButton: {
+    marginTop: 18,
+    backgroundColor: '#1E3A5F',
+    paddingVertical: 14,
     borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 30,
     alignItems: 'center',
-    marginTop: 20,
-    width: '50%',
-    alignSelf: 'center',
+  },
+  primaryButtonText: {
+    color: 'white',
+    fontWeight: '700',
+    fontSize: 16,
   },
   disabledButton: {
-    backgroundColor: '#cccccc',
-  },
-  changeButtonText: {
-    color: 'black',
-    fontWeight: 'bold',
-    fontSize: 18,
+    backgroundColor: '#9CA3AF',
   },
 });
 

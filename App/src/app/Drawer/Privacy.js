@@ -42,16 +42,21 @@ const Privacy = () => {
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => {
-            // If navigated from CreatePasswordPage, go back there
             const state = navigation.getState?.();
             const currentRoute = state?.routes?.[state.index];
             const fromFlag = currentRoute?.params?.from;
-            if (fromFlag === 'CreatePassword') {
-              navigation.goBack();
+            const prevRoute = state?.routes?.[state.index - 1];
+
+            if (fromFlag === 'CreatePassword' && prevRoute) {
+              const targetRoute = prevRoute.params?.resetTo ?? prevRoute.name;
+              if (targetRoute && targetRoute !== currentRoute.name) {
+                navigation.navigate(targetRoute, prevRoute.params);
+              } else {
+                navigation.goBack();
+              }
               return;
             }
 
-            // Otherwise, default to drawer/AppHome behavior
             const parent = navigation.getParent();
             if (parent && parent.openDrawer) {
               parent.openDrawer();

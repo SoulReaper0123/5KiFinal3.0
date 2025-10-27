@@ -3,7 +3,6 @@ const nodemailer = require('nodemailer');
 const path = require('path');
 require('dotenv').config();
 const cors = require('cors');
-const { google } = require('googleapis');
 
 console.log('GMAIL_USER:', process.env.GMAIL_USER);
 
@@ -15,81 +14,82 @@ const WEBSITE_LINK = 'https://fivekiapp.onrender.com';
 const DASHBOARD_LINK = 'https://fiveki.onrender.com';
 const GMAIL_OWNER = '5kifinancials@gmail.com';
 
-// Middleware
+// SIMPLEST CORS SOLUTION - JUST USE CORS MIDDLEWARE
 app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    const allowedOrigins = [
-      'https://fiveki.onrender.com',
-      'https://fivekiapp.onrender.com'
-    ];
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'X-Requested-With',
-    'Accept',
-    'Origin',
-    'Access-Control-Request-Method',
-    'Access-Control-Request-Headers'
+  origin: [
+    'https://fiveki.onrender.com',
+    'https://fivekiapp.onrender.com',
+    'http://localhost:10000',
+    'http://localhost:5173'
   ],
-  credentials: true,
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  credentials: true
 }));
-
-// Handle preflight requests
-// Handle preflight requests for all routes
-app.options('/*', (req, res) => {
-  res.header('Access-Control-Allow-Origin', 'https://fiveki.onrender.com');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
-  res.status(204).send();
-});
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Create OAuth2 transporter function
-const createTransporter = async () => {
-  try {
-    const oauth2Client = new google.auth.OAuth2(
-      process.env.GMAIL_CLIENT_ID,
-      process.env.GMAIL_CLIENT_SECRET,
-      "https://developers.google.com/oauthplayground"
-    );
-
-    oauth2Client.setCredentials({
-      refresh_token: process.env.GMAIL_REFRESH_TOKEN
-    });
-
-    const accessToken = await oauth2Client.getAccessToken();
-
-    const transporter = nodemailer.createTransport({
-      service: "gmail",
-      auth: {
-        type: "OAuth2",
+// Enhanced Nodemailer Configuration with Better Timeout Settings
+const transporter = nodemailer.createTransport({
+    service: 'Gmail',
+    host: 'smtp.gmail.com',
+    port: 587, // Use port 587 instead of 465
+    secure: false, // Use TLS instead of SSL
+    requireTLS: true,
+    auth: {
         user: process.env.GMAIL_USER,
-        accessToken: accessToken.token,
-        clientId: process.env.GMAIL_CLIENT_ID,
-        clientSecret: process.env.GMAIL_CLIENT_SECRET,
-        refreshToken: process.env.GMAIL_REFRESH_TOKEN
-      }
-    });
+        pass: process.env.GMAIL_PASS,
+    },
+    connectionTimeout: 30000, // 30 seconds
+    greetingTimeout: 30000,   // 30 seconds
+    socketTimeout: 30000,     // 30 seconds
+    // Add retry logic
+    maxConnections: 5,
+    maxMessages: 100,
+    pool: true
+});
 
-    return transporter;
-  } catch (error) {
-    console.error('Error creating email transporter:', error);
-    throw error;
-  }
+// Verify transporter configuration
+transporter.verify(function(error, success) {
+    if (error) {
+        console.log('Transporter verification failed:', error);
+    } else {
+        console.log('Transporter is ready to send emails');
+    }
+});
+
+// Enhanced email sending with retry logic
+const sendEmailWithRetry = async (mailOptions, maxRetries = 3, timeout = 30000) => {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`[EMAIL] Attempt ${attempt} to send to ${mailOptions.to}`);
+            
+            // Create a promise that rejects after timeout
+            const emailPromise = transporter.sendMail(mailOptions);
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => reject(new Error(`Email sending timeout after ${timeout/1000} seconds`)), timeout);
+            });
+            
+            // Race between email sending and timeout
+            await Promise.race([emailPromise, timeoutPromise]);
+            
+            console.log(`[EMAIL ATTEMPT ${attempt}] Success`);
+            return { success: true };
+            
+        } catch (error) {
+            console.error(`[EMAIL ATTEMPT ${attempt}] Failed:`, error.message);
+            
+            if (attempt === maxRetries) {
+                return { 
+                    success: false, 
+                    error: `Failed after ${maxRetries} attempts: ${error.message}` 
+                };
+            }
+            
+            // Exponential backoff
+            const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+            console.log(`[EMAIL] Waiting ${delay}ms before retry...`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+        }
+    }
 };
 
 // Helper function to format dates for display
@@ -228,8 +228,6 @@ app.post('/send-admin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending admin creation notification to owner');
         const ownerMailOptions = {
@@ -325,6 +323,8 @@ app.post('/send-admin-email', async (req, res) => {
                     
                     <p>For any questions, please contact the system administrator.</p>
                     
+      
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
                     </p>
@@ -332,9 +332,13 @@ app.post('/send-admin-email', async (req, res) => {
             `
         };
 
-        // Send both emails
-        await transporter.sendMail(ownerMailOptions);
-        await transporter.sendMail(adminMailOptions);
+        // Send both emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const adminResult = await sendEmailWithRetry(adminMailOptions);
+
+        if (!ownerResult.success || !adminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Admin email: ${adminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Admin creation emails sent successfully');
         res.status(200).json({ 
@@ -385,8 +389,6 @@ app.post('/send-delete-admin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending admin deletion notification to owner');
         const ownerMailOptions = {
@@ -477,6 +479,8 @@ app.post('/send-delete-admin-email', async (req, res) => {
                         <a href="mailto:${process.env.GMAIL_OWNER}" style="color: #3498db;">${process.env.GMAIL_OWNER}</a>.
                     </p>
                     
+
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         5KI Financial Services &copy; ${new Date().getFullYear()}
                     </p>
@@ -484,9 +488,13 @@ app.post('/send-delete-admin-email', async (req, res) => {
             `
         };
 
-        // Send both emails
-        await transporter.sendMail(ownerMailOptions);
-        await transporter.sendMail(adminMailOptions);
+        // Send both emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const adminResult = await sendEmailWithRetry(adminMailOptions);
+
+        if (!ownerResult.success || !adminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Admin email: ${adminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Admin deletion emails sent successfully');
         res.status(200).json({ 
@@ -523,8 +531,6 @@ app.post('/register', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending new registration notification to owner');
         const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -567,8 +573,6 @@ app.post('/register', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(ownerMailOptions);
-
         console.log('[NOTIFICATION] Sending registration confirmation to user');
         const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -594,7 +598,14 @@ app.post('/register', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(userMailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Registration emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
@@ -613,8 +624,6 @@ app.post('/approveRegistrations', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending registration approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -678,7 +687,11 @@ app.post('/approveRegistrations', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Registration approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -697,8 +710,6 @@ app.post('/rejectRegistrations', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending registration rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -743,7 +754,11 @@ app.post('/rejectRegistrations', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Registration rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -792,8 +807,6 @@ app.post('/send-verification-code', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         // Log the code for development purposes (mask part of it in production)
         const codeToLog = process.env.NODE_ENV === 'production' 
             ? `${verificationCode.substring(0, 3)}***` 
@@ -845,7 +858,11 @@ app.post('/send-verification-code', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] 2FA verification email sent successfully');
         res.status(200).json({ 
             success: true,
@@ -893,8 +910,6 @@ app.post('/deposit', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         const currentDate = dateApplied || new Date().toLocaleDateString('en-US', {
             year: 'numeric',
             month: 'long',
@@ -903,7 +918,7 @@ app.post('/deposit', async (req, res) => {
 
         // Email to system owner
         console.log('[NOTIFICATION] Sending deposit application notification to owner');
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Deposit Application Received',
@@ -968,11 +983,11 @@ app.post('/deposit', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         // Email to member
         console.log('[NOTIFICATION] Sending deposit confirmation to user');
-        const mailOptions = {
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Deposit Application Received',
@@ -1010,6 +1025,8 @@ app.post('/deposit', async (req, res) => {
                     
                     <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
+    
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -1018,7 +1035,14 @@ app.post('/deposit', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Deposit notification emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
@@ -1037,8 +1061,6 @@ app.post('/approveDeposits', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending deposit approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1086,7 +1108,11 @@ app.post('/approveDeposits', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Deposit approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1105,8 +1131,6 @@ app.post('/rejectDeposits', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending deposit rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1154,7 +1178,11 @@ app.post('/rejectDeposits', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Deposit rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1172,7 +1200,7 @@ app.post('/withdraw', async (req, res) => {
         amount, 
         date, 
         recipientAccount, 
-        accountNumber,
+        accountNumber, // Add this line to accept accountNumber
         referenceNumber, 
         withdrawOption,
         accountName,
@@ -1192,12 +1220,10 @@ app.post('/withdraw', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending withdrawal notification to owner');
         
         // Email to system owner
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Withdrawal Request Received',
@@ -1260,12 +1286,12 @@ app.post('/withdraw', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending withdrawal confirmation to user');
         
         // Email to member
-        const mailOptions = {
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Withdrawal Application Received',
@@ -1319,7 +1345,14 @@ app.post('/withdraw', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Withdrawal notification emails sent successfully');
         res.status(200).json({ 
             success: true,
@@ -1339,8 +1372,6 @@ app.post('/approveWithdraws', async (req, res) => {
     const { email, firstName, lastName, amount, dateApproved, timeApproved } = req.body;
 
     try {
-        const transporter = await createTransporter();
-
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
@@ -1385,7 +1416,11 @@ app.post('/approveWithdraws', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         res.status(200).json({ success: true, message: 'Email sent successfully' });
     } catch (error) {
         console.error('Error sending approval email:', error);
@@ -1411,8 +1446,6 @@ app.post('/rejectWithdraws', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending withdrawal rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1460,7 +1493,11 @@ app.post('/rejectWithdraws', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Withdrawal rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1484,10 +1521,8 @@ app.post('/applyLoan', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending new loan application notification to owner');
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'New Loan Application Received',
@@ -1534,7 +1569,7 @@ app.post('/applyLoan', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending loan application confirmation to user');
         const userMailOptions = {
@@ -1577,7 +1612,14 @@ app.post('/applyLoan', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(userMailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan application emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
     } catch (error) {
@@ -1614,8 +1656,6 @@ app.post('/approveLoans', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending loan approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1700,7 +1740,11 @@ app.post('/approveLoans', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1731,8 +1775,6 @@ app.post('/rejectLoans', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending loan rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1772,7 +1814,11 @@ app.post('/rejectLoans', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -1800,10 +1846,8 @@ app.post('/payment', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending payment notification to owner');
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Loan Payment Received',
@@ -1852,10 +1896,10 @@ app.post('/payment', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending payment confirmation to user');
-        await transporter.sendMail({
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Payment Application Confirmed',
@@ -1897,7 +1941,15 @@ app.post('/payment', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
+
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Payment confirmation emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
@@ -1929,8 +1981,6 @@ app.post('/approvePayments', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending payment approval to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -1999,7 +2049,11 @@ app.post('/approvePayments', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Payment approval email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -2028,8 +2082,6 @@ app.post('/rejectPayments', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending payment rejection to user');
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2070,7 +2122,11 @@ app.post('/rejectPayments', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Payment rejection email sent successfully');
         res.status(200).json({ message: 'Email sent successfully' });
     } catch (error) {
@@ -2090,10 +2146,8 @@ app.post('/membershipWithdrawal', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
-        await transporter.sendMail({
+        const ownerMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: process.env.GMAIL_USER,
             subject: 'Membership Withdrawal Request',
@@ -2140,10 +2194,10 @@ app.post('/membershipWithdrawal', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
 
         console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
-        await transporter.sendMail({
+        const userMailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
             to: email,
             subject: 'Membership Withdrawal Request Received',
@@ -2174,7 +2228,15 @@ app.post('/membershipWithdrawal', async (req, res) => {
                     </p>
                 </div>
             `
-        });
+        };
+
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const userResult = await sendEmailWithRetry(userMailOptions);
+
+        if (!ownerResult.success || !userResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
         res.status(200).json({ message: 'Emails sent successfully' });
@@ -2182,6 +2244,118 @@ app.post('/membershipWithdrawal', async (req, res) => {
         console.error('[NOTIFICATION ERROR] Error sending membership withdrawal emails:', error);
         res.status(500).json({ message: 'Failed to send emails', error: error.message });
     }
+});
+
+// Add these endpoints to your server.js
+app.post('/membershipWithdrawal', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating membership withdrawal emails', req.body);
+  const { email, firstName, lastName, date, reason } = req.body;
+  const fullName = `${firstName} ${lastName}`;
+
+  if (!email || !firstName || !lastName || !date) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for membership withdrawal');
+    return res.status(400).json({ message: 'Missing required fields' });
+  }
+
+  try {
+    console.log('[NOTIFICATION] Sending membership withdrawal notification to owner');
+    const ownerMailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: process.env.GMAIL_USER,
+      subject: 'Membership Withdrawal Request',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request
+          </h2>
+          
+          <p>Dear Admin,</p>
+          
+          <p>A new permanent membership withdrawal request has been received:</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Request Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Member</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Requested</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${formatDisplayDate(date)}</td>
+            </tr>
+            ${reason ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Reason</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${reason}</td>
+            </tr>
+            ` : ''}
+          </table>
+          
+          <p>Kindly update the records and confirm in the system.</p>
+          
+          <p>
+            <a href="${DASHBOARD_LINK}" 
+               style="display: inline-block; background-color: #3498db; color: white; 
+                      padding: 10px 20px; text-decoration: none; border-radius: 4px;">
+              View in Dashboard
+            </a>
+          </p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            5KI Financial Services &copy; ${new Date().getFullYear()}
+          </p>
+        </div>
+      `
+    };
+
+    console.log('[NOTIFICATION] Sending membership withdrawal confirmation to user');
+    const userMailOptions = {
+      from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
+      to: email,
+      subject: 'Membership Withdrawal Request Received',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Membership Withdrawal Request Received
+          </h2>
+          
+          <p>Hi ${firstName},</p>
+          
+          <p>We have received your membership withdrawal request on ${formatDisplayDate(date)}. Our team is currently reviewing your application and will process it within 3-5 business days. You'll be notified once your application has been successfully processed.</p>
+          
+          ${reason ? `
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Your Reason:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; background-color: #f8f9fa;">${reason}</td>
+            </tr>
+          </table>
+          ` : ''}
+          
+          <p>For any questions, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Best regards,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    };
+
+    // Send emails using retry logic
+    const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+    const userResult = await sendEmailWithRetry(userMailOptions);
+
+    if (!ownerResult.success || !userResult.success) {
+        throw new Error(`Owner email: ${ownerResult.error}, User email: ${userResult.error}`);
+    }
+
+    console.log('[NOTIFICATION SUCCESS] Membership withdrawal emails sent successfully');
+    res.status(200).json({ message: 'Emails sent successfully' });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending membership withdrawal emails:', error);
+    res.status(500).json({ message: 'Failed to send emails', error: error.message });
+  }
 });
 
 app.post('/approveMembershipWithdrawal', async (req, res) => {
@@ -2194,8 +2368,6 @@ app.post('/approveMembershipWithdrawal', async (req, res) => {
   }
 
   try {
-    const transporter = await createTransporter();
-
     console.log('[NOTIFICATION] Sending membership withdrawal approval to user');
     const mailOptions = {
       from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2234,7 +2406,11 @@ app.post('/approveMembershipWithdrawal', async (req, res) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    const result = await sendEmailWithRetry(mailOptions);
+    if (!result.success) {
+        throw new Error(result.error);
+    }
+
     console.log('[NOTIFICATION SUCCESS] Membership withdrawal approval email sent successfully');
     res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
@@ -2253,8 +2429,6 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
   }
 
   try {
-    const transporter = await createTransporter();
-
     console.log('[NOTIFICATION] Sending membership withdrawal rejection to user');
     const mailOptions = {
       from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2295,7 +2469,11 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
       `
     };
 
-    await transporter.sendMail(mailOptions);
+    const result = await sendEmailWithRetry(mailOptions);
+    if (!result.success) {
+        throw new Error(result.error);
+    }
+
     console.log('[NOTIFICATION SUCCESS] Membership withdrawal rejection email sent successfully');
     res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
@@ -2315,7 +2493,7 @@ app.post('/send-loan-reminder', async (req, res) => {
         outstandingBalance,
         memberId,
         transactionId,
-        websiteLink,
+        websiteLink, // This is overriding your constant!
         facebookLink
     } = req.body;
 
@@ -2337,8 +2515,6 @@ app.post('/send-loan-reminder', async (req, res) => {
     }
 
     try {
-        const transporter = await createTransporter();
-
         const formattedDueDate = formatDisplayDate(dueDate);
         const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
         
@@ -2352,7 +2528,8 @@ app.post('/send-loan-reminder', async (req, res) => {
 
         console.log('[NOTIFICATION] Sending loan reminder to user');
         
-        const paymentWebsiteLink = WEBSITE_LINK;
+        // FIX: Always use the correct website link with "app"
+        const paymentWebsiteLink = WEBSITE_LINK; // This will always be 'https://fivekiapp.onrender.com'
         
         const mailOptions = {
             from: `"5KI Financial Services" <${process.env.GMAIL_USER}>`,
@@ -2422,6 +2599,7 @@ app.post('/send-loan-reminder', async (req, res) => {
                     
                     <p>For any questions about your payment, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
                     
+                    
                     <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
                         Best regards,<br>
                         <strong>5KI Financial Services Team</strong>
@@ -2430,16 +2608,20 @@ app.post('/send-loan-reminder', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(mailOptions);
+        const result = await sendEmailWithRetry(mailOptions);
+        if (!result.success) {
+            throw new Error(result.error);
+        }
+
         console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
-        console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`);
+        console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`); // Add this for debugging
         res.status(200).json({ 
             success: true,
             message: 'Loan reminder email sent successfully',
             data: {
                 emailSent: email,
                 daysUntilDue: daysUntilDue,
-                paymentLink: paymentWebsiteLink,
+                paymentLink: paymentWebsiteLink, // Include the link in response for verification
                 timestamp: new Date().toISOString()
             }
         });
@@ -2485,8 +2667,6 @@ app.post('/send-coadmin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending co-admin creation notification to owner');
         const ownerMailOptions = {
@@ -2576,8 +2756,13 @@ app.post('/send-coadmin-email', async (req, res) => {
             `
         };
 
-        await transporter.sendMail(ownerMailOptions);
-        await transporter.sendMail(coAdminMailOptions);
+        // Send emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const coAdminResult = await sendEmailWithRetry(coAdminMailOptions);
+
+        if (!ownerResult.success || !coAdminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Co-admin email: ${coAdminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Co-admin creation emails sent successfully');
         res.status(200).json({ 
@@ -2627,8 +2812,6 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
     });
 
     try {
-        const transporter = await createTransporter();
-
         // Email to system owner
         console.log('[NOTIFICATION] Sending co-admin deletion notification to owner');
         const ownerMailOptions = {
@@ -2716,9 +2899,13 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
             `
         };
 
-        // Send both emails
-        await transporter.sendMail(ownerMailOptions);
-        await transporter.sendMail(coAdminMailOptions);
+        // Send both emails using retry logic
+        const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+        const coAdminResult = await sendEmailWithRetry(coAdminMailOptions);
+
+        if (!ownerResult.success || !coAdminResult.success) {
+            throw new Error(`Owner email: ${ownerResult.error}, Co-admin email: ${coAdminResult.error}`);
+        }
 
         console.log('[NOTIFICATION SUCCESS] Co-admin deletion emails sent successfully');
         res.status(200).json({ 
@@ -2740,6 +2927,14 @@ app.post('/send-delete-coadmin-email', async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
     console.log(`Server running at http://localhost:${PORT}`);
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+        console.log('Process terminated');
+    });
 });

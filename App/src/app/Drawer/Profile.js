@@ -11,6 +11,8 @@ import {
   Modal,
   ActivityIndicator,
   Switch,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -273,123 +275,117 @@ const Profile = () => {
         </View>
 
         <View style={styles.detailsContainer}>
-          <DetailRow label="Member ID:" detail={userDetails.id || 'N/A'} />
-          <DetailRow label="Name:" detail={`${userDetails.firstName || 'N/A'} ${userDetails.middleName || ''} ${userDetails.lastName || ''}`} />
-          <DetailRow label="Email:" detail={userDetails.email || 'N/A'} />
-          <DetailRow label="Address:" detail={userDetails.address || 'N/A'} />
-          <DetailRow label="Birthday:" detail={userDetails.dateOfBirth || 'N/A'} />
-          <DetailRow label="Contact Number:" detail={userDetails.phoneNumber || 'N/A'} />
-          <DetailRow label="Gender:" detail={userDetails.gender || 'N/A'} />
-          <DetailRow label="Place of Birth:" detail={userDetails.placeOfBirth || 'N/A'} />
-          <DetailRow label="Civil Status:" detail={userDetails.civilStatus || 'N/A'} />
-          
-          <TouchableOpacity onPress={handleEditDetails} style={styles.editButton}>
-            <Text style={styles.editButtonText}>Edit Profile</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            onPress={() => navigation.navigate('ChangePassword', { email: email })}
-            style={[styles.editButton, { backgroundColor: '#6C63FF', marginTop: 10 }]}
-          >
-            <Text style={styles.editButtonText}>Change Password</Text>
-          </TouchableOpacity>
-          
-          {/* Biometric Authentication Section */}
-          <View style={styles.biometricSection}>
-            <Text style={styles.sectionTitle}>Biometric Authentication</Text>
-            
-            <View style={styles.biometricRow}>
-              <View style={styles.biometricInfo}>
-                <Ionicons 
-                  name="finger-print" 
-                  size={24} 
-                  color={biometricsEnabled ? "#4FE7AF" : "#999"} 
-                />
-                <Text style={styles.biometricText}>
-                  {biometricsEnabled ? "Fingerprint Login Enabled" : "Fingerprint Login Disabled"}
-                </Text>
-              </View>
-              
-              {biometricsAvailable ? (
-                <TouchableOpacity
-                  style={[
-                    styles.biometricButton,
-                    { backgroundColor: biometricsEnabled ? '#FF6B6B' : '#4FE7AF' }
-                  ]}
-                  onPress={biometricsEnabled ? disableBiometrics : enableBiometrics}
-                >
-                  <Text style={styles.biometricButtonText}>
-                    {biometricsEnabled ? 'Disable' : 'Enable'}
-                  </Text>
-                </TouchableOpacity>
-              ) : (
-                <Text style={styles.biometricUnavailable}>
-                  Not available on this device
-                </Text>
-              )}
+          <View style={styles.headerInfo}>
+            <View>
+              <Text style={styles.nameText}>
+                {`${(userDetails.firstName || '').trim()} ${(userDetails.middleName || '').trim()} ${(userDetails.lastName || '').trim()}`.replace(/\s+/g,' ').trim() || 'No name'}
+              </Text>
+              <Text style={styles.emailText}>{userDetails.email || 'N/A'}</Text>
             </View>
-            
-            <Text style={styles.biometricNote}>
-              {biometricsEnabled 
-                ? "You can use your fingerprint to log in to the app." 
-                : "Enable fingerprint login for faster access to your account."}
-            </Text>
+            <View style={styles.idBadge}>
+              <Text style={styles.idLabel}>Member ID</Text>
+              <Text style={styles.idValue}>{userDetails.id || 'N/A'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.infoList}>
+            <View style={styles.infoRow}>
+              <Text style={styles.infoRowLabel}>Address</Text>
+              <Text style={styles.infoRowValue}>{userDetails.address || 'N/A'}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoRowLabel}>Birthday</Text>
+              <Text style={styles.infoRowValue}>{userDetails.dateOfBirth || 'N/A'}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoRowLabel}>Contact Number</Text>
+              <Text style={styles.infoRowValue}>{userDetails.phoneNumber || 'N/A'}</Text>
+            </View>
+
+            <View style={styles.infoRow}>
+              <Text style={styles.infoRowLabel}>Place of Birth</Text>
+              <Text style={styles.infoRowValue}>{userDetails.placeOfBirth || 'N/A'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionRow}>
+            <View style={styles.actionColumn}>
+              <TouchableOpacity onPress={handleEditDetails} style={[styles.actionButton, styles.editButton]}>
+                <Text style={styles.editButtonText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => navigation.navigate('ChangePassword', { email })}
+                style={[styles.actionButton, styles.changePwButton]}
+              >
+                <Text style={styles.changePwText}>Change Password</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </ScrollView>
 
       {/* Edit Modal */}
-      {/* Edit Modal */}
-<Modal
+      <Modal
   animationType="slide"
   transparent={true}
   visible={modalVisible}
   onRequestClose={() => setModalVisible(false)}
 >
-  <View style={styles.modalContainer}>
-    <View style={styles.modalHeader}>
-      <TouchableOpacity 
-        onPress={() => setModalVisible(false)} 
-        style={styles.modalBackButton}
-      >
-        <MaterialIcons name="arrow-back" size={24} color="white" />
-      </TouchableOpacity>
-      <Text style={styles.modalHeaderTitle}>Edit Profile Details</Text>
-    </View>
-    <ScrollView contentContainerStyle={styles.modalContent}>
-      {[
-        {field: 'firstName', required: true},
-        {field: 'middleName', required: false},
-        {field: 'lastName', required: true},
-        {field: 'address', required: true},
-        {field: 'dateOfBirth', required: true},
-        {field: 'phoneNumber', required: true},
-        {field: 'gender', required: true},
-        {field: 'placeOfBirth', required: true},
-        {field: 'civilStatus', required: true}
-      ].map(({field, required}) => (
-        <View key={field} style={styles.inputContainer}>
-          <Text style={styles.label}>
-            {capitalizeFirstLetter(field)}{required && <Text style={styles.requiredStar}> *</Text>}:
-          </Text>
-          <TextInput
-            style={styles.input}
-            placeholder={`Enter ${capitalizeFirstLetter(field)}`}
-            value={newDetails[field]}
-            onChangeText={(text) => setNewDetails({ ...newDetails, [field]: text })}
-          />
-        </View>
-      ))}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity onPress={handleSaveDetails} style={styles.saveButton}>
-          <Text style={styles.saveButtonText}>Save Changes</Text>
+  <KeyboardAvoidingView
+    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    style={styles.modalContainer}
+  >
+    <View style={styles.modalCard}>
+      <View style={styles.modalHeaderRow}>
+        <Text style={styles.modalTitleLarge}>Edit Profile</Text>
+        <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+          <MaterialIcons name="close" size={22} color="#2D5783" />
         </TouchableOpacity>
       </View>
-    </ScrollView>
-  </View>
+
+      <ScrollView contentContainerStyle={styles.modalInner} keyboardShouldPersistTaps="handled">
+        <Text style={styles.modalSubtitle}>Update your personal information. Fields marked with <Text style={styles.requiredStar}>*</Text> are required.</Text>
+
+        {[
+          { field: 'firstName', label: 'First Name', required: true },
+          { field: 'middleName', label: 'Middle Name', required: false },
+          { field: 'lastName', label: 'Last Name', required: true },
+          { field: 'address', label: 'Address', required: true },
+          { field: 'dateOfBirth', label: 'Birthday', required: true },
+          { field: 'phoneNumber', label: 'Contact Number', required: true },
+          { field: 'gender', label: 'Gender', required: true },
+          { field: 'placeOfBirth', label: 'Place of Birth', required: true },
+          { field: 'civilStatus', label: 'Civil Status', required: true }
+        ].map(({ field, label, required }) => (
+          <View key={field} style={styles.fieldRow}>
+            <Text style={styles.inputLabel}>
+              {label} {required && <Text style={styles.requiredStar}>*</Text>}
+            </Text>
+            <TextInput
+              style={styles.inputField}
+              placeholder={label}
+              value={newDetails[field]}
+              onChangeText={(text) => setNewDetails({ ...newDetails, [field]: text })}
+              returnKeyType="next"
+            />
+          </View>
+        ))}
+
+        <View style={styles.buttonRow}>
+          <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.modalActionButton, styles.cancelButton]}>
+            <Text style={styles.modalActionText}>Cancel</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={handleSaveDetails} style={[styles.modalActionButton, styles.saveButton]}>
+            <Text style={styles.modalActionText}>Save Changes</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  </KeyboardAvoidingView>
 </Modal>
 
       {/* Full Image Modal */}
@@ -470,82 +466,168 @@ const styles = StyleSheet.create({
     padding: 20,
     elevation: 2,
   },
-  detailRow: {
+  headerInfo: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 10,
+    alignItems: 'center',
+    marginBottom: 20,
   },
-  detailLabel: {
+  nameText: {
+    fontSize: 18,
     fontWeight: 'bold',
-    color: 'black',
-    width: '40%',
+    color: '#2D5783',
   },
-  detailValue: {
+  emailText: {
+    fontSize: 14,
+    color: '#64748B',
+  },
+  idBadge: {
+    backgroundColor: '#F6FBFF',
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  idLabel: {
+    fontSize: 12,
+    color: '#9CA3AF',
+  },
+  idValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#2D5783',
+  },
+  infoList: {
+    marginBottom: 20,
+  },
+  infoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  infoRowLabel: {
+    fontSize: 14,
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  infoRowValue: {
     color: 'black',
+    fontSize: 14,
+    flex: 1,
     textAlign: 'right',
-    width: '60%',
   },
-  editButton: {
-    backgroundColor: '#4FE7AF',
+  actionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  actionColumn: {
+    flexDirection: 'column',
+    flex: 1,
+  },
+  actionButton: {
     borderRadius: 5,
     paddingVertical: 10,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 20,
+    flex: 1,
+    marginBottom: 10,
+  },
+  editButton: {
+    backgroundColor: '#4FE7AF',
+  },
+  changePwButton: {
+    backgroundColor: '#6C63FF',
   },
   editButtonText: {
     color: 'white',
     fontWeight: 'bold',
   },
- modalContainer: {
-  flex: 1,
-  backgroundColor: 'rgba(0, 0, 0, 0.5)',
-},
-modalContent: {
-  backgroundColor: 'white',
-  padding: 20,
-},
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginBottom: 20,
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    paddingHorizontal: 16,
   },
-  label: {
-    fontWeight: 'bold',
-    marginBottom: 5,
+  modalCard: {
+    width: '100%',
+    maxHeight: '88%',
+    backgroundColor: 'white',
+    borderRadius: 12,
+    overflow: 'hidden',
+    elevation: 6,
   },
-  input: {
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6FBFF',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEF2F7',
+  },
+  modalTitleLarge: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2D5783',
+  },
+  modalCloseBtn: {
+    padding: 6,
+    borderRadius: 6,
+  },
+  modalInner: {
+    padding: 16,
+    paddingBottom: 28,
+  },
+  modalSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    marginBottom: 12,
+  },
+  fieldRow: {
+    marginBottom: 12,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#1F2937',
+    marginBottom: 6,
+    fontWeight: '600',
+  },
+  inputField: {
     borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    padding: 10,
-    marginBottom: 15,
+    borderColor: '#E6EEF6',
+    backgroundColor: '#FAFBFD',
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    borderRadius: 8,
+    fontSize: 14,
+    color: '#0F172A',
   },
- saveButton: {
-  backgroundColor: '#4FE7AF',
-  borderRadius: 5,
-  paddingVertical: 12,
-  paddingHorizontal: 20,
-  alignItems: 'center',
-  flex: 1,
-  marginLeft: 10,
-},
-  saveButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
+  buttonRow: {
+    flexDirection: 'row',
+    marginTop: 10,
+    justifyContent: 'space-between',
   },
- cancelButton: {
-  backgroundColor: '#FF0000',
-  borderRadius: 5,
-  paddingVertical: 12,
-  paddingHorizontal: 20,
-  alignItems: 'center',
-  flex: 1,
-  marginRight: 10,
-},
-  cancelButtonText: {
+  modalActionButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginHorizontal: 6,
+  },
+  modalActionText: {
     color: 'white',
-    fontWeight: 'bold',
+    fontWeight: '700',
+    fontSize: 15,
+  },
+  cancelButton: {
+    backgroundColor: '#9CA3AF',
+  },
+  saveButton: {
+    backgroundColor: '#2D5783',
   },
   loadingContainer: {
     flex: 1,
@@ -573,80 +655,51 @@ modalContent: {
   closeImageModalButtonText: {
     fontWeight: 'bold',
   },
-  modalHeader: {
-  flexDirection: 'row',
-  alignItems: 'center',
-  backgroundColor: '#2D5783',
-  paddingVertical: 15,
-  paddingHorizontal: 10,
-  borderTopLeftRadius: 10,
-  borderTopRightRadius: 10,
-},
-modalHeaderTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  color: 'white',
-  marginLeft: 10,
-},
-modalBackButton: {
-  marginRight: 10,
-},
-inputContainer: {
-  marginBottom: 15,
-},
-requiredStar: {
-  color: 'red',
-},
-buttonContainer: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  marginTop: 20,
-},
-biometricSection: {
-  marginTop: 20,
-  borderTopWidth: 1,
-  borderTopColor: '#eee',
-  paddingTop: 15,
-},
-sectionTitle: {
-  fontSize: 18,
-  fontWeight: 'bold',
-  marginBottom: 15,
-  color: '#2D5783',
-},
-biometricRow: {
-  flexDirection: 'row',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: 10,
-},
-biometricInfo: {
-  flexDirection: 'row',
-  alignItems: 'center',
-},
-biometricText: {
-  marginLeft: 10,
-  fontSize: 16,
-},
-biometricButton: {
-  paddingVertical: 8,
-  paddingHorizontal: 15,
-  borderRadius: 5,
-},
-biometricButtonText: {
-  color: 'white',
-  fontWeight: 'bold',
-},
-biometricUnavailable: {
-  color: '#999',
-  fontStyle: 'italic',
-},
-biometricNote: {
-  marginTop: 5,
-  color: '#666',
-  fontSize: 12,
-  fontStyle: 'italic',
-},
+  biometricSection: {
+    marginTop: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#eee',
+    paddingTop: 15,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#2D5783',
+  },
+  biometricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  biometricInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  biometricText: {
+    marginLeft: 10,
+    fontSize: 16,
+  },
+  biometricButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    borderRadius: 5,
+  },
+  biometricButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  biometricUnavailable: {
+    color: '#999',
+    fontStyle: 'italic',
+  },
+  biometricNote: {
+    marginTop: 5,
+    color: '#666',
+    fontSize: 12,
+    fontStyle: 'italic',
+  },
 });
 
 export default Profile;
