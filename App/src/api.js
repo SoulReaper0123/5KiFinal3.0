@@ -2,7 +2,7 @@ import axios from 'axios';
 
 axios.defaults.withCredentials = false; 
 
-const API_URL = 'http://192.168.8.38:10000';
+const API_URL = 'https://fiveki-backend-app.onrender.com';
 const WEBSITE_URL = 'https://fivekiapp.onrender.com';
 const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
