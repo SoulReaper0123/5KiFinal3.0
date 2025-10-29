@@ -140,7 +140,7 @@ const RegisterPage = () => {
   // Validation functions
   const validateFirstName = (value) => {
     if (!value || !value.trim()) {
-      setFirstNameError('First name is required');
+    
       return false;
     }
     setFirstNameError('');
@@ -149,7 +149,7 @@ const RegisterPage = () => {
 
   const validateLastName = (value) => {
     if (!value || !value.trim()) {
-      setLastNameError('Last name is required');
+    
       return false;
     }
     setLastNameError('');
@@ -192,7 +192,7 @@ const RegisterPage = () => {
 
   const validateAddress = (value) => {
     if (!value || !value.trim()) {
-      setAddressError('Address is required');
+  
       return false;
     }
     setAddressError('');
@@ -399,7 +399,7 @@ const RegisterPage = () => {
               value={firstName}
               onChangeText={setFirstName}
               onBlur={() => validateFirstName(firstName)}
-              style={[styles.input, firstNameError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => middleNameInput.current?.focus()}
@@ -428,7 +428,7 @@ const RegisterPage = () => {
               value={lastName}
               onChangeText={setLastName}
               onBlur={() => validateLastName(lastName)}
-              style={[styles.input, lastNameError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={lastNameInput}
@@ -491,7 +491,7 @@ const RegisterPage = () => {
               value={address}
               onChangeText={setAddress}
               onBlur={() => validateAddress(address)}
-              style={[styles.input, addressError ? styles.errorInput : null]}
+              style={styles.input}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={addressInput}
