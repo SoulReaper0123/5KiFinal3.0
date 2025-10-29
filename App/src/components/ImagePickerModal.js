@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   Image,
+  Platform
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
@@ -15,9 +16,9 @@ const ImagePickerModal = ({
   visible,
   onClose,
   onImageSelected,
+  onGalleryImageSelected,
   title = "Select Proof of Deposit",
   showCropOptions = false,
-  onCropOptionsChange = null,
   cameraOnly = false,
 }) => {
   const [showCropModal, setShowCropModal] = useState(false);
@@ -45,22 +46,14 @@ const ImagePickerModal = ({
     try {
       const result = await ImagePicker.launchCameraAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Don't auto-crop from camera
+        allowsEditing: false,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
-        
-        if (showCropOptions) {
-          setSelectedImageUri(imageUri);
-          setShowCropModal(true);
-          // Close the main modal when showing crop options
-          onClose();
-        } else {
-          onImageSelected(imageUri);
-          onClose();
-        }
+        onImageSelected(imageUri);
+        onClose();
       }
     } catch (error) {
       console.error('Camera error:', error);
@@ -75,19 +68,19 @@ const ImagePickerModal = ({
     try {
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: false, // Don't auto-crop from gallery
+        allowsEditing: false,
         quality: 0.8,
       });
 
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const imageUri = result.assets[0].uri;
         
-        if (showCropOptions) {
-          setSelectedImageUri(imageUri);
-          setShowCropModal(true);
-          // Close the main modal when showing crop options
+        if (showCropOptions && onGalleryImageSelected) {
+          // Pass the image to parent component to handle crop options
+          onGalleryImageSelected(imageUri);
           onClose();
         } else {
+          // Use image directly without crop options
           onImageSelected(imageUri);
           onClose();
         }
@@ -96,47 +89,6 @@ const ImagePickerModal = ({
       console.error('Gallery error:', error);
       Alert.alert('Error', 'Failed to select image. Please try again.');
     }
-  };
-
-  const handleUseAsIs = () => {
-    if (selectedImageUri) {
-      onImageSelected(selectedImageUri);
-      setShowCropModal(false);
-      setSelectedImageUri(null);
-      // Don't call onClose here as the main modal is already closed
-    }
-  };
-
-  const handleCrop = async () => {
-    if (!selectedImageUri) return;
-
-    try {
-      // Use ImageManipulator for cropping or launch image picker with editing
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
-        allowsEditing: true,
-        quality: 0.8,
-      });
-
-      if (!result.canceled && result.assets && result.assets.length > 0) {
-        onImageSelected(result.assets[0].uri);
-        setShowCropModal(false);
-        setSelectedImageUri(null);
-        // Don't call onClose here as the main modal is already closed
-      } else {
-        // If user cancels cropping, keep the crop modal open
-        // Don't close anything
-      }
-    } catch (error) {
-      console.error('Crop error:', error);
-      Alert.alert('Error', 'Failed to crop image. Please try again.');
-    }
-  };
-
-  const handleCloseCropModal = () => {
-    setShowCropModal(false);
-    setSelectedImageUri(null);
-    // Don't call onClose here as the main modal is already closed
   };
 
   return (
@@ -171,7 +123,9 @@ const ImagePickerModal = ({
                   onPress={handleGalleryPress}
                 >
                   <MaterialIcons name="photo-library" size={24} color="#2D5783" style={styles.optionIcon} />
-                  <Text style={styles.optionText}>Choose from Gallery</Text>
+                  <Text style={styles.optionText}>
+                    {Platform.OS === 'web' ? 'Choose File' : 'Choose from Gallery'}
+                  </Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -185,55 +139,6 @@ const ImagePickerModal = ({
           </View>
         </View>
       </Modal>
-
-      {/* Crop Options Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={showCropModal}
-        onRequestClose={handleCloseCropModal}
-      >
-          <View style={styles.modalOverlay}>
-            <View style={styles.cropModalContainer}>
-              <Text style={styles.modalTitle}>Image Selected</Text>
-              
-              {selectedImageUri && (
-                <View style={styles.imagePreviewContainer}>
-                  <Image source={{ uri: selectedImageUri }} style={styles.imagePreview} />
-                </View>
-              )}
-              
-              <Text style={styles.cropDescription}>
-                Would you like to use this image as is or crop it?
-              </Text>
-              
-              <View style={styles.cropOptionsContainer}>
-                <TouchableOpacity
-                  style={[styles.cropButton, styles.useAsIsButton]}
-                  onPress={handleUseAsIs}
-                >
-                  <MaterialIcons name="check" size={24} color="#fff" />
-                  <Text style={styles.cropButtonText}>Use as is</Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[styles.cropButton, styles.cropImageButton]}
-                  onPress={handleCrop}
-                >
-                  <MaterialIcons name="crop" size={24} color="#fff" />
-                  <Text style={styles.cropButtonText}>Crop</Text>
-                </TouchableOpacity>
-              </View>
-              
-              <TouchableOpacity
-                style={styles.cancelOption}
-                onPress={handleCloseCropModal}
-              >
-                <Text style={styles.cancelText}>Cancel</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </Modal>
     </>
   );
 };
@@ -245,13 +150,6 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContainer: {
-    backgroundColor: 'white',
-    padding: 20,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    width: '100%',
-  },
-  cropModalContainer: {
     backgroundColor: 'white',
     padding: 20,
     borderTopLeftRadius: 20,
@@ -314,56 +212,6 @@ const styles = StyleSheet.create({
     color: 'red',
     fontWeight: '500',
     textAlign: 'center',
-  },
-  imagePreviewContainer: {
-    width: '100%',
-    height: 200,
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: '#ddd',
-  },
-  imagePreview: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  cropDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 15,
-    paddingHorizontal: 10,
-  },
-  cropOptionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-    width: '100%',
-  },
-  cropButton: {
-    backgroundColor: '#2D5783',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    flex: 1,
-    marginHorizontal: 5,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  useAsIsButton: {
-    backgroundColor: '#4FE7AF',
-  },
-  cropImageButton: {
-    backgroundColor: '#2D5783',
-  },
-  cropButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginLeft: 8,
   },
 });
 
