@@ -64,17 +64,6 @@ const RegisterPage2 = () => {
         })();
     }, []);
 
-    // Handle image selection from the ImagePickerModal
-    const handleImageSelected = (imageUri, imageType = null, setFunction = null) => {
-        if (imageType === 'idFront') {
-            setValidIdFront(imageUri);
-        } else if (imageType === 'selfie') {
-            setSelfie(imageUri);
-        } else if (setFunction) {
-            setFunction(imageUri);
-        }
-    };
-
     // Show source selection options (Camera or Gallery)
     const showSourceSelection = (setImageFunction, imageType, allowCrop = true) => {
         setPendingImageAction({
@@ -91,25 +80,13 @@ const RegisterPage2 = () => {
         
         try {
             if (Platform.OS === 'web') {
-                // Web camera handling
-                const imageUri = await handleWebCameraCapture(pendingImageAction.type);
-                if (imageUri) {
-                    if (pendingImageAction.allowCrop) {
-                        // Show crop options for camera image
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        // Use directly without crop
-                        pendingImageAction.setFunction(imageUri);
-                    }
-                }
+                // For mobile web, use direct file input with camera
+                await handleMobileWebCamera(pendingImageAction.setFunction, pendingImageAction.allowCrop, pendingImageAction.type);
             } else {
                 // Native camera handling
                 const result = await ImagePicker.launchCameraAsync({
                     mediaTypes: ImagePicker.MediaType.Images,
-                    allowsEditing: false, // We'll handle cropping in our own modal
+                    allowsEditing: false,
                     aspect: [4, 3],
                     quality: 0.8,
                     base64: false,
@@ -117,13 +94,11 @@ const RegisterPage2 = () => {
 
                 if (!result.canceled && result.assets && result.assets[0]) {
                     if (pendingImageAction.allowCrop) {
-                        // Show crop options for camera image
                         setSelectedImageUri(result.assets[0].uri);
                         setCurrentSetFunction(() => pendingImageAction.setFunction);
                         setCurrentImageType(pendingImageAction.type);
                         setShowCropOptions(true);
                     } else {
-                        // Use directly without crop
                         pendingImageAction.setFunction(result.assets[0].uri);
                     }
                 }
@@ -144,25 +119,13 @@ const RegisterPage2 = () => {
         
         try {
             if (Platform.OS === 'web') {
-                // Web gallery handling
-                const imageUri = await handleWebGallerySelection();
-                if (imageUri) {
-                    if (pendingImageAction.allowCrop) {
-                        // Show crop options for gallery image
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        // Use directly without crop
-                        pendingImageAction.setFunction(imageUri);
-                    }
-                }
+                // For mobile web, use direct file input
+                await handleMobileWebGallery(pendingImageAction.setFunction, pendingImageAction.allowCrop);
             } else {
                 // Native gallery handling
                 const result = await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ImagePicker.MediaType.Images,
-                    allowsEditing: false, // We'll handle cropping in our own modal
+                    allowsEditing: false,
                     aspect: [4, 3],
                     quality: 0.8,
                     base64: false,
@@ -170,13 +133,11 @@ const RegisterPage2 = () => {
 
                 if (!result.canceled && result.assets && result.assets[0]) {
                     if (pendingImageAction.allowCrop) {
-                        // Show crop options for gallery image
                         setSelectedImageUri(result.assets[0].uri);
                         setCurrentSetFunction(() => pendingImageAction.setFunction);
                         setCurrentImageType(pendingImageAction.type);
                         setShowCropOptions(true);
                     } else {
-                        // Use directly without crop
                         pendingImageAction.setFunction(result.assets[0].uri);
                     }
                 }
@@ -191,234 +152,130 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Web camera capture - FIXED CAMERA ORIENTATION
-    const handleWebCameraCapture = (imageType) => {
-        return new Promise((resolve) => {
-            try {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    // Use environment camera for ID, user-facing for selfie
-                    const facingMode = imageType === 'selfie' ? 'user' : 'environment';
-                    
-                    navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: facingMode,
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
-                        } 
-                    }).then((stream) => {
-                        // Create video element for camera preview
-                        const video = document.createElement('video');
-                        video.srcObject = stream;
-                        video.autoplay = true;
-                        video.playsInline = true;
-                        video.style.cssText = `
-                            width: 100%;
-                            height: auto;
-                            border-radius: 8px;
-                            transform: ${facingMode === 'user' ? 'scaleX(-1)' : 'none'};
-                        `;
-                        
-                        // Create canvas for capturing image
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
-                        
-                        // Create capture UI
-                        const captureUI = document.createElement('div');
-                        captureUI.style.cssText = `
-                            position: fixed;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            background: rgba(0,0,0,0.95);
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            z-index: 10000;
-                            padding: 20px;
-                            box-sizing: border-box;
-                        `;
-                        
-                        const videoContainer = document.createElement('div');
-                        videoContainer.style.cssText = `
-                            position: relative;
-                            width: 100%;
-                            max-width: 400px;
-                            border-radius: 12px;
-                            overflow: hidden;
-                            background: #000;
-                            margin-bottom: 20px;
-                        `;
-                        
-                        const instructions = document.createElement('div');
-                        instructions.textContent = imageType === 'selfie' 
-                            ? 'Take a selfie' 
-                            : 'Take a photo of your ID';
-                        instructions.style.cssText = `
-                            color: white;
-                            text-align: center;
-                            margin-bottom: 15px;
-                            font-size: 16px;
-                            font-weight: bold;
-                        `;
-                        
-                        const buttonContainer = document.createElement('div');
-                        buttonContainer.style.cssText = `
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            width: 100%;
-                            max-width: 400px;
-                        `;
-                        
-                        const captureButton = document.createElement('button');
-                        captureButton.textContent = '📸 Capture Photo';
-                        captureButton.style.cssText = `
-                            padding: 15px 30px;
-                            background: #1E3A5F;
-                            color: white;
-                            border: none;
-                            border-radius: 10px;
-                            font-size: 16px;
-                            font-weight: bold;
-                            cursor: pointer;
-                            margin-bottom: 10px;
-                            width: 100%;
-                        `;
-                        
-                        const cancelButton = document.createElement('button');
-                        cancelButton.textContent = '❌ Cancel';
-                        cancelButton.style.cssText = `
-                            padding: 12px 24px;
-                            background: #dc2626;
-                            color: white;
-                            border: none;
-                            border-radius: 10px;
-                            font-size: 14px;
-                            cursor: pointer;
-                            width: 100%;
-                        `;
-                        
-                        // Wait for video to be ready
-                        video.onloadedmetadata = () => {
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
-                            
-                            captureButton.onclick = () => {
-                                // Draw the video frame to canvas
-                                if (facingMode === 'user') {
-                                    // Flip the canvas for selfie to match mirror view
-                                    context.translate(canvas.width, 0);
-                                    context.scale(-1, 1);
-                                }
-                                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
-                                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                                
-                                // Clean up
-                                stream.getTracks().forEach(track => track.stop());
-                                document.body.removeChild(captureUI);
-                                resolve(imageDataUrl);
-                            };
-                            
-                            cancelButton.onclick = () => {
-                                stream.getTracks().forEach(track => track.stop());
-                                document.body.removeChild(captureUI);
-                                resolve(null);
-                            };
-                            
-                            videoContainer.appendChild(video);
-                            captureUI.appendChild(instructions);
-                            captureUI.appendChild(videoContainer);
-                            buttonContainer.appendChild(captureButton);
-                            buttonContainer.appendChild(cancelButton);
-                            captureUI.appendChild(buttonContainer);
-                            document.body.appendChild(captureUI);
-                        };
-                        
-                        video.onerror = () => {
-                            stream.getTracks().forEach(track => track.stop());
-                            document.body.removeChild(captureUI);
-                            resolve(null);
-                        };
-                    }).catch((error) => {
-                        console.error('Camera access error:', error);
-                        setModalMessage('Camera not available. Please use gallery instead.');
-                        setModalType('error');
-                        setModalVisible(true);
-                        resolve(null);
-                    });
-                } else {
-                    throw new Error('Camera not supported in this browser');
-                }
-            } catch (error) {
-                console.error('Camera error:', error);
-                setModalMessage('Camera not available. Please use gallery instead.');
-                setModalType('error');
-                setModalVisible(true);
-                resolve(null);
-            }
-        });
-    };
-
-    // Web gallery selection
-    const handleWebGallerySelection = () => {
+    // SIMPLIFIED Mobile Web Camera - FIXED FOR MOBILE CHROME
+    const handleMobileWebCamera = (setImageFunction, allowCrop, imageType) => {
         return new Promise((resolve) => {
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.style.cssText = `
-                position: fixed;
-                top: -1000px;
-                left: -1000px;
-            `;
             
-            input.onchange = (e) => {
+            // Use capture attribute for mobile cameras
+            if (imageType === 'selfie') {
+                input.capture = 'user'; // Front camera for selfie
+            } else {
+                input.capture = 'environment'; // Rear camera for ID
+            }
+            
+            // Add event listeners
+            const handleChange = (e) => {
                 const file = e.target.files[0];
                 if (file) {
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         const imageUri = event.target.result;
-                        resolve(imageUri);
+                        
+                        if (allowCrop) {
+                            setSelectedImageUri(imageUri);
+                            setCurrentSetFunction(() => setImageFunction);
+                            setShowCropOptions(true);
+                        } else {
+                            setImageFunction(imageUri);
+                        }
+                        resolve(true);
                     };
                     reader.onerror = () => {
                         setModalMessage('Failed to read the image file. Please try again.');
                         setModalType('error');
                         setModalVisible(true);
-                        resolve(null);
+                        resolve(false);
                     };
                     reader.readAsDataURL(file);
                 } else {
-                    resolve(null);
+                    resolve(false);
                 }
             };
             
-            input.oncancel = () => {
-                resolve(null);
-            };
-            
-            document.body.appendChild(input);
+            input.addEventListener('change', handleChange);
             input.click();
+            
+            // Clean up
             setTimeout(() => {
-                document.body.removeChild(input);
+                input.removeEventListener('change', handleChange);
             }, 1000);
         });
     };
 
-    // Handle when user wants to crop the selected image
+    // SIMPLIFIED Mobile Web Gallery - FIXED FOR MOBILE CHROME
+    const handleMobileWebGallery = (setImageFunction, allowCrop) => {
+        return new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.multiple = false;
+            
+            // Add event listeners
+            const handleChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imageUri = event.target.result;
+                        
+                        if (allowCrop) {
+                            setSelectedImageUri(imageUri);
+                            setCurrentSetFunction(() => setImageFunction);
+                            setShowCropOptions(true);
+                        } else {
+                            setImageFunction(imageUri);
+                        }
+                        resolve(true);
+                    };
+                    reader.onerror = () => {
+                        setModalMessage('Failed to read the image file. Please try again.');
+                        setModalType('error');
+                        setModalVisible(true);
+                        resolve(false);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    resolve(false);
+                }
+            };
+            
+            input.addEventListener('change', handleChange);
+            input.click();
+            
+            // Clean up
+            setTimeout(() => {
+                input.removeEventListener('change', handleChange);
+            }, 1000);
+        });
+    };
+
+    // Handle using the image as-is (no cropping)
+    const handleUseAsIs = () => {
+        if (currentSetFunction && selectedImageUri) {
+            currentSetFunction(selectedImageUri);
+            setShowCropOptions(false);
+            setSelectedImageUri(null);
+            setCurrentImageType(null);
+            setCurrentSetFunction(null);
+        }
+    };
+
+    // SIMPLIFIED Crop handling for mobile web
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
             if (Platform.OS === 'web') {
-                // For web, we'll use a simple image cropping approach
-                // Since advanced cropping is complex, we'll use a basic implementation
-                setModalMessage('Crop functionality is limited on web. Please use the image as is or try on our mobile app for full features.');
+                // For mobile web, we'll use a basic approach
+                // Since advanced cropping is complex on mobile web, we'll use the image as-is
+                // but inform the user
+                setModalMessage('For advanced cropping features, please use the desktop version or our mobile app. Using image as is.');
                 setModalType('info');
                 setModalVisible(true);
                 
-                // For now, we'll just use the image as-is
                 if (currentSetFunction) {
                     currentSetFunction(selectedImageUri);
                 }
@@ -437,12 +294,10 @@ const RegisterPage2 = () => {
                         currentSetFunction(result.assets[0].uri);
                     }
                 } else {
-                    // User canceled cropping, keep the crop options modal open
-                    return;
+                    return; // User canceled cropping
                 }
             }
             
-            // Close the crop options modal
             setShowCropOptions(false);
             setSelectedImageUri(null);
             setCurrentImageType(null);
@@ -456,17 +311,6 @@ const RegisterPage2 = () => {
         }
     };
 
-    // Handle using the image as-is (no cropping)
-    const handleUseAsIs = () => {
-        if (currentSetFunction && selectedImageUri) {
-            currentSetFunction(selectedImageUri);
-            setShowCropOptions(false);
-            setSelectedImageUri(null);
-            setCurrentImageType(null);
-            setCurrentSetFunction(null);
-        }
-    };
-
     // Handle ID Front selection
     const handleIdFrontPress = () => {
         showSourceSelection(setValidIdFront, 'idFront', true);
@@ -474,7 +318,7 @@ const RegisterPage2 = () => {
 
     // Handle Selfie selection
     const handleSelfiePress = () => {
-        showSourceSelection(setSelfie, 'selfie', false); // No crop for selfie
+        showSourceSelection(setSelfie, 'selfie', false);
     };
 
     const handleNext = () => {
@@ -508,12 +352,12 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {/* Web Warning */}
+                {/* Mobile Web Instructions */}
                 {Platform.OS === 'web' && (
                     <View style={styles.webWarning}>
                         <MaterialIcons name="info" size={16} color="#856404" />
                         <Text style={styles.webWarningText}>
-                            Tap on the image areas to upload photos. For best experience with ID photos, use the rear camera.
+                            For mobile: Tap images to upload. Camera access works on most mobile browsers.
                         </Text>
                     </View>
                 )}
@@ -575,7 +419,7 @@ const RegisterPage2 = () => {
                                     <View style={styles.iconContainer}>
                                         <Icon name="add" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
+                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -709,7 +553,7 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="crop" size={20} color="#fff" />
                                     <Text style={styles.cropOptionButtonText}>
-                                        {Platform.OS === 'web' ? 'Crop (Limited)' : 'Crop Image'}
+                                        {Platform.OS === 'web' ? 'Crop (Basic)' : 'Crop Image'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
