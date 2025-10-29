@@ -26,10 +26,6 @@ const RegisterPage2 = () => {
     const [otherGovernmentId, setOtherGovernmentId] = useState('');
     const [validIdFront, setValidIdFront] = useState(null);
     const [selfie, setSelfie] = useState(null);
-    const [showCropOptions, setShowCropOptions] = useState(false);
-    const [selectedImageUri, setSelectedImageUri] = useState(null);
-    const [currentImageType, setCurrentImageType] = useState(null);
-    const [currentSetFunction, setCurrentSetFunction] = useState(null);
     const [showSourceOptions, setShowSourceOptions] = useState(false);
     const [pendingImageAction, setPendingImageAction] = useState(null);
     const [modalVisible, setModalVisible] = useState(false);
@@ -77,26 +73,22 @@ const RegisterPage2 = () => {
     };
 
     // Show source selection options (Camera or Gallery)
-    const showSourceSelection = (setImageFunction, imageType, allowCrop = true) => {
+    const showSourceSelection = (setImageFunction, imageType) => {
         setPendingImageAction({
             setFunction: setImageFunction,
-            type: imageType,
-            allowCrop: allowCrop
+            type: imageType
         });
         setShowSourceOptions(true);
     };
 
-    // SIMPLIFIED: Handle camera selection
+    // Handle camera selection
     const handleCameraSelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Use simple file input for web camera to avoid complexity
-                const imageUri = await handleWebImageSelection(true);
-                if (imageUri) {
-                    pendingImageAction.setFunction(imageUri);
-                }
+                // Use direct file input with camera for web
+                handleWebFileInput(true);
             } else {
                 // Native camera handling
                 const result = await ImagePicker.launchCameraAsync({
@@ -120,30 +112,31 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // SIMPLIFIED: Handle gallery selection - FIXED FOR WEB
-    const handleGallerySelection = async () => {
+    // Handle gallery selection - SIMPLIFIED AND RELIABLE
+    const handleGallerySelection = () => {
         setShowSourceOptions(false);
         
-        try {
-            if (Platform.OS === 'web') {
-                // Use simple file input for web gallery
-                const imageUri = await handleWebImageSelection(false);
-                if (imageUri) {
-                    console.log('Gallery image selected:', imageUri);
-                    pendingImageAction.setFunction(imageUri);
-                }
-            } else {
-                // Native gallery handling
-                const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: false,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                });
+        if (Platform.OS === 'web') {
+            // Use direct file input for web gallery - MOST RELIABLE METHOD
+            handleWebFileInput(false);
+        } else {
+            // Native gallery handling
+            handleNativeGallery();
+        }
+    };
 
-                if (!result.canceled && result.assets && result.assets[0]) {
-                    pendingImageAction.setFunction(result.assets[0].uri);
-                }
+    // Native gallery handling
+    const handleNativeGallery = async () => {
+        try {
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: false,
+                aspect: [4, 3],
+                quality: 0.8,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]) {
+                pendingImageAction.setFunction(result.assets[0].uri);
             }
         } catch (error) {
             console.error('Gallery error:', error);
@@ -151,157 +144,110 @@ const RegisterPage2 = () => {
             setModalType('error');
             setModalVisible(true);
         }
-        
         setPendingImageAction(null);
     };
 
-    // SIMPLIFIED WEB IMAGE SELECTION - WORKS LIKE GFORMS
-    const handleWebImageSelection = (useCamera = false) => {
-        return new Promise((resolve) => {
-            if (useCamera && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                // Camera for web
-                navigator.mediaDevices.getUserMedia({ video: true })
-                    .then((stream) => {
-                        const video = document.createElement('video');
-                        video.srcObject = stream;
-                        video.play();
-                        
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
-                        
-                        const captureUI = document.createElement('div');
-                        captureUI.style.cssText = `
-                            position: fixed;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            background: rgba(0,0,0,0.9);
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            z-index: 10000;
-                            padding: 20px;
-                        `;
-                        
-                        const videoContainer = document.createElement('div');
-                        videoContainer.style.cssText = `
-                            width: 100%;
-                            max-width: 400px;
-                            background: #000;
-                            border-radius: 10px;
-                            overflow: hidden;
-                            margin-bottom: 20px;
-                        `;
-                        
-                        const buttonContainer = document.createElement('div');
-                        buttonContainer.style.cssText = `
-                            display: flex;
-                            gap: 10px;
-                            width: 100%;
-                            max-width: 400px;
-                        `;
-                        
-                        const captureBtn = document.createElement('button');
-                        captureBtn.textContent = '📸 Capture';
-                        captureBtn.style.cssText = `
-                            flex: 1;
-                            padding: 15px;
-                            background: #1E3A5F;
-                            color: white;
-                            border: none;
-                            border-radius: 8px;
-                            font-size: 16px;
-                        `;
-                        
-                        const cancelBtn = document.createElement('button');
-                        cancelBtn.textContent = 'Cancel';
-                        cancelBtn.style.cssText = `
-                            flex: 1;
-                            padding: 15px;
-                            background: #dc2626;
-                            color: white;
-                            border: none;
-                            border-radius: 8px;
-                            font-size: 16px;
-                        `;
-                        
-                        video.onloadedmetadata = () => {
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
-                            
-                            captureBtn.onclick = () => {
-                                context.drawImage(video, 0, 0);
-                                const imageData = canvas.toDataURL('image/jpeg');
-                                stream.getTracks().forEach(track => track.stop());
-                                document.body.removeChild(captureUI);
-                                resolve(imageData);
-                            };
-                            
-                            cancelBtn.onclick = () => {
-                                stream.getTracks().forEach(track => track.stop());
-                                document.body.removeChild(captureUI);
-                                resolve(null);
-                            };
-                            
-                            videoContainer.appendChild(video);
-                            buttonContainer.appendChild(captureBtn);
-                            buttonContainer.appendChild(cancelBtn);
-                            captureUI.appendChild(videoContainer);
-                            captureUI.appendChild(buttonContainer);
-                            document.body.appendChild(captureUI);
-                        };
-                    })
-                    .catch(() => {
-                        // If camera fails, fall back to file input
-                        handleWebFileInput(resolve);
-                    });
-            } else {
-                // Direct file input for gallery (ALWAYS WORKS)
-                handleWebFileInput(resolve);
-            }
-        });
-    };
-
-    // SIMPLE FILE INPUT - WORKS LIKE GFORMS
-    const handleWebFileInput = (resolve) => {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = 'image/*';
-        input.capture = pendingImageAction?.type === 'selfie' ? 'user' : 'environment';
+    // RELIABLE WEB FILE INPUT - FIXED VERSION
+    const handleWebFileInput = (useCamera = false) => {
+        // Create file input element
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
         
-        input.onchange = (e) => {
-            const file = e.target.files[0];
+        // Set camera attribute if needed
+        if (useCamera && pendingImageAction?.type === 'selfie') {
+            fileInput.capture = 'user'; // Front camera for selfie
+        } else if (useCamera) {
+            fileInput.capture = 'environment'; // Rear camera for ID
+        }
+
+        // Style it to be hidden but functional
+        fileInput.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            opacity: 0;
+            cursor: pointer;
+            z-index: 9999;
+        `;
+
+        // Handle file selection
+        fileInput.onchange = (event) => {
+            const file = event.target.files[0];
             if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    resolve(event.target.result);
-                };
-                reader.onerror = () => {
-                    setModalMessage('Failed to read image file');
+                // Validate file type
+                if (!file.type.startsWith('image/')) {
+                    setModalMessage('Please select a valid image file (JPEG, PNG, etc.)');
                     setModalType('error');
                     setModalVisible(true);
-                    resolve(null);
+                    document.body.removeChild(fileInput);
+                    return;
+                }
+
+                // Validate file size (max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    setModalMessage('Image size should be less than 10MB');
+                    setModalType('error');
+                    setModalVisible(true);
+                    document.body.removeChild(fileInput);
+                    return;
+                }
+
+                const reader = new FileReader();
+                
+                reader.onload = (e) => {
+                    const imageUrl = e.target.result;
+                    console.log('Image loaded successfully:', imageUrl);
+                    
+                    // Set the image immediately
+                    if (pendingImageAction && pendingImageAction.setFunction) {
+                        pendingImageAction.setFunction(imageUrl);
+                    }
+                    
+                    // Clean up
+                    document.body.removeChild(fileInput);
                 };
+                
+                reader.onerror = () => {
+                    setModalMessage('Failed to read the image file. Please try again.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    document.body.removeChild(fileInput);
+                };
+                
                 reader.readAsDataURL(file);
             } else {
-                resolve(null);
+                // No file selected, clean up
+                document.body.removeChild(fileInput);
             }
         };
-        
-        input.oncancel = () => {
-            resolve(null);
+
+        // Handle cancellation
+        fileInput.oncancel = () => {
+            document.body.removeChild(fileInput);
         };
-        
-        // Trigger click and cleanup
-        document.body.appendChild(input);
-        input.click();
+
+        // Handle blur (when user clicks away)
+        fileInput.onblur = () => {
+            setTimeout(() => {
+                if (document.body.contains(fileInput)) {
+                    document.body.removeChild(fileInput);
+                }
+            }, 1000);
+        };
+
+        // Add to DOM and trigger click
+        document.body.appendChild(fileInput);
+        fileInput.click();
+
+        // Auto-cleanup after 30 seconds (safety net)
         setTimeout(() => {
-            if (document.body.contains(input)) {
-                document.body.removeChild(input);
+            if (document.body.contains(fileInput)) {
+                document.body.removeChild(fileInput);
             }
-        }, 1000);
+        }, 30000);
     };
 
     // Handle ID Front selection
@@ -332,7 +278,7 @@ const RegisterPage2 = () => {
 
     // Remove image
     const removeImage = (setImageFunction, e) => {
-        e.stopPropagation();
+        if (e && e.stopPropagation) e.stopPropagation();
         setImageFunction(null);
     };
 
@@ -351,12 +297,12 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {/* Web Warning */}
+                {/* Web Instructions */}
                 {Platform.OS === 'web' && (
                     <View style={styles.webWarning}>
                         <MaterialIcons name="info" size={16} color="#856404" />
                         <Text style={styles.webWarningText}>
-                            Tap on the image areas to upload photos. For best experience with ID photos, use the rear camera.
+                            Tap on the image areas to upload photos from your device or take new photos.
                         </Text>
                     </View>
                 )}
@@ -407,12 +353,15 @@ const RegisterPage2 = () => {
                                         >
                                             <MaterialIcons name="close" size={20} color="white" />
                                         </TouchableOpacity>
+                                        <View style={styles.imageOverlay}>
+                                            <Text style={styles.changeText}>Tap to change</Text>
+                                        </View>
                                     </View>
                                 ) : (
                                     <View style={styles.uploadPlaceholder}>
-                                        <MaterialIcons name="add-photo-alternate" size={40} color="#1E3A5F" />
+                                        <MaterialIcons name="add-a-photo" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                                        <Text style={styles.uploadSubText}>ID Front Photo</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -433,12 +382,15 @@ const RegisterPage2 = () => {
                                         >
                                             <MaterialIcons name="close" size={20} color="white" />
                                         </TouchableOpacity>
+                                        <View style={styles.imageOverlay}>
+                                            <Text style={styles.changeText}>Tap to change</Text>
+                                        </View>
                                     </View>
                                 ) : (
                                     <View style={styles.uploadPlaceholder}>
-                                        <MaterialIcons name="photo-camera" size={40} color="#1E3A5F" />
+                                        <MaterialIcons name="face" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                                        <Text style={styles.uploadSubText}>Your selfie</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -505,10 +457,10 @@ const RegisterPage2 = () => {
                 >
                     <View style={styles.modalBackground}>
                         <View style={styles.sourceOptionsModal}>
-                            <Text style={styles.modalTitle}>Select Image Source</Text>
+                            <Text style={styles.modalTitle}>Upload Photo</Text>
                             
                             <Text style={styles.sourceInstructions}>
-                                How would you like to add your {pendingImageAction?.type === 'idFront' ? 'ID photo' : 'selfie'}?
+                                Choose how to add your {pendingImageAction?.type === 'idFront' ? 'ID photo' : 'selfie'}
                             </Text>
                             
                             <View style={styles.sourceButtonsContainer}>
@@ -518,9 +470,6 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="photo-camera" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
-                                    <Text style={styles.sourceOptionSubText}>
-                                        {pendingImageAction?.type === 'selfie' ? 'Use front camera' : 'Use rear camera'}
-                                    </Text>
                                 </TouchableOpacity>
                                 
                                 <TouchableOpacity 
@@ -528,8 +477,7 @@ const RegisterPage2 = () => {
                                     onPress={handleGallerySelection}
                                 >
                                     <MaterialIcons name="photo-library" size={30} color="#fff" />
-                                    <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
-                                    <Text style={styles.sourceOptionSubText}>Select from device</Text>
+                                    <Text style={styles.sourceOptionButtonText}>Choose from Files</Text>
                                 </TouchableOpacity>
                             </View>
                             
@@ -622,10 +570,11 @@ const styles = StyleSheet.create({
     },
     imagePreviewContainer: {
         backgroundColor: '#F1F5F9',
-        borderWidth: 1,
+        borderWidth: 2,
         borderColor: '#E2E8F0',
+        borderStyle: 'dashed',
         borderRadius: 12,
-        height: 150,
+        height: 160,
         justifyContent: 'center',
         alignItems: 'center',
         overflow: 'hidden',
@@ -649,22 +598,37 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 8,
         right: 8,
-        backgroundColor: 'rgba(0,0,0,0.6)',
+        backgroundColor: 'rgba(220, 38, 38, 0.9)',
         borderRadius: 12,
         width: 24,
         height: 24,
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 10,
+    },
+    imageOverlay: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        padding: 8,
+        alignItems: 'center',
+    },
+    changeText: {
+        color: 'white',
+        fontSize: 12,
+        fontWeight: '600',
     },
     uploadText: {
         marginTop: 8,
-        fontSize: 12,
+        fontSize: 14,
         color: '#64748B',
         textAlign: 'center',
         fontWeight: '600',
     },
     uploadSubText: {
-        fontSize: 10,
+        fontSize: 12,
         color: '#94A3B8',
         textAlign: 'center',
         marginTop: 2,
@@ -748,6 +712,7 @@ const styles = StyleSheet.create({
     sourceOptionButton: {
         flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'center',
         padding: 20,
         borderRadius: 12,
         marginBottom: 12,
@@ -762,12 +727,6 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 16,
         fontWeight: '600',
-        marginLeft: 12,
-        flex: 1,
-    },
-    sourceOptionSubText: {
-        color: 'rgba(255,255,255,0.8)',
-        fontSize: 12,
         marginLeft: 12,
     },
     cancelButton: {
