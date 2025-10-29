@@ -13,6 +13,7 @@ import {
   Platform
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import ImagePickerModal from '../../components/ImagePickerModal';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -27,33 +28,64 @@ const RegisterPage2 = () => {
     const [otherGovernmentId, setOtherGovernmentId] = useState('');
     const [validIdFront, setValidIdFront] = useState(null);
     const [selfie, setSelfie] = useState(null);
+    const [showIdFrontOptions, setShowIdFrontOptions] = useState(false);
+    const [showSelfieOptions, setShowSelfieOptions] = useState(false);
+    // State for crop options modal
     const [showCropOptions, setShowCropOptions] = useState(false);
     const [selectedImageUri, setSelectedImageUri] = useState(null);
     const [currentImageType, setCurrentImageType] = useState(null);
     const [currentSetFunction, setCurrentSetFunction] = useState(null);
+    // State for source selection modal
     const [showSourceOptions, setShowSourceOptions] = useState(false);
     const [pendingImageAction, setPendingImageAction] = useState(null);
+    // State for custom modal
     const [modalVisible, setModalVisible] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
-    const [isMobile, setIsMobile] = useState(false);
+    const [browserInfo, setBrowserInfo] = useState({});
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
         address, dateOfBirth,
     } = route.params;
 
-    // Detect mobile device
+    // Detect browser and platform information
     useEffect(() => {
         if (Platform.OS === 'web') {
             const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            const isMobileDevice = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
-            setIsMobile(isMobileDevice);
-            console.log('Mobile detected:', isMobileDevice);
+            const isChrome = /chrome|chromium/i.test(userAgent);
+            const isFirefox = /firefox/i.test(userAgent);
+            const isSafari = /safari/i.test(userAgent) && !/chrome/i.test(userAgent);
+            const isEdge = /edg/i.test(userAgent);
+            const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+            const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+            const isAndroid = /android/i.test(userAgent);
+
+            setBrowserInfo({
+                isChrome,
+                isFirefox,
+                isSafari,
+                isEdge,
+                isMobile,
+                isIOS,
+                isAndroid,
+                userAgent
+            });
+
+            console.log('Browser Detection:', {
+                isChrome,
+                isFirefox,
+                isSafari,
+                isEdge,
+                isMobile,
+                isIOS,
+                isAndroid,
+                userAgent
+            });
         }
     }, []);
 
-    // Request permissions
+    // Request permissions on component mount
     useEffect(() => {
         (async () => {
             if (Platform.OS !== 'web') {
@@ -73,7 +105,18 @@ const RegisterPage2 = () => {
         })();
     }, []);
 
-    // Show source selection options
+    // Handle image selection from the ImagePickerModal
+    const handleImageSelected = (imageUri, imageType = null, setFunction = null) => {
+        if (imageType === 'idFront') {
+            setValidIdFront(imageUri);
+        } else if (imageType === 'selfie') {
+            setSelfie(imageUri);
+        } else if (setFunction) {
+            setFunction(imageUri);
+        }
+    };
+
+    // Show source selection options (Camera or Gallery)
     const showSourceSelection = (setImageFunction, imageType, allowCrop = true) => {
         setPendingImageAction({
             setFunction: setImageFunction,
@@ -83,41 +126,46 @@ const RegisterPage2 = () => {
         setShowSourceOptions(true);
     };
 
-    // SIMPLIFIED: Handle camera selection for mobile Chrome
+    // Handle camera selection - UNIVERSAL BROWSER SUPPORT
     const handleCameraSelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Use a simple file input with camera capture for mobile Chrome
-                const imageUri = await handleMobileCameraCapture();
+                // Web camera handling with universal browser support
+                const imageUri = await handleWebCameraCapture(pendingImageAction.type);
                 if (imageUri) {
+                    const processedUri = await processImageForRender(imageUri);
                     if (pendingImageAction.allowCrop) {
-                        setSelectedImageUri(imageUri);
+                        setSelectedImageUri(processedUri);
                         setCurrentSetFunction(() => pendingImageAction.setFunction);
                         setCurrentImageType(pendingImageAction.type);
                         setShowCropOptions(true);
                     } else {
-                        pendingImageAction.setFunction(imageUri);
+                        pendingImageAction.setFunction(processedUri);
                     }
                 }
             } else {
+                // Native camera handling
                 const result = await ImagePicker.launchCameraAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false,
                     aspect: [4, 3],
                     quality: 0.8,
+                    base64: false,
                 });
 
                 if (!result.canceled && result.assets && result.assets[0]) {
                     const imageUri = result.assets[0].uri;
+                    const processedUri = await processImageForRender(imageUri);
+                    
                     if (pendingImageAction.allowCrop) {
-                        setSelectedImageUri(imageUri);
+                        setSelectedImageUri(processedUri);
                         setCurrentSetFunction(() => pendingImageAction.setFunction);
                         setCurrentImageType(pendingImageAction.type);
                         setShowCropOptions(true);
                     } else {
-                        pendingImageAction.setFunction(imageUri);
+                        pendingImageAction.setFunction(processedUri);
                     }
                 }
             }
@@ -131,224 +179,301 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // FIXED: Simple gallery selection that works on mobile Chrome
-    const handleGallerySelection = async () => {
-        setShowSourceOptions(false);
-        
-        try {
-            if (Platform.OS === 'web') {
-                // Use a simple file input that works everywhere
-                const imageUri = await handleSimpleFileInput();
-                if (imageUri) {
-                    if (pendingImageAction.allowCrop) {
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        pendingImageAction.setFunction(imageUri);
-                    }
-                }
-            } else {
-                const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: false,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                });
-
-                if (!result.canceled && result.assets && result.assets[0]) {
-                    const imageUri = result.assets[0].uri;
-                    if (pendingImageAction.allowCrop) {
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        pendingImageAction.setFunction(imageUri);
-                    }
+    // Handle gallery selection - UNIVERSAL BROWSER SUPPORT
+// Improved gallery selection for web
+const handleGallerySelection = async () => {
+    setShowSourceOptions(false);
+    
+    try {
+        if (Platform.OS === 'web') {
+            // Enhanced web gallery handling
+            const imageUri = await handleWebGallerySelection();
+            if (imageUri) {
+                const processedUri = await processImageForRender(imageUri);
+                if (pendingImageAction?.allowCrop) {
+                    setSelectedImageUri(processedUri);
+                    setCurrentSetFunction(() => pendingImageAction.setFunction);
+                    setCurrentImageType(pendingImageAction.type);
+                    setShowCropOptions(true);
+                } else {
+                    pendingImageAction.setFunction(processedUri);
                 }
             }
-        } catch (error) {
-            console.error('Gallery error:', error);
-            setModalMessage('Failed to select image. Please try again.');
-            setModalType('error');
-            setModalVisible(true);
+        } else {
+            // Native gallery handling (unchanged)
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: false,
+                aspect: [4, 3],
+                quality: 0.8,
+                base64: false,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+                const processedUri = await processImageForRender(imageUri);
+                
+                if (pendingImageAction.allowCrop) {
+                    setSelectedImageUri(processedUri);
+                    setCurrentSetFunction(() => pendingImageAction.setFunction);
+                    setCurrentImageType(pendingImageAction.type);
+                    setShowCropOptions(true);
+                } else {
+                    pendingImageAction.setFunction(processedUri);
+                }
+            }
         }
-        
-        setPendingImageAction(null);
+    } catch (error) {
+        console.error('Gallery error:', error);
+        setModalMessage('Failed to select image from gallery. Please try again.');
+        setModalType('error');
+        setModalVisible(true);
+    }
+    
+    setPendingImageAction(null);
+};
+
+    // Process image for Render compatibility
+    const processImageForRender = async (imageUri) => {
+        try {
+            if (imageUri.startsWith('data:image')) {
+                return imageUri;
+            }
+            
+            if (imageUri.startsWith('file://')) {
+                if (Platform.OS === 'web') {
+                    return await convertFileUriToBase64(imageUri);
+                }
+            }
+            
+            return imageUri;
+        } catch (error) {
+            console.error('Error processing image for Render:', error);
+            return imageUri;
+        }
     };
 
-    // SIMPLE FILE INPUT - Works on ALL browsers including mobile Chrome
-    const handleSimpleFileInput = () => {
-        return new Promise((resolve) => {
-            try {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                
-                // Add capture attribute for mobile devices to use camera
-                if (isMobile) {
-                    input.setAttribute('capture', 'environment');
-                }
-                
-                input.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    opacity: 0;
-                    z-index: 9999;
-                `;
-
-                const cleanup = () => {
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
-                    }
-                };
-
-                const timeoutId = setTimeout(() => {
-                    cleanup();
-                    resolve(null);
-                }, 60000); // 60 second timeout
-
-                input.onchange = (e) => {
-                    clearTimeout(timeoutId);
-                    const file = e.target.files[0];
-                    if (file) {
-                        // Validate file size (max 5MB for mobile)
-                        if (file.size > 5 * 1024 * 1024) {
-                            setModalMessage('Image too large. Please select image smaller than 5MB.');
-                            setModalType('error');
-                            setModalVisible(true);
-                            cleanup();
-                            resolve(null);
-                            return;
-                        }
-
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            cleanup();
-                            resolve(event.target.result);
-                        };
-                        reader.onerror = () => {
-                            cleanup();
-                            setModalMessage('Failed to read image file.');
-                            setModalType('error');
-                            setModalVisible(true);
-                            resolve(null);
-                        };
-                        reader.readAsDataURL(file);
-                    } else {
-                        cleanup();
-                        resolve(null);
-                    }
-                };
-
-                input.oncancel = () => {
-                    clearTimeout(timeoutId);
-                    cleanup();
-                    resolve(null);
-                };
-
-                input.onerror = () => {
-                    clearTimeout(timeoutId);
-                    cleanup();
-                    setModalMessage('Error accessing file picker.');
-                    setModalType('error');
-                    setModalVisible(true);
-                    resolve(null);
-                };
-
-                document.body.appendChild(input);
-                input.click();
-
-            } catch (error) {
-                console.error('File input error:', error);
-                setModalMessage('File selection not working. Please try again.');
-                setModalType('error');
-                setModalVisible(true);
-                resolve(null);
+    // Convert file URI to base64 for web deployment
+    const convertFileUriToBase64 = (fileUri) => {
+        return new Promise((resolve, reject) => {
+            if (fileUri.startsWith('data:image')) {
+                resolve(fileUri);
+                return;
             }
+            
+            fetch(fileUri)
+                .then(response => response.blob())
+                .then(blob => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => {
+                        resolve(reader.result);
+                    };
+                    reader.onerror = reject;
+                    reader.readAsDataURL(blob);
+                })
+                .catch(error => {
+                    console.warn('Failed to convert file URI to base64:', error);
+                    resolve(fileUri);
+                });
         });
     };
 
-    // SIMPLE MOBILE CAMERA CAPTURE - Works on mobile Chrome
-    const handleMobileCameraCapture = () => {
+    // Web camera capture - UNIVERSAL BROWSER SUPPORT
+    const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
+            // Check if browser supports camera
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setModalMessage('Camera not supported in this browser. Please use gallery instead.');
+                setModalType('error');
+                setModalVisible(true);
+                resolve(null);
+                return;
+            }
+
             try {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
+                const facingMode = imageType === 'selfie' ? 'user' : 'environment';
                 
-                // Force camera usage on mobile
-                input.setAttribute('capture', 'environment');
-                
-                input.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100%;
-                    opacity: 0;
-                    z-index: 9999;
-                `;
-
-                const cleanup = () => {
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
+                // Browser-specific constraints for better compatibility
+                const constraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
                     }
                 };
 
-                const timeoutId = setTimeout(() => {
-                    cleanup();
-                    resolve(null);
-                }, 60000);
+                // Safari specific constraints
+                if (browserInfo.isSafari) {
+                    constraints.video = {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    };
+                }
 
-                input.onchange = (e) => {
-                    clearTimeout(timeoutId);
-                    const file = e.target.files[0];
-                    if (file) {
-                        if (file.size > 5 * 1024 * 1024) {
-                            setModalMessage('Image too large. Please take a smaller photo.');
-                            setModalType('error');
-                            setModalVisible(true);
-                            cleanup();
+                // iOS Safari specific constraints
+                if (browserInfo.isIOS) {
+                    constraints.video = {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    };
+                }
+
+                navigator.mediaDevices.getUserMedia(constraints)
+                .then((stream) => {
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    video.style.cssText = `
+                        width: 100%;
+                        height: auto;
+                        border-radius: 8px;
+                        transform: ${facingMode === 'user' ? 'scaleX(-1)' : 'none'};
+                    `;
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    const captureUI = document.createElement('div');
+                    captureUI.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.95);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                        padding: 20px;
+                        box-sizing: border-box;
+                    `;
+                    
+                    const videoContainer = document.createElement('div');
+                    videoContainer.style.cssText = `
+                        position: relative;
+                        width: 100%;
+                        max-width: 400px;
+                        border-radius: 12px;
+                        overflow: hidden;
+                        background: #000;
+                        margin-bottom: 20px;
+                    `;
+                    
+                    const instructions = document.createElement('div');
+                    instructions.textContent = imageType === 'selfie' 
+                        ? 'Take a selfie' 
+                        : 'Take a photo of your ID';
+                    instructions.style.cssText = `
+                        color: white;
+                        text-align: center;
+                        margin-bottom: 15px;
+                        font-size: 16px;
+                        font-weight: bold;
+                    `;
+                    
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        width: 100%;
+                        max-width: 400px;
+                    `;
+                    
+                    const captureButton = document.createElement('button');
+                    captureButton.textContent = '📸 Capture Photo';
+                    captureButton.style.cssText = `
+                        padding: 15px 30px;
+                        background: #1E3A5F;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        margin-bottom: 10px;
+                        width: 100%;
+                    `;
+                    
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = '❌ Cancel';
+                    cancelButton.style.cssText = `
+                        padding: 12px 24px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        width: 100%;
+                    `;
+                    
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        
+                        captureButton.onclick = () => {
+                            if (facingMode === 'user') {
+                                context.translate(canvas.width, 0);
+                                context.scale(-1, 1);
+                            }
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            
+                            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            
+                            // Clean up
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(imageDataUrl);
+                        };
+                        
+                        cancelButton.onclick = () => {
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
                             resolve(null);
-                            return;
+                        };
+                        
+                        videoContainer.appendChild(video);
+                        captureUI.appendChild(instructions);
+                        captureUI.appendChild(videoContainer);
+                        buttonContainer.appendChild(captureButton);
+                        buttonContainer.appendChild(cancelButton);
+                        captureUI.appendChild(buttonContainer);
+                        document.body.appendChild(captureUI);
+                    };
+                    
+                    video.onerror = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        if (document.body.contains(captureUI)) {
+                            document.body.removeChild(captureUI);
                         }
-
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            cleanup();
-                            resolve(event.target.result);
-                        };
-                        reader.onerror = () => {
-                            cleanup();
-                            setModalMessage('Failed to process photo.');
-                            setModalType('error');
-                            setModalVisible(true);
-                            resolve(null);
-                        };
-                        reader.readAsDataURL(file);
-                    } else {
-                        cleanup();
                         resolve(null);
+                    };
+                }).catch((error) => {
+                    console.error('Camera access error:', error);
+                    let errorMessage = 'Camera not available. Please use gallery instead.';
+                    
+                    // Specific error messages for different scenarios
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage = 'No camera found on this device.';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage = 'Camera not supported in this browser.';
                     }
-                };
-
-                input.oncancel = () => {
-                    clearTimeout(timeoutId);
-                    cleanup();
+                    
+                    setModalMessage(errorMessage);
+                    setModalType('error');
+                    setModalVisible(true);
                     resolve(null);
-                };
-
-                document.body.appendChild(input);
-                input.click();
-
+                });
             } catch (error) {
-                console.error('Mobile camera error:', error);
+                console.error('Camera error:', error);
                 setModalMessage('Camera not available. Please use gallery instead.');
                 setModalType('error');
                 setModalVisible(true);
@@ -357,13 +482,135 @@ const RegisterPage2 = () => {
         });
     };
 
-    // Handle crop selection
+    // Web gallery selection - UNIVERSAL BROWSER SUPPORT
+    const handleWebGallerySelection = () => {
+        return new Promise((resolve) => {
+            try {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                
+                // Support for multiple image types across all browsers
+                input.accept = 'image/jpeg, image/png, image/jpg, image/gif, image/webp';
+                
+                input.style.cssText = `
+                    position: fixed;
+                    top: -1000px;
+                    left: -1000px;
+                    opacity: 0;
+                `;
+                
+                let cleanup = () => {
+                    if (document.body.contains(input)) {
+                        document.body.removeChild(input);
+                    }
+                };
+                
+                // Set timeout for cleanup in case something goes wrong
+                const cleanupTimeout = setTimeout(() => {
+                    cleanup();
+                    resolve(null);
+                }, 30000); // 30 second timeout
+                
+                input.onchange = (e) => {
+                    clearTimeout(cleanupTimeout);
+                    const file = e.target.files[0];
+                    if (file) {
+                        // Check file size (max 10MB)
+                        if (file.size > 10 * 1024 * 1024) {
+                            setModalMessage('Image size too large. Please select an image smaller than 10MB.');
+                            setModalType('error');
+                            setModalVisible(true);
+                            cleanup();
+                            resolve(null);
+                            return;
+                        }
+                        
+                        // Check file type
+                        const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+                        if (!validTypes.includes(file.type)) {
+                            setModalMessage('Please select a valid image file (JPEG, PNG, GIF, WebP).');
+                            setModalType('error');
+                            setModalVisible(true);
+                            cleanup();
+                            resolve(null);
+                            return;
+                        }
+                        
+                        const reader = new FileReader();
+                        
+                        reader.onload = (event) => {
+                            const imageUri = event.target.result;
+                            cleanup();
+                            resolve(imageUri);
+                        };
+                        
+                        reader.onerror = () => {
+                            setModalMessage('Failed to read the image file. Please try again.');
+                            setModalType('error');
+                            setModalVisible(true);
+                            cleanup();
+                            resolve(null);
+                        };
+                        
+                        reader.onabort = () => {
+                            cleanup();
+                            resolve(null);
+                        };
+                        
+                        reader.readAsDataURL(file);
+                    } else {
+                        cleanup();
+                        resolve(null);
+                    }
+                };
+                
+                input.oncancel = () => {
+                    clearTimeout(cleanupTimeout);
+                    cleanup();
+                    resolve(null);
+                };
+                
+                input.onerror = () => {
+                    clearTimeout(cleanupTimeout);
+                    cleanup();
+                    setModalMessage('Error accessing file picker. Please try again.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                };
+                
+                document.body.appendChild(input);
+                
+                // Trigger click with error handling
+                try {
+                    input.click();
+                } catch (error) {
+                    console.error('Error triggering file input:', error);
+                    cleanup();
+                    setModalMessage('File selection not supported in this browser. Please try a different browser.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                }
+                
+            } catch (error) {
+                console.error('Gallery selection error:', error);
+                setModalMessage('File selection failed. Please try again or use a different browser.');
+                setModalType('error');
+                setModalVisible(true);
+                resolve(null);
+            }
+        });
+    };
+
+    // Handle when user wants to crop the selected image
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
             if (Platform.OS === 'web') {
-                setModalMessage('Crop functionality is limited on web. Using image as is.');
+                setModalMessage('Crop functionality is limited on web. Please use the image as is or try on our mobile app for full features.');
                 setModalType('info');
                 setModalVisible(true);
                 
@@ -376,11 +623,13 @@ const RegisterPage2 = () => {
                     allowsEditing: true,
                     aspect: [4, 3],
                     quality: 0.8,
+                    base64: false,
                 });
 
                 if (!result.canceled && result.assets && result.assets[0]) {
+                    const processedUri = await processImageForRender(result.assets[0].uri);
                     if (currentSetFunction) {
-                        currentSetFunction(result.assets[0].uri);
+                        currentSetFunction(processedUri);
                     }
                 } else {
                     return;
@@ -394,15 +643,16 @@ const RegisterPage2 = () => {
             
         } catch (error) {
             console.error('Error cropping image:', error);
-            setModalMessage('Failed to crop image. Using image as is.');
+            setModalMessage('Failed to crop image. Please try again.');
             setModalType('error');
             setModalVisible(true);
         }
     };
 
-    // Handle using the image as-is
+    // Handle using the image as-is (no cropping)
     const handleUseAsIs = () => {
         if (currentSetFunction && selectedImageUri) {
+            console.log('Setting image as-is:', selectedImageUri);
             currentSetFunction(selectedImageUri);
             setShowCropOptions(false);
             setSelectedImageUri(null);
@@ -421,10 +671,30 @@ const RegisterPage2 = () => {
         showSourceSelection(setSelfie, 'selfie', false);
     };
 
-    // Get image source for display
+    // Improved image display for all browsers
     const getImageSource = (uri) => {
         if (!uri) return null;
+        
+        if (uri.startsWith('data:image') || uri.startsWith('http') || uri.startsWith('file://')) {
+            return { uri };
+        }
+        
         return { uri };
+    };
+
+    // Get browser-specific instructions
+    const getBrowserInstructions = () => {
+        if (!browserInfo.isMobile) return null;
+
+        if (browserInfo.isIOS) {
+            return "On iOS: For best results, use Safari browser. Tap 'Choose from Gallery' to upload photos.";
+        } else if (browserInfo.isAndroid) {
+            return "On Android: Chrome works best. Allow camera permissions when prompted.";
+        } else if (browserInfo.isChrome) {
+            return "Using Chrome: Make sure to allow camera and file access permissions.";
+        }
+        
+        return "For mobile devices: Use Chrome or Safari for best compatibility.";
     };
 
     const handleNext = () => {
@@ -458,13 +728,25 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {/* Mobile-specific instructions */}
-                {Platform.OS === 'web' && isMobile && (
-                    <View style={styles.mobileWarning}>
-                        <MaterialIcons name="smartphone" size={16} color="#055160" />
-                        <Text style={styles.mobileWarningText}>
-                            📱 Mobile Detected: Tap "Take Photo" for camera or "Choose from Gallery" for files. Works on Chrome!
-                        </Text>
+                {/* Browser-specific warnings and instructions */}
+                {Platform.OS === 'web' && (
+                    <View style={styles.webWarning}>
+                        <MaterialIcons name="info" size={16} color="#856404" />
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.webWarningText}>
+                                Tap on the image areas to upload photos. Compatible with all major browsers.
+                            </Text>
+                            {getBrowserInstructions() && (
+                                <Text style={styles.browserSpecificText}>
+                                    {getBrowserInstructions()}
+                                </Text>
+                            )}
+                            {browserInfo.isMobile && (
+                                <Text style={styles.mobileTipText}>
+                                    💡 Tip: For ID photos, use the rear camera. For selfies, use the front camera.
+                                </Text>
+                            )}
+                        </View>
                     </View>
                 )}
 
@@ -525,9 +807,9 @@ const RegisterPage2 = () => {
                                     <View style={styles.iconContainer}>
                                         <Icon name="add" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
-                                        {isMobile && (
-                                            <Text style={styles.mobileHint}>📷 Works on Mobile Chrome!</Text>
+                                        <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
+                                        {browserInfo.isMobile && (
+                                            <Text style={styles.mobileHintText}>Use rear camera for best results</Text>
                                         )}
                                     </View>
                                 )}
@@ -547,8 +829,8 @@ const RegisterPage2 = () => {
                                         <Icon name="photo-camera" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery</Text>
-                                        {isMobile && (
-                                            <Text style={styles.mobileHint}>🤳 Use front camera</Text>
+                                        {browserInfo.isMobile && (
+                                            <Text style={styles.mobileHintText}>Use front camera</Text>
                                         )}
                                     </View>
                                 )}
@@ -588,10 +870,14 @@ const RegisterPage2 = () => {
                                 How would you like to add your {pendingImageAction?.type === 'idFront' ? 'ID photo' : 'selfie'}?
                             </Text>
 
-                            {isMobile && (
-                                <View style={styles.mobileTip}>
-                                    <Text style={styles.mobileTipText}>
-                                        ✅ Guaranteed to work on Mobile Chrome!
+                            {/* Browser-specific tips */}
+                            {Platform.OS === 'web' && browserInfo.isMobile && (
+                                <View style={styles.browserTipContainer}>
+                                    <Text style={styles.browserTipText}>
+                                        {browserInfo.isIOS 
+                                            ? "📱 iOS Tip: Safari works best. Allow camera access when prompted."
+                                            : "📱 Android Tip: Chrome recommended. Check permissions if issues occur."
+                                        }
                                     </Text>
                                 </View>
                             )}
@@ -604,7 +890,7 @@ const RegisterPage2 = () => {
                                     <MaterialIcons name="photo-camera" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
                                     <Text style={styles.sourceOptionSubText}>
-                                        {isMobile ? 'Opens camera directly' : 'Use camera'}
+                                        {pendingImageAction?.type === 'selfie' ? 'Use front camera' : 'Use rear camera'}
                                     </Text>
                                 </TouchableOpacity>
                                 
@@ -614,9 +900,7 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="photo-library" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
-                                    <Text style={styles.sourceOptionSubText}>
-                                        {isMobile ? 'Select from photos' : 'Select from device'}
-                                    </Text>
+                                    <Text style={styles.sourceOptionSubText}>Select from device</Text>
                                 </TouchableOpacity>
                             </View>
                             
@@ -633,7 +917,7 @@ const RegisterPage2 = () => {
                     </View>
                 </Modal>
 
-                {/* Crop Options Modal */}
+                {/* Crop Options Modal - Shows after image selection */}
                 <Modal
                     transparent={true}
                     visible={showCropOptions}
@@ -652,12 +936,12 @@ const RegisterPage2 = () => {
                             {selectedImageUri && (
                                 <View style={styles.previewImageContainer}>
                                     <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
-                                    <Text style={styles.previewText}>Your selected image</Text>
+                                    <Text style={styles.previewText}>Preview of your selected image</Text>
                                 </View>
                             )}
                             
                             <Text style={styles.cropInstructions}>
-                                Would you like to use this image as is?
+                                Would you like to use this image as is or crop it?
                             </Text>
                             
                             <View style={styles.cropButtonsContainer}>
@@ -675,7 +959,7 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="crop" size={20} color="#fff" />
                                     <Text style={styles.cropOptionButtonText}>
-                                        {Platform.OS === 'web' ? 'Try Crop' : 'Crop Image'}
+                                        {Platform.OS === 'web' ? 'Crop (Limited)' : 'Crop Image'}
                                     </Text>
                                 </TouchableOpacity>
                             </View>
@@ -729,41 +1013,70 @@ const styles = StyleSheet.create({
         color: '#0F172A',
         textAlign: 'left',
     },
+    section: {
+        marginBottom: 16,
+    },
+    label: {
+        fontSize: 15,
+        marginBottom: 8,
+        color: '#0F172A',
+        fontWeight: '600',
+    },
     subLabel: {
         fontSize: 13,
         marginTop: 2,
         color: '#475569',
     },
-    mobileWarning: {
-        backgroundColor: '#D1ECF1',
+    webWarning: {
+        backgroundColor: '#FFF3CD',
         padding: 12,
         borderRadius: 8,
         marginBottom: 16,
         borderLeftWidth: 4,
-        borderLeftColor: '#0CA678',
+        borderLeftColor: '#FFC107',
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
     },
-    mobileWarningText: {
-        color: '#055160',
+    webWarningText: {
+        color: '#856404',
         fontSize: 12,
         marginLeft: 8,
         flex: 1,
         fontWeight: '600',
     },
-    mobileTip: {
-        backgroundColor: '#E7F3FF',
+    browserSpecificText: {
+        color: '#856404',
+        fontSize: 11,
+        marginLeft: 8,
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    browserTipContainer: {
+        backgroundColor: '#D1ECF1',
         padding: 10,
         borderRadius: 8,
         marginBottom: 15,
         borderLeftWidth: 4,
-        borderLeftColor: '#1E3A5F',
+        borderLeftColor: '#0CA678',
+    },
+    browserTipText: {
+        color: '#055160',
+        fontSize: 12,
+        fontWeight: '500',
     },
     mobileTipText: {
-        color: '#1E3A5F',
-        fontSize: 12,
-        fontWeight: '600',
+        color: '#856404',
+        fontSize: 11,
+        marginLeft: 8,
+        marginTop: 4,
+        fontWeight: '500',
+    },
+    mobileHintText: {
+        fontSize: 9,
+        color: '#94A3B8',
         textAlign: 'center',
+        marginTop: 2,
+        fontStyle: 'italic',
     },
     card: {
         backgroundColor: '#FFFFFF',
@@ -810,14 +1123,6 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         textAlign: 'center',
         marginTop: 2,
-    },
-    mobileHint: {
-        fontSize: 9,
-        color: '#1E3A5F',
-        textAlign: 'center',
-        marginTop: 4,
-        fontWeight: '600',
-        fontStyle: 'italic',
     },
     imagePreview: {
         width: '100%',
