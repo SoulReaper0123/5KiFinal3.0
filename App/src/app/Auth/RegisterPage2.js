@@ -42,11 +42,48 @@ const RegisterPage2 = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
+    const [browserInfo, setBrowserInfo] = useState({});
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
         address, dateOfBirth,
     } = route.params;
+
+    // Detect browser and platform information
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isChrome = /chrome|chromium/i.test(userAgent);
+            const isFirefox = /firefox/i.test(userAgent);
+            const isSafari = /safari/i.test(userAgent) && !/chrome/i.test(userAgent);
+            const isEdge = /edg/i.test(userAgent);
+            const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+            const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+            const isAndroid = /android/i.test(userAgent);
+
+            setBrowserInfo({
+                isChrome,
+                isFirefox,
+                isSafari,
+                isEdge,
+                isMobile,
+                isIOS,
+                isAndroid,
+                userAgent
+            });
+
+            console.log('Browser Detection:', {
+                isChrome,
+                isFirefox,
+                isSafari,
+                isEdge,
+                isMobile,
+                isIOS,
+                isAndroid,
+                userAgent
+            });
+        }
+    }, []);
 
     // Request permissions on component mount
     useEffect(() => {
@@ -89,16 +126,15 @@ const RegisterPage2 = () => {
         setShowSourceOptions(true);
     };
 
-    // Handle camera selection - FIXED FOR RENDER
+    // Handle camera selection - UNIVERSAL BROWSER SUPPORT
     const handleCameraSelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Web camera handling
+                // Web camera handling with universal browser support
                 const imageUri = await handleWebCameraCapture(pendingImageAction.type);
                 if (imageUri) {
-                    // FIX: Ensure the image URI is properly formatted for Render
                     const processedUri = await processImageForRender(imageUri);
                     if (pendingImageAction.allowCrop) {
                         setSelectedImageUri(processedUri);
@@ -120,7 +156,6 @@ const RegisterPage2 = () => {
                 });
 
                 if (!result.canceled && result.assets && result.assets[0]) {
-                    // FIX: Process image URI for consistency
                     const imageUri = result.assets[0].uri;
                     const processedUri = await processImageForRender(imageUri);
                     
@@ -144,16 +179,15 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED FOR RENDER
+    // Handle gallery selection - UNIVERSAL BROWSER SUPPORT
     const handleGallerySelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Web gallery handling
+                // Web gallery handling with universal browser support
                 const imageUri = await handleWebGallerySelection();
                 if (imageUri) {
-                    // FIX: Process image for Render compatibility
                     const processedUri = await processImageForRender(imageUri);
                     if (pendingImageAction.allowCrop) {
                         setSelectedImageUri(processedUri);
@@ -180,7 +214,6 @@ const RegisterPage2 = () => {
                     const imageUri = result.assets[0].uri;
                     console.log('Selected image URI:', imageUri);
                     
-                    // FIX: Process image for Render compatibility
                     const processedUri = await processImageForRender(imageUri);
                     
                     if (pendingImageAction.allowCrop) {
@@ -206,20 +239,15 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // NEW: Process image for Render compatibility
+    // Process image for Render compatibility
     const processImageForRender = async (imageUri) => {
         try {
-            // If it's a base64 data URL, ensure it's properly formatted
             if (imageUri.startsWith('data:image')) {
                 return imageUri;
             }
             
-            // If it's a file URI, ensure it's accessible
             if (imageUri.startsWith('file://')) {
-                // For Render deployment, we might need to convert to base64
-                // or ensure the file path is properly handled
                 if (Platform.OS === 'web') {
-                    // For web deployment, convert file URIs to base64 if needed
                     return await convertFileUriToBase64(imageUri);
                 }
             }
@@ -227,20 +255,18 @@ const RegisterPage2 = () => {
             return imageUri;
         } catch (error) {
             console.error('Error processing image for Render:', error);
-            return imageUri; // Return original as fallback
+            return imageUri;
         }
     };
 
-    // NEW: Convert file URI to base64 for web deployment
+    // Convert file URI to base64 for web deployment
     const convertFileUriToBase64 = (fileUri) => {
         return new Promise((resolve, reject) => {
-            // If it's already a base64 data URL, return as is
             if (fileUri.startsWith('data:image')) {
                 resolve(fileUri);
                 return;
             }
             
-            // For file URIs on web, we need to fetch and convert
             fetch(fileUri)
                 .then(response => response.blob())
                 .then(blob => {
@@ -253,165 +279,205 @@ const RegisterPage2 = () => {
                 })
                 .catch(error => {
                     console.warn('Failed to convert file URI to base64:', error);
-                    resolve(fileUri); // Return original as fallback
+                    resolve(fileUri);
                 });
         });
     };
 
-    // Web camera capture - IMPROVED FOR RENDER
+    // Web camera capture - UNIVERSAL BROWSER SUPPORT
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
+            // Check if browser supports camera
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setModalMessage('Camera not supported in this browser. Please use gallery instead.');
+                setModalType('error');
+                setModalVisible(true);
+                resolve(null);
+                return;
+            }
+
             try {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    const facingMode = imageType === 'selfie' ? 'user' : 'environment';
+                const facingMode = imageType === 'selfie' ? 'user' : 'environment';
+                
+                // Browser-specific constraints for better compatibility
+                const constraints = {
+                    video: {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
+                };
+
+                // Safari specific constraints
+                if (browserInfo.isSafari) {
+                    constraints.video = {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    };
+                }
+
+                // iOS Safari specific constraints
+                if (browserInfo.isIOS) {
+                    constraints.video = {
+                        facingMode: facingMode,
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    };
+                }
+
+                navigator.mediaDevices.getUserMedia(constraints)
+                .then((stream) => {
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    video.style.cssText = `
+                        width: 100%;
+                        height: auto;
+                        border-radius: 8px;
+                        transform: ${facingMode === 'user' ? 'scaleX(-1)' : 'none'};
+                    `;
                     
-                    navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: facingMode,
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
-                        } 
-                    }).then((stream) => {
-                        const video = document.createElement('video');
-                        video.srcObject = stream;
-                        video.autoplay = true;
-                        video.playsInline = true;
-                        video.style.cssText = `
-                            width: 100%;
-                            height: auto;
-                            border-radius: 8px;
-                            transform: ${facingMode === 'user' ? 'scaleX(-1)' : 'none'};
-                        `;
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    const captureUI = document.createElement('div');
+                    captureUI.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.95);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                        padding: 20px;
+                        box-sizing: border-box;
+                    `;
+                    
+                    const videoContainer = document.createElement('div');
+                    videoContainer.style.cssText = `
+                        position: relative;
+                        width: 100%;
+                        max-width: 400px;
+                        border-radius: 12px;
+                        overflow: hidden;
+                        background: #000;
+                        margin-bottom: 20px;
+                    `;
+                    
+                    const instructions = document.createElement('div');
+                    instructions.textContent = imageType === 'selfie' 
+                        ? 'Take a selfie' 
+                        : 'Take a photo of your ID';
+                    instructions.style.cssText = `
+                        color: white;
+                        text-align: center;
+                        margin-bottom: 15px;
+                        font-size: 16px;
+                        font-weight: bold;
+                    `;
+                    
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        width: 100%;
+                        max-width: 400px;
+                    `;
+                    
+                    const captureButton = document.createElement('button');
+                    captureButton.textContent = '📸 Capture Photo';
+                    captureButton.style.cssText = `
+                        padding: 15px 30px;
+                        background: #1E3A5F;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        font-weight: bold;
+                        cursor: pointer;
+                        margin-bottom: 10px;
+                        width: 100%;
+                    `;
+                    
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = '❌ Cancel';
+                    cancelButton.style.cssText = `
+                        padding: 12px 24px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 14px;
+                        cursor: pointer;
+                        width: 100%;
+                    `;
+                    
+                    video.onloadedmetadata = () => {
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
                         
-                        const canvas = document.createElement('canvas');
-                        const context = canvas.getContext('2d');
-                        
-                        const captureUI = document.createElement('div');
-                        captureUI.style.cssText = `
-                            position: fixed;
-                            top: 0;
-                            left: 0;
-                            width: 100%;
-                            height: 100%;
-                            background: rgba(0,0,0,0.95);
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            justify-content: center;
-                            z-index: 10000;
-                            padding: 20px;
-                            box-sizing: border-box;
-                        `;
-                        
-                        const videoContainer = document.createElement('div');
-                        videoContainer.style.cssText = `
-                            position: relative;
-                            width: 100%;
-                            max-width: 400px;
-                            border-radius: 12px;
-                            overflow: hidden;
-                            background: #000;
-                            margin-bottom: 20px;
-                        `;
-                        
-                        const instructions = document.createElement('div');
-                        instructions.textContent = imageType === 'selfie' 
-                            ? 'Take a selfie' 
-                            : 'Take a photo of your ID';
-                        instructions.style.cssText = `
-                            color: white;
-                            text-align: center;
-                            margin-bottom: 15px;
-                            font-size: 16px;
-                            font-weight: bold;
-                        `;
-                        
-                        const buttonContainer = document.createElement('div');
-                        buttonContainer.style.cssText = `
-                            display: flex;
-                            flex-direction: column;
-                            align-items: center;
-                            width: 100%;
-                            max-width: 400px;
-                        `;
-                        
-                        const captureButton = document.createElement('button');
-                        captureButton.textContent = '📸 Capture Photo';
-                        captureButton.style.cssText = `
-                            padding: 15px 30px;
-                            background: #1E3A5F;
-                            color: white;
-                            border: none;
-                            border-radius: 10px;
-                            font-size: 16px;
-                            font-weight: bold;
-                            cursor: pointer;
-                            margin-bottom: 10px;
-                            width: 100%;
-                        `;
-                        
-                        const cancelButton = document.createElement('button');
-                        cancelButton.textContent = '❌ Cancel';
-                        cancelButton.style.cssText = `
-                            padding: 12px 24px;
-                            background: #dc2626;
-                            color: white;
-                            border: none;
-                            border-radius: 10px;
-                            font-size: 14px;
-                            cursor: pointer;
-                            width: 100%;
-                        `;
-                        
-                        video.onloadedmetadata = () => {
-                            canvas.width = video.videoWidth;
-                            canvas.height = video.videoHeight;
+                        captureButton.onclick = () => {
+                            if (facingMode === 'user') {
+                                context.translate(canvas.width, 0);
+                                context.scale(-1, 1);
+                            }
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
                             
-                            captureButton.onclick = () => {
-                                if (facingMode === 'user') {
-                                    context.translate(canvas.width, 0);
-                                    context.scale(-1, 1);
-                                }
-                                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
-                                // FIX: Ensure high quality base64 image for Render
-                                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                                
-                                stream.getTracks().forEach(track => track.stop());
-                                document.body.removeChild(captureUI);
-                                resolve(imageDataUrl);
-                            };
+                            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
                             
-                            cancelButton.onclick = () => {
-                                stream.getTracks().forEach(track => track.stop());
-                                document.body.removeChild(captureUI);
-                                resolve(null);
-                            };
-                            
-                            videoContainer.appendChild(video);
-                            captureUI.appendChild(instructions);
-                            captureUI.appendChild(videoContainer);
-                            buttonContainer.appendChild(captureButton);
-                            buttonContainer.appendChild(cancelButton);
-                            captureUI.appendChild(buttonContainer);
-                            document.body.appendChild(captureUI);
+                            // Clean up
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(imageDataUrl);
                         };
                         
-                        video.onerror = () => {
+                        cancelButton.onclick = () => {
                             stream.getTracks().forEach(track => track.stop());
                             document.body.removeChild(captureUI);
                             resolve(null);
                         };
-                    }).catch((error) => {
-                        console.error('Camera access error:', error);
-                        setModalMessage('Camera not available. Please use gallery instead.');
-                        setModalType('error');
-                        setModalVisible(true);
+                        
+                        videoContainer.appendChild(video);
+                        captureUI.appendChild(instructions);
+                        captureUI.appendChild(videoContainer);
+                        buttonContainer.appendChild(captureButton);
+                        buttonContainer.appendChild(cancelButton);
+                        captureUI.appendChild(buttonContainer);
+                        document.body.appendChild(captureUI);
+                    };
+                    
+                    video.onerror = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        if (document.body.contains(captureUI)) {
+                            document.body.removeChild(captureUI);
+                        }
                         resolve(null);
-                    });
-                } else {
-                    throw new Error('Camera not supported in this browser');
-                }
+                    };
+                }).catch((error) => {
+                    console.error('Camera access error:', error);
+                    let errorMessage = 'Camera not available. Please use gallery instead.';
+                    
+                    // Specific error messages for different scenarios
+                    if (error.name === 'NotAllowedError') {
+                        errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
+                    } else if (error.name === 'NotFoundError') {
+                        errorMessage = 'No camera found on this device.';
+                    } else if (error.name === 'NotSupportedError') {
+                        errorMessage = 'Camera not supported in this browser.';
+                    }
+                    
+                    setModalMessage(errorMessage);
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                });
             } catch (error) {
                 console.error('Camera error:', error);
                 setModalMessage('Camera not available. Please use gallery instead.');
@@ -422,52 +488,129 @@ const RegisterPage2 = () => {
         });
     };
 
-    // Web gallery selection - IMPROVED FOR RENDER
+    // Web gallery selection - UNIVERSAL BROWSER SUPPORT
     const handleWebGallerySelection = () => {
         return new Promise((resolve) => {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.style.cssText = `
-                position: fixed;
-                top: -1000px;
-                left: -1000px;
-            `;
-            
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        // FIX: Ensure proper base64 format for Render
-                        const imageUri = event.target.result;
-                        resolve(imageUri);
-                    };
-                    reader.onerror = () => {
-                        setModalMessage('Failed to read the image file. Please try again.');
-                        setModalType('error');
-                        setModalVisible(true);
+            try {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*';
+                
+                // Support for multiple image types across all browsers
+                input.accept = 'image/jpeg, image/png, image/jpg, image/gif, image/webp';
+                
+                input.style.cssText = `
+                    position: fixed;
+                    top: -1000px;
+                    left: -1000px;
+                    opacity: 0;
+                `;
+                
+                let cleanup = () => {
+                    if (document.body.contains(input)) {
+                        document.body.removeChild(input);
+                    }
+                };
+                
+                // Set timeout for cleanup in case something goes wrong
+                const cleanupTimeout = setTimeout(() => {
+                    cleanup();
+                    resolve(null);
+                }, 30000); // 30 second timeout
+                
+                input.onchange = (e) => {
+                    clearTimeout(cleanupTimeout);
+                    const file = e.target.files[0];
+                    if (file) {
+                        // Check file size (max 10MB)
+                        if (file.size > 10 * 1024 * 1024) {
+                            setModalMessage('Image size too large. Please select an image smaller than 10MB.');
+                            setModalType('error');
+                            setModalVisible(true);
+                            cleanup();
+                            resolve(null);
+                            return;
+                        }
+                        
+                        // Check file type
+                        const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+                        if (!validTypes.includes(file.type)) {
+                            setModalMessage('Please select a valid image file (JPEG, PNG, GIF, WebP).');
+                            setModalType('error');
+                            setModalVisible(true);
+                            cleanup();
+                            resolve(null);
+                            return;
+                        }
+                        
+                        const reader = new FileReader();
+                        
+                        reader.onload = (event) => {
+                            const imageUri = event.target.result;
+                            cleanup();
+                            resolve(imageUri);
+                        };
+                        
+                        reader.onerror = () => {
+                            setModalMessage('Failed to read the image file. Please try again.');
+                            setModalType('error');
+                            setModalVisible(true);
+                            cleanup();
+                            resolve(null);
+                        };
+                        
+                        reader.onabort = () => {
+                            cleanup();
+                            resolve(null);
+                        };
+                        
+                        reader.readAsDataURL(file);
+                    } else {
+                        cleanup();
                         resolve(null);
-                    };
-                    reader.readAsDataURL(file);
-                } else {
+                    }
+                };
+                
+                input.oncancel = () => {
+                    clearTimeout(cleanupTimeout);
+                    cleanup();
+                    resolve(null);
+                };
+                
+                input.onerror = () => {
+                    clearTimeout(cleanupTimeout);
+                    cleanup();
+                    setModalMessage('Error accessing file picker. Please try again.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                };
+                
+                document.body.appendChild(input);
+                
+                // Trigger click with error handling
+                try {
+                    input.click();
+                } catch (error) {
+                    console.error('Error triggering file input:', error);
+                    cleanup();
+                    setModalMessage('File selection not supported in this browser. Please try a different browser.');
+                    setModalType('error');
+                    setModalVisible(true);
                     resolve(null);
                 }
-            };
-            
-            input.oncancel = () => {
+                
+            } catch (error) {
+                console.error('Gallery selection error:', error);
+                setModalMessage('File selection failed. Please try again or use a different browser.');
+                setModalType('error');
+                setModalVisible(true);
                 resolve(null);
-            };
-            
-            document.body.appendChild(input);
-            input.click();
-            setTimeout(() => {
-                document.body.removeChild(input);
-            }, 1000);
+            }
         });
     };
 
-    // Handle when user wants to crop the selected image - FIXED
+    // Handle when user wants to crop the selected image
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
@@ -490,7 +633,6 @@ const RegisterPage2 = () => {
                 });
 
                 if (!result.canceled && result.assets && result.assets[0]) {
-                    // FIX: Process the cropped image for Render
                     const processedUri = await processImageForRender(result.assets[0].uri);
                     if (currentSetFunction) {
                         currentSetFunction(processedUri);
@@ -513,7 +655,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // Handle using the image as-is (no cropping) - FIXED
+    // Handle using the image as-is (no cropping)
     const handleUseAsIs = () => {
         if (currentSetFunction && selectedImageUri) {
             console.log('Setting image as-is:', selectedImageUri);
@@ -535,17 +677,30 @@ const RegisterPage2 = () => {
         showSourceSelection(setSelfie, 'selfie', false);
     };
 
-    // FIX: Improved image display for Render
+    // Improved image display for all browsers
     const getImageSource = (uri) => {
         if (!uri) return null;
         
-        // For base64 images or web URLs
-        if (uri.startsWith('data:image') || uri.startsWith('http')) {
+        if (uri.startsWith('data:image') || uri.startsWith('http') || uri.startsWith('file://')) {
             return { uri };
         }
         
-        // For file URIs, ensure they're properly handled
         return { uri };
+    };
+
+    // Get browser-specific instructions
+    const getBrowserInstructions = () => {
+        if (!browserInfo.isMobile) return null;
+
+        if (browserInfo.isIOS) {
+            return "On iOS: For best results, use Safari browser. Tap 'Choose from Gallery' to upload photos.";
+        } else if (browserInfo.isAndroid) {
+            return "On Android: Chrome works best. Allow camera permissions when prompted.";
+        } else if (browserInfo.isChrome) {
+            return "Using Chrome: Make sure to allow camera and file access permissions.";
+        }
+        
+        return "For mobile devices: Use Chrome or Safari for best compatibility.";
     };
 
     const handleNext = () => {
@@ -579,14 +734,25 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {/* Web Warning */}
+                {/* Browser-specific warnings and instructions */}
                 {Platform.OS === 'web' && (
                     <View style={styles.webWarning}>
                         <MaterialIcons name="info" size={16} color="#856404" />
-                        <Text style={styles.webWarningText}>
-                            Tap on the image areas to upload photos. For best experience with ID photos, use the rear camera.
-                            {typeof window !== 'undefined' && window.location.hostname !== 'localhost' && ' (Render Deployment Active)'}
-                        </Text>
+                        <View style={{ flex: 1 }}>
+                            <Text style={styles.webWarningText}>
+                                Tap on the image areas to upload photos. Compatible with all major browsers.
+                            </Text>
+                            {getBrowserInstructions() && (
+                                <Text style={styles.browserSpecificText}>
+                                    {getBrowserInstructions()}
+                                </Text>
+                            )}
+                            {browserInfo.isMobile && (
+                                <Text style={styles.mobileTipText}>
+                                    💡 Tip: For ID photos, use the rear camera. For selfies, use the front camera.
+                                </Text>
+                            )}
+                        </View>
                     </View>
                 )}
 
@@ -648,6 +814,9 @@ const RegisterPage2 = () => {
                                         <Icon name="add" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
+                                        {browserInfo.isMobile && (
+                                            <Text style={styles.mobileHintText}>Use rear camera for best results</Text>
+                                        )}
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -666,6 +835,9 @@ const RegisterPage2 = () => {
                                         <Icon name="photo-camera" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                                        {browserInfo.isMobile && (
+                                            <Text style={styles.mobileHintText}>Use front camera</Text>
+                                        )}
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -703,6 +875,18 @@ const RegisterPage2 = () => {
                             <Text style={styles.sourceInstructions}>
                                 How would you like to add your {pendingImageAction?.type === 'idFront' ? 'ID photo' : 'selfie'}?
                             </Text>
+
+                            {/* Browser-specific tips */}
+                            {Platform.OS === 'web' && browserInfo.isMobile && (
+                                <View style={styles.browserTipContainer}>
+                                    <Text style={styles.browserTipText}>
+                                        {browserInfo.isIOS 
+                                            ? "📱 iOS Tip: Safari works best. Allow camera access when prompted."
+                                            : "📱 Android Tip: Chrome recommended. Check permissions if issues occur."
+                                        }
+                                    </Text>
+                                </View>
+                            )}
                             
                             <View style={styles.sourceButtonsContainer}>
                                 <TouchableOpacity 
@@ -857,13 +1041,48 @@ const styles = StyleSheet.create({
         borderLeftWidth: 4,
         borderLeftColor: '#FFC107',
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-start',
     },
     webWarningText: {
         color: '#856404',
         fontSize: 12,
         marginLeft: 8,
         flex: 1,
+        fontWeight: '600',
+    },
+    browserSpecificText: {
+        color: '#856404',
+        fontSize: 11,
+        marginLeft: 8,
+        marginTop: 4,
+        fontStyle: 'italic',
+    },
+    browserTipContainer: {
+        backgroundColor: '#D1ECF1',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+        borderLeftWidth: 4,
+        borderLeftColor: '#0CA678',
+    },
+    browserTipText: {
+        color: '#055160',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    mobileTipText: {
+        color: '#856404',
+        fontSize: 11,
+        marginLeft: 8,
+        marginTop: 4,
+        fontWeight: '500',
+    },
+    mobileHintText: {
+        fontSize: 9,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 2,
+        fontStyle: 'italic',
     },
     card: {
         backgroundColor: '#FFFFFF',
