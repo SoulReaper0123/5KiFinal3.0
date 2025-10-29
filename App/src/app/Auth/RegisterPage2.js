@@ -98,7 +98,6 @@ const RegisterPage2 = () => {
                 setCurrentSetFunction(null);
             } else {
                 // User canceled cropping, keep the crop options modal open
-                // so they can choose "Use as is" instead
                 console.log('User canceled cropping');
             }
         } catch (error) {
@@ -120,33 +119,57 @@ const RegisterPage2 = () => {
         }
     };
 
+    // Enhanced file input for mobile web browsers
+    const handleFileInput = (setImageFunction, showCrop = false) => {
+        return new Promise((resolve) => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = showCrop ? undefined : 'user'; // For mobile camera
+            
+            // Add event listeners
+            input.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imageUri = event.target.result;
+                        if (showCrop) {
+                            setSelectedImageUri(imageUri);
+                            setCurrentSetFunction(() => setImageFunction);
+                            setShowCropOptions(true);
+                        } else {
+                            setImageFunction(imageUri);
+                        }
+                        resolve(true);
+                    };
+                    reader.onerror = () => {
+                        setModalMessage('Failed to read the image file. Please try again.');
+                        setModalType('error');
+                        setModalVisible(true);
+                        resolve(false);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    resolve(false);
+                }
+            };
+            
+            input.oncancel = () => {
+                resolve(false);
+            };
+            
+            // Trigger click on input
+            input.click();
+        });
+    };
+
     // Handle when image is selected from gallery and show crop options
     const handleGalleryImageSelected = async (imageUri, setImageFunction, imageType) => {
         try {
-            // For web/mobile browser compatibility, we'll handle image selection differently
             if (Platform.OS === 'web') {
-                // On web, we need to use a different approach
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*';
-                
-                input.onchange = (e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                        const reader = new FileReader();
-                        reader.onload = (event) => {
-                            const imageUri = event.target.result;
-                            // Save the image and show crop options
-                            setSelectedImageUri(imageUri);
-                            setCurrentSetFunction(() => setImageFunction);
-                            setCurrentImageType(imageType);
-                            setShowCropOptions(true);
-                        };
-                        reader.readAsDataURL(file);
-                    }
-                };
-                
-                input.click();
+                // Use enhanced file input for web
+                await handleFileInput(setImageFunction, true);
             } else {
                 // For native apps, use the existing approach
                 setSelectedImageUri(imageUri);
@@ -162,32 +185,155 @@ const RegisterPage2 = () => {
         }
     };
 
-    // Direct image selection for web (bypasses crop options if needed)
-    const handleDirectImageSelection = async (setImageFunction, showCrop = false) => {
+    // Handle ID Front selection
+    const handleIdFrontPress = async () => {
         if (Platform.OS === 'web') {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const imageUri = event.target.result;
+            // On web, use enhanced file input for ID front with crop options
+            await handleFileInput(setValidIdFront, true);
+        } else {
+            setShowIdFrontOptions(true);
+        }
+    };
+
+    // Handle Selfie selection
+    const handleSelfiePress = async () => {
+        if (Platform.OS === 'web') {
+            // On web, use enhanced file input for selfie without crop
+            await handleFileInput(setSelfie, false);
+        } else {
+            setShowSelfieOptions(true);
+        }
+    };
+
+    // Enhanced mobile web image source selection
+    const showWebImageSourceOptions = (setImageFunction, showCrop = false) => {
+        Alert.alert(
+            "Select Image Source",
+            "Choose how you want to add your image",
+            [
+                {
+                    text: "Take Photo",
+                    onPress: () => handleWebCameraCapture(setImageFunction, showCrop)
+                },
+                {
+                    text: "Choose from Gallery",
+                    onPress: () => handleFileInput(setImageFunction, showCrop)
+                },
+                {
+                    text: "Cancel",
+                    style: "cancel"
+                }
+            ]
+        );
+    };
+
+    // Handle web camera capture (for browsers that support it)
+    const handleWebCameraCapture = async (setImageFunction, showCrop = false) => {
+        try {
+            if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                // Create video element for camera preview
+                const video = document.createElement('video');
+                video.srcObject = stream;
+                video.play();
+                
+                // Create canvas for capturing image
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                // Wait for video to be ready
+                video.onloadedmetadata = () => {
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    
+                    // Create capture button and UI
+                    const captureUI = document.createElement('div');
+                    captureUI.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.8);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                    `;
+                    
+                    const videoContainer = document.createElement('div');
+                    videoContainer.style.cssText = `
+                        position: relative;
+                        max-width: 90%;
+                        max-height: 70%;
+                    `;
+                    
+                    const captureButton = document.createElement('button');
+                    captureButton.textContent = 'Capture Photo';
+                    captureButton.style.cssText = `
+                        margin-top: 20px;
+                        padding: 12px 24px;
+                        background: #1E3A5F;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 16px;
+                        cursor: pointer;
+                    `;
+                    
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = 'Cancel';
+                    cancelButton.style.cssText = `
+                        margin-top: 10px;
+                        padding: 10px 20px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-size: 14px;
+                        cursor: pointer;
+                    `;
+                    
+                    captureButton.onclick = () => {
+                        context.drawImage(video, 0, 0);
+                        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                        
                         if (showCrop) {
-                            setSelectedImageUri(imageUri);
+                            setSelectedImageUri(imageDataUrl);
                             setCurrentSetFunction(() => setImageFunction);
                             setShowCropOptions(true);
                         } else {
-                            setImageFunction(imageUri);
+                            setImageFunction(imageDataUrl);
                         }
+                        
+                        // Clean up
+                        stream.getTracks().forEach(track => track.stop());
+                        document.body.removeChild(captureUI);
                     };
-                    reader.readAsDataURL(file);
-                }
-            };
-            
-            input.click();
+                    
+                    cancelButton.onclick = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        document.body.removeChild(captureUI);
+                    };
+                    
+                    videoContainer.appendChild(video);
+                    captureUI.appendChild(videoContainer);
+                    captureUI.appendChild(captureButton);
+                    captureUI.appendChild(cancelButton);
+                    document.body.appendChild(captureUI);
+                };
+            } else {
+                throw new Error('Camera not supported in this browser');
+            }
+        } catch (error) {
+            console.error('Camera error:', error);
+            setModalMessage('Camera not available. Please use file upload instead.');
+            setModalType('error');
+            setModalVisible(true);
+            // Fallback to file input
+            await handleFileInput(setImageFunction, showCrop);
         }
     };
 
@@ -205,26 +351,6 @@ const RegisterPage2 = () => {
             validIdFront,
             selfie
         });
-    };
-
-    // Handle ID Front selection
-    const handleIdFrontPress = () => {
-        if (Platform.OS === 'web') {
-            // On web, use direct file input for ID front with crop options
-            handleDirectImageSelection(setValidIdFront, true);
-        } else {
-            setShowIdFrontOptions(true);
-        }
-    };
-
-    // Handle Selfie selection
-    const handleSelfiePress = () => {
-        if (Platform.OS === 'web') {
-            // On web, use direct file input for selfie
-            handleDirectImageSelection(setSelfie, false);
-        } else {
-            setShowSelfieOptions(true);
-        }
     };
 
     return (
@@ -247,7 +373,7 @@ const RegisterPage2 = () => {
                     <View style={styles.webWarning}>
                         <MaterialIcons name="info" size={16} color="#856404" />
                         <Text style={styles.webWarningText}>
-                            For image uploads on web: Click the image area and select a file from your device. Camera access is not available on web.
+                            Tap on the image areas to upload photos. On mobile, you can choose to take a photo or select from gallery.
                         </Text>
                     </View>
                 )}
@@ -309,6 +435,7 @@ const RegisterPage2 = () => {
                                     <View style={styles.iconContainer}>
                                         <Icon name="add" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
+                                        <Text style={styles.uploadSubText}>Crop available</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -326,6 +453,7 @@ const RegisterPage2 = () => {
                                     <View style={styles.iconContainer}>
                                         <Icon name="photo-camera" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
+                                        <Text style={styles.uploadSubText}>Camera preferred</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -531,6 +659,13 @@ const styles = StyleSheet.create({
         fontSize: 12,
         color: '#64748B',
         textAlign: 'center',
+        fontWeight: '600',
+    },
+    uploadSubText: {
+        fontSize: 10,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 2,
     },
     imagePreview: {
         width: '100%',
