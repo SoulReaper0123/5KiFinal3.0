@@ -45,120 +45,54 @@ const RegisterPage2 = () => {
         address, dateOfBirth,
     } = route.params;
 
-    // Web-compatible image selection handler
-    const handleWebImageSelection = (setImageFunction) => {
-        if (Platform.OS !== 'web') return;
-        
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        
-        fileInput.onchange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    const imageUri = event.target.result;
-                    setImageFunction(imageUri);
-                    
-                    // Clean up state
-                    setCurrentSetFunction(null);
-                    setCurrentImageType(null);
-                };
-                reader.readAsDataURL(file);
-            }
-        };
-        
-        // Trigger file selection
-        fileInput.click();
+    // Handle image selection from the ImagePickerModal
+    const handleImageSelected = (imageUri, imageType = null, setFunction = null) => {
+        if (imageType === 'idFront') {
+            setValidIdFront(imageUri);
+        } else if (imageType === 'selfie') {
+            setSelfie(imageUri);
+        } else if (setFunction) {
+            setFunction(imageUri);
+        }
     };
 
-    const handleSelectImage = async (source, setImageFunction, imageType) => {
-        // First, ensure we have a valid function to set the image
-        if (typeof setImageFunction !== 'function') {
-            console.error('setImageFunction is not a function:', setImageFunction);
-            Alert.alert('Error', 'An internal error occurred. Please try again.');
-            return;
-        }
-        
-        // Close all option modals first
-        setShowIdFrontOptions(false);
-        setShowSelfieOptions(false);
-        
-        // Save the current set function and image type for later use
-        setCurrentSetFunction(() => setImageFunction);
-        setCurrentImageType(imageType);
-        
-        // Web-specific handling
-        if (Platform.OS === 'web') {
-            if (source === 'camera') {
-                // For web, use the ImagePickerModal which has better web handling
-                if (imageType === 'selfie') {
-                    setShowSelfieOptions(true);
-                } else {
-                    setShowIdFrontOptions(true);
-                }
-                return;
-            } else if (source === 'gallery') {
-                // Use web fallback for gallery
-                handleWebImageSelection(setImageFunction);
-                return;
-            }
-        }
+    // Handle when user wants to crop the selected image
+    const handleCropSelectedImage = async () => {
+        if (!selectedImageUri) return;
 
         try {
-            const { status } = source === 'camera' 
-                ? await ImagePicker.requestCameraPermissionsAsync()
-                : await ImagePicker.requestMediaLibraryPermissionsAsync();
-                
-            if (status !== 'granted') {
-                setModalMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
-                setModalType('error');
-                setModalVisible(true);
-                return;
-            }
-
-            // Launch camera or image library WITHOUT automatic editing
-            const result = await (source === 'camera' 
-                ? ImagePicker.launchCameraAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: false, // Disable automatic editing
-                    quality: 0.8,
-                })
-                : ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: false, // Disable automatic editing
-                    quality: 0.8,
-                }));
+            // Use ImagePicker with editing enabled to crop the SAME image
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: undefined, // Free form cropping
+                quality: 0.8,
+                base64: false,
+            });
 
             if (!result.canceled && result.assets && result.assets[0]) {
-                if (source === 'camera') {
-                    // For camera: automatically use the image as is
-                    setImageFunction(result.assets[0].uri);
-                    // Clean up state
-                    setCurrentSetFunction(null);
-                    setCurrentImageType(null);
-                } else {
-                    // For gallery: show crop options
-                    setSelectedImageUri(result.assets[0].uri);
-                    setShowCropOptions(true);
+                // Use the cropped image
+                if (currentSetFunction) {
+                    currentSetFunction(result.assets[0].uri);
                 }
+                // Close the crop options modal
+                setShowCropOptions(false);
+                setSelectedImageUri(null);
+                setCurrentImageType(null);
+                setCurrentSetFunction(null);
+            } else {
+                // User canceled cropping, keep the crop options modal open
+                // so they can choose "Use as is" instead
             }
         } catch (error) {
-            console.error('Error selecting image:', error);
-            
-            // Fallback for web if ImagePicker fails
-            if (Platform.OS === 'web' && source === 'gallery') {
-                handleWebImageSelection(setImageFunction);
-                return;
-            }
-            
-            setModalMessage('Failed to select image');
+            console.error('Error cropping image:', error);
+            setModalMessage('Failed to crop image');
             setModalType('error');
             setModalVisible(true);
         }
     };
 
+    // Handle using the image as-is (no cropping)
     const handleUseAsIs = () => {
         if (currentSetFunction && selectedImageUri) {
             currentSetFunction(selectedImageUri);
@@ -169,61 +103,13 @@ const RegisterPage2 = () => {
         }
     };
 
-    const handleCropImage = async () => {
-        if (!selectedImageUri) return;
-
-        try {
-            setShowCropOptions(false);
-            
-            Alert.alert(
-                'Crop Image',
-                'You can now crop the image with flexible dimensions. Drag the corners to adjust both height and width as needed.',
-                [
-                    {
-                        text: 'Cancel',
-                        style: 'cancel',
-                        onPress: () => setShowCropOptions(true)
-                    },
-                    {
-                        text: 'Continue',
-                        onPress: async () => {
-                            try {
-                                // Use ImagePicker with editing enabled for flexible cropping
-                                const result = await ImagePicker.launchImageLibraryAsync({
-                                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                                    allowsEditing: true,
-                                    // No aspect ratio = free form cropping
-                                    quality: 0.8,
-                                });
-
-                                if (!result.canceled && result.assets && result.assets[0]) {
-                                    if (currentSetFunction) {
-                                        currentSetFunction(result.assets[0].uri);
-                                    }
-                                    // Clean up state
-                                    setSelectedImageUri(null);
-                                    setCurrentImageType(null);
-                                    setCurrentSetFunction(null);
-                                } else {
-                                    setShowCropOptions(true);
-                                }
-                            } catch (error) {
-                                console.error('Error cropping image:', error);
-                                setModalMessage('Failed to crop image');
-                                setModalType('error');
-                                setModalVisible(true);
-                                setShowCropOptions(true);
-                            }
-                        },
-                    },
-                ]
-            );
-        } catch (error) {
-            console.error('Error with crop:', error);
-            setModalMessage('Failed to crop image');
-            setModalType('error');
-            setModalVisible(true);
-        }
+    // Handle when image is selected from gallery and show crop options
+    const handleGalleryImageSelected = (imageUri, setImageFunction, imageType) => {
+        // Save the image and show crop options
+        setSelectedImageUri(imageUri);
+        setCurrentSetFunction(() => setImageFunction);
+        setCurrentImageType(imageType);
+        setShowCropOptions(true);
     };
 
     const handleNext = () => {
@@ -241,61 +127,6 @@ const RegisterPage2 = () => {
             selfie
         });
     };
-
-    const renderOptionsModal = (visible, setVisible, onCameraPress, onLibraryPress, title, showLibraryOption = true) => (
-        <Modal
-            transparent={true}
-            visible={visible}
-            onRequestClose={() => setVisible(false)}
-            animationType="slide"
-        >
-            <View style={styles.modalBackground}>
-                <View style={styles.optionsModal}>
-                    <Text style={styles.modalTitle}>{title}</Text>
-                    <View style={styles.optionButtonsContainer}>
-                        <TouchableOpacity 
-                            style={[styles.optionButton, !showLibraryOption && styles.fullWidthOption]}
-                            onPress={() => {
-                                // First close the modal, then handle the camera press
-                                setVisible(false);
-                                // Small delay to ensure modal is closed before proceeding
-                                setTimeout(() => {
-                                    onCameraPress();
-                                }, 300);
-                            }}
-                        >
-                            <Icon name="photo-camera" size={24} color="#2D5783" style={styles.optionIcon} />
-                            <Text style={styles.optionText}>Take Photo</Text>
-                        </TouchableOpacity>
-                        {showLibraryOption && (
-                            <TouchableOpacity 
-                                style={styles.optionButton}
-                                onPress={() => {
-                                    // First close the modal, then handle the library press
-                                    setVisible(false);
-                                    // Small delay to ensure modal is closed before proceeding
-                                    setTimeout(() => {
-                                        onLibraryPress();
-                                    }, 300);
-                                }}
-                            >
-                                <Icon name="photo-library" size={24} color="#2D5783" style={styles.optionIcon} />
-                                <Text style={styles.optionText}>
-                                    {Platform.OS === 'web' ? 'Choose File' : 'Choose from Gallery'}
-                                </Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                    <TouchableOpacity 
-                        style={styles.cancelButton}
-                        onPress={() => setVisible(false)}
-                    >
-                        <Text style={styles.cancelText}>Cancel</Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
-        </Modal>
-    );
 
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -369,7 +200,10 @@ const RegisterPage2 = () => {
                     <View style={styles.grid}>
                         <View style={styles.tile}>
                             <Text style={styles.label}>Valid ID - Front</Text>
-                            <TouchableOpacity onPress={() => setShowIdFrontOptions(true)} style={styles.imagePreviewContainer}>
+                            <TouchableOpacity 
+                                onPress={() => setShowIdFrontOptions(true)} 
+                                style={styles.imagePreviewContainer}
+                            >
                                 {validIdFront ? (
                                     <Image source={{ uri: validIdFront }} style={styles.imagePreview} />
                                 ) : (
@@ -382,7 +216,10 @@ const RegisterPage2 = () => {
 
                         <View style={styles.tile}>
                             <Text style={styles.label}>Selfie</Text>
-                            <TouchableOpacity onPress={() => setShowSelfieOptions(true)} style={styles.imagePreviewContainer}>
+                            <TouchableOpacity 
+                                onPress={() => setShowSelfieOptions(true)} 
+                                style={styles.imagePreviewContainer}
+                            >
                                 {selfie ? (
                                     <Image source={{ uri: selfie }} style={styles.imagePreview} />
                                 ) : (
@@ -412,9 +249,8 @@ const RegisterPage2 = () => {
                 <ImagePickerModal
                     visible={showIdFrontOptions}
                     onClose={() => setShowIdFrontOptions(false)}
-                    onImageSelected={(imageUri) => {
-                        setValidIdFront(imageUri);
-                    }}
+                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'idFront', setValidIdFront)}
+                    onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setValidIdFront, 'idFront')}
                     title="Select ID Front Source"
                     showCropOptions={true}
                 />
@@ -422,28 +258,33 @@ const RegisterPage2 = () => {
                 <ImagePickerModal
                     visible={showSelfieOptions}
                     onClose={() => setShowSelfieOptions(false)}
-                    onImageSelected={(imageUri) => {
-                        setSelfie(imageUri);
-                    }}
+                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'selfie', setSelfie)}
+                    onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setSelfie, 'selfie')}
                     title="Take Selfie"
                     showCropOptions={false}
                     cameraOnly={true}
                 />
 
-                {/* Crop Options Modal */}
+                {/* Crop Options Modal - Shows after gallery selection */}
                 <Modal
                     transparent={true}
                     visible={showCropOptions}
-                    onRequestClose={() => setShowCropOptions(false)}
+                    onRequestClose={() => {
+                        setShowCropOptions(false);
+                        setSelectedImageUri(null);
+                        setCurrentImageType(null);
+                        setCurrentSetFunction(null);
+                    }}
                     animationType="slide"
                 >
                     <View style={styles.modalBackground}>
-                        <View style={styles.optionsModal}>
-                            <Text style={styles.modalTitle}>Image Selected</Text>
+                        <View style={styles.cropOptionsModal}>
+                            <Text style={styles.modalTitle}>Image Preview</Text>
                             
                             {selectedImageUri && (
                                 <View style={styles.previewImageContainer}>
                                     <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
+                                    <Text style={styles.previewText}>Preview of your selected image</Text>
                                 </View>
                             )}
                             
@@ -453,22 +294,30 @@ const RegisterPage2 = () => {
                             
                             <View style={styles.cropButtonsContainer}>
                                 <TouchableOpacity 
-                                    style={[styles.cropButton, styles.useAsIsButton]}
+                                    style={[styles.cropOptionButton, styles.useAsIsButton]}
                                     onPress={handleUseAsIs}
                                 >
-                                    <Text style={styles.cropButtonText}>Use as is</Text>
+                                    <MaterialIcons name="check" size={20} color="#fff" />
+                                    <Text style={styles.cropOptionButtonText}>Use as is</Text>
                                 </TouchableOpacity>
+                                
                                 <TouchableOpacity 
-                                    style={styles.cropButton}
-                                    onPress={handleCropImage}
+                                    style={[styles.cropOptionButton, styles.cropImageButton]}
+                                    onPress={handleCropSelectedImage}
                                 >
-                                    <Text style={styles.cropButtonText}>Crop Image</Text>
+                                    <MaterialIcons name="crop" size={20} color="#fff" />
+                                    <Text style={styles.cropOptionButtonText}>Crop Image</Text>
                                 </TouchableOpacity>
                             </View>
                             
                             <TouchableOpacity 
                                 style={styles.cancelButton}
-                                onPress={() => setShowCropOptions(false)}
+                                onPress={() => {
+                                    setShowCropOptions(false);
+                                    setSelectedImageUri(null);
+                                    setCurrentImageType(null);
+                                    setCurrentSetFunction(null);
+                                }}
                             >
                                 <Text style={styles.cancelText}>Cancel</Text>
                             </TouchableOpacity>
@@ -494,7 +343,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
         padding: 16,
         paddingBottom: 32,
-        backgroundColor: '#F8FAFC', // light neutral background
+        backgroundColor: '#F8FAFC',
     },
     container: {
         flex: 1,
@@ -507,7 +356,7 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 22,
         fontWeight: '700',
-        color: '#0F172A', // slate-900
+        color: '#0F172A',
         textAlign: 'left',
     },
     section: {
@@ -522,9 +371,8 @@ const styles = StyleSheet.create({
     subLabel: {
         fontSize: 13,
         marginTop: 2,
-        color: '#475569', // slate-600
+        color: '#475569',
     },
-    // Web warning styles
     webWarning: {
         backgroundColor: '#FFF3CD',
         padding: 12,
@@ -541,7 +389,6 @@ const styles = StyleSheet.create({
         marginLeft: 8,
         flex: 1,
     },
-    // Card container that wraps all tiles
     card: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
@@ -582,7 +429,6 @@ const styles = StyleSheet.create({
     buttonContainer: {
         marginTop: 8,
     },
-    // Primary button style (reusable)
     primaryButton: {
         backgroundColor: '#1E3A5F',
         borderRadius: 10,
@@ -607,103 +453,91 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         backgroundColor: 'rgba(15, 23, 42, 0.5)',
     },
-    optionsModal: {
+    cropOptionsModal: {
         backgroundColor: 'white',
-        padding: 18,
+        padding: 20,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         width: '100%',
     },
     modalTitle: {
-        fontSize: 16,
+        fontSize: 18,
         fontWeight: '700',
-        marginBottom: 12,
+        marginBottom: 16,
         textAlign: 'center',
         color: '#1E3A5F',
-    },
-    optionButtonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 10,
     },
     previewImageContainer: {
         width: '100%',
         height: 200,
-        borderRadius: 8,
-        marginBottom: 20,
+        borderRadius: 12,
+        marginBottom: 16,
         borderWidth: 1,
         borderColor: '#E2E8F0',
         overflow: 'hidden',
+        backgroundColor: '#F8FAFC',
     },
     previewImage: {
         width: '100%',
         height: '100%',
+        resizeMode: 'contain',
+    },
+    previewText: {
+        position: 'absolute',
+        bottom: 8,
+        left: 0,
+        right: 0,
+        textAlign: 'center',
+        fontSize: 12,
+        color: '#64748B',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        padding: 4,
+    },
+    cropInstructions: {
+        fontSize: 14,
+        color: '#64748B',
+        textAlign: 'center',
+        marginBottom: 20,
+        paddingHorizontal: 10,
     },
     cropButtonsContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        marginBottom: 20,
+        marginBottom: 16,
         width: '100%',
     },
-    cropButton: {
-        backgroundColor: '#1E3A5F',
-        borderRadius: 8,
-        paddingVertical: 12,
-        paddingHorizontal: 20,
-        alignItems: 'center',
-        flex: 1,
-        marginHorizontal: 5,
-    },
-    useAsIsButton: {
-        backgroundColor: '#059669', // emerald accent
-    },
-    cropButtonText: {
-        color: 'white',
-        fontSize: 15,
-        fontWeight: '700',
-    },
-    optionButton: {
+    cropOptionButton: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#1E3A5F',
+        paddingVertical: 14,
+        paddingHorizontal: 16,
         borderRadius: 10,
-        marginHorizontal: 5,
+        marginHorizontal: 6,
     },
-    fullWidthOption: {
-        flex: 1,
-        marginHorizontal: 0,
+    useAsIsButton: {
+        backgroundColor: '#059669',
     },
-    optionText: {
-        fontSize: 15,
-        marginLeft: 10,
-        color: '#1E3A5F',
+    cropImageButton: {
+        backgroundColor: '#1E3A5F',
+    },
+    cropOptionButtonText: {
+        color: 'white',
+        fontSize: 16,
         fontWeight: '600',
-    },
-    optionIcon: {
-        marginRight: 5,
+        marginLeft: 8,
     },
     cancelButton: {
         padding: 14,
-        marginTop: 10,
         backgroundColor: '#F1F5F9',
         borderRadius: 10,
         alignItems: 'center',
     },
     cancelText: {
-        fontSize: 15,
+        fontSize: 16,
         color: '#DC2626',
         fontWeight: '600',
-    },
-    cropInstructions: {
-        fontSize: 13,
-        color: '#64748B',
-        textAlign: 'center',
-        marginBottom: 12,
-        paddingHorizontal: 10,
     },
     inputContainer: {
         marginBottom: 15,
