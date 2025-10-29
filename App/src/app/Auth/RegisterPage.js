@@ -23,8 +23,13 @@ const WebDatePicker = ({ value, onChange, visible, onClose }) => {
   if (!visible) return null;
 
   const handleDateChange = (e) => {
-    const newDate = new Date(e.target.value);
-    onChange(null, newDate);
+    const selectedDateString = e.target.value;
+    if (selectedDateString) {
+      // Convert YYYY-MM-DD to Date object
+      const [year, month, day] = selectedDateString.split('-').map(Number);
+      const newDate = new Date(year, month - 1, day); // month is 0-indexed in Date
+      onChange(null, newDate);
+    }
     onClose();
   };
 
@@ -152,6 +157,8 @@ const RegisterPage = () => {
   useEffect(() => {
     if (dateOfBirth.toDateString() !== new Date().toDateString()) {
       setDateText(dateOfBirth.toDateString());
+    } else {
+      setDateText('Select Date of Birth');
     }
   }, [dateOfBirth]);
 
@@ -204,6 +211,10 @@ const RegisterPage = () => {
   };
 
   const validatePlaceOfBirth = (value) => {
+    if (!value || !value.trim()) {
+      setPlaceOfBirthError('Place of birth is required');
+      return false;
+    }
     setPlaceOfBirthError('');
     return true;
   };
@@ -264,9 +275,11 @@ const RegisterPage = () => {
                        !phoneNumberError && !placeOfBirthError && !addressError &&
                        !orientationError;
 
-    // Optional employment fields are NOT required for completeness
+    // Check if date is selected (not the default)
+    const isDateSelected = dateOfBirth.toDateString() !== new Date().toDateString();
+
     const basicInfoComplete = firstName && lastName && email && phoneNumber &&
-                             placeOfBirth && address;
+                             placeOfBirth && address && isDateSelected;
 
     const orientationComplete = attendedOrientation ?
       (orientationCode && orientationCode === validOrientationCode) : true;
@@ -350,6 +363,12 @@ const RegisterPage = () => {
       return; // Don't proceed if there are validation errors
     }
 
+    // Check if date is selected
+    if (dateOfBirth.toDateString() === new Date().toDateString()) {
+      Alert.alert('Error', 'Please select your date of birth');
+      return;
+    }
+
     // Orientation code validation if attended
     if (attendedOrientation && orientationCode !== validOrientationCode) {
       const isValidCode = await validateOrientationCode();
@@ -361,18 +380,15 @@ const RegisterPage = () => {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    console.log('Date change event:', event, selectedDate);
+    console.log('Date selected:', selectedDate);
     
+    // Always close the picker first
+    setShowDatePicker(false);
+    
+    // Only update if a date was actually selected
     if (selectedDate) {
       setDateOfBirth(selectedDate);
-      setDateText(selectedDate.toDateString());
-    }
-    
-    // Close the picker
-    if (isWeb) {
-      setShowDatePicker(false);
-    } else {
-      setShowDatePicker(Platform.OS === 'ios');
+      // The useEffect will automatically update dateText
     }
   };
 
