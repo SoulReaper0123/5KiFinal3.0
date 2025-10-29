@@ -22,19 +22,30 @@ import CustomConfirmModal from '../../components/CustomConfirmModal';
 const WebDatePicker = ({ value, onChange, visible, onClose }) => {
   if (!visible) return null;
 
+  const handleDateChange = (e) => {
+    const newDate = new Date(e.target.value);
+    onChange(null, newDate);
+    onClose();
+  };
+
+  // Format date to YYYY-MM-DD for input[type="date"]
+  const formatDateForInput = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   return (
     <View style={styles.webDatePickerOverlay}>
       <View style={styles.webDatePickerContainer}>
         <Text style={styles.webDatePickerTitle}>Select Date of Birth</Text>
         <input
           type="date"
-          value={value.toISOString().split('T')[0]}
-          onChange={(e) => {
-            const newDate = new Date(e.target.value);
-            onChange(null, newDate);
-            onClose();
-          }}
+          value={formatDateForInput(value)}
+          onChange={handleDateChange}
           style={styles.webDateInput}
+          max={formatDateForInput(new Date())} // Prevent future dates
         />
         <TouchableOpacity style={styles.webDatePickerClose} onPress={onClose}>
           <Text style={styles.webDatePickerCloseText}>Cancel</Text>
@@ -136,6 +147,13 @@ const RegisterPage = () => {
 
     fetchOrientationCode();
   }, []);
+
+  // Update date text when dateOfBirth changes
+  useEffect(() => {
+    if (dateOfBirth.toDateString() !== new Date().toDateString()) {
+      setDateText(dateOfBirth.toDateString());
+    }
+  }, [dateOfBirth]);
 
   // Validation functions
   const validateFirstName = (value) => {
@@ -343,16 +361,19 @@ const RegisterPage = () => {
   };
 
   const handleDateChange = (event, selectedDate) => {
-    const currentDate = selectedDate || dateOfBirth;
+    console.log('Date change event:', event, selectedDate);
     
+    if (selectedDate) {
+      setDateOfBirth(selectedDate);
+      setDateText(selectedDate.toDateString());
+    }
+    
+    // Close the picker
     if (isWeb) {
       setShowDatePicker(false);
     } else {
       setShowDatePicker(Platform.OS === 'ios');
     }
-    
-    setDateOfBirth(currentDate);
-    setDateText(currentDate.toDateString());
   };
 
   const handleShowDatePicker = () => {
@@ -454,6 +475,7 @@ const RegisterPage = () => {
                 mode="date"
                 display="default"
                 onChange={handleDateChange}
+                maximumDate={new Date()} // Prevent future dates
               />
             )}
             
