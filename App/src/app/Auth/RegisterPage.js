@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   TextInput,
-  Button,
   Text,
   StyleSheet,
   TouchableOpacity,
@@ -16,9 +15,34 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { MaterialIcons } from '@expo/vector-icons';
-import ModalSelector from 'react-native-modal-selector';
 import { getDatabase, ref, get } from 'firebase/database';
 import CustomConfirmModal from '../../components/CustomConfirmModal';
+
+// Web-compatible date picker component
+const WebDatePicker = ({ value, onChange, visible, onClose }) => {
+  if (!visible) return null;
+
+  return (
+    <View style={styles.webDatePickerOverlay}>
+      <View style={styles.webDatePickerContainer}>
+        <Text style={styles.webDatePickerTitle}>Select Date of Birth</Text>
+        <input
+          type="date"
+          value={value.toISOString().split('T')[0]}
+          onChange={(e) => {
+            const newDate = new Date(e.target.value);
+            onChange(null, newDate);
+            onClose();
+          }}
+          style={styles.webDateInput}
+        />
+        <TouchableOpacity style={styles.webDatePickerClose} onPress={onClose}>
+          <Text style={styles.webDatePickerCloseText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+};
 
 // RadioButton component
 const RadioButton = ({ selected, onPress }) => (
@@ -67,6 +91,9 @@ const RegisterPage = () => {
 
   const navigation = useNavigation();
 
+  // Check if running on web
+  const isWeb = Platform.OS === 'web';
+
   const middleNameInput = useRef(null);
   const lastNameInput = useRef(null);
   const emailInput = useRef(null);
@@ -90,8 +117,6 @@ const RegisterPage = () => {
   
     return () => backHandler.remove();
   }, [navigation]);
-
-
 
   // Fetch the valid orientation code from Firebase
   useEffect(() => {
@@ -160,8 +185,6 @@ const RegisterPage = () => {
     return true;
   };
 
-
-
   const validatePlaceOfBirth = (value) => {
     setPlaceOfBirthError('');
     return true;
@@ -175,10 +198,6 @@ const RegisterPage = () => {
     setAddressError('');
     return true;
   };
-
-
-
-
 
   const validateOrientation = () => {
     if (!attendedOrientation) {
@@ -210,8 +229,6 @@ const RegisterPage = () => {
     validatePhoneNumber(phoneNumber);
   }, [phoneNumber]);
 
-
-
   useEffect(() => {
     validatePlaceOfBirth(placeOfBirth);
   }, [placeOfBirth]);
@@ -219,10 +236,6 @@ const RegisterPage = () => {
   useEffect(() => {
     validateAddress(address);
   }, [address]);
-
-
-
-
 
   useEffect(() => {
     validateOrientation();
@@ -331,9 +344,23 @@ const RegisterPage = () => {
 
   const handleDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || dateOfBirth;
-    setShowDatePicker(Platform.OS === 'ios');
+    
+    if (isWeb) {
+      setShowDatePicker(false);
+    } else {
+      setShowDatePicker(Platform.OS === 'ios');
+    }
+    
     setDateOfBirth(currentDate);
     setDateText(currentDate.toDateString());
+  };
+
+  const handleShowDatePicker = () => {
+    setShowDatePicker(true);
+  };
+
+  const handleCloseDatePicker = () => {
+    setShowDatePicker(false);
   };
 
   const handlePhoneNumberChange = (text) => {
@@ -341,8 +368,6 @@ const RegisterPage = () => {
       setPhoneNumber(text);
     }
   };
-
-
 
   return (
     <KeyboardAvoidingView
@@ -374,12 +399,12 @@ const RegisterPage = () => {
               value={firstName}
               onChangeText={setFirstName}
               onBlur={() => validateFirstName(firstName)}
-              style={styles.input}
+              style={[styles.input, firstNameError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               onSubmitEditing={() => middleNameInput.current?.focus()}
             />
-
+            {firstNameError ? <Text style={styles.errorText}>{firstNameError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -403,26 +428,26 @@ const RegisterPage = () => {
               value={lastName}
               onChangeText={setLastName}
               onBlur={() => validateLastName(lastName)}
-              style={styles.input}
+              style={[styles.input, lastNameError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={lastNameInput}
               onSubmitEditing={() => placeOfBirthInput.current?.focus()}
             />
-
+            {lastNameError ? <Text style={styles.errorText}>{lastNameError}</Text> : null}
           </View>
-
-
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Date of Birth <Text style={styles.required}>*</Text> </Text>
-            <TouchableOpacity onPress={() => setShowDatePicker(true)} style={styles.dateInput}>
+            <TouchableOpacity onPress={handleShowDatePicker} style={styles.dateInput}>
               <Text style={[styles.dateText, dateOfBirth.toDateString() !== new Date().toDateString() ? { color: 'black' } : { color: 'grey' }]}>
                 {dateText}
               </Text>
               <MaterialIcons name="calendar-today" size={24} color="grey" style={styles.calendarIcon} />
             </TouchableOpacity>
-            {showDatePicker && (
+            
+            {/* Native DateTimePicker for mobile */}
+            {!isWeb && showDatePicker && (
               <DateTimePicker
                 testID="dateTimePicker"
                 value={dateOfBirth}
@@ -431,9 +456,17 @@ const RegisterPage = () => {
                 onChange={handleDateChange}
               />
             )}
+            
+            {/* Web Date Picker */}
+            {isWeb && (
+              <WebDatePicker
+                value={dateOfBirth}
+                onChange={handleDateChange}
+                visible={showDatePicker}
+                onClose={handleCloseDatePicker}
+              />
+            )}
           </View>
-
-
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Place of Birth <Text style={styles.required}>*</Text> </Text>
@@ -442,13 +475,13 @@ const RegisterPage = () => {
               value={placeOfBirth}
               onChangeText={setPlaceOfBirth}
               onBlur={() => validatePlaceOfBirth(placeOfBirth)}
-              style={styles.input}
+              style={[styles.input, placeOfBirthError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={placeOfBirthInput}
               onSubmitEditing={() => addressInput.current?.focus()}
             />
-
+            {placeOfBirthError ? <Text style={styles.errorText}>{placeOfBirthError}</Text> : null}
           </View>
 
           <View style={styles.inputContainer}>
@@ -458,16 +491,14 @@ const RegisterPage = () => {
               value={address}
               onChangeText={setAddress}
               onBlur={() => validateAddress(address)}
-              style={styles.input}
+              style={[styles.input, addressError ? styles.errorInput : null]}
               returnKeyType="next"
               blurOnSubmit={false}
               ref={addressInput}
               onSubmitEditing={() => emailInput.current?.focus()}
             />
-
+            {addressError ? <Text style={styles.errorText}>{addressError}</Text> : null}
           </View>
-
-
 
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Email <Text style={styles.required}>*</Text> </Text>
@@ -476,7 +507,7 @@ const RegisterPage = () => {
               value={email}
               onChangeText={setEmail}
               onBlur={() => validateEmail(email)}
-              style={styles.input}
+              style={[styles.input, emailError ? styles.errorInput : null]}
               keyboardType="email-address"
               returnKeyType="next"
               blurOnSubmit={false}
@@ -496,7 +527,7 @@ const RegisterPage = () => {
                 validatePhoneNumber(text);
               }}
               onBlur={() => validatePhoneNumber(phoneNumber)}
-              style={styles.input}
+              style={[styles.input, phoneNumberError ? styles.errorInput : null]}
               keyboardType="phone-pad"
               returnKeyType="next"
               blurOnSubmit={false}
@@ -566,8 +597,6 @@ const RegisterPage = () => {
               onSubmitEditing={() => Keyboard.dismiss()}
             />
           </View>
-
-
 
           <View style={styles.radioContainer}>
             <Text style={styles.radioLabel}>
@@ -956,6 +985,52 @@ const styles = StyleSheet.create({
     fontSize: 12,
     marginTop: 5,
     marginLeft: 2,
+  },
+  // Web Date Picker Styles
+  webDatePickerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+  },
+  webDatePickerContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    width: '80%',
+    maxWidth: 300,
+    alignItems: 'center',
+  },
+  webDatePickerTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 15,
+    color: '#333',
+  },
+  webDateInput: {
+    width: '100%',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    marginBottom: 15,
+    fontSize: 16,
+  },
+  webDatePickerClose: {
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  webDatePickerCloseText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
 
