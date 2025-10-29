@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   View,
   Text,
-  Button,
   StyleSheet,
   TouchableOpacity,
   Image,
@@ -30,86 +29,147 @@ const RegisterPage2 = () => {
     const [selfie, setSelfie] = useState(null);
     const [showIdFrontOptions, setShowIdFrontOptions] = useState(false);
     const [showSelfieOptions, setShowSelfieOptions] = useState(false);
+    
     // State for crop options modal
     const [showCropOptions, setShowCropOptions] = useState(false);
     const [selectedImageUri, setSelectedImageUri] = useState(null);
-    const [currentImageType, setCurrentImageType] = useState(null);
     const [currentSetFunction, setCurrentSetFunction] = useState(null);
+    
     // State for custom modal
     const [modalVisible, setModalVisible] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
+
+    // Refs for hidden file inputs (web only)
+    const idFrontFileInputRef = useRef(null);
+    const selfieFileInputRef = useRef(null);
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
         address, dateOfBirth,
     } = route.params;
 
-    // Handle image selection from the ImagePickerModal
-    const handleImageSelected = (imageUri, imageType = null, setFunction = null) => {
-        if (imageType === 'idFront') {
-            setValidIdFront(imageUri);
-        } else if (imageType === 'selfie') {
-            setSelfie(imageUri);
-        } else if (setFunction) {
-            setFunction(imageUri);
+    // Web-compatible file selection handler
+    const handleWebFileSelect = (setImageFunction, fileInputRef) => {
+        if (Platform.OS !== 'web') return;
+        
+        // Create a file input if it doesn't exist
+        if (!fileInputRef.current) {
+            fileInputRef.current = document.createElement('input');
+            fileInputRef.current.type = 'file';
+            fileInputRef.current.accept = 'image/*';
+            fileInputRef.current.style.display = 'none';
+            
+            fileInputRef.current.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    // Check file size (max 10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        setModalMessage('File size too large. Please select an image smaller than 10MB.');
+                        setModalType('error');
+                        setModalVisible(true);
+                        return;
+                    }
+                    
+                    // Check file type
+                    if (!file.type.startsWith('image/')) {
+                        setModalMessage('Please select a valid image file.');
+                        setModalType('error');
+                        setModalVisible(true);
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imageUri = event.target.result;
+                        setImageFunction(imageUri);
+                    };
+                    reader.onerror = () => {
+                        setModalMessage('Failed to read the selected file.');
+                        setModalType('error');
+                        setModalVisible(true);
+                    };
+                    reader.readAsDataURL(file);
+                }
+                
+                // Reset the file input
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            };
+            
+            document.body.appendChild(fileInputRef.current);
         }
+        
+        // Trigger file selection
+        fileInputRef.current.click();
     };
 
-    // Handle when user wants to crop the selected image
-    const handleCropSelectedImage = async () => {
-        if (!selectedImageUri) return;
+    // Handle image selection from camera (mobile) or direct file input (web)
+    const handleImageSelection = async (source, setImageFunction, imageType) => {
+        if (Platform.OS === 'web') {
+            if (source === 'gallery') {
+                // Use web file input for gallery selection
+                if (imageType === 'idFront') {
+                    handleWebFileSelect(setImageFunction, idFrontFileInputRef);
+                } else if (imageType === 'selfie') {
+                    handleWebFileSelect(setImageFunction, selfieFileInputRef);
+                }
+                return;
+            } else if (source === 'camera') {
+                // For web camera, we'll use the ImagePickerModal which handles it better
+                if (imageType === 'selfie') {
+                    setShowSelfieOptions(true);
+                } else {
+                    setShowIdFrontOptions(true);
+                }
+                return;
+            }
+        }
 
+        // Mobile handling
         try {
-            // Use ImagePicker with editing enabled to crop the SAME image
-            const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                allowsEditing: true,
-                aspect: undefined, // Free form cropping
-                quality: 0.8,
-                base64: false,
-            });
+            const { status } = source === 'camera' 
+                ? await ImagePicker.requestCameraPermissionsAsync()
+                : await ImagePicker.requestMediaLibraryPermissionsAsync();
+                
+            if (status !== 'granted') {
+                setModalMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+                setModalType('error');
+                setModalVisible(true);
+                return;
+            }
+
+            const result = await (source === 'camera' 
+                ? ImagePicker.launchCameraAsync({
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                    allowsEditing: false,
+                    quality: 0.8,
+                })
+                : ImagePicker.launchImageLibraryAsync({
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                    allowsEditing: false,
+                    quality: 0.8,
+                }));
 
             if (!result.canceled && result.assets && result.assets[0]) {
-                // Use the cropped image
-                if (currentSetFunction) {
-                    currentSetFunction(result.assets[0].uri);
-                }
-                // Close the crop options modal
-                setShowCropOptions(false);
-                setSelectedImageUri(null);
-                setCurrentImageType(null);
-                setCurrentSetFunction(null);
-            } else {
-                // User canceled cropping, keep the crop options modal open
-                // so they can choose "Use as is" instead
+                setImageFunction(result.assets[0].uri);
             }
         } catch (error) {
-            console.error('Error cropping image:', error);
-            setModalMessage('Failed to crop image');
+            console.error('Error selecting image:', error);
+            setModalMessage('Failed to select image');
             setModalType('error');
             setModalVisible(true);
         }
     };
 
-    // Handle using the image as-is (no cropping)
-    const handleUseAsIs = () => {
-        if (currentSetFunction && selectedImageUri) {
-            currentSetFunction(selectedImageUri);
-            setShowCropOptions(false);
-            setSelectedImageUri(null);
-            setCurrentImageType(null);
-            setCurrentSetFunction(null);
+    // Handle direct image selection from ImagePickerModal
+    const handleImageSelected = (imageUri, imageType = null) => {
+        if (imageType === 'idFront') {
+            setValidIdFront(imageUri);
+        } else if (imageType === 'selfie') {
+            setSelfie(imageUri);
         }
-    };
-
-    // Handle when image is selected from gallery and show crop options
-    const handleGalleryImageSelected = (imageUri, setImageFunction, imageType) => {
-        // Save the image and show crop options
-        setSelectedImageUri(imageUri);
-        setCurrentSetFunction(() => setImageFunction);
-        setCurrentImageType(imageType);
-        setShowCropOptions(true);
     };
 
     const handleNext = () => {
@@ -128,6 +188,20 @@ const RegisterPage2 = () => {
         });
     };
 
+    // Clean up on unmount (web only)
+    React.useEffect(() => {
+        return () => {
+            if (Platform.OS === 'web') {
+                if (idFrontFileInputRef.current) {
+                    document.body.removeChild(idFrontFileInputRef.current);
+                }
+                if (selfieFileInputRef.current) {
+                    document.body.removeChild(selfieFileInputRef.current);
+                }
+            }
+        };
+    }, []);
+
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
@@ -143,12 +217,12 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {/* Web Warning */}
+                {/* Web Instructions */}
                 {Platform.OS === 'web' && (
-                    <View style={styles.webWarning}>
-                        <MaterialIcons name="info" size={16} color="#856404" />
-                        <Text style={styles.webWarningText}>
-                            For best experience with image uploads, use a mobile device or ensure your browser supports camera access.
+                    <View style={styles.webInfo}>
+                        <MaterialIcons name="info" size={16} color="#1E3A5F" />
+                        <Text style={styles.webInfoText}>
+                            Click on the image areas to upload photos. Your browser will open a file selector.
                         </Text>
                     </View>
                 )}
@@ -201,7 +275,14 @@ const RegisterPage2 = () => {
                         <View style={styles.tile}>
                             <Text style={styles.label}>Valid ID - Front</Text>
                             <TouchableOpacity 
-                                onPress={() => setShowIdFrontOptions(true)} 
+                                onPress={() => {
+                                    if (Platform.OS === 'web') {
+                                        // Direct file selection for web
+                                        handleWebFileSelect(setValidIdFront, idFrontFileInputRef);
+                                    } else {
+                                        setShowIdFrontOptions(true);
+                                    }
+                                }} 
                                 style={styles.imagePreviewContainer}
                             >
                                 {validIdFront ? (
@@ -209,6 +290,9 @@ const RegisterPage2 = () => {
                                 ) : (
                                     <View style={styles.iconContainer}>
                                         <Icon name="add" size={40} color="#1E3A5F" />
+                                        <Text style={styles.uploadText}>
+                                            {Platform.OS === 'web' ? 'Click to Upload' : 'Tap to Add'}
+                                        </Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -217,7 +301,14 @@ const RegisterPage2 = () => {
                         <View style={styles.tile}>
                             <Text style={styles.label}>Selfie</Text>
                             <TouchableOpacity 
-                                onPress={() => setShowSelfieOptions(true)} 
+                                onPress={() => {
+                                    if (Platform.OS === 'web') {
+                                        // Direct file selection for web
+                                        handleWebFileSelect(setSelfie, selfieFileInputRef);
+                                    } else {
+                                        setShowSelfieOptions(true);
+                                    }
+                                }} 
                                 style={styles.imagePreviewContainer}
                             >
                                 {selfie ? (
@@ -225,6 +316,9 @@ const RegisterPage2 = () => {
                                 ) : (
                                     <View style={styles.iconContainer}>
                                         <Icon name="photo-camera" size={40} color="#1E3A5F" />
+                                        <Text style={styles.uploadText}>
+                                            {Platform.OS === 'web' ? 'Click to Upload' : 'Tap to Add'}
+                                        </Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -245,85 +339,23 @@ const RegisterPage2 = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Image Picker Modals */}
+                {/* Image Picker Modals - For mobile and web camera */}
                 <ImagePickerModal
                     visible={showIdFrontOptions}
                     onClose={() => setShowIdFrontOptions(false)}
-                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'idFront', setValidIdFront)}
-                    onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setValidIdFront, 'idFront')}
+                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'idFront')}
                     title="Select ID Front Source"
-                    showCropOptions={true}
+                    showCropOptions={false}
                 />
 
                 <ImagePickerModal
                     visible={showSelfieOptions}
                     onClose={() => setShowSelfieOptions(false)}
-                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'selfie', setSelfie)}
-                    onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setSelfie, 'selfie')}
+                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'selfie')}
                     title="Take Selfie"
                     showCropOptions={false}
                     cameraOnly={true}
                 />
-
-                {/* Crop Options Modal - Shows after gallery selection */}
-                <Modal
-                    transparent={true}
-                    visible={showCropOptions}
-                    onRequestClose={() => {
-                        setShowCropOptions(false);
-                        setSelectedImageUri(null);
-                        setCurrentImageType(null);
-                        setCurrentSetFunction(null);
-                    }}
-                    animationType="slide"
-                >
-                    <View style={styles.modalBackground}>
-                        <View style={styles.cropOptionsModal}>
-                            <Text style={styles.modalTitle}>Image Preview</Text>
-                            
-                            {selectedImageUri && (
-                                <View style={styles.previewImageContainer}>
-                                    <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
-                                    <Text style={styles.previewText}>Preview of your selected image</Text>
-                                </View>
-                            )}
-                            
-                            <Text style={styles.cropInstructions}>
-                                Would you like to use this image as is or crop it?
-                            </Text>
-                            
-                            <View style={styles.cropButtonsContainer}>
-                                <TouchableOpacity 
-                                    style={[styles.cropOptionButton, styles.useAsIsButton]}
-                                    onPress={handleUseAsIs}
-                                >
-                                    <MaterialIcons name="check" size={20} color="#fff" />
-                                    <Text style={styles.cropOptionButtonText}>Use as is</Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity 
-                                    style={[styles.cropOptionButton, styles.cropImageButton]}
-                                    onPress={handleCropSelectedImage}
-                                >
-                                    <MaterialIcons name="crop" size={20} color="#fff" />
-                                    <Text style={styles.cropOptionButtonText}>Crop Image</Text>
-                                </TouchableOpacity>
-                            </View>
-                            
-                            <TouchableOpacity 
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setShowCropOptions(false);
-                                    setSelectedImageUri(null);
-                                    setCurrentImageType(null);
-                                    setCurrentSetFunction(null);
-                                }}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
 
                 {/* Custom Modal */}
                 <CustomModal
@@ -359,32 +391,23 @@ const styles = StyleSheet.create({
         color: '#0F172A',
         textAlign: 'left',
     },
-    section: {
-        marginBottom: 16,
-    },
-    label: {
-        fontSize: 15,
-        marginBottom: 8,
-        color: '#0F172A',
-        fontWeight: '600',
-    },
     subLabel: {
         fontSize: 13,
         marginTop: 2,
         color: '#475569',
     },
-    webWarning: {
-        backgroundColor: '#FFF3CD',
+    webInfo: {
+        backgroundColor: '#EFF6FF',
         padding: 12,
         borderRadius: 8,
         marginBottom: 16,
         borderLeftWidth: 4,
-        borderLeftColor: '#FFC107',
+        borderLeftColor: '#3B82F6',
         flexDirection: 'row',
         alignItems: 'center',
     },
-    webWarningText: {
-        color: '#856404',
+    webInfoText: {
+        color: '#1E40AF',
         fontSize: 12,
         marginLeft: 8,
         flex: 1,
@@ -426,6 +449,12 @@ const styles = StyleSheet.create({
         width: '100%',
         height: '100%',
     },
+    uploadText: {
+        marginTop: 8,
+        fontSize: 12,
+        color: '#64748B',
+        textAlign: 'center',
+    },
     buttonContainer: {
         marginTop: 8,
     },
@@ -447,97 +476,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontWeight: '700',
         letterSpacing: 0.3,
-    },
-    modalBackground: {
-        flex: 1,
-        justifyContent: 'flex-end',
-        backgroundColor: 'rgba(15, 23, 42, 0.5)',
-    },
-    cropOptionsModal: {
-        backgroundColor: 'white',
-        padding: 20,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-        width: '100%',
-    },
-    modalTitle: {
-        fontSize: 18,
-        fontWeight: '700',
-        marginBottom: 16,
-        textAlign: 'center',
-        color: '#1E3A5F',
-    },
-    previewImageContainer: {
-        width: '100%',
-        height: 200,
-        borderRadius: 12,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        overflow: 'hidden',
-        backgroundColor: '#F8FAFC',
-    },
-    previewImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'contain',
-    },
-    previewText: {
-        position: 'absolute',
-        bottom: 8,
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontSize: 12,
-        color: '#64748B',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        padding: 4,
-    },
-    cropInstructions: {
-        fontSize: 14,
-        color: '#64748B',
-        textAlign: 'center',
-        marginBottom: 20,
-        paddingHorizontal: 10,
-    },
-    cropButtonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        width: '100%',
-    },
-    cropOptionButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        marginHorizontal: 6,
-    },
-    useAsIsButton: {
-        backgroundColor: '#059669',
-    },
-    cropImageButton: {
-        backgroundColor: '#1E3A5F',
-    },
-    cropOptionButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
-    cancelButton: {
-        padding: 14,
-        backgroundColor: '#F1F5F9',
-        borderRadius: 10,
-        alignItems: 'center',
-    },
-    cancelText: {
-        fontSize: 16,
-        color: '#DC2626',
-        fontWeight: '600',
     },
     inputContainer: {
         marginBottom: 15,
