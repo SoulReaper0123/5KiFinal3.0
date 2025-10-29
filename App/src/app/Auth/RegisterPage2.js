@@ -9,7 +9,8 @@ import {
   Alert,
   ScrollView,
   Modal,
-  TextInput
+  TextInput,
+  Platform
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
 import ImagePickerModal from '../../components/ImagePickerModal';
@@ -39,12 +40,38 @@ const RegisterPage2 = () => {
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
 
-
-
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
         address, dateOfBirth,
     } = route.params;
+
+    // Web-compatible image selection handler
+    const handleWebImageSelection = (setImageFunction) => {
+        if (Platform.OS !== 'web') return;
+        
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        
+        fileInput.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    const imageUri = event.target.result;
+                    setImageFunction(imageUri);
+                    
+                    // Clean up state
+                    setCurrentSetFunction(null);
+                    setCurrentImageType(null);
+                };
+                reader.readAsDataURL(file);
+            }
+        };
+        
+        // Trigger file selection
+        fileInput.click();
+    };
 
     const handleSelectImage = async (source, setImageFunction, imageType) => {
         // First, ensure we have a valid function to set the image
@@ -62,18 +89,35 @@ const RegisterPage2 = () => {
         setCurrentSetFunction(() => setImageFunction);
         setCurrentImageType(imageType);
         
-        const { status } = source === 'camera' 
-            ? await ImagePicker.requestCameraPermissionsAsync()
-            : await ImagePicker.requestMediaLibraryPermissionsAsync();
-            
-        if (status !== 'granted') {
-            setModalMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
-            setModalType('error');
-            setModalVisible(true);
-            return;
+        // Web-specific handling
+        if (Platform.OS === 'web') {
+            if (source === 'camera') {
+                // For web, use the ImagePickerModal which has better web handling
+                if (imageType === 'selfie') {
+                    setShowSelfieOptions(true);
+                } else {
+                    setShowIdFrontOptions(true);
+                }
+                return;
+            } else if (source === 'gallery') {
+                // Use web fallback for gallery
+                handleWebImageSelection(setImageFunction);
+                return;
+            }
         }
 
         try {
+            const { status } = source === 'camera' 
+                ? await ImagePicker.requestCameraPermissionsAsync()
+                : await ImagePicker.requestMediaLibraryPermissionsAsync();
+                
+            if (status !== 'granted') {
+                setModalMessage(`We need permission to access your ${source === 'camera' ? 'camera' : 'media library'}`);
+                setModalType('error');
+                setModalVisible(true);
+                return;
+            }
+
             // Launch camera or image library WITHOUT automatic editing
             const result = await (source === 'camera' 
                 ? ImagePicker.launchCameraAsync({
@@ -102,6 +146,13 @@ const RegisterPage2 = () => {
             }
         } catch (error) {
             console.error('Error selecting image:', error);
+            
+            // Fallback for web if ImagePicker fails
+            if (Platform.OS === 'web' && source === 'gallery') {
+                handleWebImageSelection(setImageFunction);
+                return;
+            }
+            
             setModalMessage('Failed to select image');
             setModalType('error');
             setModalVisible(true);
@@ -229,7 +280,9 @@ const RegisterPage2 = () => {
                                 }}
                             >
                                 <Icon name="photo-library" size={24} color="#2D5783" style={styles.optionIcon} />
-                                <Text style={styles.optionText}>Choose from Gallery</Text>
+                                <Text style={styles.optionText}>
+                                    {Platform.OS === 'web' ? 'Choose File' : 'Choose from Gallery'}
+                                </Text>
                             </TouchableOpacity>
                         )}
                     </View>
@@ -258,6 +311,16 @@ const RegisterPage2 = () => {
                         <View style={{ width: '40%', height: 6, backgroundColor: '#1E3A5F', borderRadius: 999 }} />
                     </View>
                 </View>
+
+                {/* Web Warning */}
+                {Platform.OS === 'web' && (
+                    <View style={styles.webWarning}>
+                        <MaterialIcons name="info" size={16} color="#856404" />
+                        <Text style={styles.webWarningText}>
+                            For best experience with image uploads, use a mobile device or ensure your browser supports camera access.
+                        </Text>
+                    </View>
+                )}
 
                 <View style={styles.card}>
                     <View style={styles.inputContainer}>
@@ -367,7 +430,51 @@ const RegisterPage2 = () => {
                     cameraOnly={true}
                 />
 
-
+                {/* Crop Options Modal */}
+                <Modal
+                    transparent={true}
+                    visible={showCropOptions}
+                    onRequestClose={() => setShowCropOptions(false)}
+                    animationType="slide"
+                >
+                    <View style={styles.modalBackground}>
+                        <View style={styles.optionsModal}>
+                            <Text style={styles.modalTitle}>Image Selected</Text>
+                            
+                            {selectedImageUri && (
+                                <View style={styles.previewImageContainer}>
+                                    <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
+                                </View>
+                            )}
+                            
+                            <Text style={styles.cropInstructions}>
+                                Would you like to use this image as is or crop it?
+                            </Text>
+                            
+                            <View style={styles.cropButtonsContainer}>
+                                <TouchableOpacity 
+                                    style={[styles.cropButton, styles.useAsIsButton]}
+                                    onPress={handleUseAsIs}
+                                >
+                                    <Text style={styles.cropButtonText}>Use as is</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity 
+                                    style={styles.cropButton}
+                                    onPress={handleCropImage}
+                                >
+                                    <Text style={styles.cropButtonText}>Crop Image</Text>
+                                </TouchableOpacity>
+                            </View>
+                            
+                            <TouchableOpacity 
+                                style={styles.cancelButton}
+                                onPress={() => setShowCropOptions(false)}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* Custom Modal */}
                 <CustomModal
@@ -393,9 +500,9 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     backButton: {
-    alignSelf: 'flex-start',
-    marginBottom: 10,
-    marginTop: 20,
+        alignSelf: 'flex-start',
+        marginBottom: 10,
+        marginTop: 20,
     },
     title: {
         fontSize: 22,
@@ -416,6 +523,23 @@ const styles = StyleSheet.create({
         fontSize: 13,
         marginTop: 2,
         color: '#475569', // slate-600
+    },
+    // Web warning styles
+    webWarning: {
+        backgroundColor: '#FFF3CD',
+        padding: 12,
+        borderRadius: 8,
+        marginBottom: 16,
+        borderLeftWidth: 4,
+        borderLeftColor: '#FFC107',
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    webWarningText: {
+        color: '#856404',
+        fontSize: 12,
+        marginLeft: 8,
+        flex: 1,
     },
     // Card container that wraps all tiles
     card: {
@@ -502,13 +626,18 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: 10,
     },
-    previewImage: {
+    previewImageContainer: {
         width: '100%',
         height: 200,
         borderRadius: 8,
         marginBottom: 20,
         borderWidth: 1,
         borderColor: '#E2E8F0',
+        overflow: 'hidden',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
     },
     cropButtonsContainer: {
         flexDirection: 'row',
