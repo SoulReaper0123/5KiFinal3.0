@@ -11,6 +11,7 @@ import {
   BackHandler,
   Keyboard,
   KeyboardAvoidingView,
+  Animated,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -18,22 +19,50 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { getDatabase, ref, get } from 'firebase/database';
 import CustomConfirmModal from '../../components/CustomConfirmModal';
 
-// Web-compatible date picker component
+// Enhanced Web-compatible date picker component
 const WebDatePicker = ({ value, onChange, visible, onClose }) => {
-  if (!visible) return null;
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(50)).current;
+
+  useEffect(() => {
+    if (visible) {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 1,
+          duration: 300,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        })
+      ]).start();
+    } else {
+      Animated.parallel([
+        Animated.timing(fadeAnim, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }),
+        Animated.timing(slideAnim, {
+          toValue: 50,
+          duration: 200,
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+  }, [visible, fadeAnim, slideAnim]);
 
   const handleDateChange = (e) => {
     const selectedDateString = e.target.value;
     if (selectedDateString) {
-      // Convert YYYY-MM-DD to Date object
       const [year, month, day] = selectedDateString.split('-').map(Number);
-      const newDate = new Date(year, month - 1, day); // month is 0-indexed in Date
+      const newDate = new Date(year, month - 1, day);
       onChange(null, newDate);
     }
-    onClose();
   };
 
-  // Format date to YYYY-MM-DD for input[type="date"]
   const formatDateForInput = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -41,26 +70,95 @@ const WebDatePicker = ({ value, onChange, visible, onClose }) => {
     return `${year}-${month}-${day}`;
   };
 
+  if (!visible) return null;
+
   return (
-    <View style={styles.webDatePickerOverlay}>
-      <View style={styles.webDatePickerContainer}>
-        <Text style={styles.webDatePickerTitle}>Select Date of Birth</Text>
-        <input
-          type="date"
-          value={formatDateForInput(value)}
-          onChange={handleDateChange}
-          style={styles.webDateInput}
-          max={formatDateForInput(new Date())} // Prevent future dates
-        />
-        <TouchableOpacity style={styles.webDatePickerClose} onPress={onClose}>
-          <Text style={styles.webDatePickerCloseText}>Cancel</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+    <Animated.View style={[styles.webDatePickerOverlay, { opacity: fadeAnim }]}>
+      <TouchableOpacity 
+        style={styles.webDatePickerBackdrop} 
+        onPress={onClose}
+        activeOpacity={1}
+      >
+        <Animated.View 
+          style={[
+            styles.webDatePickerContainer,
+            {
+              opacity: fadeAnim,
+              transform: [{ translateY: slideAnim }]
+            }
+          ]}
+        >
+          {/* Header */}
+          <View style={styles.webDatePickerHeader}>
+            <View style={styles.webDatePickerHeaderContent}>
+              <MaterialIcons name="calendar-today" size={24} color="#1E3A5F" />
+              <Text style={styles.webDatePickerTitle}>Select Date of Birth</Text>
+            </View>
+            <TouchableOpacity 
+              onPress={onClose} 
+              style={styles.webDatePickerCloseButton}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <MaterialIcons name="close" size={24} color="#64748B" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Content */}
+          <View style={styles.webDatePickerContent}>
+            <Text style={styles.webDatePickerSubtitle}>
+              Choose your date of birth from the calendar below
+            </Text>
+            
+            <View style={styles.dateInputContainer}>
+              <MaterialIcons name="event" size={20} color="#1E3A5F" style={styles.dateInputIcon} />
+              <input
+                type="date"
+                value={formatDateForInput(value)}
+                onChange={handleDateChange}
+                style={styles.webDateInput}
+                max={formatDateForInput(new Date())}
+              />
+            </View>
+
+            {/* Selected Date Preview */}
+            <View style={styles.selectedDatePreview}>
+              <Text style={styles.selectedDateLabel}>Selected Date:</Text>
+              <Text style={styles.selectedDateValue}>
+                {value.toLocaleDateString('en-US', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })}
+              </Text>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View style={styles.webDatePickerFooter}>
+            <TouchableOpacity 
+              style={[styles.webDatePickerButton, styles.cancelButton]} 
+              onPress={onClose}
+            >
+              <MaterialIcons name="cancel" size={18} color="#64748B" />
+              <Text style={styles.cancelButtonText}>Cancel</Text>
+            </TouchableOpacity>
+            
+            <TouchableOpacity 
+              style={[styles.webDatePickerButton, styles.confirmButton]} 
+              onPress={onClose}
+            >
+              <MaterialIcons name="check-circle" size={18} color="#FFFFFF" />
+              <Text style={styles.confirmButtonText}>Confirm Selection</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      </TouchableOpacity>
+    </Animated.View>
   );
 };
 
-// RadioButton component
+// RadioButton component (unchanged)
 const RadioButton = ({ selected, onPress }) => (
   <TouchableOpacity 
     onPress={onPress} 
@@ -157,12 +255,10 @@ const RegisterPage = () => {
   useEffect(() => {
     if (dateOfBirth.toDateString() !== new Date().toDateString()) {
       setDateText(dateOfBirth.toDateString());
-    } else {
-      setDateText('Select Date of Birth');
     }
   }, [dateOfBirth]);
 
-  // Validation functions
+  // Validation functions (keep your existing validation functions)
   const validateFirstName = (value) => {
     if (!value || !value.trim()) {
       setFirstNameError('First name is required');
@@ -211,10 +307,6 @@ const RegisterPage = () => {
   };
 
   const validatePlaceOfBirth = (value) => {
-    if (!value || !value.trim()) {
-      setPlaceOfBirthError('Place of birth is required');
-      return false;
-    }
     setPlaceOfBirthError('');
     return true;
   };
@@ -275,11 +367,9 @@ const RegisterPage = () => {
                        !phoneNumberError && !placeOfBirthError && !addressError &&
                        !orientationError;
 
-    // Check if date is selected (not the default)
-    const isDateSelected = dateOfBirth.toDateString() !== new Date().toDateString();
-
+    // Optional employment fields are NOT required for completeness
     const basicInfoComplete = firstName && lastName && email && phoneNumber &&
-                             placeOfBirth && address && isDateSelected;
+                             placeOfBirth && address;
 
     const orientationComplete = attendedOrientation ?
       (orientationCode && orientationCode === validOrientationCode) : true;
@@ -363,12 +453,6 @@ const RegisterPage = () => {
       return; // Don't proceed if there are validation errors
     }
 
-    // Check if date is selected
-    if (dateOfBirth.toDateString() === new Date().toDateString()) {
-      Alert.alert('Error', 'Please select your date of birth');
-      return;
-    }
-
     // Orientation code validation if attended
     if (attendedOrientation && orientationCode !== validOrientationCode) {
       const isValidCode = await validateOrientationCode();
@@ -393,6 +477,7 @@ const RegisterPage = () => {
   };
 
   const handleShowDatePicker = () => {
+    Keyboard.dismiss();
     setShowDatePicker(true);
   };
 
@@ -474,13 +559,34 @@ const RegisterPage = () => {
             {lastNameError ? <Text style={styles.errorText}>{lastNameError}</Text> : null}
           </View>
 
+          {/* Enhanced Date of Birth Field */}
           <View style={styles.inputContainer}>
             <Text style={styles.label}>Date of Birth <Text style={styles.required}>*</Text> </Text>
-            <TouchableOpacity onPress={handleShowDatePicker} style={styles.dateInput}>
-              <Text style={[styles.dateText, dateOfBirth.toDateString() !== new Date().toDateString() ? { color: 'black' } : { color: 'grey' }]}>
-                {dateText}
-              </Text>
-              <MaterialIcons name="calendar-today" size={24} color="grey" style={styles.calendarIcon} />
+            <TouchableOpacity 
+              onPress={handleShowDatePicker} 
+              style={[
+                styles.dateInput,
+                dateOfBirth.toDateString() !== new Date().toDateString() && styles.dateInputSelected
+              ]}
+            >
+              <View style={styles.dateInputContent}>
+                <MaterialIcons 
+                  name="calendar-today" 
+                  size={20} 
+                  color={dateOfBirth.toDateString() !== new Date().toDateString() ? "#1E3A5F" : "#9CA3AF"} 
+                />
+                <Text style={[
+                  styles.dateText,
+                  dateOfBirth.toDateString() !== new Date().toDateString() ? styles.dateTextSelected : styles.dateTextPlaceholder
+                ]}>
+                  {dateText}
+                </Text>
+                <MaterialIcons 
+                  name="keyboard-arrow-down" 
+                  size={20} 
+                  color="#6B7280" 
+                />
+              </View>
             </TouchableOpacity>
             
             {/* Native DateTimePicker for mobile */}
@@ -495,7 +601,7 @@ const RegisterPage = () => {
               />
             )}
             
-            {/* Web Date Picker */}
+            {/* Enhanced Web Date Picker */}
             {isWeb && (
               <WebDatePicker
                 value={dateOfBirth}
@@ -785,9 +891,6 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
-  formContainer: {
-    // deprecated in favor of card style
-  },
   card: {
     backgroundColor: '#FFFFFF',
     borderRadius: 12,
@@ -824,45 +927,51 @@ const styles = StyleSheet.create({
   inputContainer: {
     marginBottom: 15,
   },
-  picker: {
-    marginBottom: 10,
-  },
-  pickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 10,
-    borderColor: '#ccc',
-    height: 50,
-    borderWidth: 1,
-    borderRadius: 10,
-  },
-  pickerText: {
-    fontSize: 14,
-    color: 'grey',
-  },
+  // Enhanced Date Input Styles
   dateInput: {
-    borderColor: '#ccc',
-    borderWidth: 1,
-    borderRadius: 5,
-    padding: 8,
+    borderColor: '#E5E7EB',
+    borderWidth: 2,
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  dateInputSelected: {
+    borderColor: '#1E3A5F',
+    backgroundColor: '#F8FAFC',
+    shadowColor: '#1E3A5F',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  dateInputContent: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    justifyContent: 'space-between',
   },
   dateText: {
     fontSize: 16,
+    flex: 1,
+    marginLeft: 12,
+    marginRight: 12,
   },
-  calendarIcon: {
-    marginLeft: 10,
+  dateTextSelected: {
+    color: '#1F2937',
+    fontWeight: '600',
+  },
+  dateTextPlaceholder: {
+    color: '#9CA3AF',
   },
   backButton: {
     alignSelf: 'flex-start',
     marginBottom: 10,
     marginTop: 20,
   },
-  // Primary button style (shared)
   primaryButton: {
     backgroundColor: '#1E3A5F',
     borderRadius: 10,
@@ -1024,51 +1133,148 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginLeft: 2,
   },
-  // Web Date Picker Styles
+  // Enhanced Web Date Picker Styles
   webDatePickerOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    zIndex: 1000,
+  },
+  webDatePickerBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 1000,
+    padding: 20,
   },
   webDatePickerContainer: {
     backgroundColor: 'white',
-    padding: 20,
-    borderRadius: 10,
-    width: '80%',
-    maxWidth: 300,
+    borderRadius: 20,
+    width: '100%',
+    maxWidth: 440,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 20 },
+    shadowOpacity: 0.3,
+    shadowRadius: 30,
+    elevation: 10,
+    overflow: 'hidden',
+  },
+  webDatePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 24,
+    backgroundColor: '#F8FAFC',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  webDatePickerHeaderContent: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
   webDatePickerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#333',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#1E3A5F',
+    marginLeft: 12,
+  },
+  webDatePickerCloseButton: {
+    padding: 8,
+    borderRadius: 8,
+    backgroundColor: '#F1F5F9',
+  },
+  webDatePickerContent: {
+    padding: 24,
+  },
+  webDatePickerSubtitle: {
+    fontSize: 16,
+    color: '#64748B',
+    marginBottom: 24,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  dateInputContainer: {
+    position: 'relative',
+    marginBottom: 24,
+  },
+  dateInputIcon: {
+    position: 'absolute',
+    left: 16,
+    top: 16,
+    zIndex: 1,
   },
   webDateInput: {
     width: '100%',
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#ccc',
-    borderRadius: 5,
-    marginBottom: 15,
+    padding: 16,
+    paddingLeft: 48,
+    borderWidth: 2,
+    borderColor: '#E5E7EB',
+    borderRadius: 12,
     fontSize: 16,
+    fontWeight: '500',
+    color: '#1F2937',
+    backgroundColor: '#FFFFFF',
+    cursor: 'pointer',
   },
-  webDatePickerClose: {
-    padding: 10,
-    backgroundColor: '#f0f0f0',
-    borderRadius: 5,
-    width: '100%',
+  selectedDatePreview: {
+    backgroundColor: '#F0F9FF',
+    padding: 16,
+    borderRadius: 12,
+    borderLeftWidth: 4,
+    borderLeftColor: '#0EA5E9',
+  },
+  selectedDateLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#0369A1',
+    marginBottom: 4,
+  },
+  selectedDateValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0C4A6E',
+  },
+  webDatePickerFooter: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    padding: 24,
+    backgroundColor: '#F8FAFC',
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    gap: 12,
+  },
+  webDatePickerButton: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    gap: 8,
   },
-  webDatePickerCloseText: {
+  cancelButton: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  cancelButtonText: {
     fontSize: 16,
-    color: '#333',
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  confirmButton: {
+    backgroundColor: '#1E3A5F',
+    shadowColor: '#1E3A5F',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  confirmButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 
