@@ -52,13 +52,17 @@ const RegisterPage2 = () => {
     useEffect(() => {
         (async () => {
             if (Platform.OS !== 'web') {
-                const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
-                const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-                
-                if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
-                    setModalMessage('Camera and gallery permissions are required for image uploads');
-                    setModalType('error');
-                    setModalVisible(true);
+                try {
+                    const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+                    const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+                    
+                    if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
+                        setModalMessage('Camera and gallery permissions are required for image uploads');
+                        setModalType('error');
+                        setModalVisible(true);
+                    }
+                } catch (error) {
+                    console.log('Permission request error:', error);
                 }
             }
         })();
@@ -106,9 +110,9 @@ const RegisterPage2 = () => {
                     }
                 }
             } else {
-                // Native camera handling
+                // Native camera handling - FIXED: Use correct MediaTypeOptions
                 const result = await ImagePicker.launchCameraAsync({
-                    mediaTypes: ImagePicker.MediaType.Images,
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false, // We'll handle cropping in our own modal
                     aspect: [4, 3],
                     quality: 0.8,
@@ -159,9 +163,9 @@ const RegisterPage2 = () => {
                     }
                 }
             } else {
-                // Native gallery handling - FIXED: Properly handle the result
+                // Native gallery handling - FIXED: Use correct MediaTypeOptions
                 const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaType.Images,
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false,
                     aspect: [4, 3],
                     quality: 0.8,
@@ -431,9 +435,9 @@ const RegisterPage2 = () => {
                     currentSetFunction(selectedImageUri);
                 }
             } else {
-                // For native, use ImagePicker with editing
+                // For native, use ImagePicker with editing - FIXED: Use correct MediaTypeOptions
                 const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaType.Images,
+                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: true,
                     aspect: [4, 3],
                     quality: 0.8,
