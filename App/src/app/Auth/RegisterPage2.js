@@ -13,12 +13,10 @@ import {
   Platform
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
-import ImagePickerModal from '../../components/ImagePickerModal';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import ModalSelector from 'react-native-modal-selector';
 
 const RegisterPage2 = () => {
     const route = useRoute();
@@ -28,20 +26,16 @@ const RegisterPage2 = () => {
     const [otherGovernmentId, setOtherGovernmentId] = useState('');
     const [validIdFront, setValidIdFront] = useState(null);
     const [selfie, setSelfie] = useState(null);
-    const [showIdFrontOptions, setShowIdFrontOptions] = useState(false);
-    const [showSelfieOptions, setShowSelfieOptions] = useState(false);
-    // State for crop options modal
     const [showCropOptions, setShowCropOptions] = useState(false);
     const [selectedImageUri, setSelectedImageUri] = useState(null);
     const [currentImageType, setCurrentImageType] = useState(null);
     const [currentSetFunction, setCurrentSetFunction] = useState(null);
-    // State for source selection modal
     const [showSourceOptions, setShowSourceOptions] = useState(false);
     const [pendingImageAction, setPendingImageAction] = useState(null);
-    // State for custom modal
     const [modalVisible, setModalVisible] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
+    const [showGovernmentIdModal, setShowGovernmentIdModal] = useState(false);
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
@@ -68,15 +62,18 @@ const RegisterPage2 = () => {
         })();
     }, []);
 
-    // Handle image selection from the ImagePickerModal
-    const handleImageSelected = (imageUri, imageType = null, setFunction = null) => {
-        if (imageType === 'idFront') {
-            setValidIdFront(imageUri);
-        } else if (imageType === 'selfie') {
-            setSelfie(imageUri);
-        } else if (setFunction) {
-            setFunction(imageUri);
+    // Handle government ID selection
+    const handleGovernmentIdSelect = (option) => {
+        const isOther = option.key === 'other';
+        setIsOtherGovernmentId(isOther);
+        if (isOther) {
+            setGovernmentId('Other');
+            setOtherGovernmentId('');
+        } else {
+            setGovernmentId(option.label);
+            setOtherGovernmentId('');
         }
+        setShowGovernmentIdModal(false);
     };
 
     // Show source selection options (Camera or Gallery)
@@ -89,47 +86,28 @@ const RegisterPage2 = () => {
         setShowSourceOptions(true);
     };
 
-    // Handle camera selection
+    // SIMPLIFIED: Handle camera selection
     const handleCameraSelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Web camera handling
-                const imageUri = await handleWebCameraCapture(pendingImageAction.type);
+                // Use simple file input for web camera to avoid complexity
+                const imageUri = await handleWebImageSelection(true);
                 if (imageUri) {
-                    if (pendingImageAction.allowCrop) {
-                        // Show crop options for camera image
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        // Use directly without crop
-                        pendingImageAction.setFunction(imageUri);
-                    }
+                    pendingImageAction.setFunction(imageUri);
                 }
             } else {
-                // Native camera handling - FIXED: Use correct MediaTypeOptions
+                // Native camera handling
                 const result = await ImagePicker.launchCameraAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: false, // We'll handle cropping in our own modal
+                    allowsEditing: false,
                     aspect: [4, 3],
                     quality: 0.8,
-                    base64: false,
                 });
 
                 if (!result.canceled && result.assets && result.assets[0]) {
-                    if (pendingImageAction.allowCrop) {
-                        // Show crop options for camera image
-                        setSelectedImageUri(result.assets[0].uri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        // Use directly without crop
-                        pendingImageAction.setFunction(result.assets[0].uri);
-                    }
+                    pendingImageAction.setFunction(result.assets[0].uri);
                 }
             }
         } catch (error) {
@@ -142,55 +120,29 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // SIMPLIFIED: Handle gallery selection - FIXED FOR WEB
     const handleGallerySelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Web gallery handling
-                const imageUri = await handleWebGallerySelection();
+                // Use simple file input for web gallery
+                const imageUri = await handleWebImageSelection(false);
                 if (imageUri) {
-                    if (pendingImageAction.allowCrop) {
-                        // Show crop options for gallery image
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        // Use directly without crop - FIXED: Directly call the set function
-                        pendingImageAction.setFunction(imageUri);
-                    }
+                    console.log('Gallery image selected:', imageUri);
+                    pendingImageAction.setFunction(imageUri);
                 }
             } else {
-                // Native gallery handling - FIXED: Use correct MediaTypeOptions
+                // Native gallery handling
                 const result = await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false,
                     aspect: [4, 3],
                     quality: 0.8,
-                    base64: false,
                 });
 
-                console.log('Gallery result:', result); // Debug log
-
                 if (!result.canceled && result.assets && result.assets[0]) {
-                    const imageUri = result.assets[0].uri;
-                    console.log('Selected image URI:', imageUri); // Debug log
-                    
-                    if (pendingImageAction.allowCrop) {
-                        // Show crop options for gallery image
-                        setSelectedImageUri(imageUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        // Use directly without crop - FIXED: Directly call the set function
-                        console.log('Setting image directly:', imageUri); // Debug log
-                        pendingImageAction.setFunction(imageUri);
-                    }
-                } else {
-                    console.log('User canceled gallery selection');
+                    pendingImageAction.setFunction(result.assets[0].uri);
                 }
             }
         } catch (error) {
@@ -203,38 +155,20 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Web camera capture - FIXED CAMERA ORIENTATION
-    const handleWebCameraCapture = (imageType) => {
+    // SIMPLIFIED WEB IMAGE SELECTION - WORKS LIKE GFORMS
+    const handleWebImageSelection = (useCamera = false) => {
         return new Promise((resolve) => {
-            try {
-                if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
-                    // Use environment camera for ID, user-facing for selfie
-                    const facingMode = imageType === 'selfie' ? 'user' : 'environment';
-                    
-                    navigator.mediaDevices.getUserMedia({ 
-                        video: { 
-                            facingMode: facingMode,
-                            width: { ideal: 1920 },
-                            height: { ideal: 1080 }
-                        } 
-                    }).then((stream) => {
-                        // Create video element for camera preview
+            if (useCamera && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+                // Camera for web
+                navigator.mediaDevices.getUserMedia({ video: true })
+                    .then((stream) => {
                         const video = document.createElement('video');
                         video.srcObject = stream;
-                        video.autoplay = true;
-                        video.playsInline = true;
-                        video.style.cssText = `
-                            width: 100%;
-                            height: auto;
-                            border-radius: 8px;
-                            transform: ${facingMode === 'user' ? 'scaleX(-1)' : 'none'};
-                        `;
+                        video.play();
                         
-                        // Create canvas for capturing image
                         const canvas = document.createElement('canvas');
                         const context = canvas.getContext('2d');
                         
-                        // Create capture UI
                         const captureUI = document.createElement('div');
                         captureUI.style.cssText = `
                             position: fixed;
@@ -242,252 +176,142 @@ const RegisterPage2 = () => {
                             left: 0;
                             width: 100%;
                             height: 100%;
-                            background: rgba(0,0,0,0.95);
+                            background: rgba(0,0,0,0.9);
                             display: flex;
                             flex-direction: column;
                             align-items: center;
                             justify-content: center;
                             z-index: 10000;
                             padding: 20px;
-                            box-sizing: border-box;
                         `;
                         
                         const videoContainer = document.createElement('div');
                         videoContainer.style.cssText = `
-                            position: relative;
                             width: 100%;
                             max-width: 400px;
-                            border-radius: 12px;
-                            overflow: hidden;
                             background: #000;
+                            border-radius: 10px;
+                            overflow: hidden;
                             margin-bottom: 20px;
-                        `;
-                        
-                        const instructions = document.createElement('div');
-                        instructions.textContent = imageType === 'selfie' 
-                            ? 'Take a selfie' 
-                            : 'Take a photo of your ID';
-                        instructions.style.cssText = `
-                            color: white;
-                            text-align: center;
-                            margin-bottom: 15px;
-                            font-size: 16px;
-                            font-weight: bold;
                         `;
                         
                         const buttonContainer = document.createElement('div');
                         buttonContainer.style.cssText = `
                             display: flex;
-                            flex-direction: column;
-                            align-items: center;
+                            gap: 10px;
                             width: 100%;
                             max-width: 400px;
                         `;
                         
-                        const captureButton = document.createElement('button');
-                        captureButton.textContent = '📸 Capture Photo';
-                        captureButton.style.cssText = `
-                            padding: 15px 30px;
+                        const captureBtn = document.createElement('button');
+                        captureBtn.textContent = '📸 Capture';
+                        captureBtn.style.cssText = `
+                            flex: 1;
+                            padding: 15px;
                             background: #1E3A5F;
                             color: white;
                             border: none;
-                            border-radius: 10px;
+                            border-radius: 8px;
                             font-size: 16px;
-                            font-weight: bold;
-                            cursor: pointer;
-                            margin-bottom: 10px;
-                            width: 100%;
                         `;
                         
-                        const cancelButton = document.createElement('button');
-                        cancelButton.textContent = '❌ Cancel';
-                        cancelButton.style.cssText = `
-                            padding: 12px 24px;
+                        const cancelBtn = document.createElement('button');
+                        cancelBtn.textContent = 'Cancel';
+                        cancelBtn.style.cssText = `
+                            flex: 1;
+                            padding: 15px;
                             background: #dc2626;
                             color: white;
                             border: none;
-                            border-radius: 10px;
-                            font-size: 14px;
-                            cursor: pointer;
-                            width: 100%;
+                            border-radius: 8px;
+                            font-size: 16px;
                         `;
                         
-                        // Wait for video to be ready
                         video.onloadedmetadata = () => {
                             canvas.width = video.videoWidth;
                             canvas.height = video.videoHeight;
                             
-                            captureButton.onclick = () => {
-                                // Draw the video frame to canvas
-                                if (facingMode === 'user') {
-                                    // Flip the canvas for selfie to match mirror view
-                                    context.translate(canvas.width, 0);
-                                    context.scale(-1, 1);
-                                }
-                                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
-                                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                                
-                                // Clean up
+                            captureBtn.onclick = () => {
+                                context.drawImage(video, 0, 0);
+                                const imageData = canvas.toDataURL('image/jpeg');
                                 stream.getTracks().forEach(track => track.stop());
                                 document.body.removeChild(captureUI);
-                                resolve(imageDataUrl);
+                                resolve(imageData);
                             };
                             
-                            cancelButton.onclick = () => {
+                            cancelBtn.onclick = () => {
                                 stream.getTracks().forEach(track => track.stop());
                                 document.body.removeChild(captureUI);
                                 resolve(null);
                             };
                             
                             videoContainer.appendChild(video);
-                            captureUI.appendChild(instructions);
+                            buttonContainer.appendChild(captureBtn);
+                            buttonContainer.appendChild(cancelBtn);
                             captureUI.appendChild(videoContainer);
-                            buttonContainer.appendChild(captureButton);
-                            buttonContainer.appendChild(cancelButton);
                             captureUI.appendChild(buttonContainer);
                             document.body.appendChild(captureUI);
                         };
-                        
-                        video.onerror = () => {
-                            stream.getTracks().forEach(track => track.stop());
-                            document.body.removeChild(captureUI);
-                            resolve(null);
-                        };
-                    }).catch((error) => {
-                        console.error('Camera access error:', error);
-                        setModalMessage('Camera not available. Please use gallery instead.');
-                        setModalType('error');
-                        setModalVisible(true);
-                        resolve(null);
+                    })
+                    .catch(() => {
+                        // If camera fails, fall back to file input
+                        handleWebFileInput(resolve);
                     });
-                } else {
-                    throw new Error('Camera not supported in this browser');
-                }
-            } catch (error) {
-                console.error('Camera error:', error);
-                setModalMessage('Camera not available. Please use gallery instead.');
-                setModalType('error');
-                setModalVisible(true);
-                resolve(null);
-            }
-        });
-    };
-
-    // Web gallery selection
-    const handleWebGallerySelection = () => {
-        return new Promise((resolve) => {
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.style.cssText = `
-                position: fixed;
-                top: -1000px;
-                left: -1000px;
-            `;
-            
-            input.onchange = (e) => {
-                const file = e.target.files[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        const imageUri = event.target.result;
-                        resolve(imageUri);
-                    };
-                    reader.onerror = () => {
-                        setModalMessage('Failed to read the image file. Please try again.');
-                        setModalType('error');
-                        setModalVisible(true);
-                        resolve(null);
-                    };
-                    reader.readAsDataURL(file);
-                } else {
-                    resolve(null);
-                }
-            };
-            
-            input.oncancel = () => {
-                resolve(null);
-            };
-            
-            document.body.appendChild(input);
-            input.click();
-            setTimeout(() => {
-                document.body.removeChild(input);
-            }, 1000);
-        });
-    };
-
-    // Handle when user wants to crop the selected image
-    const handleCropSelectedImage = async () => {
-        if (!selectedImageUri) return;
-
-        try {
-            if (Platform.OS === 'web') {
-                // For web, we'll use a simple image cropping approach
-                // Since advanced cropping is complex, we'll use a basic implementation
-                setModalMessage('Crop functionality is limited on web. Please use the image as is or try on our mobile app for full features.');
-                setModalType('info');
-                setModalVisible(true);
-                
-                // For now, we'll just use the image as-is
-                if (currentSetFunction) {
-                    currentSetFunction(selectedImageUri);
-                }
             } else {
-                // For native, use ImagePicker with editing - FIXED: Use correct MediaTypeOptions
-                const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                    base64: false,
-                });
-
-                if (!result.canceled && result.assets && result.assets[0]) {
-                    if (currentSetFunction) {
-                        currentSetFunction(result.assets[0].uri);
-                    }
-                } else {
-                    // User canceled cropping, keep the crop options modal open
-                    return;
-                }
+                // Direct file input for gallery (ALWAYS WORKS)
+                handleWebFileInput(resolve);
             }
-            
-            // Close the crop options modal
-            setShowCropOptions(false);
-            setSelectedImageUri(null);
-            setCurrentImageType(null);
-            setCurrentSetFunction(null);
-            
-        } catch (error) {
-            console.error('Error cropping image:', error);
-            setModalMessage('Failed to crop image. Please try again.');
-            setModalType('error');
-            setModalVisible(true);
-        }
+        });
     };
 
-    // Handle using the image as-is (no cropping) - FIXED: Proper state update
-    const handleUseAsIs = () => {
-        if (currentSetFunction && selectedImageUri) {
-            console.log('Setting image as-is:', selectedImageUri); // Debug log
-            currentSetFunction(selectedImageUri);
-            setShowCropOptions(false);
-            setSelectedImageUri(null);
-            setCurrentImageType(null);
-            setCurrentSetFunction(null);
-        }
+    // SIMPLE FILE INPUT - WORKS LIKE GFORMS
+    const handleWebFileInput = (resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.capture = pendingImageAction?.type === 'selfie' ? 'user' : 'environment';
+        
+        input.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    resolve(event.target.result);
+                };
+                reader.onerror = () => {
+                    setModalMessage('Failed to read image file');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                };
+                reader.readAsDataURL(file);
+            } else {
+                resolve(null);
+            }
+        };
+        
+        input.oncancel = () => {
+            resolve(null);
+        };
+        
+        // Trigger click and cleanup
+        document.body.appendChild(input);
+        input.click();
+        setTimeout(() => {
+            if (document.body.contains(input)) {
+                document.body.removeChild(input);
+            }
+        }, 1000);
     };
 
     // Handle ID Front selection
     const handleIdFrontPress = () => {
-        showSourceSelection(setValidIdFront, 'idFront', true);
+        showSourceSelection(setValidIdFront, 'idFront');
     };
 
     // Handle Selfie selection
     const handleSelfiePress = () => {
-        showSourceSelection(setSelfie, 'selfie', false); // No crop for selfie
+        showSourceSelection(setSelfie, 'selfie');
     };
 
     const handleNext = () => {
@@ -504,6 +328,12 @@ const RegisterPage2 = () => {
             validIdFront,
             selfie
         });
+    };
+
+    // Remove image
+    const removeImage = (setImageFunction, e) => {
+        e.stopPropagation();
+        setImageFunction(null);
     };
 
     return (
@@ -534,32 +364,18 @@ const RegisterPage2 = () => {
                 <View style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
-                        <ModalSelector
-                            data={governmentIdOptions}
-                            initValue="Select Government ID"
-                            cancelText="Cancel"
-                            onChange={(option) => {
-                                const isOther = option.key === 'other';
-                                setIsOtherGovernmentId(isOther);
-                                if (isOther) {
-                                    setGovernmentId('Other');
-                                    setOtherGovernmentId('');
-                                } else {
-                                    setGovernmentId(option.label);
-                                    setOtherGovernmentId('');
-                                }
-                            }}
-                            style={styles.picker}
-                            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-                            overlayStyle={{ justifyContent: 'flex-end' }}
+                        <TouchableOpacity 
+                            style={styles.pickerContainer}
+                            onPress={() => setShowGovernmentIdModal(true)}
                         >
-                            <TouchableOpacity style={styles.pickerContainer}>
-                                <Text style={styles.pickerText}>
-                                    {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
-                                </Text>
-                                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-                            </TouchableOpacity>
-                        </ModalSelector>
+                            <Text style={[
+                                styles.pickerText,
+                                governmentId && styles.pickerTextSelected
+                            ]}>
+                                {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
+                            </Text>
+                            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                        </TouchableOpacity>
                         {isOtherGovernmentId && (
                             <View style={{ marginTop: 8 }}>
                                 <TextInput
@@ -583,12 +399,20 @@ const RegisterPage2 = () => {
                                 style={styles.imagePreviewContainer}
                             >
                                 {validIdFront ? (
-                                    <Image source={{ uri: validIdFront }} style={styles.imagePreview} />
+                                    <View style={styles.imageWithRemove}>
+                                        <Image source={{ uri: validIdFront }} style={styles.imagePreview} />
+                                        <TouchableOpacity 
+                                            style={styles.removeButton}
+                                            onPress={(e) => removeImage(setValidIdFront, e)}
+                                        >
+                                            <MaterialIcons name="close" size={20} color="white" />
+                                        </TouchableOpacity>
+                                    </View>
                                 ) : (
-                                    <View style={styles.iconContainer}>
-                                        <Icon name="add" size={40} color="#1E3A5F" />
+                                    <View style={styles.uploadPlaceholder}>
+                                        <MaterialIcons name="add-photo-alternate" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
+                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -601,10 +425,18 @@ const RegisterPage2 = () => {
                                 style={styles.imagePreviewContainer}
                             >
                                 {selfie ? (
-                                    <Image source={{ uri: selfie }} style={styles.imagePreview} />
+                                    <View style={styles.imageWithRemove}>
+                                        <Image source={{ uri: selfie }} style={styles.imagePreview} />
+                                        <TouchableOpacity 
+                                            style={styles.removeButton}
+                                            onPress={(e) => removeImage(setSelfie, e)}
+                                        >
+                                            <MaterialIcons name="close" size={20} color="white" />
+                                        </TouchableOpacity>
+                                    </View>
                                 ) : (
-                                    <View style={styles.iconContainer}>
-                                        <Icon name="photo-camera" size={40} color="#1E3A5F" />
+                                    <View style={styles.uploadPlaceholder}>
+                                        <MaterialIcons name="photo-camera" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery</Text>
                                     </View>
@@ -626,6 +458,40 @@ const RegisterPage2 = () => {
                         <Text style={styles.primaryButtonText}>Next</Text>
                     </TouchableOpacity>
                 </View>
+
+                {/* Government ID Selection Modal */}
+                <Modal
+                    transparent={true}
+                    visible={showGovernmentIdModal}
+                    onRequestClose={() => setShowGovernmentIdModal(false)}
+                    animationType="slide"
+                >
+                    <View style={styles.modalBackground}>
+                        <View style={styles.governmentIdModal}>
+                            <Text style={styles.modalTitle}>Select Government ID</Text>
+                            
+                            <View style={styles.optionsContainer}>
+                                {governmentIdOptions.map((option) => (
+                                    <TouchableOpacity
+                                        key={option.key}
+                                        style={styles.optionItem}
+                                        onPress={() => handleGovernmentIdSelect(option)}
+                                    >
+                                        <Text style={styles.optionText}>{option.label}</Text>
+                                        <MaterialIcons name="chevron-right" size={20} color="#64748B" />
+                                    </TouchableOpacity>
+                                ))}
+                            </View>
+                            
+                            <TouchableOpacity 
+                                style={styles.cancelButton}
+                                onPress={() => setShowGovernmentIdModal(false)}
+                            >
+                                <Text style={styles.cancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </Modal>
 
                 {/* Source Selection Modal */}
                 <Modal
@@ -680,68 +546,6 @@ const RegisterPage2 = () => {
                     </View>
                 </Modal>
 
-                {/* Crop Options Modal - Shows after image selection */}
-                <Modal
-                    transparent={true}
-                    visible={showCropOptions}
-                    onRequestClose={() => {
-                        setShowCropOptions(false);
-                        setSelectedImageUri(null);
-                        setCurrentImageType(null);
-                        setCurrentSetFunction(null);
-                    }}
-                    animationType="slide"
-                >
-                    <View style={styles.modalBackground}>
-                        <View style={styles.cropOptionsModal}>
-                            <Text style={styles.modalTitle}>Image Preview</Text>
-                            
-                            {selectedImageUri && (
-                                <View style={styles.previewImageContainer}>
-                                    <Image source={{ uri: selectedImageUri }} style={styles.previewImage} />
-                                    <Text style={styles.previewText}>Preview of your selected image</Text>
-                                </View>
-                            )}
-                            
-                            <Text style={styles.cropInstructions}>
-                                Would you like to use this image as is or crop it?
-                            </Text>
-                            
-                            <View style={styles.cropButtonsContainer}>
-                                <TouchableOpacity 
-                                    style={[styles.cropOptionButton, styles.useAsIsButton]}
-                                    onPress={handleUseAsIs}
-                                >
-                                    <MaterialIcons name="check" size={20} color="#fff" />
-                                    <Text style={styles.cropOptionButtonText}>Use as is</Text>
-                                </TouchableOpacity>
-                                
-                                <TouchableOpacity 
-                                    style={[styles.cropOptionButton, styles.cropImageButton]}
-                                    onPress={handleCropSelectedImage}
-                                >
-                                    <MaterialIcons name="crop" size={20} color="#fff" />
-                                    <Text style={styles.cropOptionButtonText}>
-                                        {Platform.OS === 'web' ? 'Crop (Limited)' : 'Crop Image'}
-                                    </Text>
-                                </TouchableOpacity>
-                            </View>
-                            
-                            <TouchableOpacity 
-                                style={styles.cancelButton}
-                                onPress={() => {
-                                    setShowCropOptions(false);
-                                    setSelectedImageUri(null);
-                                    setCurrentImageType(null);
-                                    setCurrentSetFunction(null);
-                                }}
-                            >
-                                <Text style={styles.cancelText}>Cancel</Text>
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                </Modal>
-
                 {/* Custom Modal */}
                 <CustomModal
                     visible={modalVisible}
@@ -775,15 +579,6 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: '#0F172A',
         textAlign: 'left',
-    },
-    section: {
-        marginBottom: 16,
-    },
-    label: {
-        fontSize: 15,
-        marginBottom: 8,
-        color: '#0F172A',
-        fontWeight: '600',
     },
     subLabel: {
         fontSize: 13,
@@ -835,7 +630,29 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         overflow: 'hidden',
     },
-    iconContainer: {
+    uploadPlaceholder: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 16,
+    },
+    imageWithRemove: {
+        width: '100%',
+        height: '100%',
+        position: 'relative',
+    },
+    imagePreview: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'cover',
+    },
+    removeButton: {
+        position: 'absolute',
+        top: 8,
+        right: 8,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        borderRadius: 12,
+        width: 24,
+        height: 24,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -851,11 +668,6 @@ const styles = StyleSheet.create({
         color: '#94A3B8',
         textAlign: 'center',
         marginTop: 2,
-    },
-    imagePreview: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'cover',
     },
     buttonContainer: {
         marginTop: 8,
@@ -884,14 +696,15 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
         backgroundColor: 'rgba(15, 23, 42, 0.5)',
     },
-    sourceOptionsModal: {
+    governmentIdModal: {
         backgroundColor: 'white',
         padding: 20,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
         width: '100%',
+        maxHeight: '80%',
     },
-    cropOptionsModal: {
+    sourceOptionsModal: {
         backgroundColor: 'white',
         padding: 20,
         borderTopLeftRadius: 20,
@@ -904,6 +717,22 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         textAlign: 'center',
         color: '#1E3A5F',
+    },
+    optionsContainer: {
+        marginBottom: 16,
+    },
+    optionItem: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 16,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#F1F5F9',
+    },
+    optionText: {
+        fontSize: 16,
+        color: '#0F172A',
     },
     sourceInstructions: {
         fontSize: 14,
@@ -941,67 +770,6 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginLeft: 12,
     },
-    previewImageContainer: {
-        width: '100%',
-        height: 200,
-        borderRadius: 12,
-        marginBottom: 16,
-        borderWidth: 1,
-        borderColor: '#E2E8F0',
-        overflow: 'hidden',
-        backgroundColor: '#F8FAFC',
-    },
-    previewImage: {
-        width: '100%',
-        height: '100%',
-        resizeMode: 'contain',
-    },
-    previewText: {
-        position: 'absolute',
-        bottom: 8,
-        left: 0,
-        right: 0,
-        textAlign: 'center',
-        fontSize: 12,
-        color: '#64748B',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        padding: 4,
-    },
-    cropInstructions: {
-        fontSize: 14,
-        color: '#64748B',
-        textAlign: 'center',
-        marginBottom: 20,
-        paddingHorizontal: 10,
-    },
-    cropButtonsContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 16,
-        width: '100%',
-    },
-    cropOptionButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        marginHorizontal: 6,
-    },
-    useAsIsButton: {
-        backgroundColor: '#059669',
-    },
-    cropImageButton: {
-        backgroundColor: '#1E3A5F',
-    },
-    cropOptionButtonText: {
-        color: 'white',
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
     cancelButton: {
         padding: 14,
         backgroundColor: '#F1F5F9',
@@ -1024,9 +792,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         backgroundColor: 'white',
     },
-    picker: {
-        marginBottom: 10,
-    },
     pickerContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -1041,6 +806,9 @@ const styles = StyleSheet.create({
     pickerText: {
         fontSize: 14,
         color: 'grey',
+    },
+    pickerTextSelected: {
+        color: '#0F172A',
     },
     required: {
         color: 'red',
