@@ -79,7 +79,7 @@ const RegisterPage2 = () => {
         try {
             // Use ImagePicker with editing enabled to crop the SAME image
             const result = await ImagePicker.launchImageLibraryAsync({
-                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                mediaTypes: ImagePicker.MediaType.Images,
                 allowsEditing: true,
                 aspect: [4, 3],
                 quality: 0.8,
@@ -163,7 +163,7 @@ const RegisterPage2 = () => {
     };
 
     // Direct image selection for web (bypasses crop options if needed)
-    const handleDirectImageSelection = async (setImageFunction) => {
+    const handleDirectImageSelection = async (setImageFunction, showCrop = false) => {
         if (Platform.OS === 'web') {
             const input = document.createElement('input');
             input.type = 'file';
@@ -175,7 +175,13 @@ const RegisterPage2 = () => {
                     const reader = new FileReader();
                     reader.onload = (event) => {
                         const imageUri = event.target.result;
-                        setImageFunction(imageUri);
+                        if (showCrop) {
+                            setSelectedImageUri(imageUri);
+                            setCurrentSetFunction(() => setImageFunction);
+                            setShowCropOptions(true);
+                        } else {
+                            setImageFunction(imageUri);
+                        }
                     };
                     reader.readAsDataURL(file);
                 }
@@ -204,8 +210,8 @@ const RegisterPage2 = () => {
     // Handle ID Front selection
     const handleIdFrontPress = () => {
         if (Platform.OS === 'web') {
-            // On web, show options directly
-            setShowIdFrontOptions(true);
+            // On web, use direct file input for ID front with crop options
+            handleDirectImageSelection(setValidIdFront, true);
         } else {
             setShowIdFrontOptions(true);
         }
@@ -215,7 +221,7 @@ const RegisterPage2 = () => {
     const handleSelfiePress = () => {
         if (Platform.OS === 'web') {
             // On web, use direct file input for selfie
-            handleDirectImageSelection(setSelfie);
+            handleDirectImageSelection(setSelfie, false);
         } else {
             setShowSelfieOptions(true);
         }
@@ -241,7 +247,7 @@ const RegisterPage2 = () => {
                     <View style={styles.webWarning}>
                         <MaterialIcons name="info" size={16} color="#856404" />
                         <Text style={styles.webWarningText}>
-                            For image uploads on web: Click the image area and select a file from your device. Crop functionality may be limited on some mobile browsers.
+                            For image uploads on web: Click the image area and select a file from your device. Camera access is not available on web.
                         </Text>
                     </View>
                 )}
@@ -340,25 +346,28 @@ const RegisterPage2 = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Image Picker Modals */}
-                <ImagePickerModal
-                    visible={showIdFrontOptions}
-                    onClose={() => setShowIdFrontOptions(false)}
-                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'idFront', setValidIdFront)}
-                    onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setValidIdFront, 'idFront')}
-                    title="Select ID Front Source"
-                    showCropOptions={true}
-                />
+                {/* Image Picker Modals - Only show on native platforms */}
+                {Platform.OS !== 'web' && (
+                    <>
+                        <ImagePickerModal
+                            visible={showIdFrontOptions}
+                            onClose={() => setShowIdFrontOptions(false)}
+                            onImageSelected={(imageUri) => handleImageSelected(imageUri, 'idFront', setValidIdFront)}
+                            onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setValidIdFront, 'idFront')}
+                            title="Select ID Front Source"
+                            showCropOptions={true}
+                        />
 
-                <ImagePickerModal
-                    visible={showSelfieOptions}
-                    onClose={() => setShowSelfieOptions(false)}
-                    onImageSelected={(imageUri) => handleImageSelected(imageUri, 'selfie', setSelfie)}
-                    onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setSelfie, 'selfie')}
-                    title="Take Selfie"
-                    showCropOptions={false}
-                    cameraOnly={true}
-                />
+                        <ImagePickerModal
+                            visible={showSelfieOptions}
+                            onClose={() => setShowSelfieOptions(false)}
+                            onImageSelected={(imageUri) => handleImageSelected(imageUri, 'selfie', setSelfie)}
+                            onGalleryImageSelected={(imageUri) => handleGalleryImageSelected(imageUri, setSelfie, 'selfie')}
+                            title="Take Selfie"
+                            showCropOptions={false}
+                        />
+                    </>
+                )}
 
                 {/* Crop Options Modal - Shows after gallery selection */}
                 <Modal
