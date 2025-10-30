@@ -220,7 +220,8 @@ const RegisterPage2 = () => {
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = 'image/*';
-                input.capture = 'environment';
+                
+                // REMOVED: input.capture = 'environment'; // THIS WAS CAUSING CAMERA TO OPEN INSTEAD OF GALLERY
                 
                 // Support for multiple image types across all browsers
                 input.accept = 'image/jpeg, image/png, image/jpg, image/gif, image/webp, image/heic, image/heif';
@@ -277,7 +278,12 @@ const RegisterPage2 = () => {
                 let clickAttempts = 0;
                 const tryClick = () => {
                     try {
-                        input.click();
+                        const event = new MouseEvent('click', {
+                            view: window,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        input.dispatchEvent(event);
                     } catch (error) {
                         clickAttempts++;
                         if (clickAttempts < 3) {
@@ -336,9 +342,9 @@ const RegisterPage2 = () => {
             `;
             
             instructionDiv.innerHTML = `
-                <h3 style="color: white; margin-bottom: 20px;">Select Image</h3>
-                <p style="margin-bottom: 20px; line-height: 1.5;">If file picker doesn't open automatically, please tap the area below to select an image from your gallery.</p>
-                <div style="background: #1E3A5F; color: white; padding: 15px 30px; border-radius: 10px; margin-bottom: 20px;">
+                <h3 style="color: white; margin-bottom: 20px;">Select Image from Gallery</h3>
+                <p style="margin-bottom: 20px; line-height: 1.5;">Please select an image from your device's gallery or file manager.</p>
+                <div style="background: #1E3A5F; color: white; padding: 15px 30px; border-radius: 10px; margin-bottom: 20px; cursor: pointer;" onclick="document.querySelector('input[type=file]')?.click()">
                     TAP HERE TO SELECT IMAGE
                 </div>
                 <button id="cancel-alt-gallery" style="padding: 10px 20px; background: #dc2626; color: white; border: none; border-radius: 8px; cursor: pointer;">
@@ -381,7 +387,12 @@ const RegisterPage2 = () => {
             // Auto-trigger after a short delay
             setTimeout(() => {
                 try {
-                    altInput.click();
+                    const event = new MouseEvent('click', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    altInput.dispatchEvent(event);
                 } catch (error) {
                     console.log('Alternative method click failed');
                 }
@@ -583,7 +594,7 @@ const RegisterPage2 = () => {
                         text-align: center;
                         margin-bottom: 15px;
                         font-size: 16px;
-                        font-weight: bold;
+                        fontWeight: bold;
                     `;
                     
                     const buttonContainer = document.createElement('div');
@@ -1076,7 +1087,7 @@ const RegisterPage2 = () => {
             return "On iOS: For best results, use Safari browser.";
         } else if (browserInfo.isAndroid) {
             if (browserInfo.isMiBrowser) {
-                return "Using Mi Browser: If gallery doesn't work, try using camera or switch to Chrome.";
+                return "Using Mi Browser: Gallery should now work properly.";
             }
             return "On Android: Chrome works best. Allow camera permissions when prompted.";
         } else if (browserInfo.isChrome) {
@@ -1132,7 +1143,7 @@ const RegisterPage2 = () => {
                             )}
                             {browserInfo.isMobile && (
                                 <Text style={styles.mobileTipText}>
-                                    💡 Tip: If gallery doesn't work, try camera. If crop fails, use "Use as is".
+                                    💡 Tip: Gallery should now open your local files properly.
                                 </Text>
                             )}
                         </View>
@@ -1198,7 +1209,7 @@ const RegisterPage2 = () => {
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
                                         {browserInfo.isMobile && (
-                                            <Text style={styles.mobileHintText}>Works on all browsers</Text>
+                                            <Text style={styles.mobileHintText}>Gallery opens local files</Text>
                                         )}
                                     </View>
                                 )}
@@ -1219,7 +1230,7 @@ const RegisterPage2 = () => {
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
                                         {browserInfo.isMobile && (
-                                            <Text style={styles.mobileHintText}>Works on all browsers</Text>
+                                            <Text style={styles.mobileHintText}>Gallery opens local files</Text>
                                         )}
                                     </View>
                                 )}
@@ -1263,12 +1274,7 @@ const RegisterPage2 = () => {
                             {Platform.OS === 'web' && (
                                 <View style={styles.browserTipContainer}>
                                     <Text style={styles.browserTipText}>
-                                        {browserInfo.isMiBrowser 
-                                            ? "📱 Mi Browser: If gallery has issues, camera usually works better."
-                                            : browserInfo.isIOS 
-                                            ? "📱 iOS: Safari works best. Allow camera access when prompted."
-                                            : "📱 Android: Works on all browsers. Camera recommended for reliability."
-                                        }
+                                        📱 Gallery will open your local files and photo gallery
                                     </Text>
                                 </View>
                             )}
@@ -1291,7 +1297,7 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="photo-library" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
-                                    <Text style={styles.sourceOptionSubText}>Universal browser support</Text>
+                                    <Text style={styles.sourceOptionSubText}>Select from local files</Text>
                                 </TouchableOpacity>
                             </View>
                             
