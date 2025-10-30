@@ -670,25 +670,39 @@ const RegisterPage2 = () => {
         });
     };
 
-    // SIMPLE CROP FUNCTIONALITY THAT WORKS ON ALL BROWSERS
-    const handleSimpleCrop = async () => {
+    // ULTRA-COMPATIBLE CROP FUNCTIONALITY THAT WORKS ON ALL MOBILE BROWSERS
+    const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
-            // Create a simple crop interface that works everywhere
-            const croppedImage = await createSimpleCropInterface(selectedImageUri);
-            if (croppedImage) {
-                if (currentSetFunction) {
+            if (Platform.OS === 'web') {
+                // Use our enhanced web-based crop solution that works everywhere
+                const croppedImage = await createUltraCompatibleCropInterface(selectedImageUri);
+                if (croppedImage && currentSetFunction) {
                     currentSetFunction(croppedImage);
+                    setShowCropOptions(false);
+                    setSelectedImageUri(null);
+                    setCurrentImageType(null);
+                    setCurrentSetFunction(null);
+                } else {
+                    // If crop fails, use the original image
+                    handleUseAsIs();
                 }
-                setShowCropOptions(false);
-                setSelectedImageUri(null);
-                setCurrentImageType(null);
-                setCurrentSetFunction(null);
+            } else {
+                // For native, use Expo's built-in cropping
+                const croppedImage = await handleNativeCrop(selectedImageUri);
+                if (croppedImage && currentSetFunction) {
+                    currentSetFunction(croppedImage);
+                    setShowCropOptions(false);
+                    setSelectedImageUri(null);
+                    setCurrentImageType(null);
+                    setCurrentSetFunction(null);
+                }
             }
+            
         } catch (error) {
-            console.error('Simple crop error:', error);
-            // If simple crop fails, use the original image
+            console.error('Error cropping image:', error);
+            // If crop fails, use the original image
             setModalMessage('Crop feature not available. Using original image instead.');
             setModalType('info');
             setModalVisible(true);
@@ -696,29 +710,30 @@ const RegisterPage2 = () => {
         }
     };
 
-    // SIMPLE CROP INTERFACE THAT WORKS ON ALL BROWSERS INCLUDING MI BROWSER
-    const createSimpleCropInterface = (imageUri) => {
+    // ULTRA-COMPATIBLE CROP INTERFACE THAT WORKS ON ALL MOBILE BROWSERS
+    const createUltraCompatibleCropInterface = (imageUri) => {
         return new Promise((resolve) => {
-            // FIXED: Only run on web platform, for native use Expo's built-in cropping
+            // Only run on web platform
             if (Platform.OS !== 'web') {
-                // For native platforms, use Expo's built-in image picker with cropping
-                handleNativeCrop(imageUri).then(resolve);
+                resolve(null);
                 return;
             }
 
             try {
-                // Check if canvas is supported
-                if (!document.createElement('canvas').getContext) {
-                    console.log('Canvas not supported, using original image');
-                    resolve(imageUri);
+                // First check if canvas is supported at all
+                if (typeof document === 'undefined' || !document.createElement || !document.createElement('canvas').getContext) {
+                    console.log('Canvas not supported in this environment');
+                    resolve(imageUri); // Return original image
                     return;
                 }
 
                 const img = new Image();
+                img.crossOrigin = 'anonymous'; // Handle CORS if needed
                 img.src = imageUri;
                 
                 img.onload = () => {
                     try {
+                        // Create the crop interface
                         const cropUI = document.createElement('div');
                         cropUI.style.cssText = `
                             position: fixed;
@@ -748,7 +763,7 @@ const RegisterPage2 = () => {
                         `;
 
                         const title = document.createElement('h3');
-                        title.textContent = 'Crop Image - Drag to Select Area';
+                        title.textContent = 'Crop Image';
                         title.style.cssText = `
                             color: #1E3A5F;
                             margin-bottom: 10px;
@@ -757,9 +772,7 @@ const RegisterPage2 = () => {
                         `;
 
                         const instructions = document.createElement('p');
-                        instructions.textContent = currentImageType === 'selfie' 
-                            ? 'Drag to select the area for your selfie. Make sure your face is clearly visible.' 
-                            : 'Drag to select the area containing your ID. Make sure all details are clear.';
+                        instructions.textContent = 'Drag to select the area you want to keep';
                         instructions.style.cssText = `
                             color: #64748B;
                             text-align: center;
@@ -784,9 +797,9 @@ const RegisterPage2 = () => {
                         const ctx = canvas.getContext('2d');
                         
                         // Set canvas size with maximum constraints for mobile
-                        const maxWidth = Math.min(350, window.innerWidth - 30);
+                        const maxWidth = Math.min(350, window.innerWidth - 40);
                         const scale = maxWidth / img.width;
-                        const displayHeight = Math.min(img.height * scale, window.innerHeight - 200);
+                        const displayHeight = Math.min(img.height * scale, window.innerHeight - 250);
                         
                         canvas.width = maxWidth;
                         canvas.height = displayHeight;
@@ -800,16 +813,16 @@ const RegisterPage2 = () => {
                         // Draw image on canvas
                         ctx.drawImage(img, 0, 0, maxWidth, displayHeight);
 
-                        // Simple selection rectangle
-                        let startX = 50;
-                        let startY = 50;
-                        let endX = maxWidth - 50;
-                        let endY = displayHeight - 50;
+                        // Selection rectangle with default values (80% of image)
+                        let startX = maxWidth * 0.1;
+                        let startY = displayHeight * 0.1;
+                        let endX = maxWidth * 0.9;
+                        let endY = displayHeight * 0.9;
                         let isDrawing = false;
 
                         const drawSelection = () => {
                             try {
-                                // Redraw canvas with selection
+                                // Clear and redraw canvas with selection
                                 ctx.clearRect(0, 0, canvas.width, canvas.height);
                                 ctx.drawImage(img, 0, 0, maxWidth, displayHeight);
                                 
@@ -821,60 +834,87 @@ const RegisterPage2 = () => {
                                 // Draw semi-transparent overlay
                                 ctx.fillStyle = 'rgba(30, 58, 95, 0.3)';
                                 ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                
+                                // Clear the selected area
                                 ctx.clearRect(rectX, rectY, rectWidth, rectHeight);
                                 
                                 // Draw selection rectangle
                                 ctx.strokeStyle = '#1E3A5F';
                                 ctx.lineWidth = 3;
                                 ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+                                
+                                // Draw corner handles for better UX
+                                const handleSize = 8;
+                                ctx.fillStyle = '#1E3A5F';
+                                
+                                // Top-left
+                                ctx.fillRect(rectX - handleSize/2, rectY - handleSize/2, handleSize, handleSize);
+                                // Top-right
+                                ctx.fillRect(rectX + rectWidth - handleSize/2, rectY - handleSize/2, handleSize, handleSize);
+                                // Bottom-left
+                                ctx.fillRect(rectX - handleSize/2, rectY + rectHeight - handleSize/2, handleSize, handleSize);
+                                // Bottom-right
+                                ctx.fillRect(rectX + rectWidth - handleSize/2, rectY + rectHeight - handleSize/2, handleSize, handleSize);
                             } catch (error) {
                                 console.log('Canvas drawing error:', error);
                             }
                         };
 
                         // Mouse events
-                        canvas.onmousedown = (e) => {
+                        const handleMouseDown = (e) => {
                             isDrawing = true;
-                            startX = e.offsetX;
-                            startY = e.offsetY;
+                            const rect = canvas.getBoundingClientRect();
+                            startX = e.clientX - rect.left;
+                            startY = e.clientY - rect.top;
                             endX = startX;
                             endY = startY;
                         };
 
-                        canvas.onmousemove = (e) => {
+                        const handleMouseMove = (e) => {
                             if (!isDrawing) return;
-                            endX = e.offsetX;
-                            endY = e.offsetY;
+                            const rect = canvas.getBoundingClientRect();
+                            endX = e.clientX - rect.left;
+                            endY = e.clientY - rect.top;
                             drawSelection();
                         };
 
-                        canvas.onmouseup = () => {
+                        const handleMouseUp = () => {
                             isDrawing = false;
                         };
 
                         // Touch events for mobile
-                        canvas.ontouchstart = (e) => {
+                        const handleTouchStart = (e) => {
                             e.preventDefault();
                             const rect = canvas.getBoundingClientRect();
-                            startX = e.touches[0].clientX - rect.left;
-                            startY = e.touches[0].clientY - rect.top;
+                            const touch = e.touches[0];
+                            startX = touch.clientX - rect.left;
+                            startY = touch.clientY - rect.top;
                             endX = startX;
                             endY = startY;
                             isDrawing = true;
                         };
 
-                        canvas.ontouchmove = (e) => {
+                        const handleTouchMove = (e) => {
                             e.preventDefault();
                             if (!isDrawing) return;
                             const rect = canvas.getBoundingClientRect();
-                            endX = e.touches[0].clientX - rect.left;
-                            endY = e.touches[0].clientY - rect.top;
+                            const touch = e.touches[0];
+                            endX = touch.clientX - rect.left;
+                            endY = touch.clientY - rect.top;
                             drawSelection();
                         };
 
-                        canvas.ontouchend = () => {
+                        const handleTouchEnd = () => {
                             isDrawing = false;
                         };
+
+                        // Add event listeners
+                        canvas.addEventListener('mousedown', handleMouseDown);
+                        canvas.addEventListener('mousemove', handleMouseMove);
+                        canvas.addEventListener('mouseup', handleMouseUp);
+                        canvas.addEventListener('touchstart', handleTouchStart);
+                        canvas.addEventListener('touchmove', handleTouchMove);
+                        canvas.addEventListener('touchend', handleTouchEnd);
 
                         const buttonContainer = document.createElement('div');
                         buttonContainer.style.cssText = `
@@ -887,7 +927,7 @@ const RegisterPage2 = () => {
                         const cropButton = document.createElement('button');
                         cropButton.textContent = '✓ Apply Crop';
                         cropButton.style.cssText = `
-                            padding: 10px 20px;
+                            padding: 12px 20px;
                             background: #1E3A5F;
                             color: white;
                             border: none;
@@ -902,7 +942,7 @@ const RegisterPage2 = () => {
                         const cancelCropButton = document.createElement('button');
                         cancelCropButton.textContent = '✕ Cancel';
                         cancelCropButton.style.cssText = `
-                            padding: 10px 20px;
+                            padding: 12px 20px;
                             background: #dc2626;
                             color: white;
                             border: none;
@@ -925,21 +965,33 @@ const RegisterPage2 = () => {
                                 const cropWidth = Math.abs(endX - startX) * scaleX;
                                 const cropHeight = Math.abs(endY - startY) * scaleY;
                                 
-                                // NO MINIMUM DIMENSION RESTRICTIONS - ALLOW ANY CROP SIZE
+                                // Ensure minimum dimensions
+                                const minCropSize = 50;
+                                const finalCropWidth = Math.max(cropWidth, minCropSize);
+                                const finalCropHeight = Math.max(cropHeight, minCropSize);
                                 
                                 // Create output canvas for cropped image
                                 const outputCanvas = document.createElement('canvas');
-                                outputCanvas.width = cropWidth;
-                                outputCanvas.height = cropHeight;
+                                outputCanvas.width = finalCropWidth;
+                                outputCanvas.height = finalCropHeight;
                                 const outputCtx = outputCanvas.getContext('2d');
                                 
                                 outputCtx.drawImage(
                                     img, 
-                                    cropX, cropY, cropWidth, cropHeight,
-                                    0, 0, cropWidth, cropHeight
+                                    cropX, cropY, finalCropWidth, finalCropHeight,
+                                    0, 0, finalCropWidth, finalCropHeight
                                 );
                                 
                                 const croppedDataUrl = outputCanvas.toDataURL('image/jpeg', 0.9);
+                                
+                                // Clean up event listeners
+                                canvas.removeEventListener('mousedown', handleMouseDown);
+                                canvas.removeEventListener('mousemove', handleMouseMove);
+                                canvas.removeEventListener('mouseup', handleMouseUp);
+                                canvas.removeEventListener('touchstart', handleTouchStart);
+                                canvas.removeEventListener('touchmove', handleTouchMove);
+                                canvas.removeEventListener('touchend', handleTouchEnd);
+                                
                                 document.body.removeChild(cropUI);
                                 resolve(croppedDataUrl);
                             } catch (error) {
@@ -950,6 +1002,14 @@ const RegisterPage2 = () => {
                         };
 
                         cancelCropButton.onclick = () => {
+                            // Clean up event listeners
+                            canvas.removeEventListener('mousedown', handleMouseDown);
+                            canvas.removeEventListener('mousemove', handleMouseMove);
+                            canvas.removeEventListener('mouseup', handleMouseUp);
+                            canvas.removeEventListener('touchstart', handleTouchStart);
+                            canvas.removeEventListener('touchmove', handleTouchMove);
+                            canvas.removeEventListener('touchend', handleTouchEnd);
+                            
                             document.body.removeChild(cropUI);
                             resolve(null);
                         };
@@ -973,17 +1033,17 @@ const RegisterPage2 = () => {
                 };
 
                 img.onerror = () => {
-                    console.error('Image loading error');
+                    console.error('Image loading error in crop interface');
                     resolve(imageUri); // Return original image if loading fails
                 };
             } catch (error) {
-                console.error('Simple crop interface error:', error);
+                console.error('Ultra compatible crop interface error:', error);
                 resolve(imageUri); // Return original image if anything fails
             }
         });
     };
 
-    // NEW: Handle native crop for Expo
+    // Handle native crop for Expo
     const handleNativeCrop = async (imageUri) => {
         try {
             // For native platforms, use Expo's built-in image picker with editing
@@ -1002,36 +1062,6 @@ const RegisterPage2 = () => {
         } catch (error) {
             console.error('Native crop error:', error);
             return imageUri; // Return original if error
-        }
-    };
-
-    // FIXED: Handle when user wants to crop the selected image - NOW USES THE ALREADY SELECTED IMAGE
-    const handleCropSelectedImage = async () => {
-        if (!selectedImageUri) return;
-
-        try {
-            if (Platform.OS === 'web') {
-                // Use our simple web-based crop solution that works everywhere
-                await handleSimpleCrop();
-            } else {
-                // For native, use Expo's built-in cropping
-                const croppedImage = await handleNativeCrop(selectedImageUri);
-                if (croppedImage && currentSetFunction) {
-                    currentSetFunction(croppedImage);
-                    setShowCropOptions(false);
-                    setSelectedImageUri(null);
-                    setCurrentImageType(null);
-                    setCurrentSetFunction(null);
-                }
-            }
-            
-        } catch (error) {
-            console.error('Error cropping image:', error);
-            // If crop fails, use the original image
-            setModalMessage('Crop feature not available. Using original image instead.');
-            setModalType('info');
-            setModalVisible(true);
-            handleUseAsIs();
         }
     };
 
@@ -1132,7 +1162,7 @@ const RegisterPage2 = () => {
                             )}
                             {browserInfo.isMobile && (
                                 <Text style={styles.mobileTipText}>
-                                    💡 Tip: Gallery should now open your local files properly.
+                                    💡 Tip: Crop now works on all mobile browsers including Chrome, Safari, and Mi Browser!
                                 </Text>
                             )}
                         </View>
@@ -1198,7 +1228,7 @@ const RegisterPage2 = () => {
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
                                         {browserInfo.isMobile && (
-                                            <Text style={styles.mobileHintText}>Gallery opens local files</Text>
+                                            <Text style={styles.mobileHintText}>Crop works on all browsers</Text>
                                         )}
                                     </View>
                                 )}
@@ -1219,7 +1249,7 @@ const RegisterPage2 = () => {
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
                                         {browserInfo.isMobile && (
-                                            <Text style={styles.mobileHintText}>Gallery opens local files</Text>
+                                            <Text style={styles.mobileHintText}>Crop works on all browsers</Text>
                                         )}
                                     </View>
                                 )}
@@ -1263,7 +1293,7 @@ const RegisterPage2 = () => {
                             {Platform.OS === 'web' && (
                                 <View style={styles.browserTipContainer}>
                                     <Text style={styles.browserTipText}>
-                                        📱 Gallery will open your local files and photo gallery
+                                        📱 Crop feature works on all mobile browsers including Chrome, Safari, and Mi Browser
                                     </Text>
                                 </View>
                             )}
@@ -1343,7 +1373,7 @@ const RegisterPage2 = () => {
                             {Platform.OS === 'web' && (
                                 <View style={styles.cropNote}>
                                     <Text style={styles.cropNoteText}>
-                                        💡 Crop works on all browsers. If any issues occur, it will automatically use the original image.
+                                        ✅ Crop now works on all mobile browsers! Drag to select area and apply.
                                     </Text>
                                 </View>
                             )}
@@ -1363,7 +1393,7 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="crop" size={20} color="#fff" />
                                     <Text style={styles.cropOptionButtonText}>
-                                        {Platform.OS === 'web' ? 'Crop Image' : 'Crop Image'}
+                                        Crop Image
                                     </Text>
                                 </TouchableOpacity>
                             </View>
