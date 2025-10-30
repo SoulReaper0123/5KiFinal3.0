@@ -49,58 +49,37 @@ const RegisterPage2 = () => {
         address, dateOfBirth,
     } = route.params;
 
-    // Enhanced browser detection
+    // Detect browser and platform information
     useEffect(() => {
         if (Platform.OS === 'web') {
             const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-            
-            // Enhanced browser detection
-            const isChrome = /chrome|chromium/i.test(userAgent) && !/edg/i.test(userAgent);
+            const isChrome = /chrome|chromium/i.test(userAgent);
             const isFirefox = /firefox/i.test(userAgent);
-            const isSafari = /safari/i.test(userAgent) && !/chrome|chromium/i.test(userAgent);
+            const isSafari = /safari/i.test(userAgent) && !/chrome/i.test(userAgent);
             const isEdge = /edg/i.test(userAgent);
-            const isOpera = /opr|opera/i.test(userAgent);
-            const isSamsung = /samsung/i.test(userAgent);
-            
-            // Enhanced mobile detection
-            const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini|mobile/i.test(userAgent.toLowerCase());
+            const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
             const isIOS = /iphone|ipad|ipod/i.test(userAgent);
             const isAndroid = /android/i.test(userAgent);
-            
-            // Chrome mobile specific
-            const isChromeMobile = isChrome && isMobile;
-            const isIOSChrome = isIOS && /crios/i.test(userAgent);
-            const isAndroidChrome = isAndroid && isChrome;
 
             setBrowserInfo({
                 isChrome,
                 isFirefox,
                 isSafari,
                 isEdge,
-                isOpera,
-                isSamsung,
                 isMobile,
                 isIOS,
                 isAndroid,
-                isChromeMobile,
-                isIOSChrome,
-                isAndroidChrome,
                 userAgent
             });
 
-            console.log('Enhanced Browser Detection:', {
+            console.log('Browser Detection:', {
                 isChrome,
                 isFirefox,
                 isSafari,
                 isEdge,
-                isOpera,
-                isSamsung,
                 isMobile,
                 isIOS,
                 isAndroid,
-                isChromeMobile,
-                isIOSChrome,
-                isAndroidChrome,
                 userAgent
             });
         }
@@ -147,13 +126,13 @@ const RegisterPage2 = () => {
         setShowSourceOptions(true);
     };
 
-    // Handle camera selection - ENHANCED BROWSER SUPPORT
+    // Handle camera selection - UNIVERSAL BROWSER SUPPORT
     const handleCameraSelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Enhanced web camera handling with Chrome mobile fixes
+                // Web camera handling with universal browser support
                 const imageUri = await handleWebCameraCapture(pendingImageAction.type);
                 if (imageUri) {
                     const processedUri = await processImageForRender(imageUri);
@@ -200,58 +179,59 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // ENHANCED: Handle gallery selection with Chrome mobile fixes
-    const handleGallerySelection = async () => {
-        setShowSourceOptions(false);
-        
-        try {
-            if (Platform.OS === 'web') {
-                // Enhanced web gallery handling with Chrome mobile compatibility
-                const imageUri = await handleWebGallerySelection();
-                if (imageUri) {
-                    const processedUri = await processImageForRender(imageUri);
-                    if (pendingImageAction?.allowCrop) {
-                        setSelectedImageUri(processedUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        pendingImageAction.setFunction(processedUri);
-                    }
-                }
-            } else {
-                // Native gallery handling
-                const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: false,
-                    aspect: [4, 3],
-                    quality: 0.8,
-                    base64: false,
-                });
-
-                if (!result.canceled && result.assets && result.assets[0]) {
-                    const imageUri = result.assets[0].uri;
-                    const processedUri = await processImageForRender(imageUri);
-                    
-                    if (pendingImageAction.allowCrop) {
-                        setSelectedImageUri(processedUri);
-                        setCurrentSetFunction(() => pendingImageAction.setFunction);
-                        setCurrentImageType(pendingImageAction.type);
-                        setShowCropOptions(true);
-                    } else {
-                        pendingImageAction.setFunction(processedUri);
-                    }
+    // Handle gallery selection - UNIVERSAL BROWSER SUPPORT
+// Improved gallery selection for web
+const handleGallerySelection = async () => {
+    setShowSourceOptions(false);
+    
+    try {
+        if (Platform.OS === 'web') {
+            // Enhanced web gallery handling
+            const imageUri = await handleWebGallerySelection();
+            if (imageUri) {
+                const processedUri = await processImageForRender(imageUri);
+                if (pendingImageAction?.allowCrop) {
+                    setSelectedImageUri(processedUri);
+                    setCurrentSetFunction(() => pendingImageAction.setFunction);
+                    setCurrentImageType(pendingImageAction.type);
+                    setShowCropOptions(true);
+                } else {
+                    pendingImageAction.setFunction(processedUri);
                 }
             }
-        } catch (error) {
-            console.error('Gallery error:', error);
-            setModalMessage('Failed to select image from gallery. Please try again.');
-            setModalType('error');
-            setModalVisible(true);
+        } else {
+            // Native gallery handling (unchanged)
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: false,
+                aspect: [4, 3],
+                quality: 0.8,
+                base64: false,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]) {
+                const imageUri = result.assets[0].uri;
+                const processedUri = await processImageForRender(imageUri);
+                
+                if (pendingImageAction.allowCrop) {
+                    setSelectedImageUri(processedUri);
+                    setCurrentSetFunction(() => pendingImageAction.setFunction);
+                    setCurrentImageType(pendingImageAction.type);
+                    setShowCropOptions(true);
+                } else {
+                    pendingImageAction.setFunction(processedUri);
+                }
+            }
         }
-        
-        setPendingImageAction(null);
-    };
+    } catch (error) {
+        console.error('Gallery error:', error);
+        setModalMessage('Failed to select image from gallery. Please try again.');
+        setModalType('error');
+        setModalVisible(true);
+    }
+    
+    setPendingImageAction(null);
+};
 
     // Process image for Render compatibility
     const processImageForRender = async (imageUri) => {
@@ -298,20 +278,12 @@ const RegisterPage2 = () => {
         });
     };
 
-    // ENHANCED: Web camera capture with Chrome mobile optimization
+    // Web camera capture - UNIVERSAL BROWSER SUPPORT
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
-            // Enhanced browser capability check
+            // Check if browser supports camera
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-                let errorMsg = 'Camera not supported in this browser. Please use gallery instead.';
-                
-                if (browserInfo.isChromeMobile) {
-                    errorMsg = 'Chrome mobile camera requires HTTPS. Please use gallery upload or ensure you are on a secure connection.';
-                } else if (browserInfo.isIOS) {
-                    errorMsg = 'iOS Safari camera requires user gesture. Please use gallery upload for best compatibility.';
-                }
-                
-                setModalMessage(errorMsg);
+                setModalMessage('Camera not supported in this browser. Please use gallery instead.');
                 setModalType('error');
                 setModalVisible(true);
                 resolve(null);
@@ -321,19 +293,17 @@ const RegisterPage2 = () => {
             try {
                 const facingMode = imageType === 'selfie' ? 'user' : 'environment';
                 
-                // Enhanced constraints for Chrome mobile compatibility
+                // Browser-specific constraints for better compatibility
                 const constraints = {
                     video: {
                         facingMode: facingMode,
-                        width: { ideal: 1280, min: 640, max: 1920 },
-                        height: { ideal: 720, min: 480, max: 1080 },
-                        frameRate: { ideal: 30 }
-                    },
-                    audio: false
+                        width: { ideal: 1280 },
+                        height: { ideal: 720 }
+                    }
                 };
 
-                // Chrome mobile specific optimizations
-                if (browserInfo.isChromeMobile) {
+                // Safari specific constraints
+                if (browserInfo.isSafari) {
                     constraints.video = {
                         facingMode: facingMode,
                         width: { ideal: 1280 },
@@ -341,7 +311,7 @@ const RegisterPage2 = () => {
                     };
                 }
 
-                // iOS specific constraints
+                // iOS Safari specific constraints
                 if (browserInfo.isIOS) {
                     constraints.video = {
                         facingMode: facingMode,
@@ -350,7 +320,6 @@ const RegisterPage2 = () => {
                     };
                 }
 
-                // Enhanced error handling for Chrome mobile
                 navigator.mediaDevices.getUserMedia(constraints)
                 .then((stream) => {
                     const video = document.createElement('video');
@@ -362,7 +331,6 @@ const RegisterPage2 = () => {
                         height: auto;
                         border-radius: 8px;
                         transform: ${facingMode === 'user' ? 'scaleX(-1)' : 'none'};
-                        background: #000;
                     `;
                     
                     const canvas = document.createElement('canvas');
@@ -394,35 +362,19 @@ const RegisterPage2 = () => {
                         overflow: hidden;
                         background: #000;
                         margin-bottom: 20px;
-                        aspect-ratio: 4/3;
                     `;
                     
                     const instructions = document.createElement('div');
                     instructions.textContent = imageType === 'selfie' 
-                        ? 'Take a selfie - Make sure your face is clearly visible' 
-                        : 'Take a photo of your ID - Ensure all details are clear';
+                        ? 'Take a selfie' 
+                        : 'Take a photo of your ID';
                     instructions.style.cssText = `
                         color: white;
                         text-align: center;
                         margin-bottom: 15px;
                         font-size: 16px;
                         font-weight: bold;
-                        padding: 0 10px;
                     `;
-                    
-                    // Chrome mobile specific instructions
-                    if (browserInfo.isChromeMobile) {
-                        const chromeTip = document.createElement('div');
-                        chromeTip.textContent = '📱 Chrome Mobile: Make sure to allow camera permissions';
-                        chromeTip.style.cssText = `
-                            color: #FFD700;
-                            text-align: center;
-                            margin-bottom: 10px;
-                            font-size: 12px;
-                            font-style: italic;
-                        `;
-                        instructions.parentNode?.insertBefore(chromeTip, instructions.nextSibling);
-                    }
                     
                     const buttonContainer = document.createElement('div');
                     buttonContainer.style.cssText = `
@@ -431,7 +383,6 @@ const RegisterPage2 = () => {
                         align-items: center;
                         width: 100%;
                         max-width: 400px;
-                        gap: 10px;
                     `;
                     
                     const captureButton = document.createElement('button');
@@ -445,12 +396,9 @@ const RegisterPage2 = () => {
                         font-size: 16px;
                         font-weight: bold;
                         cursor: pointer;
+                        margin-bottom: 10px;
                         width: 100%;
-                        transition: background-color 0.2s;
                     `;
-                    
-                    captureButton.onmouseenter = () => captureButton.style.backgroundColor = '#152642';
-                    captureButton.onmouseleave = () => captureButton.style.backgroundColor = '#1E3A5F';
                     
                     const cancelButton = document.createElement('button');
                     cancelButton.textContent = '❌ Cancel';
@@ -463,50 +411,30 @@ const RegisterPage2 = () => {
                         font-size: 14px;
                         cursor: pointer;
                         width: 100%;
-                        transition: background-color 0.2s;
                     `;
-                    
-                    cancelButton.onmouseenter = () => cancelButton.style.backgroundColor = '#b91c1c';
-                    cancelButton.onmouseleave = () => cancelButton.style.backgroundColor = '#dc2626';
                     
                     video.onloadedmetadata = () => {
                         canvas.width = video.videoWidth;
                         canvas.height = video.videoHeight;
                         
                         captureButton.onclick = () => {
-                            try {
-                                if (facingMode === 'user') {
-                                    context.translate(canvas.width, 0);
-                                    context.scale(-1, 1);
-                                }
-                                context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                                
-                                const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                                
-                                // Clean up
-                                stream.getTracks().forEach(track => track.stop());
-                                if (document.body.contains(captureUI)) {
-                                    document.body.removeChild(captureUI);
-                                }
-                                resolve(imageDataUrl);
-                            } catch (error) {
-                                console.error('Capture error:', error);
-                                stream.getTracks().forEach(track => track.stop());
-                                if (document.body.contains(captureUI)) {
-                                    document.body.removeChild(captureUI);
-                                }
-                                setModalMessage('Failed to capture image. Please try again.');
-                                setModalType('error');
-                                setModalVisible(true);
-                                resolve(null);
+                            if (facingMode === 'user') {
+                                context.translate(canvas.width, 0);
+                                context.scale(-1, 1);
                             }
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            
+                            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            
+                            // Clean up
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(imageDataUrl);
                         };
                         
                         cancelButton.onclick = () => {
                             stream.getTracks().forEach(track => track.stop());
-                            if (document.body.contains(captureUI)) {
-                                document.body.removeChild(captureUI);
-                            }
+                            document.body.removeChild(captureUI);
                             resolve(null);
                         };
                         
@@ -524,30 +452,19 @@ const RegisterPage2 = () => {
                         if (document.body.contains(captureUI)) {
                             document.body.removeChild(captureUI);
                         }
-                        setModalMessage('Camera error occurred. Please try again or use gallery.');
-                        setModalType('error');
-                        setModalVisible(true);
                         resolve(null);
                     };
                 }).catch((error) => {
                     console.error('Camera access error:', error);
                     let errorMessage = 'Camera not available. Please use gallery instead.';
                     
-                    // Enhanced error messages for different scenarios
+                    // Specific error messages for different scenarios
                     if (error.name === 'NotAllowedError') {
-                        if (browserInfo.isChromeMobile) {
-                            errorMessage = 'Camera permission denied. Please allow camera access in Chrome settings or use gallery upload.';
-                        } else {
-                            errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
-                        }
+                        errorMessage = 'Camera permission denied. Please allow camera access in your browser settings.';
                     } else if (error.name === 'NotFoundError') {
-                        errorMessage = 'No camera found on this device. Please use gallery upload.';
+                        errorMessage = 'No camera found on this device.';
                     } else if (error.name === 'NotSupportedError') {
-                        errorMessage = 'Camera not supported in this browser. Please use gallery upload.';
-                    } else if (error.name === 'NotReadableError') {
-                        errorMessage = 'Camera is already in use by another application.';
-                    } else if (error.name === 'OverconstrainedError') {
-                        errorMessage = 'Camera constraints cannot be met. Please try gallery upload.';
+                        errorMessage = 'Camera not supported in this browser.';
                     }
                     
                     setModalMessage(errorMessage);
@@ -556,7 +473,7 @@ const RegisterPage2 = () => {
                     resolve(null);
                 });
             } catch (error) {
-                console.error('Camera setup error:', error);
+                console.error('Camera error:', error);
                 setModalMessage('Camera not available. Please use gallery instead.');
                 setModalType('error');
                 setModalVisible(true);
@@ -565,70 +482,43 @@ const RegisterPage2 = () => {
         });
     };
 
-    // ENHANCED: Web gallery selection with Chrome mobile optimization
+    // Web gallery selection - UNIVERSAL BROWSER SUPPORT
     const handleWebGallerySelection = () => {
         return new Promise((resolve) => {
             try {
                 const input = document.createElement('input');
                 input.type = 'file';
+                input.accept = 'image/*';
                 
-                // Enhanced file type support for all browsers
-                input.accept = 'image/jpeg, image/png, image/jpg, image/gif, image/webp, image/heic, image/heif';
-                input.capture = pendingImageAction?.type === 'selfie' ? 'user' : 'environment';
+                // Support for multiple image types across all browsers
+                input.accept = 'image/jpeg, image/png, image/jpg, image/gif, image/webp';
                 
                 input.style.cssText = `
                     position: fixed;
                     top: -1000px;
                     left: -1000px;
                     opacity: 0;
-                    width: 1px;
-                    height: 1px;
                 `;
                 
-                let isResolved = false;
-                
-                const cleanup = () => {
-                    if (!isResolved && document.body.contains(input)) {
+                let cleanup = () => {
+                    if (document.body.contains(input)) {
                         document.body.removeChild(input);
                     }
                 };
                 
-                // Enhanced timeout handling
+                // Set timeout for cleanup in case something goes wrong
                 const cleanupTimeout = setTimeout(() => {
-                    if (!isResolved) {
-                        cleanup();
-                        setModalMessage('File selection timed out. Please try again.');
-                        setModalType('error');
-                        setModalVisible(true);
-                        resolve(null);
-                    }
-                }, 60000); // 60 second timeout for mobile devices
+                    cleanup();
+                    resolve(null);
+                }, 30000); // 30 second timeout
                 
                 input.onchange = (e) => {
                     clearTimeout(cleanupTimeout);
-                    isResolved = true;
                     const file = e.target.files[0];
-                    
                     if (file) {
-                        // Enhanced file validation
-                        const validTypes = [
-                            'image/jpeg', 
-                            'image/png', 
-                            'image/jpg', 
-                            'image/gif', 
-                            'image/webp',
-                            'image/heic',
-                            'image/heif'
-                        ];
-                        
-                        // Check file type with fallback for Chrome mobile
-                        const fileType = file.type.toLowerCase();
-                        const fileExtension = file.name.toLowerCase().split('.').pop();
-                        const isValidType = validTypes.includes(fileType) || 
-                                          ['jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif'].includes(fileExtension);
-                        
-                        if (!isValidType) {
-                            setModalMessage('Please select a valid image file (JPEG, PNG, GIF, WebP, HEIC).');
+                        // Check file size (max 10MB)
+                        if (file.size > 10 * 1024 * 1024) {
+                            setModalMessage('Image size too large. Please select an image smaller than 10MB.');
                             setModalType('error');
                             setModalVisible(true);
                             cleanup();
@@ -636,10 +526,10 @@ const RegisterPage2 = () => {
                             return;
                         }
                         
-                        // Enhanced file size check (max 15MB for mobile)
-                        const maxSize = browserInfo.isMobile ? 15 * 1024 * 1024 : 10 * 1024 * 1024;
-                        if (file.size > maxSize) {
-                            setModalMessage(`Image size too large. Please select an image smaller than ${browserInfo.isMobile ? '15MB' : '10MB'}.`);
+                        // Check file type
+                        const validTypes = ['image/jpeg', 'image/png', 'image/jpg', 'image/gif', 'image/webp'];
+                        if (!validTypes.includes(file.type)) {
+                            setModalMessage('Please select a valid image file (JPEG, PNG, GIF, WebP).');
                             setModalType('error');
                             setModalVisible(true);
                             cleanup();
@@ -656,7 +546,7 @@ const RegisterPage2 = () => {
                         };
                         
                         reader.onerror = () => {
-                            setModalMessage('Failed to read the image file. The file may be corrupted.');
+                            setModalMessage('Failed to read the image file. Please try again.');
                             setModalType('error');
                             setModalVisible(true);
                             cleanup();
@@ -668,17 +558,7 @@ const RegisterPage2 = () => {
                             resolve(null);
                         };
                         
-                        // Enhanced error handling for large files on mobile
-                        try {
-                            reader.readAsDataURL(file);
-                        } catch (readError) {
-                            console.error('File read error:', readError);
-                            setModalMessage('Failed to process the image. Please try a different image.');
-                            setModalType('error');
-                            setModalVisible(true);
-                            cleanup();
-                            resolve(null);
-                        }
+                        reader.readAsDataURL(file);
                     } else {
                         cleanup();
                         resolve(null);
@@ -687,66 +567,35 @@ const RegisterPage2 = () => {
                 
                 input.oncancel = () => {
                     clearTimeout(cleanupTimeout);
-                    isResolved = true;
                     cleanup();
                     resolve(null);
                 };
                 
-                input.onerror = (error) => {
+                input.onerror = () => {
                     clearTimeout(cleanupTimeout);
-                    isResolved = true;
-                    console.error('File input error:', error);
                     cleanup();
-                    
-                    let errorMsg = 'Error accessing file picker. Please try again.';
-                    if (browserInfo.isChromeMobile) {
-                        errorMsg = 'Chrome mobile file picker issue. Please ensure you are using the latest Chrome version.';
-                    }
-                    
-                    setModalMessage(errorMsg);
+                    setModalMessage('Error accessing file picker. Please try again.');
                     setModalType('error');
                     setModalVisible(true);
                     resolve(null);
                 };
                 
-                // Enhanced click handling for Chrome mobile
                 document.body.appendChild(input);
                 
-                const triggerFileInput = () => {
-                    try {
-                        // Multiple approaches for Chrome mobile compatibility
-                        if (browserInfo.isChromeMobile) {
-                            // Force a click event for Chrome mobile
-                            const event = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            input.dispatchEvent(event);
-                        } else {
-                            input.click();
-                        }
-                    } catch (error) {
-                        console.error('Error triggering file input:', error);
-                        cleanup();
-                        
-                        let errorMsg = 'File selection not supported in this browser. Please try a different browser.';
-                        if (browserInfo.isMobile) {
-                            errorMsg = 'Mobile file picker not available. Please try using Chrome or Safari browser.';
-                        }
-                        
-                        setModalMessage(errorMsg);
-                        setModalType('error');
-                        setModalVisible(true);
-                        resolve(null);
-                    }
-                };
-                
-                // Small delay to ensure DOM is ready, especially for mobile
-                setTimeout(triggerFileInput, 100);
+                // Trigger click with error handling
+                try {
+                    input.click();
+                } catch (error) {
+                    console.error('Error triggering file input:', error);
+                    cleanup();
+                    setModalMessage('File selection not supported in this browser. Please try a different browser.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                }
                 
             } catch (error) {
-                console.error('Gallery selection setup error:', error);
+                console.error('Gallery selection error:', error);
                 setModalMessage('File selection failed. Please try again or use a different browser.');
                 setModalType('error');
                 setModalVisible(true);
@@ -833,33 +682,19 @@ const RegisterPage2 = () => {
         return { uri };
     };
 
-    // Enhanced browser-specific instructions
+    // Get browser-specific instructions
     const getBrowserInstructions = () => {
         if (!browserInfo.isMobile) return null;
 
         if (browserInfo.isIOS) {
-            if (browserInfo.isIOSChrome) {
-                return "On iOS Chrome: Gallery upload works best. Camera may have limitations.";
-            }
-            return "On iOS: Safari works best. Tap 'Choose from Gallery' to upload photos.";
+            return "On iOS: For best results, use Safari browser. Tap 'Choose from Gallery' to upload photos.";
         } else if (browserInfo.isAndroid) {
-            if (browserInfo.isChromeMobile) {
-                return "On Chrome Mobile: Gallery upload recommended. Allow permissions if using camera.";
-            }
             return "On Android: Chrome works best. Allow camera permissions when prompted.";
         } else if (browserInfo.isChrome) {
             return "Using Chrome: Make sure to allow camera and file access permissions.";
         }
         
         return "For mobile devices: Use Chrome or Safari for best compatibility.";
-    };
-
-    // Enhanced Chrome mobile specific warnings
-    const getChromeMobileWarning = () => {
-        if (browserInfo.isChromeMobile) {
-            return "Chrome Mobile Tip: Gallery upload is most reliable. Camera requires HTTPS and permissions.";
-        }
-        return null;
     };
 
     const handleNext = () => {
@@ -893,22 +728,17 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {/* Enhanced browser-specific warnings and instructions */}
+                {/* Browser-specific warnings and instructions */}
                 {Platform.OS === 'web' && (
                     <View style={styles.webWarning}>
                         <MaterialIcons name="info" size={16} color="#856404" />
                         <View style={{ flex: 1 }}>
                             <Text style={styles.webWarningText}>
-                                Tap on the image areas to upload photos. Enhanced compatibility for all browsers.
+                                Tap on the image areas to upload photos. Compatible with all major browsers.
                             </Text>
                             {getBrowserInstructions() && (
                                 <Text style={styles.browserSpecificText}>
                                     {getBrowserInstructions()}
-                                </Text>
-                            )}
-                            {getChromeMobileWarning() && (
-                                <Text style={styles.chromeMobileWarning}>
-                                    {getChromeMobileWarning()}
                                 </Text>
                             )}
                             {browserInfo.isMobile && (
@@ -979,9 +809,7 @@ const RegisterPage2 = () => {
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
                                         {browserInfo.isMobile && (
-                                            <Text style={styles.mobileHintText}>
-                                                {browserInfo.isChromeMobile ? 'Gallery recommended' : 'Use rear camera'}
-                                            </Text>
+                                            <Text style={styles.mobileHintText}>Use rear camera for best results</Text>
                                         )}
                                     </View>
                                 )}
@@ -1002,9 +830,7 @@ const RegisterPage2 = () => {
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery</Text>
                                         {browserInfo.isMobile && (
-                                            <Text style={styles.mobileHintText}>
-                                                {browserInfo.isChromeMobile ? 'Gallery recommended' : 'Use front camera'}
-                                            </Text>
+                                            <Text style={styles.mobileHintText}>Use front camera</Text>
                                         )}
                                     </View>
                                 )}
@@ -1026,7 +852,7 @@ const RegisterPage2 = () => {
                     </TouchableOpacity>
                 </View>
 
-                {/* Enhanced Source Selection Modal */}
+                {/* Source Selection Modal */}
                 <Modal
                     transparent={true}
                     visible={showSourceOptions}
@@ -1044,20 +870,13 @@ const RegisterPage2 = () => {
                                 How would you like to add your {pendingImageAction?.type === 'idFront' ? 'ID photo' : 'selfie'}?
                             </Text>
 
-                            {/* Enhanced browser-specific tips */}
-                            {Platform.OS === 'web' && (
-                                <View style={[
-                                    styles.browserTipContainer,
-                                    browserInfo.isChromeMobile && styles.chromeMobileTip
-                                ]}>
+                            {/* Browser-specific tips */}
+                            {Platform.OS === 'web' && browserInfo.isMobile && (
+                                <View style={styles.browserTipContainer}>
                                     <Text style={styles.browserTipText}>
-                                        {browserInfo.isChromeMobile 
-                                            ? "📱 Chrome Mobile: Gallery upload is most reliable. Camera requires permissions."
-                                            : browserInfo.isIOS 
-                                            ? "📱 iOS Tip: Safari works best. Gallery upload recommended for reliability."
-                                            : browserInfo.isAndroid
-                                            ? "📱 Android Tip: Chrome recommended. Gallery upload works reliably."
-                                            : "💡 Tip: Gallery upload works across all browsers and devices."
+                                        {browserInfo.isIOS 
+                                            ? "📱 iOS Tip: Safari works best. Allow camera access when prompted."
+                                            : "📱 Android Tip: Chrome recommended. Check permissions if issues occur."
                                         }
                                     </Text>
                                 </View>
@@ -1073,11 +892,6 @@ const RegisterPage2 = () => {
                                     <Text style={styles.sourceOptionSubText}>
                                         {pendingImageAction?.type === 'selfie' ? 'Use front camera' : 'Use rear camera'}
                                     </Text>
-                                    {browserInfo.isChromeMobile && (
-                                        <Text style={styles.chromeMobileNote}>
-                                            May require permissions
-                                        </Text>
-                                    )}
                                 </TouchableOpacity>
                                 
                                 <TouchableOpacity 
@@ -1087,11 +901,6 @@ const RegisterPage2 = () => {
                                     <MaterialIcons name="photo-library" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
                                     <Text style={styles.sourceOptionSubText}>Select from device</Text>
-                                    {browserInfo.isChromeMobile && (
-                                        <Text style={styles.chromeMobileNote}>
-                                            Most reliable option
-                                        </Text>
-                                    )}
                                 </TouchableOpacity>
                             </View>
                             
@@ -1242,13 +1051,6 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontStyle: 'italic',
     },
-    chromeMobileWarning: {
-        color: '#D97706',
-        fontSize: 11,
-        marginLeft: 8,
-        marginTop: 4,
-        fontWeight: '600',
-    },
     browserTipContainer: {
         backgroundColor: '#D1ECF1',
         padding: 10,
@@ -1256,10 +1058,6 @@ const styles = StyleSheet.create({
         marginBottom: 15,
         borderLeftWidth: 4,
         borderLeftColor: '#0CA678',
-    },
-    chromeMobileTip: {
-        backgroundColor: '#FFE4CC',
-        borderLeftColor: '#FF8C00',
     },
     browserTipText: {
         color: '#055160',
@@ -1396,7 +1194,6 @@ const styles = StyleSheet.create({
         padding: 20,
         borderRadius: 12,
         marginBottom: 12,
-        position: 'relative',
     },
     cameraButton: {
         backgroundColor: '#1E3A5F',
@@ -1415,14 +1212,6 @@ const styles = StyleSheet.create({
         color: 'rgba(255,255,255,0.8)',
         fontSize: 12,
         marginLeft: 12,
-    },
-    chromeMobileNote: {
-        position: 'absolute',
-        bottom: 8,
-        right: 12,
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 10,
-        fontStyle: 'italic',
     },
     previewImageContainer: {
         width: '100%',
