@@ -72,6 +72,15 @@ const RegisterPage2 = () => {
                 isMiBrowser,
                 userAgent
             });
+
+            console.log('Browser Info:', {
+                isChrome,
+                isFirefox,
+                isSafari,
+                isMobile,
+                isIOS,
+                isAndroid
+            });
         }
     }, []);
 
@@ -138,13 +147,13 @@ const RegisterPage2 = () => {
         }
     };
 
-    // Handle gallery selection
+    // Handle gallery selection - FIXED FOR CHROME MOBILE
     const handleGallerySelection = async () => {
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                // Universal web gallery handling
+                // Universal web gallery handling that works on Chrome Mobile
                 const imageUri = await handleUniversalGallerySelection();
                 if (imageUri) {
                     setSelectedImageUri(imageUri);
@@ -174,7 +183,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // UNIVERSAL GALLERY SELECTION - SIMPLIFIED AND RELIABLE
+    // UNIVERSAL GALLERY SELECTION - FIXED FOR CHROME MOBILE
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -182,20 +191,43 @@ const RegisterPage2 = () => {
                 return;
             }
 
+            // Method 1: Direct file input with user gesture (works best for Chrome Mobile)
             try {
-                // Simple file input method that works everywhere
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = 'image/*';
+                input.capture = 'environment'; // This helps on mobile
                 
+                // Make it visible but off-screen for mobile compatibility
                 input.style.cssText = `
                     position: fixed;
-                    top: -1000px;
-                    left: -1000px;
-                    opacity: 0;
+                    top: 0;
+                    left: 0;
+                    width: 100%;
+                    height: 100%;
+                    opacity: 0.001;
+                    z-index: 10000;
                 `;
                 
-                document.body.appendChild(input);
+                let isResolved = false;
+                
+                const cleanup = () => {
+                    if (document.body.contains(input)) {
+                        document.body.removeChild(input);
+                    }
+                    // Remove any event listeners
+                    input.onchange = null;
+                    input.oncancel = null;
+                    input.onerror = null;
+                };
+                
+                const resolveAndCleanup = (result) => {
+                    if (!isResolved) {
+                        isResolved = true;
+                        cleanup();
+                        resolve(result);
+                    }
+                };
                 
                 input.onchange = (e) => {
                     const file = e.target.files[0];
@@ -205,51 +237,233 @@ const RegisterPage2 = () => {
                             setModalMessage('Image size too large. Please select an image smaller than 10MB.');
                             setModalType('error');
                             setModalVisible(true);
-                            document.body.removeChild(input);
-                            resolve(null);
+                            resolveAndCleanup(null);
                             return;
                         }
                         
                         const reader = new FileReader();
                         reader.onload = (event) => {
                             const imageUri = event.target.result;
-                            document.body.removeChild(input);
-                            resolve(imageUri);
+                            resolveAndCleanup(imageUri);
                         };
                         reader.onerror = () => {
-                            document.body.removeChild(input);
-                            resolve(null);
+                            resolveAndCleanup(null);
                         };
                         reader.readAsDataURL(file);
                     } else {
-                        document.body.removeChild(input);
-                        resolve(null);
+                        resolveAndCleanup(null);
                     }
                 };
                 
                 input.oncancel = () => {
-                    document.body.removeChild(input);
-                    resolve(null);
+                    resolveAndCleanup(null);
                 };
                 
-                // Trigger click
+                input.onerror = (error) => {
+                    console.error('File input error:', error);
+                    // Try alternative method if this fails
+                    attemptAlternativeGalleryMethod(resolve);
+                    cleanup();
+                };
+                
+                // Add to document and trigger click
+                document.body.appendChild(input);
+                
+                // Use a direct click event (important for Chrome Mobile)
                 setTimeout(() => {
                     try {
-                        input.click();
+                        // Create and dispatch a proper click event
+                        const clickEvent = new MouseEvent('click', {
+                            view: window,
+                            bubbles: true,
+                            cancelable: true,
+                            buttons: 1
+                        });
+                        input.dispatchEvent(clickEvent);
                     } catch (error) {
-                        document.body.removeChild(input);
-                        resolve(null);
+                        console.log('Direct click failed, trying alternative method');
+                        attemptAlternativeGalleryMethod(resolve);
+                        cleanup();
                     }
                 }, 100);
                 
+                // Safety timeout
+                setTimeout(() => {
+                    if (!isResolved) {
+                        console.log('Gallery selection timeout, trying alternative');
+                        attemptAlternativeGalleryMethod(resolve);
+                        cleanup();
+                    }
+                }, 10000);
+                
             } catch (error) {
-                console.error('Gallery selection error:', error);
-                resolve(null);
+                console.error('Primary gallery method failed:', error);
+                attemptAlternativeGalleryMethod(resolve);
             }
         });
     };
 
-    // Web camera capture - SIMPLIFIED AND RELIABLE
+    // ALTERNATIVE GALLERY METHOD FOR CHROME MOBILE
+    const attemptAlternativeGalleryMethod = (resolve) => {
+        if (Platform.OS !== 'web') {
+            resolve(null);
+            return;
+        }
+
+        try {
+            // Create a full-screen overlay with instructions
+            const overlay = document.createElement('div');
+            overlay.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.9);
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                z-index: 10000;
+                padding: 20px;
+                box-sizing: border-box;
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: white;
+                padding: 25px;
+                border-radius: 15px;
+                text-align: center;
+                max-width: 400px;
+                width: 90%;
+            `;
+            
+            const title = document.createElement('h3');
+            title.textContent = 'Select Image';
+            title.style.cssText = `
+                color: #1E3A5F;
+                margin-bottom: 15px;
+                font-size: 18px;
+            `;
+            
+            const instructions = document.createElement('p');
+            instructions.textContent = 'Please select an image from your gallery or file manager.';
+            instructions.style.cssText = `
+                color: #64748B;
+                margin-bottom: 20px;
+                line-height: 1.4;
+            `;
+            
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.accept = 'image/*';
+            fileInput.style.cssText = `
+                display: none;
+            `;
+            
+            const selectButton = document.createElement('button');
+            selectButton.textContent = '📁 Select from Gallery';
+            selectButton.style.cssText = `
+                background: #1E3A5F;
+                color: white;
+                border: none;
+                padding: 15px 25px;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: bold;
+                cursor: pointer;
+                margin-bottom: 15px;
+                width: 100%;
+            `;
+            
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = 'Cancel';
+            cancelButton.style.cssText = `
+                background: #dc2626;
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-size: 14px;
+                cursor: pointer;
+                width: 100%;
+            `;
+            
+            let isResolved = false;
+            
+            const cleanup = () => {
+                if (document.body.contains(overlay)) {
+                    document.body.removeChild(overlay);
+                }
+                fileInput.onchange = null;
+            };
+            
+            const resolveAndCleanup = (result) => {
+                if (!isResolved) {
+                    isResolved = true;
+                    cleanup();
+                    resolve(result);
+                }
+            };
+            
+            fileInput.onchange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    if (file.size > 10 * 1024 * 1024) {
+                        setModalMessage('Image size too large. Please select an image smaller than 10MB.');
+                        setModalType('error');
+                        setModalVisible(true);
+                        resolveAndCleanup(null);
+                        return;
+                    }
+                    
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        const imageUri = event.target.result;
+                        resolveAndCleanup(imageUri);
+                    };
+                    reader.onerror = () => {
+                        resolveAndCleanup(null);
+                    };
+                    reader.readAsDataURL(file);
+                } else {
+                    resolveAndCleanup(null);
+                }
+            };
+            
+            selectButton.onclick = () => {
+                fileInput.click();
+            };
+            
+            cancelButton.onclick = () => {
+                resolveAndCleanup(null);
+            };
+            
+            // Add elements to DOM
+            content.appendChild(title);
+            content.appendChild(instructions);
+            content.appendChild(selectButton);
+            content.appendChild(cancelButton);
+            overlay.appendChild(content);
+            document.body.appendChild(overlay);
+            document.body.appendChild(fileInput);
+            
+            // Auto-focus on the button for better accessibility
+            setTimeout(() => {
+                selectButton.focus();
+            }, 100);
+            
+        } catch (error) {
+            console.error('Alternative gallery method failed:', error);
+            setModalMessage('Gallery access not available. Please try using the camera instead.');
+            setModalType('error');
+            setModalVisible(true);
+            resolve(null);
+        }
+    };
+
+    // Web camera capture
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -435,13 +649,13 @@ const RegisterPage2 = () => {
         });
     };
 
-    // SIMPLIFIED CROP FUNCTIONALITY - WORKS EVERYWHERE
+    // SIMPLIFIED CROP FUNCTIONALITY
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
             if (Platform.OS === 'web') {
-                // For web, use a simple canvas-based crop that works everywhere
+                // For web, use a simple canvas-based crop
                 const croppedImage = await createSimpleCropInterface(selectedImageUri);
                 if (croppedImage) {
                     currentSetFunction(croppedImage);
@@ -474,7 +688,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // SIMPLE CROP INTERFACE - RELIABLE AND WORKS EVERYWHERE
+    // SIMPLE CROP INTERFACE
     const createSimpleCropInterface = (imageUri) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -517,7 +731,7 @@ const RegisterPage2 = () => {
                         `;
 
                         const title = document.createElement('h3');
-                        title.textContent = 'Crop Image';
+                        title.textContent = 'Crop Image - Drag to Select Area';
                         title.style.cssText = `
                             color: #1E3A5F;
                             margin-bottom: 15px;
@@ -757,6 +971,18 @@ const RegisterPage2 = () => {
         return { uri };
     };
 
+    // Get browser-specific instructions
+    const getBrowserInstructions = () => {
+        if (browserInfo.isMobile) {
+            if (browserInfo.isChrome) {
+                return "Using Chrome Mobile: Gallery should work properly. If not, try the camera.";
+            } else if (browserInfo.isSafari) {
+                return "Using Safari: Both camera and gallery should work well.";
+            }
+        }
+        return "Tap on the image areas to upload photos.";
+    };
+
     const handleNext = () => {
         if (!governmentId || !validIdFront || !selfie) {
             setModalMessage('Please select government ID and upload all required images');
@@ -794,13 +1020,11 @@ const RegisterPage2 = () => {
                         <MaterialIcons name="info" size={16} color="#856404" />
                         <View style={{ flex: 1 }}>
                             <Text style={styles.webWarningText}>
-                                Tap on the image areas to upload photos. Works on all mobile browsers.
+                                {getBrowserInstructions()}
                             </Text>
-                            {browserInfo.isMobile && (
-                                <Text style={styles.mobileTipText}>
-                                    💡 Tip: For best results, use Chrome or Safari browser.
-                                </Text>
-                            )}
+                            <Text style={styles.mobileTipText}>
+                                💡 Works on all mobile browsers including Chrome and Safari
+                            </Text>
                         </View>
                     </View>
                 )}
@@ -863,6 +1087,9 @@ const RegisterPage2 = () => {
                                         <Icon name="add" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                                        {browserInfo.isMobile && (
+                                            <Text style={styles.mobileHintText}>Works on Chrome & Safari</Text>
+                                        )}
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -881,6 +1108,9 @@ const RegisterPage2 = () => {
                                         <Icon name="photo-camera" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
                                         <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                                        {browserInfo.isMobile && (
+                                            <Text style={styles.mobileHintText}>Works on Chrome & Safari</Text>
+                                        )}
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -915,6 +1145,14 @@ const RegisterPage2 = () => {
                             <Text style={styles.sourceInstructions}>
                                 How would you like to add your {currentImageType === 'idFront' ? 'ID photo' : 'selfie'}?
                             </Text>
+
+                            {Platform.OS === 'web' && browserInfo.isMobile && (
+                                <View style={styles.browserTipContainer}>
+                                    <Text style={styles.browserTipText}>
+                                        📱 Gallery will open your device's file picker
+                                    </Text>
+                                </View>
+                            )}
                             
                             <View style={styles.sourceButtonsContainer}>
                                 <TouchableOpacity 
@@ -923,6 +1161,9 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="photo-camera" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
+                                    <Text style={styles.sourceOptionSubText}>
+                                        {currentImageType === 'selfie' ? 'Use front camera' : 'Use rear camera'}
+                                    </Text>
                                 </TouchableOpacity>
                                 
                                 <TouchableOpacity 
@@ -931,6 +1172,7 @@ const RegisterPage2 = () => {
                                 >
                                     <MaterialIcons name="photo-library" size={30} color="#fff" />
                                     <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
+                                    <Text style={styles.sourceOptionSubText}>Select from device storage</Text>
                                 </TouchableOpacity>
                             </View>
                             
@@ -1073,6 +1315,27 @@ const styles = StyleSheet.create({
         marginTop: 4,
         fontWeight: '500',
     },
+    mobileHintText: {
+        fontSize: 9,
+        color: '#94A3B8',
+        textAlign: 'center',
+        marginTop: 2,
+        fontStyle: 'italic',
+    },
+    browserTipContainer: {
+        backgroundColor: '#D1ECF1',
+        padding: 10,
+        borderRadius: 8,
+        marginBottom: 15,
+        borderLeftWidth: 4,
+        borderLeftColor: '#0CA678',
+    },
+    browserTipText: {
+        color: '#055160',
+        fontSize: 12,
+        fontWeight: '500',
+        textAlign: 'center',
+    },
     card: {
         backgroundColor: '#FFFFFF',
         borderRadius: 12,
@@ -1202,6 +1465,11 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginLeft: 12,
         flex: 1,
+    },
+    sourceOptionSubText: {
+        color: 'rgba(255,255,255,0.8)',
+        fontSize: 12,
+        marginLeft: 12,
     },
     previewImageContainer: {
         width: '100%',
