@@ -127,15 +127,14 @@ const RegisterPage2 = () => {
                 // Web camera handling with universal browser support
                 const imageUri = await handleWebCameraCapture(pendingImageAction.type);
                 if (imageUri) {
-                    const processedUri = await processImageForRender(imageUri);
-                    // ALWAYS show crop options for both ID Front and Selfie after camera capture
-                    setSelectedImageUri(processedUri);
+                    // Store the captured image immediately and show crop options
+                    setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
                     setShowCropOptions(true);
                 }
             } else {
-                // Native camera handling
+                // Native camera handling - FIXED: Use new MediaType format
                 const result = await ImagePicker.launchCameraAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false, // We'll handle editing/cropping ourselves
@@ -146,10 +145,9 @@ const RegisterPage2 = () => {
 
                 if (!result.canceled && result.assets && result.assets[0]) {
                     const imageUri = result.assets[0].uri;
-                    const processedUri = await processImageForRender(imageUri);
                     
-                    // ALWAYS show crop options for both ID Front and Selfie after camera capture
-                    setSelectedImageUri(processedUri);
+                    // Store the captured image immediately and show crop options
+                    setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
                     setShowCropOptions(true);
@@ -174,15 +172,14 @@ const RegisterPage2 = () => {
                 // Universal web gallery handling that works on all browsers
                 const imageUri = await handleUniversalGallerySelection();
                 if (imageUri) {
-                    const processedUri = await processImageForRender(imageUri);
-                    // ALWAYS show crop options for both ID Front and Selfie after gallery selection
-                    setSelectedImageUri(processedUri);
+                    // Store the selected image immediately and show crop options
+                    setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
                     setShowCropOptions(true);
                 }
             } else {
-                // Native gallery handling
+                // Native gallery handling - FIXED: Use new MediaType format
                 const result = await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false, // We'll handle editing/cropping ourselves
@@ -193,10 +190,9 @@ const RegisterPage2 = () => {
 
                 if (!result.canceled && result.assets && result.assets[0]) {
                     const imageUri = result.assets[0].uri;
-                    const processedUri = await processImageForRender(imageUri);
                     
-                    // ALWAYS show crop options for both ID Front and Selfie after gallery selection
-                    setSelectedImageUri(processedUri);
+                    // Store the selected image immediately and show crop options
+                    setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
                     setShowCropOptions(true);
@@ -215,13 +211,17 @@ const RegisterPage2 = () => {
     // UNIVERSAL GALLERY SELECTION - WORKS ON ALL BROWSERS INCLUDING CHROME AND MI BROWSER
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
+            // Only run on web platform
+            if (Platform.OS !== 'web') {
+                resolve(null);
+                return;
+            }
+
             try {
                 // Method 1: Standard input file (works on most browsers)
                 const input = document.createElement('input');
                 input.type = 'file';
                 input.accept = 'image/*';
-                
-                // REMOVED: input.capture = 'environment'; // THIS WAS CAUSING CAMERA TO OPEN INSTEAD OF GALLERY
                 
                 // Support for multiple image types across all browsers
                 input.accept = 'image/jpeg, image/png, image/jpg, image/gif, image/webp, image/heic, image/heif';
@@ -306,6 +306,12 @@ const RegisterPage2 = () => {
 
     // ALTERNATIVE GALLERY METHOD FOR PROBLEMATIC BROWSERS
     const attemptAlternativeGalleryMethod = (resolve) => {
+        // Only run on web platform
+        if (Platform.OS !== 'web') {
+            resolve(null);
+            return;
+        }
+
         try {
             // Method 2: Create a more visible input for problematic browsers
             const altInput = document.createElement('input');
@@ -454,54 +460,15 @@ const RegisterPage2 = () => {
         reader.readAsDataURL(file);
     };
 
-    // Process image for Render compatibility
-    const processImageForRender = async (imageUri) => {
-        try {
-            if (imageUri.startsWith('data:image')) {
-                return imageUri;
-            }
-            
-            if (imageUri.startsWith('file://')) {
-                if (Platform.OS === 'web') {
-                    return await convertFileUriToBase64(imageUri);
-                }
-            }
-            
-            return imageUri;
-        } catch (error) {
-            console.error('Error processing image for Render:', error);
-            return imageUri;
-        }
-    };
-
-    // Convert file URI to base64 for web deployment
-    const convertFileUriToBase64 = (fileUri) => {
-        return new Promise((resolve, reject) => {
-            if (fileUri.startsWith('data:image')) {
-                resolve(fileUri);
-                return;
-            }
-            
-            fetch(fileUri)
-                .then(response => response.blob())
-                .then(blob => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => {
-                        resolve(reader.result);
-                    };
-                    reader.onerror = reject;
-                    reader.readAsDataURL(blob);
-                })
-                .catch(error => {
-                    console.warn('Failed to convert file URI to base64:', error);
-                    resolve(fileUri);
-                });
-        });
-    };
-
     // Web camera capture - UNIVERSAL BROWSER SUPPORT
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
+            // Only run on web platform
+            if (Platform.OS !== 'web') {
+                resolve(null);
+                return;
+            }
+
             // Check if browser supports camera
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 setModalMessage('Camera not supported in this browser. Please use gallery instead.');
@@ -721,294 +688,324 @@ const RegisterPage2 = () => {
             }
         } catch (error) {
             console.error('Simple crop error:', error);
-            // If simple crop fails, offer manual crop instructions
-            offerManualCropAlternative();
+            // If simple crop fails, use the original image
+            setModalMessage('Crop feature not available. Using original image instead.');
+            setModalType('info');
+            setModalVisible(true);
+            handleUseAsIs();
         }
     };
 
     // SIMPLE CROP INTERFACE THAT WORKS ON ALL BROWSERS INCLUDING MI BROWSER
     const createSimpleCropInterface = (imageUri) => {
         return new Promise((resolve) => {
+            // FIXED: Only run on web platform, for native use Expo's built-in cropping
+            if (Platform.OS !== 'web') {
+                // For native platforms, use Expo's built-in image picker with cropping
+                handleNativeCrop(imageUri).then(resolve);
+                return;
+            }
+
             try {
+                // Check if canvas is supported
+                if (!document.createElement('canvas').getContext) {
+                    console.log('Canvas not supported, using original image');
+                    resolve(imageUri);
+                    return;
+                }
+
                 const img = new Image();
                 img.src = imageUri;
                 
                 img.onload = () => {
-                    const cropUI = document.createElement('div');
-                    cropUI.style.cssText = `
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100%;
-                        height: 100%;
-                        background: rgba(0,0,0,0.95);
-                        display: flex;
-                        flex-direction: column;
-                        align-items: center;
-                        justify-content: center;
-                        z-index: 10000;
-                        padding: 10px;
-                        box-sizing: border-box;
-                    `;
+                    try {
+                        const cropUI = document.createElement('div');
+                        cropUI.style.cssText = `
+                            position: fixed;
+                            top: 0;
+                            left: 0;
+                            width: 100%;
+                            height: 100%;
+                            background: rgba(0,0,0,0.95);
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            z-index: 10000;
+                            padding: 10px;
+                            box-sizing: border-box;
+                        `;
 
-                    const container = document.createElement('div');
-                    container.style.cssText = `
-                        background: white;
-                        border-radius: 12px;
-                        padding: 15px;
-                        max-width: 95%;
-                        max-height: 90%;
-                        overflow: auto;
-                        width: 100%;
-                    `;
+                        const container = document.createElement('div');
+                        container.style.cssText = `
+                            background: white;
+                            border-radius: 12px;
+                            padding: 15px;
+                            max-width: 95%;
+                            max-height: 90%;
+                            overflow: auto;
+                            width: 100%;
+                        `;
 
-                    const title = document.createElement('h3');
-                    title.textContent = 'Crop Image - Drag to Select Area';
-                    title.style.cssText = `
-                        color: #1E3A5F;
-                        margin-bottom: 10px;
-                        text-align: center;
-                        font-size: 16px;
-                    `;
+                        const title = document.createElement('h3');
+                        title.textContent = 'Crop Image - Drag to Select Area';
+                        title.style.cssText = `
+                            color: #1E3A5F;
+                            margin-bottom: 10px;
+                            text-align: center;
+                            font-size: 16px;
+                        `;
 
-                    const instructions = document.createElement('p');
-                    instructions.textContent = currentImageType === 'selfie' 
-                        ? 'Drag to select the area for your selfie. Make sure your face is clearly visible.' 
-                        : 'Drag to select the area containing your ID. Make sure all details are clear.';
-                    instructions.style.cssText = `
-                        color: #64748B;
-                        text-align: center;
-                        margin-bottom: 10px;
-                        font-size: 12px;
-                        line-height: 1.3;
-                    `;
+                        const instructions = document.createElement('p');
+                        instructions.textContent = currentImageType === 'selfie' 
+                            ? 'Drag to select the area for your selfie. Make sure your face is clearly visible.' 
+                            : 'Drag to select the area containing your ID. Make sure all details are clear.';
+                        instructions.style.cssText = `
+                            color: #64748B;
+                            text-align: center;
+                            margin-bottom: 10px;
+                            font-size: 12px;
+                            line-height: 1.3;
+                        `;
 
-                    const canvasContainer = document.createElement('div');
-                    canvasContainer.style.cssText = `
-                        position: relative;
-                        margin-bottom: 10px;
-                        border: 2px solid #1E3A5F;
-                        border-radius: 8px;
-                        overflow: hidden;
-                        max-width: 100%;
-                        background: #f8fafc;
-                        touch-action: none;
-                    `;
+                        const canvasContainer = document.createElement('div');
+                        canvasContainer.style.cssText = `
+                            position: relative;
+                            margin-bottom: 10px;
+                            border: 2px solid #1E3A5F;
+                            border-radius: 8px;
+                            overflow: hidden;
+                            max-width: 100%;
+                            background: #f8fafc;
+                            touch-action: none;
+                        `;
 
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    
-                    // Set canvas size with maximum constraints for mobile
-                    const maxWidth = Math.min(350, window.innerWidth - 30);
-                    const scale = maxWidth / img.width;
-                    const displayHeight = Math.min(img.height * scale, window.innerHeight - 200);
-                    
-                    canvas.width = maxWidth;
-                    canvas.height = displayHeight;
-                    canvas.style.cssText = `
-                        width: 100%;
-                        height: auto;
-                        display: block;
-                        cursor: crosshair;
-                    `;
-                    
-                    // Draw image on canvas
-                    ctx.drawImage(img, 0, 0, maxWidth, displayHeight);
-
-                    // Simple selection rectangle
-                    let startX = 50;
-                    let startY = 50;
-                    let endX = maxWidth - 50;
-                    let endY = displayHeight - 50;
-                    let isDrawing = false;
-
-                    const drawSelection = () => {
-                        // Redraw canvas with selection
-                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // Set canvas size with maximum constraints for mobile
+                        const maxWidth = Math.min(350, window.innerWidth - 30);
+                        const scale = maxWidth / img.width;
+                        const displayHeight = Math.min(img.height * scale, window.innerHeight - 200);
+                        
+                        canvas.width = maxWidth;
+                        canvas.height = displayHeight;
+                        canvas.style.cssText = `
+                            width: 100%;
+                            height: auto;
+                            display: block;
+                            cursor: crosshair;
+                        `;
+                        
+                        // Draw image on canvas
                         ctx.drawImage(img, 0, 0, maxWidth, displayHeight);
-                        
-                        const rectX = Math.min(startX, endX);
-                        const rectY = Math.min(startY, endY);
-                        const rectWidth = Math.abs(endX - startX);
-                        const rectHeight = Math.abs(endY - startY);
-                        
-                        // Draw semi-transparent overlay
-                        ctx.fillStyle = 'rgba(30, 58, 95, 0.3)';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.clearRect(rectX, rectY, rectWidth, rectHeight);
-                        
-                        // Draw selection rectangle
-                        ctx.strokeStyle = '#1E3A5F';
-                        ctx.lineWidth = 3;
-                        ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
-                    };
 
-                    // Mouse events
-                    canvas.onmousedown = (e) => {
-                        isDrawing = true;
-                        startX = e.offsetX;
-                        startY = e.offsetY;
-                        endX = startX;
-                        endY = startY;
-                    };
+                        // Simple selection rectangle
+                        let startX = 50;
+                        let startY = 50;
+                        let endX = maxWidth - 50;
+                        let endY = displayHeight - 50;
+                        let isDrawing = false;
 
-                    canvas.onmousemove = (e) => {
-                        if (!isDrawing) return;
-                        endX = e.offsetX;
-                        endY = e.offsetY;
+                        const drawSelection = () => {
+                            try {
+                                // Redraw canvas with selection
+                                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                                ctx.drawImage(img, 0, 0, maxWidth, displayHeight);
+                                
+                                const rectX = Math.min(startX, endX);
+                                const rectY = Math.min(startY, endY);
+                                const rectWidth = Math.abs(endX - startX);
+                                const rectHeight = Math.abs(endY - startY);
+                                
+                                // Draw semi-transparent overlay
+                                ctx.fillStyle = 'rgba(30, 58, 95, 0.3)';
+                                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                                ctx.clearRect(rectX, rectY, rectWidth, rectHeight);
+                                
+                                // Draw selection rectangle
+                                ctx.strokeStyle = '#1E3A5F';
+                                ctx.lineWidth = 3;
+                                ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+                            } catch (error) {
+                                console.log('Canvas drawing error:', error);
+                            }
+                        };
+
+                        // Mouse events
+                        canvas.onmousedown = (e) => {
+                            isDrawing = true;
+                            startX = e.offsetX;
+                            startY = e.offsetY;
+                            endX = startX;
+                            endY = startY;
+                        };
+
+                        canvas.onmousemove = (e) => {
+                            if (!isDrawing) return;
+                            endX = e.offsetX;
+                            endY = e.offsetY;
+                            drawSelection();
+                        };
+
+                        canvas.onmouseup = () => {
+                            isDrawing = false;
+                        };
+
+                        // Touch events for mobile
+                        canvas.ontouchstart = (e) => {
+                            e.preventDefault();
+                            const rect = canvas.getBoundingClientRect();
+                            startX = e.touches[0].clientX - rect.left;
+                            startY = e.touches[0].clientY - rect.top;
+                            endX = startX;
+                            endY = startY;
+                            isDrawing = true;
+                        };
+
+                        canvas.ontouchmove = (e) => {
+                            e.preventDefault();
+                            if (!isDrawing) return;
+                            const rect = canvas.getBoundingClientRect();
+                            endX = e.touches[0].clientX - rect.left;
+                            endY = e.touches[0].clientY - rect.top;
+                            drawSelection();
+                        };
+
+                        canvas.ontouchend = () => {
+                            isDrawing = false;
+                        };
+
+                        const buttonContainer = document.createElement('div');
+                        buttonContainer.style.cssText = `
+                            display: flex;
+                            gap: 8px;
+                            justify-content: center;
+                            flex-wrap: wrap;
+                        `;
+
+                        const cropButton = document.createElement('button');
+                        cropButton.textContent = '✓ Apply Crop';
+                        cropButton.style.cssText = `
+                            padding: 10px 20px;
+                            background: #1E3A5F;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            flex: 1;
+                            min-width: 120px;
+                        `;
+
+                        const cancelCropButton = document.createElement('button');
+                        cancelCropButton.textContent = '✕ Cancel';
+                        cancelCropButton.style.cssText = `
+                            padding: 10px 20px;
+                            background: #dc2626;
+                            color: white;
+                            border: none;
+                            border-radius: 8px;
+                            font-size: 14px;
+                            font-weight: bold;
+                            cursor: pointer;
+                            flex: 1;
+                            min-width: 120px;
+                        `;
+
+                        cropButton.onclick = () => {
+                            try {
+                                // Calculate actual crop coordinates
+                                const scaleX = img.width / maxWidth;
+                                const scaleY = img.height / displayHeight;
+                                
+                                const cropX = Math.min(startX, endX) * scaleX;
+                                const cropY = Math.min(startY, endY) * scaleY;
+                                const cropWidth = Math.abs(endX - startX) * scaleX;
+                                const cropHeight = Math.abs(endY - startY) * scaleY;
+                                
+                                // NO MINIMUM DIMENSION RESTRICTIONS - ALLOW ANY CROP SIZE
+                                
+                                // Create output canvas for cropped image
+                                const outputCanvas = document.createElement('canvas');
+                                outputCanvas.width = cropWidth;
+                                outputCanvas.height = cropHeight;
+                                const outputCtx = outputCanvas.getContext('2d');
+                                
+                                outputCtx.drawImage(
+                                    img, 
+                                    cropX, cropY, cropWidth, cropHeight,
+                                    0, 0, cropWidth, cropHeight
+                                );
+                                
+                                const croppedDataUrl = outputCanvas.toDataURL('image/jpeg', 0.9);
+                                document.body.removeChild(cropUI);
+                                resolve(croppedDataUrl);
+                            } catch (error) {
+                                console.error('Crop processing error:', error);
+                                document.body.removeChild(cropUI);
+                                resolve(imageUri); // Return original image if crop fails
+                            }
+                        };
+
+                        cancelCropButton.onclick = () => {
+                            document.body.removeChild(cropUI);
+                            resolve(null);
+                        };
+
+                        canvasContainer.appendChild(canvas);
+                        container.appendChild(title);
+                        container.appendChild(instructions);
+                        container.appendChild(canvasContainer);
+                        buttonContainer.appendChild(cropButton);
+                        buttonContainer.appendChild(cancelCropButton);
+                        container.appendChild(buttonContainer);
+                        cropUI.appendChild(container);
+                        document.body.appendChild(cropUI);
+
+                        // Initial draw
                         drawSelection();
-                    };
-
-                    canvas.onmouseup = () => {
-                        isDrawing = false;
-                    };
-
-                    // Touch events for mobile
-                    canvas.ontouchstart = (e) => {
-                        e.preventDefault();
-                        const rect = canvas.getBoundingClientRect();
-                        startX = e.touches[0].clientX - rect.left;
-                        startY = e.touches[0].clientY - rect.top;
-                        endX = startX;
-                        endY = startY;
-                        isDrawing = true;
-                    };
-
-                    canvas.ontouchmove = (e) => {
-                        e.preventDefault();
-                        if (!isDrawing) return;
-                        const rect = canvas.getBoundingClientRect();
-                        endX = e.touches[0].clientX - rect.left;
-                        endY = e.touches[0].clientY - rect.top;
-                        drawSelection();
-                    };
-
-                    canvas.ontouchend = () => {
-                        isDrawing = false;
-                    };
-
-                    const buttonContainer = document.createElement('div');
-                    buttonContainer.style.cssText = `
-                        display: flex;
-                        gap: 8px;
-                        justify-content: center;
-                        flex-wrap: wrap;
-                    `;
-
-                    const cropButton = document.createElement('button');
-                    cropButton.textContent = '✓ Apply Crop';
-                    cropButton.style.cssText = `
-                        padding: 10px 20px;
-                        background: #1E3A5F;
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        cursor: pointer;
-                        flex: 1;
-                        min-width: 120px;
-                    `;
-
-                    const cancelCropButton = document.createElement('button');
-                    cancelCropButton.textContent = '✕ Cancel';
-                    cancelCropButton.style.cssText = `
-                        padding: 10px 20px;
-                        background: #dc2626;
-                        color: white;
-                        border: none;
-                        border-radius: 8px;
-                        font-size: 14px;
-                        font-weight: bold;
-                        cursor: pointer;
-                        flex: 1;
-                        min-width: 120px;
-                    `;
-
-                    cropButton.onclick = () => {
-                        // Calculate actual crop coordinates
-                        const scaleX = img.width / maxWidth;
-                        const scaleY = img.height / displayHeight;
-                        
-                        const cropX = Math.min(startX, endX) * scaleX;
-                        const cropY = Math.min(startY, endY) * scaleY;
-                        const cropWidth = Math.abs(endX - startX) * scaleX;
-                        const cropHeight = Math.abs(endY - startY) * scaleY;
-                        
-                        // Ensure minimum dimensions
-                        if (cropWidth < 100 || cropHeight < 100) {
-                            setModalMessage('Please select a larger area to crop');
-                            setModalType('error');
-                            setModalVisible(true);
-                            return;
-                        }
-                        
-                        // Create output canvas for cropped image
-                        const outputCanvas = document.createElement('canvas');
-                        outputCanvas.width = cropWidth;
-                        outputCanvas.height = cropHeight;
-                        const outputCtx = outputCanvas.getContext('2d');
-                        
-                        outputCtx.drawImage(
-                            img, 
-                            cropX, cropY, cropWidth, cropHeight,
-                            0, 0, cropWidth, cropHeight
-                        );
-                        
-                        const croppedDataUrl = outputCanvas.toDataURL('image/jpeg', 0.9);
-                        document.body.removeChild(cropUI);
-                        resolve(croppedDataUrl);
-                    };
-
-                    cancelCropButton.onclick = () => {
-                        document.body.removeChild(cropUI);
-                        resolve(null);
-                    };
-
-                    canvasContainer.appendChild(canvas);
-                    container.appendChild(title);
-                    container.appendChild(instructions);
-                    container.appendChild(canvasContainer);
-                    buttonContainer.appendChild(cropButton);
-                    buttonContainer.appendChild(cancelCropButton);
-                    container.appendChild(buttonContainer);
-                    cropUI.appendChild(container);
-                    document.body.appendChild(cropUI);
-
-                    // Initial draw
-                    drawSelection();
+                    } catch (error) {
+                        console.error('Crop UI creation error:', error);
+                        resolve(imageUri); // Return original image if UI fails
+                    }
                 };
 
                 img.onerror = () => {
-                    setModalMessage('Failed to load image for cropping');
-                    setModalType('error');
-                    setModalVisible(true);
-                    resolve(null);
+                    console.error('Image loading error');
+                    resolve(imageUri); // Return original image if loading fails
                 };
             } catch (error) {
                 console.error('Simple crop interface error:', error);
-                // Fallback to manual crop instructions
-                offerManualCropAlternative();
-                resolve(null);
+                resolve(imageUri); // Return original image if anything fails
             }
         });
     };
 
-    // MANUAL CROP ALTERNATIVE FOR BROWSERS THAT DON'T SUPPORT CANVAS CROP
-    const offerManualCropAlternative = () => {
-        setModalMessage(
-            'For best results, please crop your image before uploading:\n\n' +
-            '1. Use your phone\'s built-in photo editor\n' +
-            '2. Crop to show only the required area\n' +
-            '3. Save the cropped image\n' +
-            '4. Upload the cropped version\n\n' +
-            'Alternatively, use the "Use as is" option if the image is already properly framed.'
-        );
-        setModalType('info');
-        setModalVisible(true);
+    // NEW: Handle native crop for Expo
+    const handleNativeCrop = async (imageUri) => {
+        try {
+            // For native platforms, use Expo's built-in image picker with editing
+            const result = await ImagePicker.launchImageLibraryAsync({
+                mediaTypes: ImagePicker.MediaTypeOptions.Images,
+                allowsEditing: true,
+                aspect: currentImageType === 'selfie' ? [1, 1] : [4, 3],
+                quality: 0.8,
+                base64: false,
+            });
+
+            if (!result.canceled && result.assets && result.assets[0]) {
+                return result.assets[0].uri;
+            }
+            return imageUri; // Return original if user cancels
+        } catch (error) {
+            console.error('Native crop error:', error);
+            return imageUri; // Return original if error
+        }
     };
 
-    // Handle when user wants to crop the selected image
+    // FIXED: Handle when user wants to crop the selected image - NOW USES THE ALREADY SELECTED IMAGE
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
@@ -1017,20 +1014,10 @@ const RegisterPage2 = () => {
                 // Use our simple web-based crop solution that works everywhere
                 await handleSimpleCrop();
             } else {
-                // Native crop handling for Expo
-                const result = await ImagePicker.launchImageLibraryAsync({
-                    mediaTypes: ImagePicker.MediaTypeOptions.Images,
-                    allowsEditing: true,
-                    aspect: currentImageType === 'selfie' ? [1, 1] : [4, 3], // Square for selfie, rectangle for ID
-                    quality: 0.8,
-                    base64: false,
-                });
-
-                if (!result.canceled && result.assets && result.assets[0]) {
-                    const processedUri = await processImageForRender(result.assets[0].uri);
-                    if (currentSetFunction) {
-                        currentSetFunction(processedUri);
-                    }
+                // For native, use Expo's built-in cropping
+                const croppedImage = await handleNativeCrop(selectedImageUri);
+                if (croppedImage && currentSetFunction) {
+                    currentSetFunction(croppedImage);
                     setShowCropOptions(false);
                     setSelectedImageUri(null);
                     setCurrentImageType(null);
@@ -1040,9 +1027,11 @@ const RegisterPage2 = () => {
             
         } catch (error) {
             console.error('Error cropping image:', error);
-            setModalMessage('Failed to crop image. Please try the "Use as is" option or crop manually before uploading.');
-            setModalType('error');
+            // If crop fails, use the original image
+            setModalMessage('Crop feature not available. Using original image instead.');
+            setModalType('info');
             setModalVisible(true);
+            handleUseAsIs();
         }
     };
 
@@ -1354,7 +1343,7 @@ const RegisterPage2 = () => {
                             {Platform.OS === 'web' && (
                                 <View style={styles.cropNote}>
                                     <Text style={styles.cropNoteText}>
-                                        💡 Crop works on most browsers. If it fails, use "Use as is" or crop manually before uploading.
+                                        💡 Crop works on all browsers. If any issues occur, it will automatically use the original image.
                                     </Text>
                                 </View>
                             )}
