@@ -461,7 +461,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // FIXED INTERACTIVE CROPPER WITH PROPER CENTERING
+    // FIXED INTERACTIVE CROPPER WITH PROPER CENTERING AND CROPPING
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -712,40 +712,32 @@ const RegisterPage2 = () => {
             cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
             cropArea.addEventListener('touchend', handleTouchEnd);
 
-            // FIXED: Proper image centering logic
+            // FIXED: Improved image centering logic
             const centerImage = () => {
                 const containerWidth = cropArea.clientWidth;
                 const containerHeight = cropArea.clientHeight;
-                const imgWidth = img.naturalWidth;
-                const imgHeight = img.naturalHeight;
                 
-                console.log('Centering image:', { imgWidth, imgHeight, containerWidth, containerHeight });
-                
-                // Calculate scale to fit container while maintaining aspect ratio
-                const scaleX = containerWidth / imgWidth;
-                const scaleY = containerHeight / imgHeight;
-                scale = Math.min(scaleX, scaleY) * 0.9; // 90% of max fit to show borders
-                
-                // Calculate centered position
-                const scaledWidth = imgWidth * scale;
-                const scaledHeight = imgHeight * scale;
-                posX = (containerWidth - scaledWidth) / 2;
-                posY = (containerHeight - scaledHeight) / 2;
-                
-                console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
-                updateImageTransform();
-                img.style.cursor = 'grab';
-            };
-
-            img.onload = () => {
-                console.log('Image loaded in cropper');
-                centerImage();
-            };
-
-            img.onerror = () => {
-                console.error('Failed to load image in cropper');
-                document.body.removeChild(cropUI);
-                resolve(null);
+                img.onload = function() {
+                    const imgWidth = this.naturalWidth;
+                    const imgHeight = this.naturalHeight;
+                    
+                    console.log('Centering image:', { imgWidth, imgHeight, containerWidth, containerHeight });
+                    
+                    // Calculate scale to fit container while maintaining aspect ratio
+                    const scaleX = containerWidth / imgWidth;
+                    const scaleY = containerHeight / imgHeight;
+                    scale = Math.min(scaleX, scaleY) * 0.8; // 80% of max fit to show borders
+                    
+                    // Calculate centered position
+                    const scaledWidth = imgWidth * scale;
+                    const scaledHeight = imgHeight * scale;
+                    posX = (containerWidth - scaledWidth) / 2;
+                    posY = (containerHeight - scaledHeight) / 2;
+                    
+                    console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
+                    updateImageTransform();
+                    img.style.cursor = 'grab';
+                };
             };
 
             // FIXED: Proper cropping logic with correct coordinate transformation
@@ -766,39 +758,58 @@ const RegisterPage2 = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Set canvas size to crop area size
+                // Set canvas size to crop area size (this will be our output size)
                 canvas.width = containerWidth;
                 canvas.height = containerHeight;
                 
                 // Calculate the visible portion of the image in the crop area
                 // Convert crop area coordinates to original image coordinates
-                const sourceX = -posX / scale;
-                const sourceY = -posY / scale;
-                const sourceWidth = containerWidth / scale;
-                const sourceHeight = containerHeight / scale;
+                const sourceX = Math.max(0, -posX / scale);
+                const sourceY = Math.max(0, -posY / scale);
+                const sourceWidth = Math.min(imgWidth - sourceX, containerWidth / scale);
+                const sourceHeight = Math.min(imgHeight - sourceY, containerHeight / scale);
                 
                 console.log('Source crop coordinates:', {
                     sourceX, sourceY, sourceWidth, sourceHeight
                 });
                 
-                // Ensure we don't try to crop outside the image bounds
-                const boundedSourceX = Math.max(0, sourceX);
-                const boundedSourceY = Math.max(0, sourceY);
-                const boundedSourceWidth = Math.min(imgWidth - boundedSourceX, sourceWidth);
-                const boundedSourceHeight = Math.min(imgHeight - boundedSourceY, sourceHeight);
+                // Clear canvas with white background
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                console.log('Bounded source coordinates:', {
-                    boundedSourceX, boundedSourceY, boundedSourceWidth, boundedSourceHeight
-                });
-                
-                // Draw the cropped image
-                ctx.drawImage(
-                    img,
-                    boundedSourceX, boundedSourceY,           // Source x, y
-                    boundedSourceWidth, boundedSourceHeight,   // Source width, height
-                    0, 0,                                     // Destination x, y
-                    canvas.width, canvas.height               // Destination width, height
-                );
+                // Draw the cropped image centered on canvas
+                if (sourceWidth > 0 && sourceHeight > 0) {
+                    // Calculate destination dimensions to maintain aspect ratio
+                    const destAspect = containerWidth / containerHeight;
+                    const sourceAspect = sourceWidth / sourceHeight;
+                    
+                    let destX = 0;
+                    let destY = 0;
+                    let destWidth = containerWidth;
+                    let destHeight = containerHeight;
+                    
+                    if (sourceAspect > destAspect) {
+                        // Source is wider - fit to width
+                        destHeight = containerWidth / sourceAspect;
+                        destY = (containerHeight - destHeight) / 2;
+                    } else {
+                        // Source is taller - fit to height
+                        destWidth = containerHeight * sourceAspect;
+                        destX = (containerWidth - destWidth) / 2;
+                    }
+                    
+                    console.log('Destination coordinates:', {
+                        destX, destY, destWidth, destHeight
+                    });
+                    
+                    ctx.drawImage(
+                        img,
+                        sourceX, sourceY,           // Source x, y
+                        sourceWidth, sourceHeight,   // Source width, height
+                        destX, destY,               // Destination x, y
+                        destWidth, destHeight       // Destination width, height
+                    );
+                }
                 
                 const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
                 console.log('Image cropped successfully');
@@ -835,6 +846,9 @@ const RegisterPage2 = () => {
             container.appendChild(buttonContainer);
             cropUI.appendChild(container);
             document.body.appendChild(cropUI);
+            
+            // Center the image after it's added to DOM
+            setTimeout(centerImage, 100);
             
             console.log('Crop interface created successfully');
         });
