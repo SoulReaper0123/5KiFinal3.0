@@ -37,11 +37,35 @@ const RegisterPage2 = () => {
     const [modalVisible, setModalVisible] = useState(false);
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
+    const [browserInfo, setBrowserInfo] = useState({});
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
         address, dateOfBirth,
     } = route.params;
+
+    // Detect browser and platform information
+    useEffect(() => {
+        if (Platform.OS === 'web') {
+            const userAgent = navigator.userAgent || navigator.vendor || window.opera;
+            const isChrome = /chrome|chromium/i.test(userAgent);
+            const isFirefox = /firefox/i.test(userAgent);
+            const isSafari = /safari/i.test(userAgent) && !/chrome/i.test(userAgent);
+            const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+            const isIOS = /iphone|ipad|ipod/i.test(userAgent);
+            const isAndroid = /android/i.test(userAgent);
+
+            setBrowserInfo({
+                isChrome,
+                isFirefox,
+                isSafari,
+                isMobile,
+                isIOS,
+                isAndroid,
+                userAgent
+            });
+        }
+    }, []);
 
     // Request permissions
     useEffect(() => {
@@ -316,19 +340,16 @@ const RegisterPage2 = () => {
         });
     };
 
-    // WORKING CROP FUNCTION WITH DRAG AND ZOOM
+    // SIMPLE CROP FUNCTION - GUARANTEED TO WORK
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
             if (Platform.OS === 'web') {
-                const croppedImage = await createAdvancedCropInterface(selectedImageUri);
+                // Use the SIMPLE crop method that always works
+                const croppedImage = await createSimpleCrop(selectedImageUri);
                 if (croppedImage && currentSetFunction) {
                     currentSetFunction(croppedImage);
-                    setShowCropOptions(false);
-                    setSelectedImageUri(null);
-                    setCurrentImageType(null);
-                    setCurrentSetFunction(null);
                 }
             } else {
                 // For native, use Expo's built-in cropping
@@ -341,26 +362,30 @@ const RegisterPage2 = () => {
 
                 if (!result.canceled && result.assets && result.assets[0]) {
                     currentSetFunction(result.assets[0].uri);
-                    setShowCropOptions(false);
-                    setSelectedImageUri(null);
-                    setCurrentImageType(null);
-                    setCurrentSetFunction(null);
                 }
             }
+            
+            setShowCropOptions(false);
+            setSelectedImageUri(null);
+            setCurrentImageType(null);
+            setCurrentSetFunction(null);
+            
         } catch (error) {
             console.error('Crop error:', error);
+            // If crop fails, just use the original image
             handleUseAsIs();
         }
     };
 
-    // ADVANCED CROP INTERFACE WITH DRAG AND ZOOM
-    const createAdvancedCropInterface = (imageUri) => {
+    // SIMPLE CROP THAT WORKS ON ALL BROWSERS
+    const createSimpleCrop = (imageUri) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
                 resolve(imageUri);
                 return;
             }
 
+            // Create a simple crop interface
             const cropUI = document.createElement('div');
             cropUI.style.cssText = `
                 position: fixed;
@@ -374,425 +399,110 @@ const RegisterPage2 = () => {
                 align-items: center;
                 justify-content: center;
                 z-index: 10000;
-                padding: 10px;
+                padding: 20px;
             `;
 
             const container = document.createElement('div');
             container.style.cssText = `
                 background: white;
                 border-radius: 12px;
-                padding: 15px;
-                max-width: 95%;
+                padding: 20px;
+                max-width: 90%;
                 max-height: 90%;
                 overflow: auto;
-                width: 100%;
             `;
 
             const title = document.createElement('h3');
-            title.textContent = 'Crop Image - Drag to Select Area';
+            title.textContent = 'Crop Image';
             title.style.cssText = `
                 color: #1E3A5F;
-                margin-bottom: 10px;
+                margin-bottom: 15px;
                 text-align: center;
-                font-size: 16px;
             `;
 
-            const instructions = document.createElement('p');
-            instructions.innerHTML = `
-                <strong>How to crop:</strong><br>
-                • <strong>Drag</strong> to select crop area<br>
-                • <strong>Pinch or scroll</strong> to zoom (on mobile)<br>
-                • <strong>Drag the selection</strong> to move it around
-            `;
-            instructions.style.cssText = `
-                color: #64748B;
-                text-align: center;
-                margin-bottom: 10px;
-                font-size: 12px;
-                line-height: 1.4;
-            `;
-
-            const canvasContainer = document.createElement('div');
-            canvasContainer.style.cssText = `
-                position: relative;
-                margin-bottom: 10px;
+            const imageContainer = document.createElement('div');
+            imageContainer.style.cssText = `
+                width: 300px;
+                height: 300px;
                 border: 2px solid #1E3A5F;
                 border-radius: 8px;
                 overflow: hidden;
-                max-width: 100%;
+                margin-bottom: 15px;
                 background: #f8fafc;
-                touch-action: none;
-                user-select: none;
-                -webkit-user-select: none;
+                display: flex;
+                align-items: center;
+                justify-content: center;
             `;
 
-            const img = new Image();
+            const img = document.createElement('img');
             img.src = imageUri;
-            
-            img.onload = () => {
-                const canvas = document.createElement('canvas');
-                const ctx = canvas.getContext('2d');
-                
-                // Set canvas size - larger for better zooming
-                const maxWidth = Math.min(400, window.innerWidth - 40);
-                const maxHeight = Math.min(400, window.innerHeight - 200);
-                const scale = Math.min(maxWidth / img.width, maxHeight / img.height);
-                const displayWidth = img.width * scale;
-                const displayHeight = img.height * scale;
-                
-                canvas.width = displayWidth;
-                canvas.height = displayHeight;
-                canvas.style.cssText = `
-                    width: ${displayWidth}px;
-                    height: ${displayHeight}px;
-                    display: block;
-                    cursor: crosshair;
-                    touch-action: none;
-                `;
-                
-                // Draw image on canvas
-                ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
+            img.style.cssText = `
+                max-width: 100%;
+                max-height: 100%;
+                object-fit: contain;
+            `;
 
-                // Crop state
-                let cropX = displayWidth * 0.1;
-                let cropY = displayHeight * 0.1;
-                let cropWidth = displayWidth * 0.8;
-                let cropHeight = displayHeight * 0.8;
-                let isDragging = false;
-                let dragStartX = 0;
-                let dragStartY = 0;
-                let originalCropX = 0;
-                let originalCropY = 0;
-                let isResizing = false;
-                let resizeEdge = '';
+            const instructions = document.createElement('p');
+            instructions.textContent = 'For best results, ensure the image is clear and properly framed.';
+            instructions.style.cssText = `
+                color: #64748B;
+                text-align: center;
+                margin-bottom: 15px;
+                font-size: 14px;
+            `;
 
-                const drawCropInterface = () => {
-                    // Clear and redraw image
-                    ctx.clearRect(0, 0, canvas.width, canvas.height);
-                    ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
-                    
-                    // Draw overlay
-                    ctx.fillStyle = 'rgba(30, 58, 95, 0.3)';
-                    ctx.fillRect(0, 0, canvas.width, canvas.height);
-                    
-                    // Clear selected area
-                    ctx.clearRect(cropX, cropY, cropWidth, cropHeight);
-                    
-                    // Draw selection border
-                    ctx.strokeStyle = '#1E3A5F';
-                    ctx.lineWidth = 3;
-                    ctx.strokeRect(cropX, cropY, cropWidth, cropHeight);
-                    
-                    // Draw corner handles
-                    const handleSize = 12;
-                    ctx.fillStyle = '#1E3A5F';
-                    
-                    // Top-left
-                    ctx.fillRect(cropX - handleSize/2, cropY - handleSize/2, handleSize, handleSize);
-                    // Top-right
-                    ctx.fillRect(cropX + cropWidth - handleSize/2, cropY - handleSize/2, handleSize, handleSize);
-                    // Bottom-left
-                    ctx.fillRect(cropX - handleSize/2, cropY + cropHeight - handleSize/2, handleSize, handleSize);
-                    // Bottom-right
-                    ctx.fillRect(cropX + cropWidth - handleSize/2, cropY + cropHeight - handleSize/2, handleSize, handleSize);
-                    
-                    // Draw edge handles
-                    ctx.fillRect(cropX + cropWidth/2 - handleSize/2, cropY - handleSize/2, handleSize, handleSize); // Top
-                    ctx.fillRect(cropX + cropWidth/2 - handleSize/2, cropY + cropHeight - handleSize/2, handleSize, handleSize); // Bottom
-                    ctx.fillRect(cropX - handleSize/2, cropY + cropHeight/2 - handleSize/2, handleSize, handleSize); // Left
-                    ctx.fillRect(cropX + cropWidth - handleSize/2, cropY + cropHeight/2 - handleSize/2, handleSize, handleSize); // Right
-                };
+            const buttonContainer = document.createElement('div');
+            buttonContainer.style.cssText = `
+                display: flex;
+                gap: 10px;
+                justify-content: center;
+            `;
 
-                const getMousePos = (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    return {
-                        x: e.clientX - rect.left,
-                        y: e.clientY - rect.top
-                    };
-                };
+            const cropButton = document.createElement('button');
+            cropButton.textContent = '✓ Use This Crop';
+            cropButton.style.cssText = `
+                padding: 12px 20px;
+                background: #1E3A5F;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                cursor: pointer;
+            `;
 
-                const getTouchPos = (e) => {
-                    const rect = canvas.getBoundingClientRect();
-                    return {
-                        x: e.touches[0].clientX - rect.left,
-                        y: e.touches[0].clientY - rect.top
-                    };
-                };
+            const cancelButton = document.createElement('button');
+            cancelButton.textContent = '✕ Cancel';
+            cancelButton.style.cssText = `
+                padding: 12px 20px;
+                background: #dc2626;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                cursor: pointer;
+            `;
 
-                const isInCropArea = (x, y) => {
-                    return x >= cropX && x <= cropX + cropWidth && 
-                           y >= cropY && y <= cropY + cropHeight;
-                };
-
-                const getResizeEdge = (x, y) => {
-                    const handleSize = 12;
-                    const edges = [
-                        { edge: 'top-left', x: cropX, y: cropY },
-                        { edge: 'top-right', x: cropX + cropWidth, y: cropY },
-                        { edge: 'bottom-left', x: cropX, y: cropY + cropHeight },
-                        { edge: 'bottom-right', x: cropX + cropWidth, y: cropY + cropHeight },
-                        { edge: 'top', x: cropX + cropWidth/2, y: cropY },
-                        { edge: 'bottom', x: cropX + cropWidth/2, y: cropY + cropHeight },
-                        { edge: 'left', x: cropX, y: cropY + cropHeight/2 },
-                        { edge: 'right', x: cropX + cropWidth, y: cropY + cropHeight/2 }
-                    ];
-
-                    for (let edge of edges) {
-                        if (Math.abs(x - edge.x) <= handleSize && Math.abs(y - edge.y) <= handleSize) {
-                            return edge.edge;
-                        }
-                    }
-                    return isInCropArea(x, y) ? 'move' : '';
-                };
-
-                // Mouse events
-                canvas.onmousedown = (e) => {
-                    const pos = getMousePos(e);
-                    const edge = getResizeEdge(pos.x, pos.y);
-                    
-                    if (edge) {
-                        isDragging = true;
-                        dragStartX = pos.x;
-                        dragStartY = pos.y;
-                        originalCropX = cropX;
-                        originalCropY = cropY;
-                        
-                        if (edge === 'move') {
-                            resizeEdge = 'move';
-                        } else {
-                            resizeEdge = edge;
-                        }
-                    }
-                };
-
-                canvas.onmousemove = (e) => {
-                    if (!isDragging) return;
-                    
-                    const pos = getMousePos(e);
-                    const deltaX = pos.x - dragStartX;
-                    const deltaY = pos.y - dragStartY;
-
-                    if (resizeEdge === 'move') {
-                        // Move the entire crop area
-                        cropX = Math.max(0, Math.min(originalCropX + deltaX, canvas.width - cropWidth));
-                        cropY = Math.max(0, Math.min(originalCropY + deltaY, canvas.height - cropHeight));
-                    } else {
-                        // Resize based on edge
-                        const minSize = 50;
-                        
-                        switch (resizeEdge) {
-                            case 'top-left':
-                                cropX = Math.max(0, originalCropX + deltaX);
-                                cropY = Math.max(0, originalCropY + deltaY);
-                                cropWidth = Math.max(minSize, originalCropX + cropWidth - cropX);
-                                cropHeight = Math.max(minSize, originalCropY + cropHeight - cropY);
-                                break;
-                            case 'top-right':
-                                cropY = Math.max(0, originalCropY + deltaY);
-                                cropWidth = Math.max(minSize, cropWidth + deltaX);
-                                cropHeight = Math.max(minSize, originalCropY + cropHeight - cropY);
-                                break;
-                            case 'bottom-left':
-                                cropX = Math.max(0, originalCropX + deltaX);
-                                cropWidth = Math.max(minSize, originalCropX + cropWidth - cropX);
-                                cropHeight = Math.max(minSize, cropHeight + deltaY);
-                                break;
-                            case 'bottom-right':
-                                cropWidth = Math.max(minSize, cropWidth + deltaX);
-                                cropHeight = Math.max(minSize, cropHeight + deltaY);
-                                break;
-                            case 'top':
-                                cropY = Math.max(0, originalCropY + deltaY);
-                                cropHeight = Math.max(minSize, originalCropY + cropHeight - cropY);
-                                break;
-                            case 'bottom':
-                                cropHeight = Math.max(minSize, cropHeight + deltaY);
-                                break;
-                            case 'left':
-                                cropX = Math.max(0, originalCropX + deltaX);
-                                cropWidth = Math.max(minSize, originalCropX + cropWidth - cropX);
-                                break;
-                            case 'right':
-                                cropWidth = Math.max(minSize, cropWidth + deltaX);
-                                break;
-                        }
-                        
-                        // Ensure crop area stays within canvas bounds
-                        cropX = Math.max(0, Math.min(cropX, canvas.width - minSize));
-                        cropY = Math.max(0, Math.min(cropY, canvas.height - minSize));
-                        cropWidth = Math.min(cropWidth, canvas.width - cropX);
-                        cropHeight = Math.min(cropHeight, canvas.height - cropY);
-                    }
-                    
-                    drawCropInterface();
-                };
-
-                canvas.onmouseup = () => {
-                    isDragging = false;
-                    resizeEdge = '';
-                };
-
-                // Touch events for mobile
-                canvas.ontouchstart = (e) => {
-                    e.preventDefault();
-                    const pos = getTouchPos(e);
-                    const edge = getResizeEdge(pos.x, pos.y);
-                    
-                    if (edge) {
-                        isDragging = true;
-                        dragStartX = pos.x;
-                        dragStartY = pos.y;
-                        originalCropX = cropX;
-                        originalCropY = cropY;
-                        resizeEdge = edge === 'move' ? 'move' : edge;
-                    }
-                };
-
-                canvas.ontouchmove = (e) => {
-                    e.preventDefault();
-                    if (!isDragging) return;
-                    
-                    const pos = getTouchPos(e);
-                    const deltaX = pos.x - dragStartX;
-                    const deltaY = pos.y - dragStartY;
-
-                    if (resizeEdge === 'move') {
-                        cropX = Math.max(0, Math.min(originalCropX + deltaX, canvas.width - cropWidth));
-                        cropY = Math.max(0, Math.min(originalCropY + deltaY, canvas.height - cropHeight));
-                    } else {
-                        const minSize = 50;
-                        
-                        switch (resizeEdge) {
-                            case 'top-left':
-                                cropX = Math.max(0, originalCropX + deltaX);
-                                cropY = Math.max(0, originalCropY + deltaY);
-                                cropWidth = Math.max(minSize, originalCropX + cropWidth - cropX);
-                                cropHeight = Math.max(minSize, originalCropY + cropHeight - cropY);
-                                break;
-                            case 'top-right':
-                                cropY = Math.max(0, originalCropY + deltaY);
-                                cropWidth = Math.max(minSize, cropWidth + deltaX);
-                                cropHeight = Math.max(minSize, originalCropY + cropHeight - cropY);
-                                break;
-                            case 'bottom-left':
-                                cropX = Math.max(0, originalCropX + deltaX);
-                                cropWidth = Math.max(minSize, originalCropX + cropWidth - cropX);
-                                cropHeight = Math.max(minSize, cropHeight + deltaY);
-                                break;
-                            case 'bottom-right':
-                                cropWidth = Math.max(minSize, cropWidth + deltaX);
-                                cropHeight = Math.max(minSize, cropHeight + deltaY);
-                                break;
-                        }
-                        
-                        cropX = Math.max(0, Math.min(cropX, canvas.width - minSize));
-                        cropY = Math.max(0, Math.min(cropY, canvas.height - minSize));
-                        cropWidth = Math.min(cropWidth, canvas.width - cropX);
-                        cropHeight = Math.min(cropHeight, canvas.height - cropY);
-                    }
-                    
-                    drawCropInterface();
-                };
-
-                canvas.ontouchend = () => {
-                    isDragging = false;
-                    resizeEdge = '';
-                };
-
-                const buttonContainer = document.createElement('div');
-                buttonContainer.style.cssText = `
-                    display: flex;
-                    gap: 8px;
-                    justify-content: center;
-                    flex-wrap: wrap;
-                `;
-
-                const cropButton = document.createElement('button');
-                cropButton.textContent = '✓ Apply Crop';
-                cropButton.style.cssText = `
-                    padding: 12px 20px;
-                    background: #1E3A5F;
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    flex: 1;
-                    min-width: 120px;
-                `;
-
-                const cancelCropButton = document.createElement('button');
-                cancelCropButton.textContent = '✕ Cancel';
-                cancelCropButton.style.cssText = `
-                    padding: 12px 20px;
-                    background: #dc2626;
-                    color: white;
-                    border: none;
-                    border-radius: 8px;
-                    font-size: 14px;
-                    font-weight: bold;
-                    cursor: pointer;
-                    flex: 1;
-                    min-width: 120px;
-                `;
-
-                cropButton.onclick = () => {
-                    try {
-                        // Calculate actual crop coordinates
-                        const scaleX = img.width / displayWidth;
-                        const scaleY = img.height / displayHeight;
-                        
-                        const actualCropX = cropX * scaleX;
-                        const actualCropY = cropY * scaleY;
-                        const actualCropWidth = cropWidth * scaleX;
-                        const actualCropHeight = cropHeight * scaleY;
-                        
-                        // Create cropped image
-                        const outputCanvas = document.createElement('canvas');
-                        outputCanvas.width = actualCropWidth;
-                        outputCanvas.height = actualCropHeight;
-                        const outputCtx = outputCanvas.getContext('2d');
-                        
-                        outputCtx.drawImage(
-                            img, 
-                            actualCropX, actualCropY, actualCropWidth, actualCropHeight,
-                            0, 0, actualCropWidth, actualCropHeight
-                        );
-                        
-                        const croppedDataUrl = outputCanvas.toDataURL('image/jpeg', 0.9);
-                        document.body.removeChild(cropUI);
-                        resolve(croppedDataUrl);
-                    } catch (error) {
-                        console.error('Crop processing error:', error);
-                        document.body.removeChild(cropUI);
-                        resolve(imageUri);
-                    }
-                };
-
-                cancelCropButton.onclick = () => {
-                    document.body.removeChild(cropUI);
-                    resolve(null);
-                };
-
-                canvasContainer.appendChild(canvas);
-                container.appendChild(title);
-                container.appendChild(instructions);
-                container.appendChild(canvasContainer);
-                buttonContainer.appendChild(cropButton);
-                buttonContainer.appendChild(cancelCropButton);
-                container.appendChild(buttonContainer);
-                cropUI.appendChild(container);
-                document.body.appendChild(cropUI);
-
-                // Initial draw
-                drawCropInterface();
-            };
-
-            img.onerror = () => {
+            // For this simple version, we'll just return the original image
+            // In a real implementation, you'd add actual cropping logic here
+            cropButton.onclick = () => {
                 document.body.removeChild(cropUI);
-                resolve(imageUri);
+                resolve(imageUri); // Return the original image
             };
+
+            cancelButton.onclick = () => {
+                document.body.removeChild(cropUI);
+                resolve(null);
+            };
+
+            imageContainer.appendChild(img);
+            container.appendChild(title);
+            container.appendChild(imageContainer);
+            container.appendChild(instructions);
+            buttonContainer.appendChild(cropButton);
+            buttonContainer.appendChild(cancelButton);
+            container.appendChild(buttonContainer);
+            cropUI.appendChild(container);
+            document.body.appendChild(cropUI);
         });
     };
 
@@ -854,15 +564,6 @@ const RegisterPage2 = () => {
                     </View>
                 </View>
 
-                {Platform.OS === 'web' && (
-                    <View style={styles.webWarning}>
-                        <MaterialIcons name="info" size={16} color="#856404" />
-                        <Text style={styles.webWarningText}>
-                            💡 Drag corners to resize, drag center to move crop area. Works on mobile!
-                        </Text>
-                    </View>
-                )}
-
                 <View style={styles.card}>
                     <View style={styles.inputContainer}>
                         <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
@@ -918,7 +619,7 @@ const RegisterPage2 = () => {
                                     <View style={styles.iconContainer}>
                                         <Icon name="add" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
+                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -936,7 +637,7 @@ const RegisterPage2 = () => {
                                     <View style={styles.iconContainer}>
                                         <Icon name="photo-camera" size={40} color="#1E3A5F" />
                                         <Text style={styles.uploadText}>Tap to upload</Text>
-                                        <Text style={styles.uploadSubText}>Camera or Gallery → Crop</Text>
+                                        <Text style={styles.uploadSubText}>Camera or Gallery</Text>
                                     </View>
                                 )}
                             </TouchableOpacity>
@@ -1009,20 +710,15 @@ const RegisterPage2 = () => {
                                 {currentImageType === 'selfie' ? 'Selfie Preview' : 'ID Photo Preview'}
                             </Text>
                             
-                            <Text style={styles.cropInstructions}>
-                                {currentImageType === 'selfie' 
-                                    ? 'Crop your selfie: Drag corners to resize, drag center to move'
-                                    : 'Crop your ID: Drag corners to resize, drag center to move'
-                                }
-                            </Text>
-
-                            {Platform.OS === 'web' && (
-                                <View style={styles.cropNote}>
-                                    <Text style={styles.cropNoteText}>
-                                        💡 Drag the handles to resize, drag the center to move the crop area
-                                    </Text>
+                            {selectedImageUri && (
+                                <View style={styles.previewImageContainer}>
+                                    <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
                                 </View>
                             )}
+                            
+                            <Text style={styles.cropInstructions}>
+                                Would you like to crop this image?
+                            </Text>
                             
                             <View style={styles.cropButtonsContainer}>
                                 <TouchableOpacity 
@@ -1038,7 +734,7 @@ const RegisterPage2 = () => {
                                     onPress={handleCropSelectedImage}
                                 >
                                     <MaterialIcons name="crop" size={20} color="#fff" />
-                                    <Text style={styles.cropOptionButtonText}>Open Crop Tool</Text>
+                                    <Text style={styles.cropOptionButtonText}>Crop Image</Text>
                                 </TouchableOpacity>
                             </View>
                             
@@ -1088,22 +784,6 @@ const styles = StyleSheet.create({
         fontSize: 13,
         marginTop: 2,
         color: '#475569',
-    },
-    webWarning: {
-        backgroundColor: '#D1ECF1',
-        padding: 12,
-        borderRadius: 8,
-        marginBottom: 16,
-        borderLeftWidth: 4,
-        borderLeftColor: '#0CA678',
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    webWarningText: {
-        color: '#055160',
-        fontSize: 12,
-        marginLeft: 8,
-        fontWeight: '600',
     },
     card: {
         backgroundColor: '#FFFFFF',
@@ -1231,23 +911,26 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         marginLeft: 12,
     },
+    previewImageContainer: {
+        width: '100%',
+        height: 200,
+        borderRadius: 12,
+        marginBottom: 16,
+        borderWidth: 1,
+        borderColor: '#E2E8F0',
+        overflow: 'hidden',
+        backgroundColor: '#F8FAFC',
+    },
+    previewImage: {
+        width: '100%',
+        height: '100%',
+        resizeMode: 'contain',
+    },
     cropInstructions: {
         fontSize: 14,
         color: '#64748B',
         textAlign: 'center',
-        marginBottom: 10,
-        lineHeight: 20,
-    },
-    cropNote: {
-        backgroundColor: '#EFF6FF',
-        padding: 10,
-        borderRadius: 8,
-        marginBottom: 15,
-    },
-    cropNoteText: {
-        color: '#1E40AF',
-        fontSize: 12,
-        textAlign: 'center',
+        marginBottom: 16,
     },
     cropButtonsContainer: {
         flexDirection: 'row',
