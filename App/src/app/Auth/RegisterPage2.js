@@ -418,15 +418,21 @@ const RegisterPage2 = () => {
         });
     };
 
-    // FIXED CROPPER WITH PROPER CENTERING
+    // FIXED: Handle crop selected image - PROPERLY SET THE CROPPED IMAGE
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
             if (Platform.OS === 'web') {
                 const croppedImage = await createInteractiveCrop(selectedImageUri, currentImageType);
+                console.log('Cropped image result:', croppedImage ? 'Success' : 'Failed');
+                
                 if (croppedImage && currentSetFunction) {
+                    // FIX: Actually set the cropped image to the state
                     currentSetFunction(croppedImage);
+                    console.log('Cropped image set to state successfully');
+                } else {
+                    console.log('No cropped image to set');
                 }
             } else {
                 // For native, use Expo's built-in cropping
@@ -442,6 +448,7 @@ const RegisterPage2 = () => {
                 }
             }
             
+            // Close crop options regardless of success
             setShowCropOptions(false);
             setSelectedImageUri(null);
             setCurrentImageType(null);
