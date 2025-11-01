@@ -44,6 +44,14 @@ const RegisterPage2 = () => {
         address, dateOfBirth,
     } = route.params;
 
+    // Debug alerts helper
+    const showDebugAlert = (message) => {
+        if (Platform.OS === 'web') {
+            alert(`DEBUG: ${message}`);
+        }
+        console.log(`DEBUG: ${message}`);
+    };
+
     // Detect browser and platform information
     useEffect(() => {
         if (Platform.OS === 'web') {
@@ -64,15 +72,8 @@ const RegisterPage2 = () => {
                 isAndroid,
                 userAgent
             });
-            console.log('Browser detected:', {
-                isChrome,
-                isFirefox,
-                isSafari,
-                isMobile,
-                isIOS,
-                isAndroid,
-                userAgent
-            });
+            
+            showDebugAlert(`Browser detected: ${isChrome ? 'Chrome' : isFirefox ? 'Firefox' : isSafari ? 'Safari' : 'Other'} - Mobile: ${isMobile ? 'Yes' : 'No'}`);
         }
     }, []);
 
@@ -98,6 +99,7 @@ const RegisterPage2 = () => {
 
     // Show source selection options
     const showSourceSelection = (setImageFunction, imageType) => {
+        showDebugAlert(`Starting image selection for: ${imageType}`);
         setPendingImageAction({
             setFunction: setImageFunction,
             type: imageType
@@ -107,13 +109,14 @@ const RegisterPage2 = () => {
 
     // Handle camera selection
     const handleCameraSelection = async () => {
-        console.log('Camera selected');
+        showDebugAlert('Camera selected');
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
+                showDebugAlert('Starting web camera capture');
                 const imageUri = await handleWebCameraCapture(pendingImageAction.type);
-                console.log('Camera result:', imageUri ? 'Image captured' : 'Cancelled');
+                showDebugAlert(imageUri ? 'Image captured successfully' : 'Camera cancelled');
                 if (imageUri) {
                     setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
@@ -146,28 +149,32 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // SIMPLIFIED GALLERY SELECTION FOR CHROME
     const handleGallerySelection = async () => {
-        console.log('Gallery selected');
+        showDebugAlert('Gallery selected - starting process');
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                console.log('Using web gallery selection');
+                showDebugAlert('Using web gallery selection');
+                
+                // Add small delay to ensure modal is closed
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
                 const imageUri = await handleUniversalGallerySelection();
-                console.log('Gallery result:', imageUri ? 'Image selected' : 'Cancelled');
+                showDebugAlert(imageUri ? 'Gallery SUCCESS - image selected' : 'Gallery FAILED - no image');
                 
                 if (imageUri) {
-                    console.log('Setting crop options with image');
+                    showDebugAlert('Setting crop options with selected image');
                     setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
                     setShowCropOptions(true);
                 } else {
-                    console.log('No image selected from gallery');
+                    showDebugAlert('No image selected from gallery');
                 }
             } else {
-                console.log('Using native gallery selection');
+                showDebugAlert('Using native gallery selection');
                 const result = await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false,
@@ -185,6 +192,7 @@ const RegisterPage2 = () => {
             }
         } catch (error) {
             console.error('Gallery error:', error);
+            showDebugAlert(`Gallery ERROR: ${error.message}`);
             setModalMessage('Failed to select image from gallery. Please try again.');
             setModalType('error');
             setModalVisible(true);
@@ -193,7 +201,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
+    // SIMPLIFIED UNIVERSAL GALLERY SELECTION - FIXED FOR CHROME
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -201,92 +209,93 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery');
+            showDebugAlert('Creating file input for gallery');
+            
+            let isResolved = false;
+            
+            const resolvePromise = (result) => {
+                if (!isResolved) {
+                    isResolved = true;
+                    showDebugAlert(`Gallery result: ${result ? 'SUCCESS' : 'FAILED/CANCELLED'}`);
+                    resolve(result);
+                }
+            };
+
+            // Create file input - SIMPLE VERSION
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            input.style.cssText = 'position: fixed; top: 0; left: 0; width: 100px; height: 100px; opacity: 1;';
             
-            let resolved = false;
-            
-            const cleanup = () => {
-                if (!resolved) {
-                    resolved = true;
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
-                    }
-                    resolve(null);
-                }
-            };
-            
-            const handleChange = (e) => {
-                console.log('File input change event');
-                const file = e.target.files[0];
-                if (file) {
-                    console.log('File selected:', file.name, file.type, file.size);
+            const handleChange = (event) => {
+                showDebugAlert('File input change event triggered');
+                const file = event.target.files[0];
+                
+                if (file && file.type.startsWith('image/')) {
+                    showDebugAlert(`File selected: ${file.name} (${Math.round(file.size/1024)}KB)`);
+                    
                     const reader = new FileReader();
                     
-                    reader.onload = (event) => {
-                        console.log('File read successfully');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(event.target.result);
-                        }
+                    reader.onload = (loadEvent) => {
+                        showDebugAlert('File read successfully');
+                        resolvePromise(loadEvent.target.result);
                     };
                     
                     reader.onerror = () => {
-                        console.error('File read error');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(null);
-                        }
-                    };
-                    
-                    reader.onabort = () => {
-                        console.log('File read aborted');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(null);
-                        }
+                        showDebugAlert('File read ERROR');
+                        resolvePromise(null);
                     };
                     
                     try {
                         reader.readAsDataURL(file);
                     } catch (error) {
-                        console.error('Error reading file:', error);
-                        cleanup();
+                        showDebugAlert(`FileReader error: ${error}`);
+                        resolvePromise(null);
                     }
                 } else {
-                    console.log('No file selected');
-                    cleanup();
+                    showDebugAlert('No valid file selected');
+                    resolvePromise(null);
                 }
             };
-            
+
             const handleCancel = () => {
-                console.log('File selection cancelled');
-                cleanup();
+                showDebugAlert('File selection cancelled');
+                setTimeout(() => {
+                    resolvePromise(null);
+                }, 1000);
             };
-            
+
             // Add event listeners
-            input.addEventListener('change', handleChange);
-            input.addEventListener('cancel', handleCancel);
-            
-            // Add to document and trigger click
+            input.addEventListener('change', handleChange, { once: true });
+            input.addEventListener('cancel', handleCancel, { once: true });
+
+            // Add to document
             document.body.appendChild(input);
             
-            // Set timeout for safety
+            // Safety timeout
             setTimeout(() => {
-                if (!resolved) {
-                    console.log('Gallery selection timeout');
-                    cleanup();
+                if (!isResolved) {
+                    showDebugAlert('Gallery selection TIMEOUT');
+                    resolvePromise(null);
                 }
-            }, 30000); // 30 second timeout
-            
-            console.log('Triggering file input click');
-            input.click();
+            }, 30000);
+
+            // Try to click the input
+            try {
+                showDebugAlert('Attempting to click file input');
+                input.click();
+                showDebugAlert('File input click completed');
+            } catch (error) {
+                showDebugAlert(`Click error: ${error}`);
+                resolvePromise(null);
+            }
+
+            // Cleanup after a moment
+            setTimeout(() => {
+                if (document.body.contains(input)) {
+                    document.body.removeChild(input);
+                }
+            }, 1000);
         });
     };
 
@@ -424,7 +433,9 @@ const RegisterPage2 = () => {
 
         try {
             if (Platform.OS === 'web') {
+                showDebugAlert('Starting web image cropping');
                 const croppedImage = await createInteractiveCrop(selectedImageUri, currentImageType);
+                showDebugAlert(croppedImage ? 'Cropping SUCCESS' : 'Cropping FAILED');
                 if (croppedImage && currentSetFunction) {
                     currentSetFunction(croppedImage);
                 }
@@ -449,6 +460,7 @@ const RegisterPage2 = () => {
             
         } catch (error) {
             console.error('Crop error:', error);
+            showDebugAlert(`Crop ERROR: ${error.message}`);
             // If crop fails, just use the original image
             handleUseAsIs();
         }
@@ -462,7 +474,7 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating interactive crop interface');
+            showDebugAlert('Creating interactive crop interface');
             const cropUI = document.createElement('div');
             cropUI.style.cssText = `
                 position: fixed;
@@ -835,6 +847,7 @@ const RegisterPage2 = () => {
 
     // Handle using the image as-is (no cropping)
     const handleUseAsIs = () => {
+        showDebugAlert('Using image as-is without cropping');
         if (currentSetFunction && selectedImageUri) {
             currentSetFunction(selectedImageUri);
             setShowCropOptions(false);
@@ -876,11 +889,26 @@ const RegisterPage2 = () => {
         });
     };
 
+    // TEST FUNCTION FOR DEBUGGING
+    const testGalleryFunction = async () => {
+        showDebugAlert('Testing gallery function directly');
+        const result = await handleUniversalGallerySelection();
+        showDebugAlert(`Direct test result: ${result ? 'SUCCESS' : 'FAILED'}`);
+    };
+
     return (
         <ScrollView contentContainerStyle={styles.scrollContainer}>
             <View style={styles.container}>
                 <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
                     <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+                </TouchableOpacity>
+
+                {/* TEMPORARY TEST BUTTON - REMOVE AFTER FIXING */}
+                <TouchableOpacity 
+                    style={styles.testButton}
+                    onPress={testGalleryFunction}
+                >
+                    <Text style={styles.testButtonText}>🧪 TEST GALLERY</Text>
                 </TouchableOpacity>
 
                 <View style={{ marginBottom: 16 }}>
@@ -1322,6 +1350,21 @@ const styles = StyleSheet.create({
     },
     required: {
         color: 'red',
+    },
+    // TEST BUTTON STYLES
+    testButton: {
+        backgroundColor: 'orange',
+        padding: 12,
+        margin: 10,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: 'darkorange',
+    },
+    testButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 14,
     },
 });
 
