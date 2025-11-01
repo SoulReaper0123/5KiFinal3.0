@@ -202,102 +202,150 @@ const RegisterPage2 = () => {
     };
 
     // SIMPLIFIED UNIVERSAL GALLERY SELECTION - FIXED FOR CHROME
-    const handleUniversalGallerySelection = () => {
-        return new Promise((resolve) => {
-            if (Platform.OS !== 'web') {
-                resolve(null);
-                return;
-            }
+// COMPLETELY REWRITTEN GALLERY SELECTION FOR CHROME
+const handleUniversalGallerySelection = () => {
+    return new Promise((resolve) => {
+        if (Platform.OS !== 'web') {
+            resolve(null);
+            return;
+        }
 
-            showDebugAlert('Creating file input for gallery');
-            
-            let isResolved = false;
-            
-            const resolvePromise = (result) => {
-                if (!isResolved) {
-                    isResolved = true;
-                    showDebugAlert(`Gallery result: ${result ? 'SUCCESS' : 'FAILED/CANCELLED'}`);
-                    resolve(result);
-                }
-            };
+        showDebugAlert('🚀 Starting gallery selection');
+        
+        let isResolved = false;
+        let fileInput = null;
 
-            // Create file input - SIMPLE VERSION
-            const input = document.createElement('input');
-            input.type = 'file';
-            input.accept = 'image/*';
-            input.style.cssText = 'position: fixed; top: 0; left: 0; width: 100px; height: 100px; opacity: 1;';
-            
-            const handleChange = (event) => {
-                showDebugAlert('File input change event triggered');
-                const file = event.target.files[0];
+        const resolvePromise = (result) => {
+            if (!isResolved) {
+                isResolved = true;
+                showDebugAlert(`✅ Gallery result: ${result ? 'SUCCESS' : 'FAILED/CANCELLED'}`);
                 
-                if (file && file.type.startsWith('image/')) {
-                    showDebugAlert(`File selected: ${file.name} (${Math.round(file.size/1024)}KB)`);
-                    
-                    const reader = new FileReader();
-                    
-                    reader.onload = (loadEvent) => {
-                        showDebugAlert('File read successfully');
-                        resolvePromise(loadEvent.target.result);
-                    };
-                    
-                    reader.onerror = () => {
-                        showDebugAlert('File read ERROR');
-                        resolvePromise(null);
-                    };
-                    
-                    try {
-                        reader.readAsDataURL(file);
-                    } catch (error) {
-                        showDebugAlert(`FileReader error: ${error}`);
-                        resolvePromise(null);
-                    }
-                } else {
-                    showDebugAlert('No valid file selected');
-                    resolvePromise(null);
+                // Cleanup
+                if (fileInput && document.body.contains(fileInput)) {
+                    document.body.removeChild(fileInput);
                 }
-            };
+                
+                resolve(result);
+            }
+        };
 
-            const handleCancel = () => {
-                showDebugAlert('File selection cancelled');
-                setTimeout(() => {
-                    resolvePromise(null);
-                }, 1000);
-            };
+        // Create a MORE VISIBLE file input
+        fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.multiple = false;
+        
+        // Make it visible and clickable
+        fileInput.style.cssText = `
+            position: fixed !important;
+            top: 50% !important;
+            left: 50% !important;
+            transform: translate(-50%, -50%) !important;
+            width: 200px !important;
+            height: 40px !important;
+            opacity: 1 !important;
+            z-index: 10000 !important;
+            background: red !important;
+            color: white !important;
+            font-size: 16px !important;
+            border: 2px solid blue !important;
+        `;
+        
+        fileInput.setAttribute('title', 'Select an image file');
 
-            // Add event listeners
-            input.addEventListener('change', handleChange, { once: true });
-            input.addEventListener('cancel', handleCancel, { once: true });
-
-            // Add to document
-            document.body.appendChild(input);
+        const handleChange = (event) => {
+            showDebugAlert('📁 File input change event triggered');
+            const file = event.target.files[0];
             
-            // Safety timeout
-            setTimeout(() => {
-                if (!isResolved) {
-                    showDebugAlert('Gallery selection TIMEOUT');
+            if (file && file.type.startsWith('image/')) {
+                showDebugAlert(`📸 File selected: ${file.name} (${Math.round(file.size/1024)}KB)`);
+                
+                const reader = new FileReader();
+                
+                reader.onload = (loadEvent) => {
+                    showDebugAlert('✅ File read successfully');
+                    resolvePromise(loadEvent.target.result);
+                };
+                
+                reader.onerror = () => {
+                    showDebugAlert('❌ File read ERROR');
+                    resolvePromise(null);
+                };
+                
+                try {
+                    reader.readAsDataURL(file);
+                } catch (error) {
+                    showDebugAlert(`❌ FileReader error: ${error}`);
                     resolvePromise(null);
                 }
-            }, 30000);
-
-            // Try to click the input
-            try {
-                showDebugAlert('Attempting to click file input');
-                input.click();
-                showDebugAlert('File input click completed');
-            } catch (error) {
-                showDebugAlert(`Click error: ${error}`);
+            } else {
+                showDebugAlert('❌ No valid file selected');
                 resolvePromise(null);
             }
+        };
 
-            // Cleanup after a moment
+        // Add event listeners
+        fileInput.addEventListener('change', handleChange, { once: true });
+        
+        // Add to document FIRST
+        document.body.appendChild(fileInput);
+        showDebugAlert('📝 File input added to document');
+
+        // Safety timeout
+        const safetyTimeout = setTimeout(() => {
+            if (!isResolved) {
+                showDebugAlert('⏰ Gallery selection TIMEOUT - taking too long');
+                resolvePromise(null);
+            }
+        }, 15000); // 15 seconds
+
+        // MULTIPLE CLICK METHODS - Try different approaches
+        const triggerFileInput = () => {
+            showDebugAlert('🖱️ Attempting to trigger file input');
+            
+            // Method 1: Direct click
+            try {
+                fileInput.click();
+                showDebugAlert('✅ Direct click completed');
+            } catch (error) {
+                showDebugAlert(`❌ Direct click failed: ${error}`);
+            }
+            
+            // Method 2: Use focus and click
             setTimeout(() => {
-                if (document.body.contains(input)) {
-                    document.body.removeChild(input);
+                if (!isResolved) {
+                    try {
+                        fileInput.focus();
+                        fileInput.click();
+                        showDebugAlert('✅ Focus + click completed');
+                    } catch (error) {
+                        showDebugAlert(`❌ Focus + click failed: ${error}`);
+                    }
                 }
-            }, 1000);
-        });
-    };
+            }, 100);
+            
+            // Method 3: Create and dispatch mouse event
+            setTimeout(() => {
+                if (!isResolved) {
+                    try {
+                        const clickEvent = new MouseEvent('click', {
+                            view: window,
+                            bubbles: true,
+                            cancelable: true
+                        });
+                        fileInput.dispatchEvent(clickEvent);
+                        showDebugAlert('✅ Mouse event dispatched');
+                    } catch (error) {
+                        showDebugAlert(`❌ Mouse event failed: ${error}`);
+                    }
+                }
+            }, 200);
+        };
+
+        // Small delay to ensure DOM is ready
+        setTimeout(triggerFileInput, 100);
+    });
+};
 
     // Web camera capture
     const handleWebCameraCapture = (imageType) => {
