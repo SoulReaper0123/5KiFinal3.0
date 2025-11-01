@@ -376,7 +376,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // INTERACTIVE CROPPER WITH ZOOM AND DRAG
+    // INTERACTIVE CROPPER WITH ZOOM AND DRAG - FIXED SIZE
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -399,6 +399,7 @@ const RegisterPage2 = () => {
                 z-index: 10000;
                 padding: 20px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                box-sizing: border-box;
             `;
 
             const container = document.createElement('div');
@@ -408,9 +409,13 @@ const RegisterPage2 = () => {
                 padding: 24px;
                 max-width: 95%;
                 max-height: 95%;
-                width: 400px;
+                width: 500px;
+                height: 600px;
                 overflow: hidden;
+                display: flex;
+                flex-direction: column;
                 box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+                box-sizing: border-box;
             `;
 
             const title = document.createElement('h3');
@@ -421,19 +426,22 @@ const RegisterPage2 = () => {
                 text-align: center;
                 font-size: 20px;
                 font-weight: 700;
+                flex-shrink: 0;
             `;
 
             const cropArea = document.createElement('div');
             cropArea.style.cssText = `
                 width: 100%;
-                height: 300px;
-                border: 2px dashed #1E3A5F;
+                height: 400px;
+                border: 2px solid #1E3A5F;
                 border-radius: 12px;
                 margin-bottom: 16px;
                 overflow: hidden;
                 background: #f8fafc;
                 position: relative;
                 touch-action: none;
+                flex-shrink: 0;
+                box-sizing: border-box;
             `;
 
             const img = document.createElement('img');
@@ -445,20 +453,15 @@ const RegisterPage2 = () => {
                 user-select: none;
                 -webkit-user-select: none;
                 -webkit-user-drag: none;
+                transform-origin: center center;
             `;
-
-            // Set initial size and position
-            img.style.width = '100%';
-            img.style.height = 'auto';
-            img.style.top = '0';
-            img.style.left = '0';
 
             const instructions = document.createElement('div');
             instructions.innerHTML = `
-                <p style="color: #64748B; text-align: center; margin: 0 0 16px 0; font-size: 14px; line-height: 1.4;">
+                <div style="color: #64748B; text-align: center; margin: 0 0 16px 0; font-size: 14px; line-height: 1.4; flex-shrink: 0;">
                     <strong>Pinch to zoom & drag to reposition</strong><br>
                     For best results, ensure the image is clear and properly framed
-                </p>
+                </div>
             `;
 
             const buttonContainer = document.createElement('div');
@@ -467,6 +470,8 @@ const RegisterPage2 = () => {
                 gap: 12px;
                 justify-content: center;
                 flex-wrap: wrap;
+                margin-top: auto;
+                flex-shrink: 0;
             `;
 
             const cropButton = document.createElement('button');
@@ -515,11 +520,13 @@ const RegisterPage2 = () => {
 
             // Touch event handlers for mobile
             const handleTouchStart = (e) => {
+                e.preventDefault();
                 if (e.touches.length === 1) {
                     // Single touch - start dragging
                     isDragging = true;
                     startX = e.touches[0].clientX - posX;
                     startY = e.touches[0].clientY - posY;
+                    img.style.cursor = 'grabbing';
                 } else if (e.touches.length === 2) {
                     // Two touches - start pinch to zoom
                     initialDistance = Math.hypot(
@@ -553,6 +560,7 @@ const RegisterPage2 = () => {
             const handleTouchEnd = () => {
                 isDragging = false;
                 initialDistance = null;
+                img.style.cursor = 'grab';
             };
 
             // Mouse event handlers for desktop
@@ -580,7 +588,18 @@ const RegisterPage2 = () => {
             const handleWheel = (e) => {
                 e.preventDefault();
                 const delta = -e.deltaY * 0.01;
-                scale = Math.max(0.5, Math.min(3, scale + delta));
+                const newScale = Math.max(0.5, Math.min(3, scale + delta));
+                
+                // Zoom towards mouse position
+                const rect = cropArea.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                const scaleChange = newScale - scale;
+                posX -= (mouseX - posX - rect.width / 2) * (scaleChange / scale);
+                posY -= (mouseY - posY - rect.height / 2) * (scaleChange / scale);
+                
+                scale = newScale;
                 updateImageTransform();
             };
 
@@ -595,9 +614,9 @@ const RegisterPage2 = () => {
             cropArea.addEventListener('wheel', handleWheel, { passive: false });
             
             // Touch events
-            img.addEventListener('touchstart', handleTouchStart, { passive: false });
-            img.addEventListener('touchmove', handleTouchMove, { passive: false });
-            img.addEventListener('touchend', handleTouchEnd);
+            cropArea.addEventListener('touchstart', handleTouchStart, { passive: false });
+            cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
+            cropArea.addEventListener('touchend', handleTouchEnd);
 
             // Center image initially
             img.onload = () => {
@@ -609,13 +628,14 @@ const RegisterPage2 = () => {
                 // Calculate initial scale to fit container
                 const scaleX = containerWidth / imgWidth;
                 const scaleY = containerHeight / imgHeight;
-                scale = Math.min(scaleX, scaleY) * 0.8; // Slightly smaller to show it's zoomable
+                scale = Math.min(scaleX, scaleY) * 0.9;
                 
                 // Center the image
                 posX = (containerWidth - imgWidth * scale) / 2;
                 posY = (containerHeight - imgHeight * scale) / 2;
                 
                 updateImageTransform();
+                img.style.cursor = 'grab';
             };
 
             cropButton.onclick = () => {
@@ -646,9 +666,9 @@ const RegisterPage2 = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
                 cropArea.removeEventListener('wheel', handleWheel);
-                img.removeEventListener('touchstart', handleTouchStart);
-                img.removeEventListener('touchmove', handleTouchMove);
-                img.removeEventListener('touchend', handleTouchEnd);
+                cropArea.removeEventListener('touchstart', handleTouchStart);
+                cropArea.removeEventListener('touchmove', handleTouchMove);
+                cropArea.removeEventListener('touchend', handleTouchEnd);
                 
                 document.body.removeChild(cropUI);
                 resolve(croppedImageDataUrl);
@@ -659,9 +679,9 @@ const RegisterPage2 = () => {
                 document.removeEventListener('mousemove', handleMouseMove);
                 document.removeEventListener('mouseup', handleMouseUp);
                 cropArea.removeEventListener('wheel', handleWheel);
-                img.removeEventListener('touchstart', handleTouchStart);
-                img.removeEventListener('touchmove', handleTouchMove);
-                img.removeEventListener('touchend', handleTouchEnd);
+                cropArea.removeEventListener('touchstart', handleTouchStart);
+                cropArea.removeEventListener('touchmove', handleTouchMove);
+                cropArea.removeEventListener('touchend', handleTouchEnd);
                 
                 document.body.removeChild(cropUI);
                 resolve(null);
