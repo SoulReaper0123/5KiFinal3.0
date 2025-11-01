@@ -418,7 +418,7 @@ const RegisterPage2 = () => {
         });
     };
 
-    // WORKING CROPPER FOR ALL BROWSERS
+    // FIXED CROPPER WITH PROPER CENTERING
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
@@ -454,7 +454,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // INTERACTIVE CROPPER WITH ZOOM AND DRAG - FIXED FOR ALL BROWSERS
+    // FIXED INTERACTIVE CROPPER WITH PROPER CENTERING
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -705,28 +705,34 @@ const RegisterPage2 = () => {
             cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
             cropArea.addEventListener('touchend', handleTouchEnd);
 
-            // Center image initially
-            img.onload = () => {
-                console.log('Image loaded in cropper');
-                const imgWidth = img.naturalWidth;
-                const imgHeight = img.naturalHeight;
+            // FIXED: Proper image centering logic
+            const centerImage = () => {
                 const containerWidth = cropArea.clientWidth;
                 const containerHeight = cropArea.clientHeight;
+                const imgWidth = img.naturalWidth;
+                const imgHeight = img.naturalHeight;
                 
-                console.log('Image dimensions:', imgWidth, imgHeight);
-                console.log('Container dimensions:', containerWidth, containerHeight);
+                console.log('Centering image:', { imgWidth, imgHeight, containerWidth, containerHeight });
                 
-                // Calculate initial scale to fit container
+                // Calculate scale to fit container while maintaining aspect ratio
                 const scaleX = containerWidth / imgWidth;
                 const scaleY = containerHeight / imgHeight;
-                scale = Math.min(scaleX, scaleY) * 0.9;
+                scale = Math.min(scaleX, scaleY) * 0.9; // 90% of max fit to show borders
                 
-                // Center the image
-                posX = (containerWidth - imgWidth * scale) / 2;
-                posY = (containerHeight - imgHeight * scale) / 2;
+                // Calculate centered position
+                const scaledWidth = imgWidth * scale;
+                const scaledHeight = imgHeight * scale;
+                posX = (containerWidth - scaledWidth) / 2;
+                posY = (containerHeight - scaledHeight) / 2;
                 
+                console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
                 updateImageTransform();
                 img.style.cursor = 'grab';
+            };
+
+            img.onload = () => {
+                console.log('Image loaded in cropper');
+                centerImage();
             };
 
             img.onerror = () => {
@@ -735,23 +741,56 @@ const RegisterPage2 = () => {
                 resolve(null);
             };
 
+            // FIXED: Proper cropping logic with correct coordinate transformation
             cropButton.onclick = () => {
                 console.log('Crop button clicked');
+                
+                // Get actual dimensions
+                const containerWidth = cropArea.clientWidth;
+                const containerHeight = cropArea.clientHeight;
+                const imgWidth = img.naturalWidth;
+                const imgHeight = img.naturalHeight;
+                
+                console.log('Cropping dimensions:', {
+                    containerWidth, containerHeight, imgWidth, imgHeight, scale, posX, posY
+                });
+                
                 // Create a canvas to crop the image
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
                 // Set canvas size to crop area size
-                canvas.width = cropArea.clientWidth;
-                canvas.height = cropArea.clientHeight;
+                canvas.width = containerWidth;
+                canvas.height = containerHeight;
+                
+                // Calculate the visible portion of the image in the crop area
+                // Convert crop area coordinates to original image coordinates
+                const sourceX = -posX / scale;
+                const sourceY = -posY / scale;
+                const sourceWidth = containerWidth / scale;
+                const sourceHeight = containerHeight / scale;
+                
+                console.log('Source crop coordinates:', {
+                    sourceX, sourceY, sourceWidth, sourceHeight
+                });
+                
+                // Ensure we don't try to crop outside the image bounds
+                const boundedSourceX = Math.max(0, sourceX);
+                const boundedSourceY = Math.max(0, sourceY);
+                const boundedSourceWidth = Math.min(imgWidth - boundedSourceX, sourceWidth);
+                const boundedSourceHeight = Math.min(imgHeight - boundedSourceY, sourceHeight);
+                
+                console.log('Bounded source coordinates:', {
+                    boundedSourceX, boundedSourceY, boundedSourceWidth, boundedSourceHeight
+                });
                 
                 // Draw the cropped image
                 ctx.drawImage(
                     img,
-                    -posX / scale, -posY / scale, // Source x, y
-                    canvas.width / scale, canvas.height / scale, // Source width, height
-                    0, 0, // Destination x, y
-                    canvas.width, canvas.height // Destination width, height
+                    boundedSourceX, boundedSourceY,           // Source x, y
+                    boundedSourceWidth, boundedSourceHeight,   // Source width, height
+                    0, 0,                                     // Destination x, y
+                    canvas.width, canvas.height               // Destination width, height
                 );
                 
                 const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -1047,8 +1086,6 @@ const RegisterPage2 = () => {
         </ScrollView>
     );
 };
-
-// ... (styles remain the same as previous code)
 
 const styles = StyleSheet.create({
     scrollContainer: {
