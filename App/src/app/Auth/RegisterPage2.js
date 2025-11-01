@@ -146,7 +146,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // FIXED: Handle gallery selection - IMPROVED VERSION
     const handleGallerySelection = async () => {
         console.log('Gallery selected');
         setShowSourceOptions(false);
@@ -193,7 +193,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
+    // FIXED: UNIVERSAL GALLERY SELECTION - COMPLETELY REWRITTEN
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -201,91 +201,212 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery');
+            console.log('Creating file input for gallery selection');
+            
+            // Create file input element
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0; width: 1px; height: 1px;';
             
-            let resolved = false;
+            let isResolved = false;
             
-            const cleanup = () => {
-                if (!resolved) {
-                    resolved = true;
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
-                    }
-                    resolve(null);
+            const resolvePromise = (result) => {
+                if (!isResolved) {
+                    isResolved = true;
+                    cleanup();
+                    resolve(result);
                 }
             };
             
-            const handleChange = (e) => {
-                console.log('File input change event');
-                const file = e.target.files[0];
+            const cleanup = () => {
+                if (document.body.contains(input)) {
+                    document.body.removeChild(input);
+                }
+                window.removeEventListener('focus', handleWindowFocus);
+            };
+            
+            const handleWindowFocus = () => {
+                // If window regains focus and we haven't resolved, assume cancellation
+                setTimeout(() => {
+                    if (!isResolved) {
+                        console.log('Window focus detected - assuming cancellation');
+                        resolvePromise(null);
+                    }
+                }, 1000);
+            };
+            
+            const handleChange = (event) => {
+                console.log('File input change event triggered');
+                const file = event.target.files[0];
+                
                 if (file) {
                     console.log('File selected:', file.name, file.type, file.size);
+                    
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                        setModalMessage('Please select an image file');
+                        setModalType('error');
+                        setModalVisible(true);
+                        resolvePromise(null);
+                        return;
+                    }
+                    
+                    // Validate file size (10MB limit)
+                    if (file.size > 10 * 1024 * 1024) {
+                        setModalMessage('Image size should be less than 10MB');
+                        setModalType('error');
+                        setModalVisible(true);
+                        resolvePromise(null);
+                        return;
+                    }
+                    
                     const reader = new FileReader();
                     
-                    reader.onload = (event) => {
+                    reader.onload = (e) => {
                         console.log('File read successfully');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(event.target.result);
-                        }
+                        resolvePromise(e.target.result);
                     };
                     
                     reader.onerror = () => {
-                        console.error('File read error');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(null);
-                        }
+                        console.error('Error reading file');
+                        setModalMessage('Error reading image file');
+                        setModalType('error');
+                        setModalVisible(true);
+                        resolvePromise(null);
                     };
                     
                     reader.onabort = () => {
-                        console.log('File read aborted');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(null);
-                        }
+                        console.log('File reading aborted');
+                        resolvePromise(null);
                     };
                     
                     try {
                         reader.readAsDataURL(file);
                     } catch (error) {
-                        console.error('Error reading file:', error);
-                        cleanup();
+                        console.error('Error in readAsDataURL:', error);
+                        resolvePromise(null);
                     }
                 } else {
-                    console.log('No file selected');
-                    cleanup();
+                    console.log('No file selected in change event');
+                    resolvePromise(null);
                 }
-            };
-            
-            const handleCancel = () => {
-                console.log('File selection cancelled');
-                cleanup();
             };
             
             // Add event listeners
             input.addEventListener('change', handleChange);
-            input.addEventListener('cancel', handleCancel);
+            window.addEventListener('focus', handleWindowFocus);
             
-            // Add to document and trigger click
+            // Add to document
             document.body.appendChild(input);
             
-            // Set timeout for safety
+            // Set safety timeout
+            const safetyTimeout = setTimeout(() => {
+                if (!isResolved) {
+                    console.log('Gallery selection timeout');
+                    resolvePromise(null);
+                }
+            }, 60000); // 60 second timeout
+            
+            // Cleanup timeout on resolution
+            const originalResolve = resolvePromise;
+            resolvePromise = (result) => {
+                clearTimeout(safetyTimeout);
+                originalResolve(result);
+            };
+            
+            // Trigger file selection
+            console.log('Triggering file input click');
+            try {
+                input.click();
+            } catch (error) {
+                console.error('Error triggering file input:', error);
+                resolvePromise(null);
+            }
+        });
+    };
+
+    // ALTERNATIVE GALLERY METHOD - FOR MOBILE CHROME
+    const handleMobileChromeGallerySelection = () => {
+        return new Promise((resolve) => {
+            if (Platform.OS !== 'web') {
+                resolve(null);
+                return;
+            }
+
+            console.log('Using mobile Chrome optimized gallery selection');
+            
+            // Create a more visible file input for mobile
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = 'environment'; // This helps on some mobile browsers
+            input.style.cssText = `
+                position: fixed;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                width: 100px;
+                height: 100px;
+                opacity: 0.01;
+                z-index: 10000;
+            `;
+            
+            let resolved = false;
+            
+            const resolveWithCleanup = (result) => {
+                if (!resolved) {
+                    resolved = true;
+                    if (document.body.contains(input)) {
+                        document.body.removeChild(input);
+                    }
+                    resolve(result);
+                }
+            };
+            
+            const handleChange = (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    console.log('Mobile Chrome: File selected', file.name);
+                    const reader = new FileReader();
+                    
+                    reader.onload = (event) => {
+                        resolveWithCleanup(event.target.result);
+                    };
+                    
+                    reader.onerror = () => {
+                        console.error('Mobile Chrome: File read error');
+                        resolveWithCleanup(null);
+                    };
+                    
+                    try {
+                        reader.readAsDataURL(file);
+                    } catch (error) {
+                        console.error('Mobile Chrome: Error reading file', error);
+                        resolveWithCleanup(null);
+                    }
+                } else {
+                    console.log('Mobile Chrome: No file selected');
+                    resolveWithCleanup(null);
+                }
+            };
+            
+            // Add change listener
+            input.addEventListener('change', handleChange);
+            
+            // Add to document
+            document.body.appendChild(input);
+            
+            // Safety timeout
             setTimeout(() => {
                 if (!resolved) {
-                    console.log('Gallery selection timeout');
-                    cleanup();
+                    console.log('Mobile Chrome: Selection timeout');
+                    resolveWithCleanup(null);
                 }
-            }, 30000); // 30 second timeout
+            }, 30000);
             
-            console.log('Triggering file input click');
+            // Trigger click
+            console.log('Mobile Chrome: Triggering file input');
             input.click();
         });
     };
