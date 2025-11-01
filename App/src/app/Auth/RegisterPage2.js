@@ -64,15 +64,6 @@ const RegisterPage2 = () => {
                 isAndroid,
                 userAgent
             });
-            console.log('Browser detected:', {
-                isChrome,
-                isFirefox,
-                isSafari,
-                isMobile,
-                isIOS,
-                isAndroid,
-                userAgent
-            });
         }
     }, []);
 
@@ -454,7 +445,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // INTERACTIVE CROPPER WITH ZOOM AND DRAG - FIXED FOR ALL BROWSERS
+    // INTERACTIVE CROPPER WITH PROPER CENTERING
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -603,6 +594,35 @@ const RegisterPage2 = () => {
             let startX, startY;
             let initialDistance = null;
 
+            // PROPER CENTERING FUNCTION
+            const centerImage = () => {
+                const containerWidth = cropArea.clientWidth;
+                const containerHeight = cropArea.clientHeight;
+                const imgWidth = img.naturalWidth;
+                const imgHeight = img.naturalHeight;
+                
+                console.log('Centering image:', {
+                    containerWidth,
+                    containerHeight,
+                    imgWidth,
+                    imgHeight
+                });
+                
+                // Calculate scale to fit image within container
+                const scaleX = containerWidth / imgWidth;
+                const scaleY = containerHeight / imgHeight;
+                
+                // Use the smaller scale to ensure entire image fits with some padding
+                scale = Math.min(scaleX, scaleY) * 0.9;
+                
+                // Calculate centered position
+                posX = (containerWidth - imgWidth * scale) / 2;
+                posY = (containerHeight - imgHeight * scale) / 2;
+                
+                console.log('Calculated position:', { scale, posX, posY });
+                updateImageTransform();
+            };
+
             // Touch event handlers for mobile
             const handleTouchStart = (e) => {
                 e.preventDefault();
@@ -671,22 +691,28 @@ const RegisterPage2 = () => {
                 img.style.cursor = 'grab';
             };
 
-            // Wheel event for zoom on desktop
+            // Wheel event for zoom on desktop - IMPROVED WITH CENTERING
             const handleWheel = (e) => {
                 e.preventDefault();
                 const delta = -e.deltaY * 0.01;
                 const newScale = Math.max(0.5, Math.min(3, scale + delta));
                 
-                // Zoom towards mouse position
+                // Get mouse position relative to crop area
                 const rect = cropArea.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 
-                const scaleChange = newScale - scale;
-                posX -= (mouseX - posX - rect.width / 2) * (scaleChange / scale);
-                posY -= (mouseY - posY - rect.height / 2) * (scaleChange / scale);
+                // Calculate zoom point (where the mouse is relative to image)
+                const imagePointX = (mouseX - posX) / scale;
+                const imagePointY = (mouseY - posY) / scale;
                 
+                // Apply new scale
                 scale = newScale;
+                
+                // Adjust position to zoom towards mouse point
+                posX = mouseX - imagePointX * scale;
+                posY = mouseY - imagePointY * scale;
+                
                 updateImageTransform();
             };
 
@@ -705,34 +731,42 @@ const RegisterPage2 = () => {
             cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
             cropArea.addEventListener('touchend', handleTouchEnd);
 
-            // Center image initially
+            // Center image when loaded - FIXED VERSION
             img.onload = () => {
                 console.log('Image loaded in cropper');
-                const imgWidth = img.naturalWidth;
-                const imgHeight = img.naturalHeight;
-                const containerWidth = cropArea.clientWidth;
-                const containerHeight = cropArea.clientHeight;
                 
-                console.log('Image dimensions:', imgWidth, imgHeight);
-                console.log('Container dimensions:', containerWidth, containerHeight);
-                
-                // Calculate initial scale to fit container
-                const scaleX = containerWidth / imgWidth;
-                const scaleY = containerHeight / imgHeight;
-                scale = Math.min(scaleX, scaleY) * 0.9;
-                
-                // Center the image
-                posX = (containerWidth - imgWidth * scale) / 2;
-                posY = (containerHeight - imgHeight * scale) / 2;
-                
-                updateImageTransform();
-                img.style.cursor = 'grab';
+                // Wait a tiny bit to ensure DOM is fully rendered
+                setTimeout(() => {
+                    centerImage();
+                    img.style.cursor = 'grab';
+                }, 100);
             };
 
             img.onerror = () => {
                 console.error('Failed to load image in cropper');
                 document.body.removeChild(cropUI);
                 resolve(null);
+            };
+
+            // Reset button to re-center the image
+            const resetButton = document.createElement('button');
+            resetButton.innerHTML = '↺ Reset Position';
+            resetButton.style.cssText = `
+                padding: 10px 16px;
+                background: #6B7280;
+                color: white;
+                border: none;
+                border-radius: 8px;
+                font-size: 14px;
+                font-weight: 500;
+                cursor: pointer;
+                margin-bottom: 12px;
+                transition: background 0.2s;
+            `;
+            resetButton.onmouseover = () => resetButton.style.background = '#4B5563';
+            resetButton.onmouseout = () => resetButton.style.background = '#6B7280';
+            resetButton.onclick = () => {
+                centerImage();
             };
 
             cropButton.onclick = () => {
@@ -745,13 +779,31 @@ const RegisterPage2 = () => {
                 canvas.width = cropArea.clientWidth;
                 canvas.height = cropArea.clientHeight;
                 
+                // Clear canvas with white background
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Calculate the source rectangle from the original image
+                const sourceX = -posX / scale;
+                const sourceY = -posY / scale;
+                const sourceWidth = canvas.width / scale;
+                const sourceHeight = canvas.height / scale;
+                
+                console.log('Cropping with params:', {
+                    sourceX, sourceY, sourceWidth, sourceHeight,
+                    posX, posY, scale,
+                    canvasWidth: canvas.width,
+                    canvasHeight: canvas.height
+                });
+                
                 // Draw the cropped image
                 ctx.drawImage(
                     img,
-                    -posX / scale, -posY / scale, // Source x, y
-                    canvas.width / scale, canvas.height / scale, // Source width, height
-                    0, 0, // Destination x, y
-                    canvas.width, canvas.height // Destination width, height
+                    Math.max(0, sourceX), Math.max(0, sourceY), // Source x, y (clamped to avoid negative values)
+                    Math.min(img.naturalWidth, sourceWidth),     // Source width
+                    Math.min(img.naturalHeight, sourceHeight),   // Source height
+                    0, 0,                                        // Destination x, y
+                    canvas.width, canvas.height                  // Destination width, height
                 );
                 
                 const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -782,6 +834,7 @@ const RegisterPage2 = () => {
 
             cropArea.appendChild(img);
             container.appendChild(title);
+            container.appendChild(resetButton); // Add reset button
             container.appendChild(cropArea);
             container.appendChild(instructions);
             buttonContainer.appendChild(cropButton);
@@ -1047,8 +1100,6 @@ const RegisterPage2 = () => {
         </ScrollView>
     );
 };
-
-// ... (styles remain the same as previous code)
 
 const styles = StyleSheet.create({
     scrollContainer: {
