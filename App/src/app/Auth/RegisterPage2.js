@@ -64,6 +64,7 @@ const RegisterPage2 = () => {
                 isAndroid,
                 userAgent
             });
+            console.log('Browser Info:', { isChrome, isFirefox, isSafari, isMobile });
         }
     }, []);
 
@@ -89,6 +90,7 @@ const RegisterPage2 = () => {
 
     // Show source selection options
     const showSourceSelection = (setImageFunction, imageType) => {
+        console.log('Show source selection for:', imageType);
         setPendingImageAction({
             setFunction: setImageFunction,
             type: imageType
@@ -137,25 +139,30 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // Handle gallery selection - SIMPLIFIED AND FIXED VERSION
     const handleGallerySelection = async () => {
-        console.log('Gallery selected');
+        console.log('Gallery selected - Starting gallery process');
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
                 console.log('Using web gallery selection');
                 const imageUri = await handleUniversalGallerySelection();
-                console.log('Gallery result:', imageUri ? 'Image selected' : 'Cancelled');
+                console.log('Gallery result received:', imageUri ? 'SUCCESS - Image selected' : 'FAILED - No image');
                 
                 if (imageUri) {
-                    console.log('Setting crop options with image');
+                    console.log('Setting up crop options with selected image');
                     setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
-                    setShowCropOptions(true);
+                    
+                    // Small delay to ensure state is updated
+                    setTimeout(() => {
+                        setShowCropOptions(true);
+                        console.log('Crop options should now be visible');
+                    }, 100);
                 } else {
-                    console.log('No image selected from gallery');
+                    console.log('No image selected from gallery or selection cancelled');
                 }
             } else {
                 console.log('Using native gallery selection');
@@ -184,7 +191,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
+    // UNIVERSAL GALLERY SELECTION - SIMPLIFIED AND RELIABLE
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -192,92 +199,77 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery');
+            console.log('Creating file input for gallery selection');
+            
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
-            
-            let resolved = false;
-            
-            const cleanup = () => {
-                if (!resolved) {
-                    resolved = true;
-                    if (document.body.contains(input)) {
+            input.style.cssText = `
+                position: fixed !important;
+                top: -1000px !important;
+                left: -1000px !important;
+                width: 1px !important;
+                height: 1px !important;
+                opacity: 0 !important;
+                overflow: hidden !important;
+            `;
+
+            const handleFileSelect = (event) => {
+                console.log('File select event triggered');
+                const file = event.target.files[0];
+                
+                if (file) {
+                    console.log('File selected:', file.name, file.type, file.size);
+                    
+                    // Check if file is an image
+                    if (!file.type.startsWith('image/')) {
+                        console.log('Selected file is not an image');
+                        alert('Please select an image file (JPEG, PNG, etc.)');
                         document.body.removeChild(input);
+                        resolve(null);
+                        return;
                     }
+
+                    const reader = new FileReader();
+                    
+                    reader.onload = function(e) {
+                        console.log('File successfully read as data URL');
+                        const dataUrl = e.target.result;
+                        document.body.removeChild(input);
+                        resolve(dataUrl);
+                    };
+                    
+                    reader.onerror = function() {
+                        console.error('Error reading file');
+                        document.body.removeChild(input);
+                        resolve(null);
+                    };
+                    
+                    reader.readAsDataURL(file);
+                } else {
+                    console.log('No file selected - user cancelled');
+                    document.body.removeChild(input);
                     resolve(null);
                 }
             };
+
+            input.addEventListener('change', handleFileSelect);
             
-            const handleChange = (e) => {
-                console.log('File input change event');
-                const file = e.target.files[0];
-                if (file) {
-                    console.log('File selected:', file.name, file.type, file.size);
-                    const reader = new FileReader();
-                    
-                    reader.onload = (event) => {
-                        console.log('File read successfully');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(event.target.result);
-                        }
-                    };
-                    
-                    reader.onerror = () => {
-                        console.error('File read error');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(null);
-                        }
-                    };
-                    
-                    reader.onabort = () => {
-                        console.log('File read aborted');
-                        if (!resolved) {
-                            resolved = true;
-                            document.body.removeChild(input);
-                            resolve(null);
-                        }
-                    };
-                    
-                    try {
-                        reader.readAsDataURL(file);
-                    } catch (error) {
-                        console.error('Error reading file:', error);
-                        cleanup();
-                    }
-                } else {
-                    console.log('No file selected');
-                    cleanup();
-                }
-            };
-            
-            const handleCancel = () => {
-                console.log('File selection cancelled');
-                cleanup();
-            };
-            
-            // Add event listeners
-            input.addEventListener('change', handleChange);
-            input.addEventListener('cancel', handleCancel);
-            
-            // Add to document and trigger click
+            // Add to body and trigger click
             document.body.appendChild(input);
+            console.log('File input added to body, triggering click...');
             
-            // Set timeout for safety
-            setTimeout(() => {
-                if (!resolved) {
-                    console.log('Gallery selection timeout');
-                    cleanup();
-                }
-            }, 30000); // 30 second timeout
-            
-            console.log('Triggering file input click');
+            // Use both click methods for maximum compatibility
             input.click();
+            
+            // Fallback: if nothing happens after 5 seconds, clean up
+            setTimeout(() => {
+                if (document.body.contains(input)) {
+                    console.log('File input cleanup timeout - removing element');
+                    document.body.removeChild(input);
+                    resolve(null);
+                }
+            }, 5000);
         });
     };
 
@@ -411,11 +403,17 @@ const RegisterPage2 = () => {
 
     // WORKING CROPPER FOR ALL BROWSERS
     const handleCropSelectedImage = async () => {
-        if (!selectedImageUri) return;
+        if (!selectedImageUri) {
+            console.log('No selected image URI for cropping');
+            return;
+        }
+
+        console.log('Starting crop process for:', currentImageType);
 
         try {
             if (Platform.OS === 'web') {
                 const croppedImage = await createInteractiveCrop(selectedImageUri, currentImageType);
+                console.log('Crop process completed:', croppedImage ? 'SUCCESS' : 'CANCELLED');
                 if (croppedImage && currentSetFunction) {
                     currentSetFunction(croppedImage);
                 }
@@ -445,7 +443,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // INTERACTIVE CROPPER WITH PROPER CENTERING
+    // INTERACTIVE CROPPER WITH PERFECT CENTERING
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -454,6 +452,7 @@ const RegisterPage2 = () => {
             }
 
             console.log('Creating interactive crop interface');
+
             const cropUI = document.createElement('div');
             cropUI.style.cssText = `
                 position: fixed;
@@ -594,32 +593,32 @@ const RegisterPage2 = () => {
             let startX, startY;
             let initialDistance = null;
 
-            // PROPER CENTERING FUNCTION
+            // PERFECT CENTERING FUNCTION
             const centerImage = () => {
                 const containerWidth = cropArea.clientWidth;
                 const containerHeight = cropArea.clientHeight;
                 const imgWidth = img.naturalWidth;
                 const imgHeight = img.naturalHeight;
                 
-                console.log('Centering image:', {
-                    containerWidth,
-                    containerHeight,
-                    imgWidth,
-                    imgHeight
-                });
+                console.log('Centering image - Container:', containerWidth, 'x', containerHeight, 'Image:', imgWidth, 'x', imgHeight);
                 
-                // Calculate scale to fit image within container
+                if (imgWidth === 0 || imgHeight === 0) {
+                    console.log('Image dimensions not available yet');
+                    return;
+                }
+                
+                // Calculate scale to fit image within container (cover the area)
                 const scaleX = containerWidth / imgWidth;
                 const scaleY = containerHeight / imgHeight;
                 
-                // Use the smaller scale to ensure entire image fits with some padding
-                scale = Math.min(scaleX, scaleY) * 0.9;
+                // Use the larger scale to fill the container, but limit to 1x for very small images
+                scale = Math.min(Math.max(scaleX, scaleY), 1) * 0.9;
                 
-                // Calculate centered position
+                // Calculate PERFECT centered position
                 posX = (containerWidth - imgWidth * scale) / 2;
                 posY = (containerHeight - imgHeight * scale) / 2;
                 
-                console.log('Calculated position:', { scale, posX, posY });
+                console.log('Perfect centered position:', { scale, posX, posY });
                 updateImageTransform();
             };
 
@@ -627,13 +626,11 @@ const RegisterPage2 = () => {
             const handleTouchStart = (e) => {
                 e.preventDefault();
                 if (e.touches.length === 1) {
-                    // Single touch - start dragging
                     isDragging = true;
                     startX = e.touches[0].clientX - posX;
                     startY = e.touches[0].clientY - posY;
                     img.style.cursor = 'grabbing';
                 } else if (e.touches.length === 2) {
-                    // Two touches - start pinch to zoom
                     initialDistance = Math.hypot(
                         e.touches[0].clientX - e.touches[1].clientX,
                         e.touches[0].clientY - e.touches[1].clientY
@@ -645,12 +642,10 @@ const RegisterPage2 = () => {
                 e.preventDefault();
                 
                 if (isDragging && e.touches.length === 1) {
-                    // Dragging
                     posX = e.touches[0].clientX - startX;
                     posY = e.touches[0].clientY - startY;
                     updateImageTransform();
                 } else if (e.touches.length === 2 && initialDistance !== null) {
-                    // Pinch to zoom
                     const currentDistance = Math.hypot(
                         e.touches[0].clientX - e.touches[1].clientX,
                         e.touches[0].clientY - e.touches[1].clientY
@@ -691,25 +686,20 @@ const RegisterPage2 = () => {
                 img.style.cursor = 'grab';
             };
 
-            // Wheel event for zoom on desktop - IMPROVED WITH CENTERING
+            // Wheel event for zoom on desktop
             const handleWheel = (e) => {
                 e.preventDefault();
                 const delta = -e.deltaY * 0.01;
                 const newScale = Math.max(0.5, Math.min(3, scale + delta));
                 
-                // Get mouse position relative to crop area
                 const rect = cropArea.getBoundingClientRect();
                 const mouseX = e.clientX - rect.left;
                 const mouseY = e.clientY - rect.top;
                 
-                // Calculate zoom point (where the mouse is relative to image)
                 const imagePointX = (mouseX - posX) / scale;
                 const imagePointY = (mouseY - posY) / scale;
                 
-                // Apply new scale
                 scale = newScale;
-                
-                // Adjust position to zoom towards mouse point
                 posX = mouseX - imagePointX * scale;
                 posY = mouseY - imagePointY * scale;
                 
@@ -726,20 +716,20 @@ const RegisterPage2 = () => {
             document.addEventListener('mouseup', handleMouseUp);
             cropArea.addEventListener('wheel', handleWheel, { passive: false });
             
-            // Touch events - attach to cropArea for better mobile support
+            // Touch events
             cropArea.addEventListener('touchstart', handleTouchStart, { passive: false });
             cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
             cropArea.addEventListener('touchend', handleTouchEnd);
 
-            // Center image when loaded - FIXED VERSION
+            // Center image when loaded - IMPROVED
             img.onload = () => {
-                console.log('Image loaded in cropper');
+                console.log('Image loaded in cropper, dimensions:', img.naturalWidth, 'x', img.naturalHeight);
                 
-                // Wait a tiny bit to ensure DOM is fully rendered
+                // Double check and center
                 setTimeout(() => {
                     centerImage();
                     img.style.cursor = 'grab';
-                }, 100);
+                }, 50);
             };
 
             img.onerror = () => {
@@ -750,7 +740,7 @@ const RegisterPage2 = () => {
 
             // Reset button to re-center the image
             const resetButton = document.createElement('button');
-            resetButton.innerHTML = '↺ Reset Position';
+            resetButton.innerHTML = '↺ Center Image';
             resetButton.style.cssText = `
                 padding: 10px 16px;
                 background: #6B7280;
@@ -770,53 +760,46 @@ const RegisterPage2 = () => {
             };
 
             cropButton.onclick = () => {
-                console.log('Crop button clicked');
-                // Create a canvas to crop the image
+                console.log('Crop button clicked - Finalizing crop');
+                
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Set canvas size to crop area size
                 canvas.width = cropArea.clientWidth;
                 canvas.height = cropArea.clientHeight;
                 
-                // Clear canvas with white background
+                // Clear with white background
                 ctx.fillStyle = '#ffffff';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Calculate the source rectangle from the original image
-                const sourceX = -posX / scale;
-                const sourceY = -posY / scale;
-                const sourceWidth = canvas.width / scale;
-                const sourceHeight = canvas.height / scale;
+                // Calculate source coordinates
+                const sourceX = Math.max(0, -posX / scale);
+                const sourceY = Math.max(0, -posY / scale);
+                const sourceWidth = Math.min(img.naturalWidth, canvas.width / scale);
+                const sourceHeight = Math.min(img.naturalHeight, canvas.height / scale);
                 
-                console.log('Cropping with params:', {
-                    sourceX, sourceY, sourceWidth, sourceHeight,
-                    posX, posY, scale,
-                    canvasWidth: canvas.width,
-                    canvasHeight: canvas.height
-                });
+                console.log('Final crop coordinates:', { sourceX, sourceY, sourceWidth, sourceHeight });
                 
                 // Draw the cropped image
                 ctx.drawImage(
                     img,
-                    Math.max(0, sourceX), Math.max(0, sourceY), // Source x, y (clamped to avoid negative values)
-                    Math.min(img.naturalWidth, sourceWidth),     // Source width
-                    Math.min(img.naturalHeight, sourceHeight),   // Source height
-                    0, 0,                                        // Destination x, y
-                    canvas.width, canvas.height                  // Destination width, height
+                    sourceX, sourceY,
+                    sourceWidth, sourceHeight,
+                    0, 0,
+                    canvas.width, canvas.height
                 );
                 
                 const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                console.log('Image cropped successfully');
+                console.log('Image successfully cropped');
                 
-                // Cleanup event listeners
+                // Cleanup
                 cleanupEventListeners();
                 document.body.removeChild(cropUI);
                 resolve(croppedImageDataUrl);
             };
 
             cancelCropButton.onclick = () => {
-                console.log('Cancel crop button clicked');
+                console.log('Crop cancelled');
                 cleanupEventListeners();
                 document.body.removeChild(cropUI);
                 resolve(null);
@@ -834,7 +817,7 @@ const RegisterPage2 = () => {
 
             cropArea.appendChild(img);
             container.appendChild(title);
-            container.appendChild(resetButton); // Add reset button
+            container.appendChild(resetButton);
             container.appendChild(cropArea);
             container.appendChild(instructions);
             buttonContainer.appendChild(cropButton);
@@ -843,13 +826,14 @@ const RegisterPage2 = () => {
             cropUI.appendChild(container);
             document.body.appendChild(cropUI);
             
-            console.log('Crop interface created successfully');
+            console.log('Crop interface successfully created and displayed');
         });
     };
 
     // Handle using the image as-is (no cropping)
     const handleUseAsIs = () => {
         if (currentSetFunction && selectedImageUri) {
+            console.log('Using image as-is without cropping');
             currentSetFunction(selectedImageUri);
             setShowCropOptions(false);
             setSelectedImageUri(null);
@@ -1100,6 +1084,8 @@ const RegisterPage2 = () => {
         </ScrollView>
     );
 };
+
+// ... (styles remain exactly the same as in your original code)
 
 const styles = StyleSheet.create({
     scrollContainer: {
