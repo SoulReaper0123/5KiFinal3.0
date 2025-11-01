@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -340,14 +340,13 @@ const RegisterPage2 = () => {
         });
     };
 
-    // SIMPLE CROP FUNCTION - GUARANTEED TO WORK
+    // WORKING CROPPER FOR ALL BROWSERS
     const handleCropSelectedImage = async () => {
         if (!selectedImageUri) return;
 
         try {
             if (Platform.OS === 'web') {
-                // Use the SIMPLE crop method that always works
-                const croppedImage = await createSimpleCrop(selectedImageUri);
+                const croppedImage = await createInteractiveCrop(selectedImageUri, currentImageType);
                 if (croppedImage && currentSetFunction) {
                     currentSetFunction(croppedImage);
                 }
@@ -377,15 +376,14 @@ const RegisterPage2 = () => {
         }
     };
 
-    // SIMPLE CROP THAT WORKS ON ALL BROWSERS
-    const createSimpleCrop = (imageUri) => {
+    // INTERACTIVE CROPPER WITH ZOOM AND DRAG
+    const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
                 resolve(imageUri);
                 return;
             }
 
-            // Create a simple crop interface
             const cropUI = document.createElement('div');
             cropUI.style.cssText = `
                 position: fixed;
@@ -400,106 +398,281 @@ const RegisterPage2 = () => {
                 justify-content: center;
                 z-index: 10000;
                 padding: 20px;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
             `;
 
             const container = document.createElement('div');
             container.style.cssText = `
                 background: white;
-                border-radius: 12px;
-                padding: 20px;
-                max-width: 90%;
-                max-height: 90%;
-                overflow: auto;
+                border-radius: 16px;
+                padding: 24px;
+                max-width: 95%;
+                max-height: 95%;
+                width: 400px;
+                overflow: hidden;
+                box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
             `;
 
             const title = document.createElement('h3');
             title.textContent = 'Crop Image';
             title.style.cssText = `
                 color: #1E3A5F;
-                margin-bottom: 15px;
+                margin: 0 0 16px 0;
                 text-align: center;
+                font-size: 20px;
+                font-weight: 700;
             `;
 
-            const imageContainer = document.createElement('div');
-            imageContainer.style.cssText = `
-                width: 300px;
+            const cropArea = document.createElement('div');
+            cropArea.style.cssText = `
+                width: 100%;
                 height: 300px;
-                border: 2px solid #1E3A5F;
-                border-radius: 8px;
+                border: 2px dashed #1E3A5F;
+                border-radius: 12px;
+                margin-bottom: 16px;
                 overflow: hidden;
-                margin-bottom: 15px;
                 background: #f8fafc;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+                position: relative;
+                touch-action: none;
             `;
 
             const img = document.createElement('img');
             img.src = imageUri;
             img.style.cssText = `
-                max-width: 100%;
-                max-height: 100%;
-                object-fit: contain;
+                position: absolute;
+                max-width: none;
+                cursor: move;
+                user-select: none;
+                -webkit-user-select: none;
+                -webkit-user-drag: none;
             `;
 
-            const instructions = document.createElement('p');
-            instructions.textContent = 'For best results, ensure the image is clear and properly framed.';
-            instructions.style.cssText = `
-                color: #64748B;
-                text-align: center;
-                margin-bottom: 15px;
-                font-size: 14px;
+            // Set initial size and position
+            img.style.width = '100%';
+            img.style.height = 'auto';
+            img.style.top = '0';
+            img.style.left = '0';
+
+            const instructions = document.createElement('div');
+            instructions.innerHTML = `
+                <p style="color: #64748B; text-align: center; margin: 0 0 16px 0; font-size: 14px; line-height: 1.4;">
+                    <strong>Pinch to zoom & drag to reposition</strong><br>
+                    For best results, ensure the image is clear and properly framed
+                </p>
             `;
 
             const buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = `
                 display: flex;
-                gap: 10px;
+                gap: 12px;
                 justify-content: center;
+                flex-wrap: wrap;
             `;
 
             const cropButton = document.createElement('button');
-            cropButton.textContent = '✓ Use This Crop';
+            cropButton.innerHTML = '✓ Use This Crop';
             cropButton.style.cssText = `
-                padding: 12px 20px;
+                padding: 14px 24px;
                 background: #1E3A5F;
                 color: white;
                 border: none;
-                border-radius: 8px;
-                font-size: 14px;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: 600;
                 cursor: pointer;
+                flex: 1;
+                min-width: 140px;
+                transition: background 0.2s;
             `;
+            cropButton.onmouseover = () => cropButton.style.background = '#0F2A4A';
+            cropButton.onmouseout = () => cropButton.style.background = '#1E3A5F';
 
-            const cancelButton = document.createElement('button');
-            cancelButton.textContent = '✕ Cancel';
-            cancelButton.style.cssText = `
-                padding: 12px 20px;
+            const cancelCropButton = document.createElement('button');
+            cancelCropButton.innerHTML = '✕ Cancel';
+            cancelCropButton.style.cssText = `
+                padding: 14px 24px;
                 background: #dc2626;
                 color: white;
                 border: none;
-                border-radius: 8px;
-                font-size: 14px;
+                border-radius: 10px;
+                font-size: 16px;
+                font-weight: 600;
                 cursor: pointer;
+                flex: 1;
+                min-width: 140px;
+                transition: background 0.2s;
             `;
+            cancelCropButton.onmouseover = () => cancelCropButton.style.background = '#b91c1c';
+            cancelCropButton.onmouseout = () => cancelCropButton.style.background = '#dc2626';
 
-            // For this simple version, we'll just return the original image
-            // In a real implementation, you'd add actual cropping logic here
-            cropButton.onclick = () => {
-                document.body.removeChild(cropUI);
-                resolve(imageUri); // Return the original image
+            // Zoom and drag variables
+            let scale = 1;
+            let posX = 0;
+            let posY = 0;
+            let isDragging = false;
+            let startX, startY;
+            let initialDistance = null;
+
+            // Touch event handlers for mobile
+            const handleTouchStart = (e) => {
+                if (e.touches.length === 1) {
+                    // Single touch - start dragging
+                    isDragging = true;
+                    startX = e.touches[0].clientX - posX;
+                    startY = e.touches[0].clientY - posY;
+                } else if (e.touches.length === 2) {
+                    // Two touches - start pinch to zoom
+                    initialDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                }
             };
 
-            cancelButton.onclick = () => {
+            const handleTouchMove = (e) => {
+                e.preventDefault();
+                
+                if (isDragging && e.touches.length === 1) {
+                    // Dragging
+                    posX = e.touches[0].clientX - startX;
+                    posY = e.touches[0].clientY - startY;
+                    updateImageTransform();
+                } else if (e.touches.length === 2 && initialDistance !== null) {
+                    // Pinch to zoom
+                    const currentDistance = Math.hypot(
+                        e.touches[0].clientX - e.touches[1].clientX,
+                        e.touches[0].clientY - e.touches[1].clientY
+                    );
+                    
+                    scale = Math.max(0.5, Math.min(3, scale * (currentDistance / initialDistance)));
+                    initialDistance = currentDistance;
+                    updateImageTransform();
+                }
+            };
+
+            const handleTouchEnd = () => {
+                isDragging = false;
+                initialDistance = null;
+            };
+
+            // Mouse event handlers for desktop
+            const handleMouseDown = (e) => {
+                isDragging = true;
+                startX = e.clientX - posX;
+                startY = e.clientY - posY;
+                img.style.cursor = 'grabbing';
+            };
+
+            const handleMouseMove = (e) => {
+                if (isDragging) {
+                    posX = e.clientX - startX;
+                    posY = e.clientY - startY;
+                    updateImageTransform();
+                }
+            };
+
+            const handleMouseUp = () => {
+                isDragging = false;
+                img.style.cursor = 'grab';
+            };
+
+            // Wheel event for zoom on desktop
+            const handleWheel = (e) => {
+                e.preventDefault();
+                const delta = -e.deltaY * 0.01;
+                scale = Math.max(0.5, Math.min(3, scale + delta));
+                updateImageTransform();
+            };
+
+            const updateImageTransform = () => {
+                img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+            };
+
+            // Add event listeners
+            img.addEventListener('mousedown', handleMouseDown);
+            document.addEventListener('mousemove', handleMouseMove);
+            document.addEventListener('mouseup', handleMouseUp);
+            cropArea.addEventListener('wheel', handleWheel, { passive: false });
+            
+            // Touch events
+            img.addEventListener('touchstart', handleTouchStart, { passive: false });
+            img.addEventListener('touchmove', handleTouchMove, { passive: false });
+            img.addEventListener('touchend', handleTouchEnd);
+
+            // Center image initially
+            img.onload = () => {
+                const imgWidth = img.naturalWidth;
+                const imgHeight = img.naturalHeight;
+                const containerWidth = cropArea.clientWidth;
+                const containerHeight = cropArea.clientHeight;
+                
+                // Calculate initial scale to fit container
+                const scaleX = containerWidth / imgWidth;
+                const scaleY = containerHeight / imgHeight;
+                scale = Math.min(scaleX, scaleY) * 0.8; // Slightly smaller to show it's zoomable
+                
+                // Center the image
+                posX = (containerWidth - imgWidth * scale) / 2;
+                posY = (containerHeight - imgHeight * scale) / 2;
+                
+                updateImageTransform();
+            };
+
+            cropButton.onclick = () => {
+                // Create a canvas to crop the image
+                const canvas = document.createElement('canvas');
+                const ctx = canvas.getContext('2d');
+                
+                // Set canvas size to crop area size
+                canvas.width = cropArea.clientWidth;
+                canvas.height = cropArea.clientHeight;
+                
+                // Calculate the visible portion of the image
+                const imgRect = img.getBoundingClientRect();
+                const cropRect = cropArea.getBoundingClientRect();
+                
+                // Draw the cropped image
+                ctx.drawImage(
+                    img,
+                    -posX / scale, -posY / scale, // Source x, y
+                    canvas.width / scale, canvas.height / scale, // Source width, height
+                    0, 0, // Destination x, y
+                    canvas.width, canvas.height // Destination width, height
+                );
+                
+                const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                
+                // Cleanup event listeners
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                cropArea.removeEventListener('wheel', handleWheel);
+                img.removeEventListener('touchstart', handleTouchStart);
+                img.removeEventListener('touchmove', handleTouchMove);
+                img.removeEventListener('touchend', handleTouchEnd);
+                
+                document.body.removeChild(cropUI);
+                resolve(croppedImageDataUrl);
+            };
+
+            cancelCropButton.onclick = () => {
+                // Cleanup event listeners
+                document.removeEventListener('mousemove', handleMouseMove);
+                document.removeEventListener('mouseup', handleMouseUp);
+                cropArea.removeEventListener('wheel', handleWheel);
+                img.removeEventListener('touchstart', handleTouchStart);
+                img.removeEventListener('touchmove', handleTouchMove);
+                img.removeEventListener('touchend', handleTouchEnd);
+                
                 document.body.removeChild(cropUI);
                 resolve(null);
             };
 
-            imageContainer.appendChild(img);
+            cropArea.appendChild(img);
             container.appendChild(title);
-            container.appendChild(imageContainer);
+            container.appendChild(cropArea);
             container.appendChild(instructions);
             buttonContainer.appendChild(cropButton);
-            buttonContainer.appendChild(cancelButton);
+            buttonContainer.appendChild(cancelCropButton);
             container.appendChild(buttonContainer);
             cropUI.appendChild(container);
             document.body.appendChild(cropUI);
