@@ -461,7 +461,7 @@ const RegisterPage2 = () => {
         }
     };
 
-    // FIXED INTERACTIVE CROPPER WITH PROPER CENTERING AND CROPPING
+    // FIXED INTERACTIVE CROPPER WITH PROPER LANDSCAPE SUPPORT
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -712,7 +712,7 @@ const RegisterPage2 = () => {
             cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
             cropArea.addEventListener('touchend', handleTouchEnd);
 
-            // FIXED: Improved image centering logic
+            // FIXED: Improved image centering logic for both portrait and landscape
             const centerImage = () => {
                 const containerWidth = cropArea.clientWidth;
                 const containerHeight = cropArea.clientHeight;
@@ -720,13 +720,22 @@ const RegisterPage2 = () => {
                 img.onload = function() {
                     const imgWidth = this.naturalWidth;
                     const imgHeight = this.naturalHeight;
+                    const imgAspectRatio = imgWidth / imgHeight;
+                    const containerAspectRatio = containerWidth / containerHeight;
                     
-                    console.log('Centering image:', { imgWidth, imgHeight, containerWidth, containerHeight });
+                    console.log('Image dimensions:', { imgWidth, imgHeight, imgAspectRatio });
+                    console.log('Container dimensions:', { containerWidth, containerHeight, containerAspectRatio });
                     
-                    // Calculate scale to fit container while maintaining aspect ratio
-                    const scaleX = containerWidth / imgWidth;
-                    const scaleY = containerHeight / imgHeight;
-                    scale = Math.min(scaleX, scaleY) * 0.8; // 80% of max fit to show borders
+                    // Determine if image is portrait or landscape
+                    if (imgAspectRatio > containerAspectRatio) {
+                        // Landscape image - fit to width
+                        scale = (containerWidth / imgWidth) * 0.9;
+                        console.log('Landscape image - scaling to width');
+                    } else {
+                        // Portrait image - fit to height
+                        scale = (containerHeight / imgHeight) * 0.9;
+                        console.log('Portrait image - scaling to height');
+                    }
                     
                     // Calculate centered position
                     const scaledWidth = imgWidth * scale;
@@ -740,7 +749,7 @@ const RegisterPage2 = () => {
                 };
             };
 
-            // FIXED: Proper cropping logic with correct coordinate transformation
+            // FIXED: Proper cropping logic for both portrait and landscape images
             cropButton.onclick = () => {
                 console.log('Crop button clicked');
                 
@@ -758,56 +767,33 @@ const RegisterPage2 = () => {
                 const canvas = document.createElement('canvas');
                 const ctx = canvas.getContext('2d');
                 
-                // Set canvas size to crop area size (this will be our output size)
+                // Set canvas size to match the visible crop area
                 canvas.width = containerWidth;
                 canvas.height = containerHeight;
                 
                 // Calculate the visible portion of the image in the crop area
                 // Convert crop area coordinates to original image coordinates
-                const sourceX = Math.max(0, -posX / scale);
-                const sourceY = Math.max(0, -posY / scale);
-                const sourceWidth = Math.min(imgWidth - sourceX, containerWidth / scale);
-                const sourceHeight = Math.min(imgHeight - sourceY, containerHeight / scale);
+                const visibleSourceX = Math.max(0, -posX / scale);
+                const visibleSourceY = Math.max(0, -posY / scale);
+                const visibleSourceWidth = Math.min(imgWidth - visibleSourceX, containerWidth / scale);
+                const visibleSourceHeight = Math.min(imgHeight - visibleSourceY, containerHeight / scale);
                 
-                console.log('Source crop coordinates:', {
-                    sourceX, sourceY, sourceWidth, sourceHeight
+                console.log('Visible source coordinates:', {
+                    visibleSourceX, visibleSourceY, visibleSourceWidth, visibleSourceHeight
                 });
                 
                 // Clear canvas with white background
                 ctx.fillStyle = 'white';
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
                 
-                // Draw the cropped image centered on canvas
-                if (sourceWidth > 0 && sourceHeight > 0) {
-                    // Calculate destination dimensions to maintain aspect ratio
-                    const destAspect = containerWidth / containerHeight;
-                    const sourceAspect = sourceWidth / sourceHeight;
-                    
-                    let destX = 0;
-                    let destY = 0;
-                    let destWidth = containerWidth;
-                    let destHeight = containerHeight;
-                    
-                    if (sourceAspect > destAspect) {
-                        // Source is wider - fit to width
-                        destHeight = containerWidth / sourceAspect;
-                        destY = (containerHeight - destHeight) / 2;
-                    } else {
-                        // Source is taller - fit to height
-                        destWidth = containerHeight * sourceAspect;
-                        destX = (containerWidth - destWidth) / 2;
-                    }
-                    
-                    console.log('Destination coordinates:', {
-                        destX, destY, destWidth, destHeight
-                    });
-                    
+                if (visibleSourceWidth > 0 && visibleSourceHeight > 0) {
+                    // Draw exactly what's visible in the crop area
                     ctx.drawImage(
                         img,
-                        sourceX, sourceY,           // Source x, y
-                        sourceWidth, sourceHeight,   // Source width, height
-                        destX, destY,               // Destination x, y
-                        destWidth, destHeight       // Destination width, height
+                        visibleSourceX, visibleSourceY,           // Source x, y
+                        visibleSourceWidth, visibleSourceHeight,   // Source width, height
+                        0, 0,                                     // Destination x, y
+                        canvas.width, canvas.height               // Destination width, height
                     );
                 }
                 
