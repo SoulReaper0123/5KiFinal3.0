@@ -64,6 +64,15 @@ const RegisterPage2 = () => {
                 isAndroid,
                 userAgent
             });
+            console.log('Browser detected:', {
+                isChrome,
+                isFirefox,
+                isSafari,
+                isMobile,
+                isIOS,
+                isAndroid,
+                userAgent
+            });
         }
     }, []);
 
@@ -98,11 +107,13 @@ const RegisterPage2 = () => {
 
     // Handle camera selection
     const handleCameraSelection = async () => {
+        console.log('Camera selected');
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
                 const imageUri = await handleWebCameraCapture(pendingImageAction.type);
+                console.log('Camera result:', imageUri ? 'Image captured' : 'Cancelled');
                 if (imageUri) {
                     setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
@@ -135,21 +146,28 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // ULTIMATE GALLERY SELECTION - FIXED FOR CHROME
+    // Handle gallery selection - FIXED VERSION
     const handleGallerySelection = async () => {
+        console.log('Gallery selected');
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
+                console.log('Using web gallery selection');
                 const imageUri = await handleUniversalGallerySelection();
+                console.log('Gallery result:', imageUri ? 'Image selected' : 'Cancelled');
                 
                 if (imageUri) {
+                    console.log('Setting crop options with image');
                     setSelectedImageUri(imageUri);
                     setCurrentSetFunction(() => pendingImageAction.setFunction);
                     setCurrentImageType(pendingImageAction.type);
                     setShowCropOptions(true);
+                } else {
+                    console.log('No image selected from gallery');
                 }
             } else {
+                console.log('Using native gallery selection');
                 const result = await ImagePicker.launchImageLibraryAsync({
                     mediaTypes: ImagePicker.MediaTypeOptions.Images,
                     allowsEditing: false,
@@ -175,7 +193,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // ULTIMATE GALLERY SELECTION WITH VISIBLE OVERLAY
+    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -183,146 +201,92 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            let isResolved = false;
-
-            const resolvePromise = (result) => {
-                if (!isResolved) {
-                    isResolved = true;
-                    
-                    // Remove the overlay
-                    if (document.getElementById('gallery-overlay')) {
-                        document.body.removeChild(document.getElementById('gallery-overlay'));
+            console.log('Creating file input for gallery');
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            
+            let resolved = false;
+            
+            const cleanup = () => {
+                if (!resolved) {
+                    resolved = true;
+                    if (document.body.contains(input)) {
+                        document.body.removeChild(input);
                     }
-                    
-                    resolve(result);
+                    resolve(null);
                 }
             };
-
-            // Create a visible overlay with a button
-            const overlay = document.createElement('div');
-            overlay.id = 'gallery-overlay';
-            overlay.style.cssText = `
-                position: fixed !important;
-                top: 0 !important;
-                left: 0 !important;
-                width: 100vw !important;
-                height: 100vh !important;
-                background: rgba(0,0,0,0.8) !important;
-                display: flex !important;
-                flex-direction: column !important;
-                align-items: center !important;
-                justify-content: center !important;
-                z-index: 10000 !important;
-                padding: 20px !important;
-            `;
-
-            const container = document.createElement('div');
-            container.style.cssText = `
-                background: white !important;
-                padding: 30px !important;
-                border-radius: 15px !important;
-                text-align: center !important;
-                max-width: 90vw !important;
-                box-shadow: 0 10px 25px rgba(0,0,0,0.3) !important;
-            `;
-
-            const title = document.createElement('h3');
-            title.textContent = 'Select Image';
-            title.style.cssText = `
-                color: #1E3A5F !important;
-                margin-bottom: 20px !important;
-                font-size: 20px !important;
-                font-weight: bold !important;
-            `;
-
-            const button = document.createElement('button');
-            button.textContent = '📁 Open Gallery';
-            button.style.cssText = `
-                padding: 15px 30px !important;
-                background: #1E3A5F !important;
-                color: white !important;
-                border: none !important;
-                border-radius: 10px !important;
-                font-size: 18px !important;
-                cursor: pointer !important;
-                margin-bottom: 15px !important;
-                width: 100% !important;
-                font-weight: bold !important;
-            `;
-
-            const cancelButton = document.createElement('button');
-            cancelButton.textContent = 'Cancel';
-            cancelButton.style.cssText = `
-                padding: 12px 24px !important;
-                background: #dc2626 !important;
-                color: white !important;
-                border: none !important;
-                border-radius: 8px !important;
-                font-size: 16px !important;
-                cursor: pointer !important;
-                width: 100% !important;
-                font-weight: bold !important;
-            `;
-
-            // Create the actual file input
-            const fileInput = document.createElement('input');
-            fileInput.type = 'file';
-            fileInput.accept = 'image/*';
-            fileInput.style.cssText = `
-                position: fixed !important;
-                top: -1000px !important;
-                left: -1000px !important;
-                opacity: 0 !important;
-            `;
-
-            const handleFileChange = (event) => {
-                const file = event.target.files[0];
-                
-                if (file && file.type.startsWith('image/')) {
+            
+            const handleChange = (e) => {
+                console.log('File input change event');
+                const file = e.target.files[0];
+                if (file) {
+                    console.log('File selected:', file.name, file.type, file.size);
                     const reader = new FileReader();
-                    reader.onload = (loadEvent) => {
-                        resolvePromise(loadEvent.target.result);
+                    
+                    reader.onload = (event) => {
+                        console.log('File read successfully');
+                        if (!resolved) {
+                            resolved = true;
+                            document.body.removeChild(input);
+                            resolve(event.target.result);
+                        }
                     };
+                    
                     reader.onerror = () => {
-                        resolvePromise(null);
+                        console.error('File read error');
+                        if (!resolved) {
+                            resolved = true;
+                            document.body.removeChild(input);
+                            resolve(null);
+                        }
                     };
-                    reader.readAsDataURL(file);
-                } else {
-                    resolvePromise(null);
-                }
-            };
-
-            fileInput.addEventListener('change', handleFileChange, { once: true });
-
-            // Button click handler
-            button.onclick = () => {
-                document.body.appendChild(fileInput);
-                setTimeout(() => {
+                    
+                    reader.onabort = () => {
+                        console.log('File read aborted');
+                        if (!resolved) {
+                            resolved = true;
+                            document.body.removeChild(input);
+                            resolve(null);
+                        }
+                    };
+                    
                     try {
-                        fileInput.click();
+                        reader.readAsDataURL(file);
                     } catch (error) {
-                        resolvePromise(null);
+                        console.error('Error reading file:', error);
+                        cleanup();
                     }
-                }, 100);
-            };
-
-            cancelButton.onclick = () => {
-                resolvePromise(null);
-            };
-
-            // Safety timeout
-            setTimeout(() => {
-                if (!isResolved) {
-                    resolvePromise(null);
+                } else {
+                    console.log('No file selected');
+                    cleanup();
                 }
-            }, 30000);
-
-            // Build the overlay
-            container.appendChild(title);
-            container.appendChild(button);
-            container.appendChild(cancelButton);
-            overlay.appendChild(container);
-            document.body.appendChild(overlay);
+            };
+            
+            const handleCancel = () => {
+                console.log('File selection cancelled');
+                cleanup();
+            };
+            
+            // Add event listeners
+            input.addEventListener('change', handleChange);
+            input.addEventListener('cancel', handleCancel);
+            
+            // Add to document and trigger click
+            document.body.appendChild(input);
+            
+            // Set timeout for safety
+            setTimeout(() => {
+                if (!resolved) {
+                    console.log('Gallery selection timeout');
+                    cleanup();
+                }
+            }, 30000); // 30 second timeout
+            
+            console.log('Triggering file input click');
+            input.click();
         });
     };
 
@@ -498,6 +462,7 @@ const RegisterPage2 = () => {
                 return;
             }
 
+            console.log('Creating interactive crop interface');
             const cropUI = document.createElement('div');
             cropUI.style.cssText = `
                 position: fixed;
@@ -747,6 +712,8 @@ const RegisterPage2 = () => {
                 const imgWidth = img.naturalWidth;
                 const imgHeight = img.naturalHeight;
                 
+                console.log('Centering image:', { imgWidth, imgHeight, containerWidth, containerHeight });
+                
                 // Calculate scale to fit container while maintaining aspect ratio
                 const scaleX = containerWidth / imgWidth;
                 const scaleY = containerHeight / imgHeight;
@@ -758,26 +725,35 @@ const RegisterPage2 = () => {
                 posX = (containerWidth - scaledWidth) / 2;
                 posY = (containerHeight - scaledHeight) / 2;
                 
+                console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
                 updateImageTransform();
                 img.style.cursor = 'grab';
             };
 
             img.onload = () => {
+                console.log('Image loaded in cropper');
                 centerImage();
             };
 
             img.onerror = () => {
+                console.error('Failed to load image in cropper');
                 document.body.removeChild(cropUI);
                 resolve(null);
             };
 
             // FIXED: Proper cropping logic with correct coordinate transformation
             cropButton.onclick = () => {
+                console.log('Crop button clicked');
+                
                 // Get actual dimensions
                 const containerWidth = cropArea.clientWidth;
                 const containerHeight = cropArea.clientHeight;
                 const imgWidth = img.naturalWidth;
                 const imgHeight = img.naturalHeight;
+                
+                console.log('Cropping dimensions:', {
+                    containerWidth, containerHeight, imgWidth, imgHeight, scale, posX, posY
+                });
                 
                 // Create a canvas to crop the image
                 const canvas = document.createElement('canvas');
@@ -794,11 +770,19 @@ const RegisterPage2 = () => {
                 const sourceWidth = containerWidth / scale;
                 const sourceHeight = containerHeight / scale;
                 
+                console.log('Source crop coordinates:', {
+                    sourceX, sourceY, sourceWidth, sourceHeight
+                });
+                
                 // Ensure we don't try to crop outside the image bounds
                 const boundedSourceX = Math.max(0, sourceX);
                 const boundedSourceY = Math.max(0, sourceY);
                 const boundedSourceWidth = Math.min(imgWidth - boundedSourceX, sourceWidth);
                 const boundedSourceHeight = Math.min(imgHeight - boundedSourceY, sourceHeight);
+                
+                console.log('Bounded source coordinates:', {
+                    boundedSourceX, boundedSourceY, boundedSourceWidth, boundedSourceHeight
+                });
                 
                 // Draw the cropped image
                 ctx.drawImage(
@@ -810,6 +794,7 @@ const RegisterPage2 = () => {
                 );
                 
                 const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                console.log('Image cropped successfully');
                 
                 // Cleanup event listeners
                 cleanupEventListeners();
@@ -818,6 +803,7 @@ const RegisterPage2 = () => {
             };
 
             cancelCropButton.onclick = () => {
+                console.log('Cancel crop button clicked');
                 cleanupEventListeners();
                 document.body.removeChild(cropUI);
                 resolve(null);
@@ -842,6 +828,8 @@ const RegisterPage2 = () => {
             container.appendChild(buttonContainer);
             cropUI.appendChild(container);
             document.body.appendChild(cropUI);
+            
+            console.log('Crop interface created successfully');
         });
     };
 
