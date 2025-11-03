@@ -51,6 +51,7 @@ const RegisterPage2 = () => {
             const isChrome = /chrome|chromium/i.test(userAgent);
             const isFirefox = /firefox/i.test(userAgent);
             const isSafari = /safari/i.test(userAgent) && !/chrome/i.test(userAgent);
+            const isEdge = /edg/i.test(userAgent);
             const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
             const isIOS = /iphone|ipad|ipod/i.test(userAgent);
             const isAndroid = /android/i.test(userAgent);
@@ -59,6 +60,7 @@ const RegisterPage2 = () => {
                 isChrome,
                 isFirefox,
                 isSafari,
+                isEdge,
                 isMobile,
                 isIOS,
                 isAndroid,
@@ -68,6 +70,7 @@ const RegisterPage2 = () => {
                 isChrome,
                 isFirefox,
                 isSafari,
+                isEdge,
                 isMobile,
                 isIOS,
                 isAndroid,
@@ -146,14 +149,14 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // UNIVERSAL GALLERY SELECTION - CHROME COMPATIBLE VERSION
     const handleGallerySelection = async () => {
         console.log('Gallery selected');
         setShowSourceOptions(false);
         
         try {
             if (Platform.OS === 'web') {
-                console.log('Using web gallery selection');
+                console.log('Using universal web gallery selection');
                 const imageUri = await handleUniversalGallerySelection();
                 console.log('Gallery result:', imageUri ? 'Image selected' : 'Cancelled');
                 
@@ -193,7 +196,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
+    // UNIVERSAL GALLERY SELECTION - COMPATIBLE WITH ALL BROWSERS INCLUDING CHROME
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -201,96 +204,220 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery');
+            console.log('Creating universal file input for gallery');
+            
+            // Create file input element
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
-            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0; width: 1px; height: 1px;';
+            input.setAttribute('data-testid', 'file-input');
             
             let resolved = false;
+            let cleanupDone = false;
             
             const cleanup = () => {
+                if (cleanupDone) return;
+                cleanupDone = true;
+                
                 if (!resolved) {
                     resolved = true;
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
-                    }
-                    resolve(null);
                 }
+                
+                // Remove event listeners
+                input.removeEventListener('change', handleChange);
+                input.removeEventListener('cancel', handleCancel);
+                input.removeEventListener('click', handleInputClick);
+                
+                // Remove from DOM safely
+                if (document.body.contains(input)) {
+                    document.body.removeChild(input);
+                }
+                
+                console.log('Cleanup completed');
+            };
+            
+            const handleInputClick = (e) => {
+                console.log('File input clicked directly');
             };
             
             const handleChange = (e) => {
-                console.log('File input change event');
+                console.log('File input change event triggered');
                 const file = e.target.files[0];
+                
                 if (file) {
-                    console.log('File selected:', file.name, file.type, file.size);
+                    console.log('File selected:', {
+                        name: file.name,
+                        type: file.type,
+                        size: file.size,
+                        lastModified: file.lastModified
+                    });
+                    
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                        console.error('Invalid file type:', file.type);
+                        setModalMessage('Please select a valid image file (JPEG, PNG, etc.)');
+                        setModalType('error');
+                        setModalVisible(true);
+                        cleanup();
+                        resolve(null);
+                        return;
+                    }
+                    
+                    // Validate file size (max 10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        console.error('File too large:', file.size);
+                        setModalMessage('Image size should be less than 10MB');
+                        setModalType('error');
+                        setModalVisible(true);
+                        cleanup();
+                        resolve(null);
+                        return;
+                    }
+                    
                     const reader = new FileReader();
                     
                     reader.onload = (event) => {
-                        console.log('File read successfully');
+                        console.log('File read successfully, result length:', event.target.result?.length);
                         if (!resolved) {
                             resolved = true;
-                            document.body.removeChild(input);
+                            cleanup();
                             resolve(event.target.result);
                         }
                     };
                     
-                    reader.onerror = () => {
-                        console.error('File read error');
+                    reader.onerror = (error) => {
+                        console.error('File read error:', error);
                         if (!resolved) {
                             resolved = true;
-                            document.body.removeChild(input);
+                            cleanup();
+                            setModalMessage('Error reading image file. Please try again.');
+                            setModalType('error');
+                            setModalVisible(true);
                             resolve(null);
                         }
                     };
                     
                     reader.onabort = () => {
-                        console.log('File read aborted');
+                        console.log('File read aborted by user');
                         if (!resolved) {
                             resolved = true;
-                            document.body.removeChild(input);
+                            cleanup();
                             resolve(null);
                         }
                     };
                     
                     try {
+                        console.log('Starting file read as DataURL');
                         reader.readAsDataURL(file);
                     } catch (error) {
                         console.error('Error reading file:', error);
-                        cleanup();
+                        if (!resolved) {
+                            resolved = true;
+                            cleanup();
+                            setModalMessage('Unable to read the selected image. Please try another file.');
+                            setModalType('error');
+                            setModalVisible(true);
+                            resolve(null);
+                        }
                     }
                 } else {
-                    console.log('No file selected');
-                    cleanup();
+                    console.log('No file selected in change event');
+                    if (!resolved) {
+                        resolved = true;
+                        cleanup();
+                        resolve(null);
+                    }
                 }
             };
             
             const handleCancel = () => {
-                console.log('File selection cancelled');
-                cleanup();
+                console.log('File selection cancelled by user');
+                if (!resolved) {
+                    resolved = true;
+                    cleanup();
+                    resolve(null);
+                }
             };
             
-            // Add event listeners
-            input.addEventListener('change', handleChange);
-            input.addEventListener('cancel', handleCancel);
+            // Add event listeners with proper error handling
+            try {
+                input.addEventListener('change', handleChange, { once: true });
+                input.addEventListener('cancel', handleCancel, { once: true });
+                input.addEventListener('click', handleInputClick, { once: true });
+            } catch (error) {
+                console.error('Error adding event listeners:', error);
+            }
             
-            // Add to document and trigger click
+            // Add to document
             document.body.appendChild(input);
             
-            // Set timeout for safety
-            setTimeout(() => {
+            // Set multiple timeouts for different scenarios
+            const safetyTimeout = setTimeout(() => {
+                console.log('Safety timeout reached - cleaning up');
                 if (!resolved) {
-                    console.log('Gallery selection timeout');
+                    resolved = true;
                     cleanup();
+                    resolve(null);
                 }
-            }, 30000); // 30 second timeout
+            }, 45000); // 45 second timeout
             
-            console.log('Triggering file input click');
-            input.click();
+            // Additional check for Chrome-specific issues
+            const chromeCheckTimeout = setTimeout(() => {
+                if (!resolved && browserInfo.isChrome) {
+                    console.log('Chrome-specific timeout check');
+                    // Try to trigger click again if it might have failed
+                    try {
+                        input.click();
+                    } catch (error) {
+                        console.error('Error in chrome retry:', error);
+                    }
+                }
+            }, 1000);
+            
+            // Cleanup timeouts when done
+            const cleanupTimeouts = () => {
+                clearTimeout(safetyTimeout);
+                clearTimeout(chromeCheckTimeout);
+            };
+            
+            // Override cleanup to include timeout clearing
+            const originalCleanup = cleanup;
+            cleanup = () => {
+                cleanupTimeouts();
+                originalCleanup();
+            };
+            
+            console.log('Triggering file input click for gallery selection');
+            try {
+                // Multiple approaches to trigger file dialog
+                if (input.click) {
+                    input.click();
+                } else if (input.dispatchEvent) {
+                    const clickEvent = new MouseEvent('click', {
+                        view: window,
+                        bubbles: true,
+                        cancelable: true
+                    });
+                    input.dispatchEvent(clickEvent);
+                }
+                
+                console.log('File input click triggered successfully');
+            } catch (error) {
+                console.error('Error triggering file input:', error);
+                if (!resolved) {
+                    resolved = true;
+                    cleanup();
+                    setModalMessage('Cannot open file selector. Please check browser permissions.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                }
+            }
         });
     };
 
-    // Web camera capture
+    // Web camera capture - Chrome compatible
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -298,7 +425,9 @@ const RegisterPage2 = () => {
                 return;
             }
 
+            // Check camera support
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                console.error('Camera not supported in this browser');
                 setModalMessage('Camera not supported in this browser. Please use gallery instead.');
                 setModalType('error');
                 setModalVisible(true);
@@ -306,27 +435,41 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            const facingMode = imageType === 'selfie' ? 'user' : 'environment';
+            const facingMode = imageType === 'selfie' ? 'user' : { exact: 'environment' };
             
-            navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: facingMode } 
-            })
+            // Camera constraints with fallback
+            const constraints = {
+                video: { 
+                    facingMode: facingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
+                },
+                audio: false
+            };
+
+            console.log('Requesting camera with constraints:', constraints);
+
+            navigator.mediaDevices.getUserMedia(constraints)
             .then((stream) => {
+                console.log('Camera access granted');
+                
                 const video = document.createElement('video');
                 video.srcObject = stream;
                 video.autoplay = true;
                 video.playsInline = true;
+                video.muted = true;
                 
                 const canvas = document.createElement('canvas');
                 const context = canvas.getContext('2d');
                 
+                // Create camera UI
                 const captureUI = document.createElement('div');
                 captureUI.style.cssText = `
                     position: fixed;
                     top: 0;
                     left: 0;
-                    width: 100%;
-                    height: 100%;
+                    width: 100vw;
+                    height: 100vh;
                     background: rgba(0,0,0,0.95);
                     display: flex;
                     flex-direction: column;
@@ -334,83 +477,190 @@ const RegisterPage2 = () => {
                     justify-content: center;
                     z-index: 10000;
                     padding: 20px;
+                    box-sizing: border-box;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 `;
                 
                 const videoContainer = document.createElement('div');
                 videoContainer.style.cssText = `
                     width: 100%;
                     max-width: 400px;
+                    max-height: 400px;
                     border-radius: 12px;
                     overflow: hidden;
                     background: #000;
                     margin-bottom: 20px;
+                    position: relative;
+                    aspect-ratio: 4/3;
+                `;
+                
+                const controlsContainer = document.createElement('div');
+                controlsContainer.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 12px;
+                    width: 100%;
+                    max-width: 400px;
                 `;
                 
                 const captureButton = document.createElement('button');
-                captureButton.textContent = '📸 Capture Photo';
+                captureButton.innerHTML = '📸 CAPTURE PHOTO';
                 captureButton.style.cssText = `
-                    padding: 15px 30px;
+                    padding: 16px 32px;
                     background: #1E3A5F;
                     color: white;
                     border: none;
-                    border-radius: 10px;
+                    border-radius: 50px;
                     font-size: 16px;
+                    font-weight: 700;
                     cursor: pointer;
-                    margin-bottom: 10px;
                     width: 100%;
-                    max-width: 400px;
+                    transition: all 0.2s ease;
+                    box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
                 `;
+                captureButton.onmouseover = () => captureButton.style.background = '#0F2A4A';
+                captureButton.onmouseout = () => captureButton.style.background = '#1E3A5F';
+                captureButton.ontouchstart = () => captureButton.style.transform = 'scale(0.95)';
+                captureButton.ontouchend = () => captureButton.style.transform = 'scale(1)';
                 
                 const cancelButton = document.createElement('button');
-                cancelButton.textContent = 'Cancel';
+                cancelButton.innerHTML = '✕ CANCEL';
                 cancelButton.style.cssText = `
-                    padding: 12px 24px;
+                    padding: 14px 28px;
                     background: #dc2626;
                     color: white;
                     border: none;
-                    border-radius: 10px;
+                    border-radius: 50px;
                     font-size: 14px;
+                    font-weight: 600;
                     cursor: pointer;
                     width: 100%;
-                    max-width: 400px;
+                    transition: all 0.2s ease;
+                `;
+                cancelButton.onmouseover = () => cancelButton.style.background = '#b91c1c';
+                cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
+                cancelButton.ontouchstart = () => cancelButton.style.transform = 'scale(0.95)';
+                cancelButton.ontouchend = () => cancelButton.style.transform = 'scale(1)';
+                
+                const instructions = document.createElement('div');
+                instructions.innerHTML = `
+                    <div style="color: white; text-align: center; margin-bottom: 16px; font-size: 14px; line-height: 1.4;">
+                        <strong>Position your ${imageType === 'selfie' ? 'face' : 'ID'} in the frame</strong><br>
+                        Ensure good lighting and clear visibility
+                    </div>
                 `;
                 
+                let streamActive = true;
+                
+                const cleanupCamera = () => {
+                    if (!streamActive) return;
+                    streamActive = false;
+                    
+                    try {
+                        stream.getTracks().forEach(track => {
+                            track.stop();
+                        });
+                    } catch (error) {
+                        console.error('Error stopping camera tracks:', error);
+                    }
+                    
+                    if (document.body.contains(captureUI)) {
+                        document.body.removeChild(captureUI);
+                    }
+                };
+                
                 video.onloadedmetadata = () => {
+                    console.log('Video metadata loaded');
+                    try {
+                        video.play().catch(e => console.error('Video play error:', e));
+                    } catch (error) {
+                        console.error('Error playing video:', error);
+                    }
+                    
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     
                     captureButton.onclick = () => {
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                        const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                        console.log('Capture button clicked');
+                        if (!streamActive) return;
                         
-                        stream.getTracks().forEach(track => track.stop());
-                        document.body.removeChild(captureUI);
-                        resolve(imageDataUrl);
+                        try {
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.85);
+                            console.log('Image captured, size:', imageDataUrl.length);
+                            
+                            cleanupCamera();
+                            resolve(imageDataUrl);
+                        } catch (error) {
+                            console.error('Error capturing image:', error);
+                            cleanupCamera();
+                            resolve(null);
+                        }
                     };
                     
                     cancelButton.onclick = () => {
-                        stream.getTracks().forEach(track => track.stop());
-                        document.body.removeChild(captureUI);
+                        console.log('Cancel button clicked');
+                        cleanupCamera();
                         resolve(null);
                     };
                     
-                    videoContainer.appendChild(video);
-                    captureUI.appendChild(videoContainer);
-                    captureUI.appendChild(captureButton);
-                    captureUI.appendChild(cancelButton);
-                    document.body.appendChild(captureUI);
+                    // Handle page visibility change
+                    const handleVisibilityChange = () => {
+                        if (document.hidden && streamActive) {
+                            console.log('Page hidden, cleaning up camera');
+                            cleanupCamera();
+                            resolve(null);
+                        }
+                    };
+                    
+                    document.addEventListener('visibilitychange', handleVisibilityChange);
+                    
+                    // Cleanup event listener on close
+                    const originalCleanup = cleanupCamera;
+                    cleanupCamera = () => {
+                        document.removeEventListener('visibilitychange', handleVisibilityChange);
+                        originalCleanup();
+                    };
                 };
                 
-                video.onerror = () => {
-                    stream.getTracks().forEach(track => track.stop());
-                    if (document.body.contains(captureUI)) {
-                        document.body.removeChild(captureUI);
-                    }
+                video.onerror = (error) => {
+                    console.error('Video error:', error);
+                    cleanupCamera();
                     resolve(null);
                 };
+                
+                // Add elements to DOM
+                videoContainer.appendChild(video);
+                controlsContainer.appendChild(instructions);
+                controlsContainer.appendChild(captureButton);
+                controlsContainer.appendChild(cancelButton);
+                captureUI.appendChild(videoContainer);
+                captureUI.appendChild(controlsContainer);
+                document.body.appendChild(captureUI);
+                
+                // Safety timeout
+                setTimeout(() => {
+                    if (streamActive) {
+                        console.log('Camera safety timeout reached');
+                        cleanupCamera();
+                        resolve(null);
+                    }
+                }, 300000); // 5 minute timeout
+                
             }).catch((error) => {
                 console.error('Camera access error:', error);
-                setModalMessage('Camera not available. Please use gallery instead.');
+                let errorMessage = 'Camera not available. Please use gallery instead.';
+                
+                if (error.name === 'NotAllowedError') {
+                    errorMessage = 'Camera permission denied. Please allow camera access and try again.';
+                } else if (error.name === 'NotFoundError') {
+                    errorMessage = 'No camera found. Please use gallery instead.';
+                } else if (error.name === 'NotSupportedError') {
+                    errorMessage = 'Camera not supported. Please use gallery instead.';
+                }
+                
+                setModalMessage(errorMessage);
                 setModalType('error');
                 setModalVisible(true);
                 resolve(null);
@@ -420,19 +670,30 @@ const RegisterPage2 = () => {
 
     // FIXED: Handle crop selected image - PROPERLY SET THE CROPPED IMAGE
     const handleCropSelectedImage = async () => {
-        if (!selectedImageUri) return;
+        if (!selectedImageUri) {
+            console.log('No selected image URI for cropping');
+            setShowCropOptions(false);
+            return;
+        }
 
         try {
+            console.log('Starting crop process for:', currentImageType);
+            
             if (Platform.OS === 'web') {
                 const croppedImage = await createInteractiveCrop(selectedImageUri, currentImageType);
                 console.log('Cropped image result:', croppedImage ? 'Success' : 'Failed');
                 
                 if (croppedImage && currentSetFunction) {
-                    // FIX: Actually set the cropped image to the state
+                    // IMPORTANT: Actually set the cropped image to the state
                     currentSetFunction(croppedImage);
                     console.log('Cropped image set to state successfully');
+                    
+                    // Show success message
+                    setModalMessage('Image cropped and saved successfully!');
+                    setModalType('success');
+                    setModalVisible(true);
                 } else {
-                    console.log('No cropped image to set');
+                    console.log('No cropped image to set - user cancelled or error');
                 }
             } else {
                 // For native, use Expo's built-in cropping
@@ -448,20 +709,23 @@ const RegisterPage2 = () => {
                 }
             }
             
-            // Close crop options regardless of success
+        } catch (error) {
+            console.error('Crop error:', error);
+            // If crop fails, use the original image and show error
+            setModalMessage('Crop failed. Using original image instead.');
+            setModalType('error');
+            setModalVisible(true);
+            handleUseAsIs();
+        } finally {
+            // Always close crop options
             setShowCropOptions(false);
             setSelectedImageUri(null);
             setCurrentImageType(null);
             setCurrentSetFunction(null);
-            
-        } catch (error) {
-            console.error('Crop error:', error);
-            // If crop fails, just use the original image
-            handleUseAsIs();
         }
     };
 
-    // FIXED INTERACTIVE CROPPER WITH PROPER LANDSCAPE SUPPORT
+    // IMPROVED INTERACTIVE CROPPER WITH CHROME COMPATIBILITY
     const createInteractiveCrop = (imageUri, imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -469,7 +733,7 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating interactive crop interface');
+            console.log('Creating interactive crop interface for:', imageType);
             const cropUI = document.createElement('div');
             cropUI.style.cssText = `
                 position: fixed;
@@ -486,6 +750,11 @@ const RegisterPage2 = () => {
                 padding: 20px;
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 box-sizing: border-box;
+                touch-action: none;
+                -webkit-user-select: none;
+                -moz-user-select: none;
+                -ms-user-select: none;
+                user-select: none;
             `;
 
             const container = document.createElement('div');
@@ -546,7 +815,9 @@ const RegisterPage2 = () => {
                 transform-origin: center center;
                 -webkit-touch-callout: none;
                 -webkit-tap-highlight-color: transparent;
+                touch-action: none;
             `;
+            img.draggable = false;
 
             const instructions = document.createElement('div');
             instructions.innerHTML = `
@@ -609,10 +880,18 @@ const RegisterPage2 = () => {
             let isDragging = false;
             let startX, startY;
             let initialDistance = null;
+            let lastTouchTime = 0;
+
+            // Prevent default touch behaviors
+            const preventDefault = (e) => {
+                if (e.cancelable) {
+                    e.preventDefault();
+                }
+            };
 
             // Touch event handlers for mobile
             const handleTouchStart = (e) => {
-                e.preventDefault();
+                preventDefault(e);
                 if (e.touches.length === 1) {
                     // Single touch - start dragging
                     isDragging = true;
@@ -629,7 +908,7 @@ const RegisterPage2 = () => {
             };
 
             const handleTouchMove = (e) => {
-                e.preventDefault();
+                preventDefault(e);
                 
                 if (isDragging && e.touches.length === 1) {
                     // Dragging
@@ -649,7 +928,8 @@ const RegisterPage2 = () => {
                 }
             };
 
-            const handleTouchEnd = () => {
+            const handleTouchEnd = (e) => {
+                preventDefault(e);
                 isDragging = false;
                 initialDistance = null;
                 img.style.cursor = 'grab';
@@ -657,7 +937,7 @@ const RegisterPage2 = () => {
 
             // Mouse event handlers for desktop
             const handleMouseDown = (e) => {
-                e.preventDefault();
+                preventDefault(e);
                 isDragging = true;
                 startX = e.clientX - posX;
                 startY = e.clientY - posY;
@@ -666,7 +946,7 @@ const RegisterPage2 = () => {
 
             const handleMouseMove = (e) => {
                 if (isDragging) {
-                    e.preventDefault();
+                    preventDefault(e);
                     posX = e.clientX - startX;
                     posY = e.clientY - startY;
                     updateImageTransform();
@@ -680,8 +960,8 @@ const RegisterPage2 = () => {
 
             // Wheel event for zoom on desktop
             const handleWheel = (e) => {
-                e.preventDefault();
-                const delta = -e.deltaY * 0.01;
+                preventDefault(e);
+                const delta = -Math.sign(e.deltaY) * 0.1;
                 const newScale = Math.max(0.5, Math.min(3, scale + delta));
                 
                 // Zoom towards mouse position
@@ -701,18 +981,19 @@ const RegisterPage2 = () => {
                 img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
             };
 
-            // Add event listeners
+            // Add event listeners with passive false for better control
             img.addEventListener('mousedown', handleMouseDown);
             document.addEventListener('mousemove', handleMouseMove);
             document.addEventListener('mouseup', handleMouseUp);
             cropArea.addEventListener('wheel', handleWheel, { passive: false });
             
-            // Touch events - attach to cropArea for better mobile support
+            // Touch events
             cropArea.addEventListener('touchstart', handleTouchStart, { passive: false });
             cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
-            cropArea.addEventListener('touchend', handleTouchEnd);
+            cropArea.addEventListener('touchend', handleTouchEnd, { passive: false });
+            cropArea.addEventListener('touchcancel', handleTouchEnd, { passive: false });
 
-            // FIXED: Improved image centering logic for both portrait and landscape
+            // Center image function
             const centerImage = () => {
                 const containerWidth = cropArea.clientWidth;
                 const containerHeight = cropArea.clientHeight;
@@ -726,16 +1007,17 @@ const RegisterPage2 = () => {
                     console.log('Image dimensions:', { imgWidth, imgHeight, imgAspectRatio });
                     console.log('Container dimensions:', { containerWidth, containerHeight, containerAspectRatio });
                     
-                    // Determine if image is portrait or landscape
+                    // Determine initial scale
                     if (imgAspectRatio > containerAspectRatio) {
                         // Landscape image - fit to width
-                        scale = (containerWidth / imgWidth) * 0.9;
-                        console.log('Landscape image - scaling to width');
+                        scale = containerWidth / imgWidth;
                     } else {
                         // Portrait image - fit to height
-                        scale = (containerHeight / imgHeight) * 0.9;
-                        console.log('Portrait image - scaling to height');
+                        scale = containerHeight / imgHeight;
                     }
+                    
+                    // Add some padding
+                    scale *= 0.9;
                     
                     // Calculate centered position
                     const scaledWidth = imgWidth * scale;
@@ -749,7 +1031,7 @@ const RegisterPage2 = () => {
                 };
             };
 
-            // FIXED: Proper cropping logic for both portrait and landscape images
+            // Improved cropping logic
             cropButton.onclick = () => {
                 console.log('Crop button clicked');
                 
@@ -772,7 +1054,6 @@ const RegisterPage2 = () => {
                 canvas.height = containerHeight;
                 
                 // Calculate the visible portion of the image in the crop area
-                // Convert crop area coordinates to original image coordinates
                 const visibleSourceX = Math.max(0, -posX / scale);
                 const visibleSourceY = Math.max(0, -posY / scale);
                 const visibleSourceWidth = Math.min(imgWidth - visibleSourceX, containerWidth / scale);
@@ -798,18 +1079,22 @@ const RegisterPage2 = () => {
                 }
                 
                 const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                console.log('Image cropped successfully');
+                console.log('Image cropped successfully, data URL length:', croppedImageDataUrl.length);
                 
-                // Cleanup event listeners
+                // Cleanup
                 cleanupEventListeners();
-                document.body.removeChild(cropUI);
+                if (document.body.contains(cropUI)) {
+                    document.body.removeChild(cropUI);
+                }
                 resolve(croppedImageDataUrl);
             };
 
             cancelCropButton.onclick = () => {
                 console.log('Cancel crop button clicked');
                 cleanupEventListeners();
-                document.body.removeChild(cropUI);
+                if (document.body.contains(cropUI)) {
+                    document.body.removeChild(cropUI);
+                }
                 resolve(null);
             };
 
@@ -821,8 +1106,10 @@ const RegisterPage2 = () => {
                 cropArea.removeEventListener('touchstart', handleTouchStart);
                 cropArea.removeEventListener('touchmove', handleTouchMove);
                 cropArea.removeEventListener('touchend', handleTouchEnd);
+                cropArea.removeEventListener('touchcancel', handleTouchEnd);
             };
 
+            // Add elements to DOM
             cropArea.appendChild(img);
             container.appendChild(title);
             container.appendChild(cropArea);
@@ -836,6 +1123,23 @@ const RegisterPage2 = () => {
             // Center the image after it's added to DOM
             setTimeout(centerImage, 100);
             
+            // Safety cleanup
+            const safetyTimeout = setTimeout(() => {
+                console.log('Crop safety timeout');
+                if (document.body.contains(cropUI)) {
+                    cleanupEventListeners();
+                    document.body.removeChild(cropUI);
+                    resolve(null);
+                }
+            }, 120000); // 2 minute timeout
+            
+            // Update cleanup to include safety timeout
+            const originalCleanup = cleanupEventListeners;
+            cleanupEventListeners = () => {
+                clearTimeout(safetyTimeout);
+                originalCleanup();
+            };
+            
             console.log('Crop interface created successfully');
         });
     };
@@ -843,12 +1147,18 @@ const RegisterPage2 = () => {
     // Handle using the image as-is (no cropping)
     const handleUseAsIs = () => {
         if (currentSetFunction && selectedImageUri) {
+            console.log('Using image as-is without cropping');
             currentSetFunction(selectedImageUri);
-            setShowCropOptions(false);
-            setSelectedImageUri(null);
-            setCurrentImageType(null);
-            setCurrentSetFunction(null);
+            setModalMessage('Image saved successfully!');
+            setModalType('success');
+            setModalVisible(true);
+        } else {
+            console.log('No image to use as-is');
         }
+        setShowCropOptions(false);
+        setSelectedImageUri(null);
+        setCurrentImageType(null);
+        setCurrentSetFunction(null);
     };
 
     // Handle ID Front selection
