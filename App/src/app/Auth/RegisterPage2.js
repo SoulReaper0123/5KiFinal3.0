@@ -552,14 +552,13 @@ const RegisterPage2 = () => {
             instructions.innerHTML = `
                 <div style="color: #64748B; text-align: center; margin: 0 0 16px 0; font-size: 14px; line-height: 1.4; flex-shrink: 0;">
                     <strong>Pinch to zoom & drag to reposition</strong><br>
-                    For best results, ensure the image is clear and properly framed
                 </div>
             `;
 
             const buttonContainer = document.createElement('div');
             buttonContainer.style.cssText = `
                 display: flex;
-                gap: 12px;
+                gap: 8px;
                 justify-content: center;
                 flex-wrap: wrap;
                 margin-top: auto;
@@ -569,16 +568,16 @@ const RegisterPage2 = () => {
             const cropButton = document.createElement('button');
             cropButton.innerHTML = '✓ Use This Crop';
             cropButton.style.cssText = `
-                padding: 14px 24px;
+                padding: 14px 16px;
                 background: #1E3A5F;
                 color: white;
                 border: none;
-                border-radius: 10px;
-                font-size: 16px;
+                border-radius: 8px;
+                font-size: 14px;
                 font-weight: 600;
                 cursor: pointer;
                 flex: 1;
-                min-width: 140px;
+                min-width: 120px;
                 transition: background 0.2s;
             `;
             cropButton.onmouseover = () => cropButton.style.background = '#0F2A4A';
@@ -587,16 +586,16 @@ const RegisterPage2 = () => {
             const cancelCropButton = document.createElement('button');
             cancelCropButton.innerHTML = '✕ Cancel';
             cancelCropButton.style.cssText = `
-                padding: 14px 24px;
+                padding: 14px 16px;
                 background: #dc2626;
                 color: white;
                 border: none;
-                border-radius: 10px;
-                font-size: 16px;
+                border-radius: 8px;
+                font-size: 14px;
                 font-weight: 600;
                 cursor: pointer;
                 flex: 1;
-                min-width: 140px;
+                min-width: 120px;
                 transition: background 0.2s;
             `;
             cancelCropButton.onmouseover = () => cancelCropButton.style.background = '#b91c1c';
