@@ -196,7 +196,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // FIXED: UNIVERSAL GALLERY SELECTION WITH CHROME MOBILE WORKAROUND
+    // COMPLETELY FIXED: UNIVERSAL GALLERY SELECTION WITH CHROME MOBILE WORKAROUND
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -210,8 +210,8 @@ const RegisterPage2 = () => {
             const isChromeMobile = browserInfo.isChromeMobile;
             
             if (isChromeMobile) {
-                console.log('Using Chrome Mobile workaround');
-                showChromeMobileFileInputWorkaround(resolve);
+                console.log('Using Chrome Mobile advanced workaround');
+                showChromeMobileAdvancedWorkaround(resolve);
                 return;
             }
 
@@ -305,8 +305,8 @@ const RegisterPage2 = () => {
         });
     };
 
-    // CHROME MOBILE WORKAROUND - Uses a custom modal with direct file input
-    const showChromeMobileFileInputWorkaround = (resolve) => {
+    // ADVANCED CHROME MOBILE WORKAROUND - Direct file selection without native gallery
+    const showChromeMobileAdvancedWorkaround = (resolve) => {
         const workaroundModal = document.createElement('div');
         workaroundModal.style.cssText = `
             position: fixed;
@@ -314,7 +314,7 @@ const RegisterPage2 = () => {
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
+            background: rgba(0,0,0,0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -345,12 +345,31 @@ const RegisterPage2 = () => {
         `;
 
         const message = document.createElement('p');
-        message.textContent = 'Chrome Mobile requires direct file input access. Please select an image file.';
+        message.innerHTML = `
+            <strong>Chrome Mobile File Selection</strong><br><br>
+            Due to Chrome Mobile restrictions, please use the file picker below.<br><br>
+            <span style="color: #64748B; font-size: 14px;">
+                • Tap "Choose File" below<br>
+                • Select "Gallery" or "Files"<br>
+                • Choose your image<br>
+                • Tap "Upload Selected File"
+            </span>
+        `;
         message.style.cssText = `
-            color: #64748B;
+            color: #374151;
             margin: 0 0 24px 0;
             font-size: 14px;
             line-height: 1.5;
+            text-align: left;
+        `;
+
+        const fileInputContainer = document.createElement('div');
+        fileInputContainer.style.cssText = `
+            margin: 0 0 20px 0;
+            padding: 20px;
+            border: 2px dashed #1E3A5F;
+            border-radius: 12px;
+            background: #F8FAFC;
         `;
 
         const fileInput = document.createElement('input');
@@ -358,11 +377,20 @@ const RegisterPage2 = () => {
         fileInput.accept = 'image/*';
         fileInput.style.cssText = `
             width: 100%;
-            margin: 0 0 16px 0;
-            padding: 12px;
-            border: 2px dashed #1E3A5F;
-            border-radius: 8px;
-            background: #F8FAFC;
+            padding: 10px;
+            font-size: 16px;
+        `;
+        fileInput.setAttribute('aria-label', 'Choose image file');
+
+        const selectedFileInfo = document.createElement('div');
+        selectedFileInfo.style.cssText = `
+            margin: 12px 0 0 0;
+            padding: 8px;
+            background: #EFF6FF;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #1E40AF;
+            display: none;
         `;
 
         const buttonContainer = document.createElement('div');
@@ -370,12 +398,13 @@ const RegisterPage2 = () => {
             display: flex;
             gap: 12px;
             justify-content: center;
+            flex-direction: column;
         `;
 
         const uploadButton = document.createElement('button');
         uploadButton.textContent = 'Upload Selected File';
         uploadButton.style.cssText = `
-            padding: 14px 24px;
+            padding: 16px 24px;
             background: #1E3A5F;
             color: white;
             border: none;
@@ -383,8 +412,11 @@ const RegisterPage2 = () => {
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            flex: 1;
+            width: 100%;
+            transition: background 0.2s;
         `;
+        uploadButton.onmouseover = () => uploadButton.style.background = '#0F2A4A';
+        uploadButton.onmouseout = () => uploadButton.style.background = '#1E3A5F';
 
         const cancelButton = document.createElement('button');
         cancelButton.textContent = 'Cancel';
@@ -397,52 +429,206 @@ const RegisterPage2 = () => {
             font-size: 16px;
             font-weight: 600;
             cursor: pointer;
-            flex: 1;
+            width: 100%;
+            transition: background 0.2s;
         `;
+        cancelButton.onmouseover = () => cancelButton.style.background = '#b91c1c';
+        cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
 
         let selectedFile = null;
 
+        // Enhanced file input handler
         fileInput.addEventListener('change', (e) => {
             selectedFile = e.target.files[0];
             if (selectedFile) {
+                // Validate file type
+                if (!selectedFile.type.startsWith('image/')) {
+                    selectedFileInfo.textContent = '❌ Please select an image file';
+                    selectedFileInfo.style.display = 'block';
+                    selectedFileInfo.style.background = '#FEF2F2';
+                    selectedFileInfo.style.color = '#DC2626';
+                    selectedFile = null;
+                    uploadButton.disabled = true;
+                    uploadButton.style.opacity = '0.6';
+                    return;
+                }
+
+                // Validate file size (10MB max)
+                if (selectedFile.size > 10 * 1024 * 1024) {
+                    selectedFileInfo.textContent = '❌ File too large (max 10MB)';
+                    selectedFileInfo.style.display = 'block';
+                    selectedFileInfo.style.background = '#FEF2F2';
+                    selectedFileInfo.style.color = '#DC2626';
+                    selectedFile = null;
+                    uploadButton.disabled = true;
+                    uploadButton.style.opacity = '0.6';
+                    return;
+                }
+
+                selectedFileInfo.textContent = `✅ Selected: ${selectedFile.name} (${(selectedFile.size / 1024 / 1024).toFixed(2)}MB)`;
+                selectedFileInfo.style.display = 'block';
+                selectedFileInfo.style.background = '#F0FDF4';
+                selectedFileInfo.style.color = '#059669';
+                
                 uploadButton.disabled = false;
                 uploadButton.style.opacity = '1';
                 uploadButton.textContent = `Upload ${selectedFile.name}`;
+            } else {
+                selectedFileInfo.style.display = 'none';
+                uploadButton.disabled = true;
+                uploadButton.style.opacity = '0.6';
+                uploadButton.textContent = 'Upload Selected File';
             }
         });
 
+        // Enhanced upload button handler
         uploadButton.addEventListener('click', () => {
             if (selectedFile) {
+                uploadButton.disabled = true;
+                uploadButton.textContent = 'Uploading...';
+                uploadButton.style.background = '#64748B';
+                
                 const reader = new FileReader();
+                
                 reader.onload = (event) => {
+                    console.log('File uploaded successfully in Chrome Mobile');
                     document.body.removeChild(workaroundModal);
                     resolve(event.target.result);
                 };
-                reader.onerror = () => {
+                
+                reader.onerror = (error) => {
+                    console.error('File upload error:', error);
                     document.body.removeChild(workaroundModal);
                     resolve(null);
                 };
-                reader.readAsDataURL(selectedFile);
+                
+                reader.onabort = () => {
+                    console.log('File upload aborted');
+                    document.body.removeChild(workaroundModal);
+                    resolve(null);
+                };
+                
+                try {
+                    reader.readAsDataURL(selectedFile);
+                } catch (error) {
+                    console.error('Error reading file:', error);
+                    document.body.removeChild(workaroundModal);
+                    resolve(null);
+                }
             }
         });
 
         cancelButton.addEventListener('click', () => {
+            console.log('Chrome Mobile gallery selection cancelled');
             document.body.removeChild(workaroundModal);
             resolve(null);
+        });
+
+        // Close modal when clicking outside
+        workaroundModal.addEventListener('click', (e) => {
+            if (e.target === workaroundModal) {
+                document.body.removeChild(workaroundModal);
+                resolve(null);
+            }
         });
 
         // Initially disable upload button
         uploadButton.disabled = true;
         uploadButton.style.opacity = '0.6';
 
+        // Assemble the modal
+        fileInputContainer.appendChild(fileInput);
+        fileInputContainer.appendChild(selectedFileInfo);
+        
         modalContent.appendChild(title);
         modalContent.appendChild(message);
-        modalContent.appendChild(fileInput);
+        modalContent.appendChild(fileInputContainer);
         buttonContainer.appendChild(uploadButton);
         buttonContainer.appendChild(cancelButton);
         modalContent.appendChild(buttonContainer);
         workaroundModal.appendChild(modalContent);
         document.body.appendChild(workaroundModal);
+
+        // Focus the file input for better accessibility
+        setTimeout(() => {
+            fileInput.click();
+        }, 300);
+    };
+
+    // ALTERNATIVE SIMPLE FILE INPUT FOR CHROME MOBILE (Fallback)
+    const showSimpleChromeMobileFileInput = (resolve) => {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.style.cssText = `
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 10000;
+            width: 90%;
+            max-width: 300px;
+            height: 60px;
+            opacity: 1;
+            background: white;
+            padding: 20px;
+            border: 2px solid #1E3A5F;
+            border-radius: 12px;
+        `;
+
+        let resolved = false;
+
+        const cleanup = () => {
+            if (!resolved) {
+                resolved = true;
+                if (document.body.contains(input)) {
+                    document.body.removeChild(input);
+                }
+                setTimeout(() => resolve(null), 100);
+            }
+        };
+
+        const handleChange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    if (!resolved) {
+                        resolved = true;
+                        document.body.removeChild(input);
+                        resolve(event.target.result);
+                    }
+                };
+                reader.onerror = cleanup;
+                reader.readAsDataURL(file);
+            } else {
+                cleanup();
+            }
+        };
+
+        const handleCancel = () => {
+            setTimeout(cleanup, 1000);
+        };
+
+        input.addEventListener('change', handleChange);
+        input.addEventListener('cancel', handleCancel);
+        input.addEventListener('blur', handleCancel);
+
+        document.body.appendChild(input);
+        input.focus();
+
+        // Force click on the input
+        setTimeout(() => {
+            input.click();
+        }, 100);
+
+        // Safety timeout
+        setTimeout(() => {
+            if (!resolved) {
+                console.log('Simple file input timeout');
+                cleanup();
+            }
+        }, 30000);
     };
 
     // Web camera capture
