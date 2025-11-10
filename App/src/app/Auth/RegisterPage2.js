@@ -898,46 +898,57 @@ const RegisterPage2 = () => {
                 </View>
 
                 <View style={styles.card}>
-                    <View style={styles.inputContainer}>
-                        <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
-                        <ModalSelector
-                            data={governmentIdOptions}
-                            initValue="Select Government ID"
-                            cancelText="Cancel"
-                            onChange={(option) => {
-                                const isOther = option.key === 'other';
-                                setIsOtherGovernmentId(isOther);
-                                if (isOther) {
-                                    setGovernmentId('Other');
-                                    setOtherGovernmentId('');
-                                } else {
-                                    setGovernmentId(option.label);
-                                    setOtherGovernmentId('');
-                                }
-                            }}
-                            style={styles.picker}
-                        >
-                            <TouchableOpacity style={styles.pickerContainer}>
-                                <Text style={styles.pickerText}>
-                                    {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
-                                </Text>
-                                <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-                            </TouchableOpacity>
-                        </ModalSelector>
-                        {isOtherGovernmentId && (
-                            <View style={{ marginTop: 8 }}>
-                                <TextInput
-                                    placeholder="Please specify your Government ID"
-                                    value={otherGovernmentId}
-                                    onChangeText={(text) => {
-                                        setOtherGovernmentId(text);
-                                        setGovernmentId(text);
-                                    }}
-                                    style={styles.input}
-                                />
-                            </View>
-                        )}
-                    </View>
+                   {/* Government ID Selection - Positioned at bottom */}
+<View style={styles.inputContainer}>
+    <Text style={styles.label}>Government ID <Text style={styles.required}>*</Text></Text>
+    <ModalSelector
+        data={governmentIdOptions}
+        initValue="Select Government ID"
+        cancelText="Cancel"
+        onChange={(option) => {
+            const isOther = option.key === 'other';
+            setIsOtherGovernmentId(isOther);
+            if (isOther) {
+                setGovernmentId('Other');
+                setOtherGovernmentId('');
+            } else {
+                setGovernmentId(option.label);
+                setOtherGovernmentId('');
+            }
+        }}
+        style={styles.picker}
+        // This makes the selector appear at bottom
+        overlayStyle={{ 
+            justifyContent: 'flex-end',
+            paddingHorizontal: 0 
+        }}
+        optionContainerStyle={{
+            borderTopLeftRadius: 16,
+            borderTopRightRadius: 16,
+            paddingVertical: 10,
+        }}
+    >
+        <TouchableOpacity style={styles.pickerContainer}>
+            <Text style={styles.pickerText}>
+                {isOtherGovernmentId ? `Other: ${otherGovernmentId || ''}` : (governmentId || 'Select Government ID')}
+            </Text>
+            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+        </TouchableOpacity>
+    </ModalSelector>
+    {isOtherGovernmentId && (
+        <View style={{ marginTop: 8 }}>
+            <TextInput
+                placeholder="Please specify your Government ID"
+                value={otherGovernmentId}
+                onChangeText={(text) => {
+                    setOtherGovernmentId(text);
+                    setGovernmentId(text);
+                }}
+                style={styles.input}
+            />
+        </View>
+    )}
+</View>
 
                     <View style={styles.grid}>
                         <View style={styles.tile}>
