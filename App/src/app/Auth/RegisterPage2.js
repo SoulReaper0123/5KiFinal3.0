@@ -54,6 +54,7 @@ const RegisterPage2 = () => {
             const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
             const isIOS = /iphone|ipad|ipod/i.test(userAgent);
             const isAndroid = /android/i.test(userAgent);
+            const isChromeMobile = isChrome && isMobile;
 
             setBrowserInfo({
                 isChrome,
@@ -62,6 +63,7 @@ const RegisterPage2 = () => {
                 isMobile,
                 isIOS,
                 isAndroid,
+                isChromeMobile,
                 userAgent
             });
             console.log('Browser detected:', {
@@ -71,6 +73,7 @@ const RegisterPage2 = () => {
                 isMobile,
                 isIOS,
                 isAndroid,
+                isChromeMobile,
                 userAgent
             });
         }
@@ -146,7 +149,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // FIXED: Handle gallery selection with Chrome Mobile workaround
     const handleGallerySelection = async () => {
         console.log('Gallery selected');
         setShowSourceOptions(false);
@@ -193,7 +196,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
+    // FIXED: UNIVERSAL GALLERY SELECTION WITH CHROME MOBILE WORKAROUND
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -201,11 +204,23 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery');
+            console.log('Creating file input for gallery with Chrome Mobile workaround');
+            
+            // Check if we're in Chrome Mobile
+            const isChromeMobile = browserInfo.isChromeMobile;
+            
+            if (isChromeMobile) {
+                console.log('Using Chrome Mobile workaround');
+                showChromeMobileFileInputWorkaround(resolve);
+                return;
+            }
+
+            // Standard file input for other browsers
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
             input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            input.setAttribute('capture', 'environment');
             
             let resolved = false;
             
@@ -288,6 +303,146 @@ const RegisterPage2 = () => {
             console.log('Triggering file input click');
             input.click();
         });
+    };
+
+    // CHROME MOBILE WORKAROUND - Uses a custom modal with direct file input
+    const showChromeMobileFileInputWorkaround = (resolve) => {
+        const workaroundModal = document.createElement('div');
+        workaroundModal.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.style.cssText = `
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            max-width: 400px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+        `;
+
+        const title = document.createElement('h3');
+        title.textContent = 'Upload Image';
+        title.style.cssText = `
+            color: #1E3A5F;
+            margin: 0 0 16px 0;
+            font-size: 20px;
+            font-weight: 700;
+        `;
+
+        const message = document.createElement('p');
+        message.textContent = 'Chrome Mobile requires direct file input access. Please select an image file.';
+        message.style.cssText = `
+            color: #64748B;
+            margin: 0 0 24px 0;
+            font-size: 14px;
+            line-height: 1.5;
+        `;
+
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = 'image/*';
+        fileInput.style.cssText = `
+            width: 100%;
+            margin: 0 0 16px 0;
+            padding: 12px;
+            border: 2px dashed #1E3A5F;
+            border-radius: 8px;
+            background: #F8FAFC;
+        `;
+
+        const buttonContainer = document.createElement('div');
+        buttonContainer.style.cssText = `
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        `;
+
+        const uploadButton = document.createElement('button');
+        uploadButton.textContent = 'Upload Selected File';
+        uploadButton.style.cssText = `
+            padding: 14px 24px;
+            background: #1E3A5F;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        `;
+
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancel';
+        cancelButton.style.cssText = `
+            padding: 14px 24px;
+            background: #dc2626;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            flex: 1;
+        `;
+
+        let selectedFile = null;
+
+        fileInput.addEventListener('change', (e) => {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                uploadButton.disabled = false;
+                uploadButton.style.opacity = '1';
+                uploadButton.textContent = `Upload ${selectedFile.name}`;
+            }
+        });
+
+        uploadButton.addEventListener('click', () => {
+            if (selectedFile) {
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                    document.body.removeChild(workaroundModal);
+                    resolve(event.target.result);
+                };
+                reader.onerror = () => {
+                    document.body.removeChild(workaroundModal);
+                    resolve(null);
+                };
+                reader.readAsDataURL(selectedFile);
+            }
+        });
+
+        cancelButton.addEventListener('click', () => {
+            document.body.removeChild(workaroundModal);
+            resolve(null);
+        });
+
+        // Initially disable upload button
+        uploadButton.disabled = true;
+        uploadButton.style.opacity = '0.6';
+
+        modalContent.appendChild(title);
+        modalContent.appendChild(message);
+        modalContent.appendChild(fileInput);
+        buttonContainer.appendChild(uploadButton);
+        buttonContainer.appendChild(cancelButton);
+        modalContent.appendChild(buttonContainer);
+        workaroundModal.appendChild(modalContent);
+        document.body.appendChild(workaroundModal);
     };
 
     // Web camera capture
