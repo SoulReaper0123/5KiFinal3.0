@@ -569,7 +569,7 @@ const RegisterPage2 = () => {
             const cropButton = document.createElement('button');
             cropButton.innerHTML = '✓ Use This Crop';
             cropButton.style.cssText = `
-                padding: 14px 24px;
+                padding: 14px 16px;
                 background: #1E3A5F;
                 color: white;
                 border: none;
@@ -587,7 +587,7 @@ const RegisterPage2 = () => {
             const cancelCropButton = document.createElement('button');
             cancelCropButton.innerHTML = '✕ Cancel';
             cancelCropButton.style.cssText = `
-                padding: 14px 24px;
+                padding: 14px 16px;
                 background: #dc2626;
                 color: white;
                 border: none;
