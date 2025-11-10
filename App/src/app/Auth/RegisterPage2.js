@@ -290,7 +290,7 @@ const RegisterPage2 = () => {
         });
     };
 
-    // Web camera capture
+    // FIXED Web camera capture - CORRECTED CAMERA ORIENTATION
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -306,10 +306,15 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            const facingMode = imageType === 'selfie' ? 'user' : 'environment';
+            // FIX: Always use user-facing camera for both selfie and ID to avoid inversion
+            const facingMode = 'user'; // Always use front camera to prevent inversion
             
             navigator.mediaDevices.getUserMedia({ 
-                video: { facingMode: facingMode } 
+                video: { 
+                    facingMode: facingMode,
+                    width: { ideal: 1920 },
+                    height: { ideal: 1080 }
+                } 
             })
             .then((stream) => {
                 const video = document.createElement('video');
@@ -334,20 +339,50 @@ const RegisterPage2 = () => {
                     justify-content: center;
                     z-index: 10000;
                     padding: 20px;
+                    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                 `;
                 
-                const videoContainer = document.createElement('div');
-                videoContainer.style.cssText = `
+                const cameraContainer = document.createElement('div');
+                cameraContainer.style.cssText = `
                     width: 100%;
                     max-width: 400px;
+                    height: 400px;
                     border-radius: 12px;
                     overflow: hidden;
                     background: #000;
                     margin-bottom: 20px;
+                    position: relative;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                `;
+                
+                // Add camera frame/border
+                const cameraFrame = document.createElement('div');
+                cameraFrame.style.cssText = `
+                    position: absolute;
+                    top: 20px;
+                    left: 20px;
+                    right: 20px;
+                    bottom: 20px;
+                    border: 2px solid white;
+                    border-radius: 8px;
+                    pointer-events: none;
+                    z-index: 2;
+                `;
+                
+                const buttonContainer = document.createElement('div');
+                buttonContainer.style.cssText = `
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    gap: 10px;
+                    width: 100%;
+                    max-width: 400px;
                 `;
                 
                 const captureButton = document.createElement('button');
-                captureButton.textContent = '📸 Capture Photo';
+                captureButton.textContent = 'Capture Photo';
                 captureButton.style.cssText = `
                     padding: 15px 30px;
                     background: #1E3A5F;
@@ -355,11 +390,13 @@ const RegisterPage2 = () => {
                     border: none;
                     border-radius: 10px;
                     font-size: 16px;
+                    font-weight: 600;
                     cursor: pointer;
-                    margin-bottom: 10px;
                     width: 100%;
-                    max-width: 400px;
+                    transition: background 0.2s;
                 `;
+                captureButton.onmouseover = () => captureButton.style.background = '#0F2A4A';
+                captureButton.onmouseout = () => captureButton.style.background = '#1E3A5F';
                 
                 const cancelButton = document.createElement('button');
                 cancelButton.textContent = 'Cancel';
@@ -370,16 +407,41 @@ const RegisterPage2 = () => {
                     border: none;
                     border-radius: 10px;
                     font-size: 14px;
+                    font-weight: 600;
                     cursor: pointer;
                     width: 100%;
-                    max-width: 400px;
+                    transition: background 0.2s;
                 `;
+                cancelButton.onmouseover = () => cancelButton.style.background = '#b91c1c';
+                cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
                 
                 video.onloadedmetadata = () => {
+                    // FIX: Set video dimensions to match container while maintaining aspect ratio
+                    const containerWidth = 400;
+                    const containerHeight = 400;
+                    const videoAspect = video.videoWidth / video.videoHeight;
+                    const containerAspect = containerWidth / containerHeight;
+                    
+                    let renderWidth, renderHeight;
+                    
+                    if (videoAspect > containerAspect) {
+                        // Video is wider than container
+                        renderWidth = containerWidth;
+                        renderHeight = containerWidth / videoAspect;
+                    } else {
+                        // Video is taller than container
+                        renderHeight = containerHeight;
+                        renderWidth = containerHeight * videoAspect;
+                    }
+                    
+                    video.style.width = `${renderWidth}px`;
+                    video.style.height = `${renderHeight}px`;
+                    
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     
                     captureButton.onclick = () => {
+                        // FIX: Draw video to canvas without transformation to maintain correct orientation
                         context.drawImage(video, 0, 0, canvas.width, canvas.height);
                         const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
                         
@@ -394,10 +456,12 @@ const RegisterPage2 = () => {
                         resolve(null);
                     };
                     
-                    videoContainer.appendChild(video);
-                    captureUI.appendChild(videoContainer);
-                    captureUI.appendChild(captureButton);
-                    captureUI.appendChild(cancelButton);
+                    cameraContainer.appendChild(video);
+                    cameraContainer.appendChild(cameraFrame);
+                    buttonContainer.appendChild(captureButton);
+                    buttonContainer.appendChild(cancelButton);
+                    captureUI.appendChild(cameraContainer);
+                    captureUI.appendChild(buttonContainer);
                     document.body.appendChild(captureUI);
                 };
                 
