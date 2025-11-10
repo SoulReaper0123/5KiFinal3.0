@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -52,6 +52,12 @@ const RegistrationFeePage = () => {
 
     const registrationData = route.params || {};
 
+    // Fetch payment settings and minimum fee on component mount
+    useEffect(() => {
+        fetchPaymentSettings();
+        fetchMinRegistrationFee();
+    }, []);
+
     // Detect browser and platform information (EXACT SAME AS RegisterPage2)
     useEffect(() => {
         if (Platform.OS === 'web') {
@@ -64,15 +70,6 @@ const RegistrationFeePage = () => {
             const isAndroid = /android/i.test(userAgent);
 
             setBrowserInfo({
-                isChrome,
-                isFirefox,
-                isSafari,
-                isMobile,
-                isIOS,
-                isAndroid,
-                userAgent
-            });
-            console.log('Browser detected:', {
                 isChrome,
                 isFirefox,
                 isSafari,
@@ -114,13 +111,19 @@ const RegistrationFeePage = () => {
             const settingsRef = dbRef(database, 'Settings/Accounts');
             const snapshot = await get(settingsRef);
             if (snapshot.exists()) {
-                setPaymentAccounts(snapshot.val());
+                const accountsData = snapshot.val();
+                console.log('Fetched payment accounts:', accountsData);
+                setPaymentAccounts(accountsData);
             } else {
                 // Fallback to old path if Accounts doesn't exist
                 const oldSettingsRef = dbRef(database, 'Settings/DepositAccounts');
                 const oldSnapshot = await get(oldSettingsRef);
                 if (oldSnapshot.exists()) {
-                    setPaymentAccounts(oldSnapshot.val());
+                    const oldAccountsData = oldSnapshot.val();
+                    console.log('Fetched payment accounts from DepositAccounts:', oldAccountsData);
+                    setPaymentAccounts(oldAccountsData);
+                } else {
+                    console.log('No payment accounts found in either location');
                 }
             }
         } catch (error) {
@@ -135,7 +138,10 @@ const RegistrationFeePage = () => {
             if (snapshot.exists()) {
                 const val = snapshot.val();
                 const num = parseFloat(val);
-                if (!isNaN(num)) setMinRegistrationFee(num);
+                if (!isNaN(num)) {
+                    console.log('Fetched minimum registration fee:', num);
+                    setMinRegistrationFee(num);
+                }
             }
         } catch (error) {
             console.error('Error fetching minimum registration fee:', error);
@@ -554,7 +560,7 @@ const RegistrationFeePage = () => {
                 height: 400px;
                 border: 2px solid #1E3A5F;
                 border-radius: 12px;
-                margin-bottom: 16px;
+                marginBottom: 16px;
                 overflow: hidden;
                 background: #f8fafc;
                 position: relative;
@@ -859,8 +865,10 @@ const RegistrationFeePage = () => {
     const handlePaymentOptionChange = (option) => {
         setPaymentOption(option.key);
         const selectedAccount = paymentAccounts[option.key];
-        setAccountNumber(selectedAccount.accountNumber || '');
-        setAccountName(selectedAccount.accountName || '');
+        console.log('Selected payment option:', option.key);
+        console.log('Selected account data:', selectedAccount);
+        setAccountNumber(selectedAccount?.accountNumber || '');
+        setAccountName(selectedAccount?.accountName || '');
     };
 
     const handleSubmit = () => {
