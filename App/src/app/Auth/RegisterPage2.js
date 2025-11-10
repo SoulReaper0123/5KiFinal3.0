@@ -569,7 +569,7 @@ const RegisterPage2 = () => {
             const cropButton = document.createElement('button');
             cropButton.innerHTML = '✓ Use This Crop';
             cropButton.style.cssText = `
-                padding: 14px 16px;
+                padding: 14px 24px;
                 background: #1E3A5F;
                 color: white;
                 border: none;
@@ -587,7 +587,7 @@ const RegisterPage2 = () => {
             const cancelCropButton = document.createElement('button');
             cancelCropButton.innerHTML = '✕ Cancel';
             cancelCropButton.style.cssText = `
-                padding: 14px 16px;
+                padding: 14px 24px;
                 background: #dc2626;
                 color: white;
                 border: none;
@@ -1215,6 +1215,8 @@ const styles = StyleSheet.create({
         padding: 20,
         borderTopLeftRadius: 20,
         borderTopRightRadius: 20,
+        maxHeight: '80%', 
+        minHeight: 300, 
     },
     modalTitle: {
         fontSize: 18,
@@ -1270,6 +1272,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         marginBottom: 16,
+        gap: 8,
     },
     cropOptionButton: {
         flex: 1,
