@@ -38,7 +38,6 @@ const RegisterPage2 = () => {
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
     const [browserInfo, setBrowserInfo] = useState({});
-    const fileInputRef = useRef(null);
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
@@ -55,7 +54,6 @@ const RegisterPage2 = () => {
             const isMobile = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
             const isIOS = /iphone|ipad|ipod/i.test(userAgent);
             const isAndroid = /android/i.test(userAgent);
-            const isChromeMobile = isChrome && isMobile;
 
             setBrowserInfo({
                 isChrome,
@@ -64,7 +62,6 @@ const RegisterPage2 = () => {
                 isMobile,
                 isIOS,
                 isAndroid,
-                isChromeMobile,
                 userAgent
             });
             console.log('Browser detected:', {
@@ -74,7 +71,6 @@ const RegisterPage2 = () => {
                 isMobile,
                 isIOS,
                 isAndroid,
-                isChromeMobile,
                 userAgent
             });
         }
@@ -150,7 +146,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // FIXED: Handle gallery selection with Chrome Mobile workaround
+    // Handle gallery selection - FIXED VERSION
     const handleGallerySelection = async () => {
         console.log('Gallery selected');
         setShowSourceOptions(false);
@@ -197,7 +193,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // COMPLETELY FIXED: UNIVERSAL GALLERY SELECTION WITH CHROME MOBILE WORKAROUND
+    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -205,23 +201,11 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery with Chrome Mobile workaround');
-            
-            // Check if we're in Chrome Mobile
-            const isChromeMobile = browserInfo.isChromeMobile;
-            
-            if (isChromeMobile) {
-                console.log('Using Chrome Mobile advanced workaround');
-                showChromeMobileDirectFileInput(resolve);
-                return;
-            }
-
-            // Standard file input for other browsers
+            console.log('Creating file input for gallery');
             const input = document.createElement('input');
             input.type = 'file';
             input.accept = 'image/*';
             input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
-            input.setAttribute('capture', 'environment');
             
             let resolved = false;
             
@@ -304,210 +288,6 @@ const RegisterPage2 = () => {
             console.log('Triggering file input click');
             input.click();
         });
-    };
-
-    // SIMPLE DIRECT FILE INPUT FOR CHROME MOBILE - Most reliable approach
-    const showChromeMobileDirectFileInput = (resolve) => {
-        console.log('Using direct file input for Chrome Mobile');
-        
-        // Create a visible file input
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            opacity: 0.001;
-            z-index: 10000;
-            font-size: 100px;
-        `;
-        
-        let resolved = false;
-        let cleanupDone = false;
-
-        const cleanup = () => {
-            if (!cleanupDone) {
-                cleanupDone = true;
-                if (document.body.contains(fileInput)) {
-                    document.body.removeChild(fileInput);
-                }
-                if (!resolved) {
-                    setTimeout(() => resolve(null), 100);
-                }
-            }
-        };
-
-        const handleChange = (event) => {
-            console.log('File input change detected in Chrome Mobile');
-            const file = event.target.files[0];
-            if (file) {
-                console.log('File selected in Chrome Mobile:', file.name, file.type);
-                
-                // Validate file type
-                if (!file.type.startsWith('image/')) {
-                    setModalMessage('Please select an image file (JPEG, PNG, etc.)');
-                    setModalType('error');
-                    setModalVisible(true);
-                    cleanup();
-                    return;
-                }
-
-                // Validate file size (10MB max)
-                if (file.size > 10 * 1024 * 1024) {
-                    setModalMessage('File size too large. Please select an image under 10MB.');
-                    setModalType('error');
-                    setModalVisible(true);
-                    cleanup();
-                    return;
-                }
-
-                const reader = new FileReader();
-                
-                reader.onload = (e) => {
-                    console.log('File successfully read in Chrome Mobile');
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-                        resolve(e.target.result);
-                    }
-                };
-                
-                reader.onerror = () => {
-                    console.error('File read error in Chrome Mobile');
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-                        resolve(null);
-                    }
-                };
-                
-                reader.onabort = () => {
-                    console.log('File read aborted in Chrome Mobile');
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-                        resolve(null);
-                    }
-                };
-                
-                try {
-                    reader.readAsDataURL(file);
-                } catch (error) {
-                    console.error('Error reading file in Chrome Mobile:', error);
-                    if (!resolved) {
-                        resolved = true;
-                        cleanup();
-                        resolve(null);
-                    }
-                }
-            } else {
-                console.log('No file selected in Chrome Mobile');
-                cleanup();
-            }
-        };
-
-        const handleCancel = () => {
-            console.log('File selection cancelled in Chrome Mobile');
-            setTimeout(cleanup, 1000);
-        };
-
-        // Add event listeners
-        fileInput.addEventListener('change', handleChange);
-        fileInput.addEventListener('cancel', handleCancel);
-        fileInput.addEventListener('blur', handleCancel);
-
-        // Add to document
-        document.body.appendChild(fileInput);
-
-        // Trigger click with delay to ensure element is ready
-        setTimeout(() => {
-            if (!resolved && document.body.contains(fileInput)) {
-                console.log('Triggering file input click in Chrome Mobile');
-                fileInput.click();
-            }
-        }, 100);
-
-        // Safety timeout
-        setTimeout(() => {
-            if (!resolved) {
-                console.log('Chrome Mobile file selection timeout');
-                cleanup();
-            }
-        }, 45000); // 45 second timeout for mobile
-    };
-
-    // ALTERNATIVE: Force native Android intent for Chrome Mobile
-    const showChromeMobileNativeIntent = (resolve) => {
-        console.log('Attempting native Android intent for Chrome Mobile');
-        
-        const fileInput = document.createElement('input');
-        fileInput.type = 'file';
-        fileInput.accept = 'image/*';
-        fileInput.capture = 'environment'; // This might trigger native camera/gallery
-        fileInput.style.cssText = `
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 90%;
-            height: 60px;
-            opacity: 0.01;
-            z-index: 10000;
-        `;
-
-        let resolved = false;
-
-        const handleChange = (e) => {
-            const file = e.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (event) => {
-                    if (!resolved) {
-                        resolved = true;
-                        if (document.body.contains(fileInput)) {
-                            document.body.removeChild(fileInput);
-                        }
-                        resolve(event.target.result);
-                    }
-                };
-                reader.onerror = () => {
-                    if (!resolved) {
-                        resolved = true;
-                        if (document.body.contains(fileInput)) {
-                            document.body.removeChild(fileInput);
-                        }
-                        resolve(null);
-                    }
-                };
-                reader.readAsDataURL(file);
-            } else {
-                if (!resolved) {
-                    resolved = true;
-                    if (document.body.contains(fileInput)) {
-                        document.body.removeChild(fileInput);
-                    }
-                    resolve(null);
-                }
-            }
-        };
-
-        fileInput.addEventListener('change', handleChange);
-        document.body.appendChild(fileInput);
-
-        // Multiple click attempts for reliability
-        setTimeout(() => fileInput.click(), 100);
-        setTimeout(() => fileInput.click(), 500);
-        setTimeout(() => fileInput.click(), 1000);
-
-        setTimeout(() => {
-            if (!resolved && document.body.contains(fileInput)) {
-                document.body.removeChild(fileInput);
-                resolve(null);
-            }
-        }, 30000);
     };
 
     // Web camera capture
