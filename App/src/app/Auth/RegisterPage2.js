@@ -291,7 +291,7 @@ const RegisterPage2 = () => {
     };
 
     // Web camera capture
-// FIXED Web camera capture - PROPER SIZING AND LAYOUT
+// FIXED Web camera capture - CORRECT SELFIE ORIENTATION
 const handleWebCameraCapture = (imageType) => {
     return new Promise((resolve) => {
         if (Platform.OS !== 'web') {
@@ -431,20 +431,33 @@ const handleWebCameraCapture = (imageType) => {
             cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
             
             video.onloadedmetadata = () => {
-                // FIX: Make video fill the entire container
-                const containerWidth = 400;
-                const containerHeight = 400;
-                
                 // Set video to fill the container completely
                 video.style.width = '100%';
                 video.style.height = '100%';
-                video.style.objectFit = 'cover'; // This ensures the video fills the container
+                video.style.objectFit = 'cover';
+                
+                // For front camera preview, we want the mirrored view (like a mirror)
+                // This is what users expect to see when taking selfies
+                if (imageType === 'selfie') {
+                    video.style.transform = 'scaleX(-1)'; // Mirror the preview
+                }
                 
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
                 
                 captureButton.onclick = () => {
-                    context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    // FIX: For selfies, we need to handle the captured image differently
+                    if (imageType === 'selfie') {
+                        // Method 1: Draw normally but flip horizontally to correct the mirroring
+                        context.save();
+                        context.scale(-1, 1); // Flip horizontally
+                        context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+                        context.restore();
+                    } else {
+                        // For back camera, draw normally
+                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    }
+                    
                     const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
                     
                     stream.getTracks().forEach(track => track.stop());
@@ -607,11 +620,27 @@ const handleWebCameraCapture = (imageType) => {
                     video.style.height = '100%';
                     video.style.objectFit = 'cover';
                     
+                    // For front camera preview in fallback, also mirror it
+                    if (fallbackFacingMode === 'user') {
+                        video.style.transform = 'scaleX(-1)';
+                    }
+                    
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     
                     captureButton.onclick = () => {
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        // Handle the captured image based on camera type
+                        if (fallbackFacingMode === 'user') {
+                            // For front camera, flip the captured image
+                            context.save();
+                            context.scale(-1, 1);
+                            context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+                            context.restore();
+                        } else {
+                            // For back camera, draw normally
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                        }
+                        
                         const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
                         
                         stream.getTracks().forEach(track => track.stop());
