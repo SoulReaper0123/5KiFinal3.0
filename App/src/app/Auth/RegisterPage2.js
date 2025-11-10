@@ -290,7 +290,7 @@ const RegisterPage2 = () => {
         });
     };
 
-    // FIXED Web camera capture - CORRECTED CAMERA ORIENTATION
+    // FIXED Web camera capture - CORRECT CAMERA SELECTION WITHOUT INVERSION
     const handleWebCameraCapture = (imageType) => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -306,8 +306,8 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            // FIX: Always use user-facing camera for both selfie and ID to avoid inversion
-            const facingMode = 'user'; // Always use front camera to prevent inversion
+            // FIX: Use back camera for ID, front camera for selfie, but prevent mirroring
+            const facingMode = imageType === 'selfie' ? 'user' : 'environment';
             
             navigator.mediaDevices.getUserMedia({ 
                 video: { 
@@ -474,10 +474,177 @@ const RegisterPage2 = () => {
                 };
             }).catch((error) => {
                 console.error('Camera access error:', error);
-                setModalMessage('Camera not available. Please use gallery instead.');
-                setModalType('error');
-                setModalVisible(true);
-                resolve(null);
+                // If the preferred camera fails, try the other one as fallback
+                console.log('Trying fallback camera...');
+                const fallbackFacingMode = imageType === 'selfie' ? 'environment' : 'user';
+                
+                navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: fallbackFacingMode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                })
+                .then((stream) => {
+                    // Same camera setup code as above but with fallback camera
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    const captureUI = document.createElement('div');
+                    captureUI.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.95);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                        padding: 20px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                    `;
+                    
+                    const cameraContainer = document.createElement('div');
+                    cameraContainer.style.cssText = `
+                        width: 100%;
+                        max-width: 400px;
+                        height: 400px;
+                        border-radius: 12px;
+                        overflow: hidden;
+                        background: #000;
+                        margin-bottom: 20px;
+                        position: relative;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                    `;
+                    
+                    const cameraFrame = document.createElement('div');
+                    cameraFrame.style.cssText = `
+                        position: absolute;
+                        top: 20px;
+                        left: 20px;
+                        right: 20px;
+                        bottom: 20px;
+                        border: 2px solid white;
+                        border-radius: 8px;
+                        pointer-events: none;
+                        z-index: 2;
+                    `;
+                    
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 10px;
+                        width: 100%;
+                        max-width: 400px;
+                    `;
+                    
+                    const captureButton = document.createElement('button');
+                    captureButton.textContent = 'Capture Photo';
+                    captureButton.style.cssText = `
+                        padding: 15px 30px;
+                        background: #1E3A5F;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        width: 100%;
+                        transition: background 0.2s;
+                    `;
+                    captureButton.onmouseover = () => captureButton.style.background = '#0F2A4A';
+                    captureButton.onmouseout = () => captureButton.style.background = '#1E3A5F';
+                    
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = 'Cancel';
+                    cancelButton.style.cssText = `
+                        padding: 12px 24px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        width: 100%;
+                        transition: background 0.2s;
+                    `;
+                    cancelButton.onmouseover = () => cancelButton.style.background = '#b91c1c';
+                    cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
+                    
+                    video.onloadedmetadata = () => {
+                        const containerWidth = 400;
+                        const containerHeight = 400;
+                        const videoAspect = video.videoWidth / video.videoHeight;
+                        const containerAspect = containerWidth / containerHeight;
+                        
+                        let renderWidth, renderHeight;
+                        
+                        if (videoAspect > containerAspect) {
+                            renderWidth = containerWidth;
+                            renderHeight = containerWidth / videoAspect;
+                        } else {
+                            renderHeight = containerHeight;
+                            renderWidth = containerHeight * videoAspect;
+                        }
+                        
+                        video.style.width = `${renderWidth}px`;
+                        video.style.height = `${renderHeight}px`;
+                        
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        
+                        captureButton.onclick = () => {
+                            context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(imageDataUrl);
+                        };
+                        
+                        cancelButton.onclick = () => {
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(null);
+                        };
+                        
+                        cameraContainer.appendChild(video);
+                        cameraContainer.appendChild(cameraFrame);
+                        buttonContainer.appendChild(captureButton);
+                        buttonContainer.appendChild(cancelButton);
+                        captureUI.appendChild(cameraContainer);
+                        captureUI.appendChild(buttonContainer);
+                        document.body.appendChild(captureUI);
+                    };
+                    
+                    video.onerror = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        if (document.body.contains(captureUI)) {
+                            document.body.removeChild(captureUI);
+                        }
+                        resolve(null);
+                    };
+                })
+                .catch((fallbackError) => {
+                    console.error('Fallback camera also failed:', fallbackError);
+                    setModalMessage('Camera not available. Please use gallery instead.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                });
             });
         });
     };
