@@ -1249,7 +1249,7 @@ const styles = StyleSheet.create({
     },
     previewImageContainer: {
         width: '100%',
-        height: 200,
+        height: 150,
         borderRadius: 12,
         marginBottom: 16,
         borderWidth: 1,
@@ -1279,8 +1279,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 14,
-        paddingHorizontal: 16,
+        paddingVertical: 12, // Reduced from 14
+        paddingHorizontal: 12, // Reduced from 16
         borderRadius: 10,
         marginHorizontal: 6,
     },
