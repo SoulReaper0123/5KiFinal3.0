@@ -75,12 +75,6 @@ const RegisterPage = () => {
   const [isCheckingCode, setIsCheckingCode] = useState(false);
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   
-  // Optional Employment fields
-  const [occupation, setOccupation] = useState('');
-  const [employer, setEmployer] = useState('');
-  const [employmentAddress, setEmploymentAddress] = useState('');
-  const [employmentContactNo, setEmploymentContactNo] = useState('');
-  
   // Error states
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
@@ -102,11 +96,6 @@ const RegisterPage = () => {
   const addressInput = useRef(null);
   const placeOfBirthInput = useRef(null);
   const orientationCodeInput = useRef(null);
-  // Optional Employment refs
-  const occupationInput = useRef(null);
-  const employerInput = useRef(null);
-  const employmentAddressInput = useRef(null);
-  const employmentContactInput = useRef(null);
   const dateInputRef = useRef(null);
 
   useEffect(() => {
@@ -259,7 +248,6 @@ const RegisterPage = () => {
                        !phoneNumberError && !placeOfBirthError && !addressError &&
                        !orientationError;
 
-    // Optional employment fields are NOT required for completeness
     const basicInfoComplete = firstName && lastName && email && phoneNumber &&
                              placeOfBirth && address;
 
@@ -318,11 +306,6 @@ const RegisterPage = () => {
       dateOfBirth: dateOfBirthISO,
       attendedOrientation,
       orientationCode,
-      // Optional employment fields
-      occupation: occupation || null,
-      employer: employer || null,
-      employmentAddress: employmentAddress || null,
-      employmentContactNo: employmentContactNo || null,
     });
   };
 
@@ -581,73 +564,11 @@ const RegisterPage = () => {
               onBlur={() => validatePhoneNumber(phoneNumber)}
               style={[styles.input, phoneNumberError ? styles.errorInput : null]}
               keyboardType="phone-pad"
-              returnKeyType="next"
-              blurOnSubmit={false}
-              ref={phoneNumberInput}
-              onSubmitEditing={() => occupationInput.current?.focus()}
-            />
-            {phoneNumberError ? <Text style={styles.errorText}>{phoneNumberError}</Text> : null}
-          </View>
-
-          {/* Optional Employment Section */}
-          <View style={{ marginTop: 10, marginBottom: 6 }}>
-            <Text style={[styles.subLabel, { fontWeight: '600', color: '#334155' }]}>Employment (Optional)</Text>
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Occupation</Text>
-            <TextInput
-              placeholder="Enter Occupation"
-              value={occupation}
-              onChangeText={setOccupation}
-              style={styles.input}
-              returnKeyType="next"
-              blurOnSubmit={false}
-              ref={occupationInput}
-              onSubmitEditing={() => employerInput.current?.focus()}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Employer</Text>
-            <TextInput
-              placeholder="Enter Employer"
-              value={employer}
-              onChangeText={setEmployer}
-              style={styles.input}
-              returnKeyType="next"
-              blurOnSubmit={false}
-              ref={employerInput}
-              onSubmitEditing={() => employmentAddressInput.current?.focus()}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Address</Text>
-            <TextInput
-              placeholder="Enter Employer Address"
-              value={employmentAddress}
-              onChangeText={setEmploymentAddress}
-              style={styles.input}
-              returnKeyType="next"
-              blurOnSubmit={false}
-              ref={employmentAddressInput}
-              onSubmitEditing={() => employmentContactInput.current?.focus()}
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Contact No.</Text>
-            <TextInput
-              placeholder="Enter Employer Contact No."
-              value={employmentContactNo}
-              onChangeText={setEmploymentContactNo}
-              style={styles.input}
-              keyboardType="phone-pad"
               returnKeyType="done"
-              ref={employmentContactInput}
+              ref={phoneNumberInput}
               onSubmitEditing={() => Keyboard.dismiss()}
             />
+            {phoneNumberError ? <Text style={styles.errorText}>{phoneNumberError}</Text> : null}
           </View>
 
           <View style={styles.radioContainer}>
