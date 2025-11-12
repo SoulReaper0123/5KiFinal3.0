@@ -459,7 +459,7 @@ const ApplyLoan = () => {
           border: none;
           border-radius: 10px;
           font-size: 14px;
-          font-weight: 600;
+          fontWeight: 600;
           cursor: pointer;
           width: 100%;
           max-width: 400px;
@@ -1168,30 +1168,41 @@ const ApplyLoan = () => {
     return { uri };
   };
 
-  // Upload image to Firebase Storage
+  // UPDATED: Upload image to Firebase Storage - MATCHES CreatePasswordPage APPROACH
   const uploadImageToFirebase = async (uri, folder, memberId) => {
     try {
+      console.log(`Starting upload for ${folder}, member: ${memberId}`);
+      
       // Create a unique filename with timestamp and user ID to avoid collisions
       const timestamp = new Date().getTime();
       const uniqueFilename = `${memberId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
       const fileExtension = uri.split('.').pop() || 'jpeg';
       const filename = `${uniqueFilename}.${fileExtension}`;
       
-      // Use a user-specific folder path to improve security
+      // Use a user-specific folder path to improve security - MATCHES CreatePasswordPage STRUCTURE
       const userFolder = `users/${memberId}/${folder}`;
       const imageRef = storageRef(storage, `${userFolder}/${filename}`);
       
+      console.log('Fetching image blob...');
       const response = await fetch(uri);
       const blob = await response.blob();
       
-      // Upload the image
+      console.log('Uploading to Firebase Storage...');
+      // Upload the image - SIMPLIFIED LIKE CreatePasswordPage
       await uploadBytes(imageRef, blob);
       
+      console.log('Getting download URL...');
       // Get the download URL
       const downloadURL = await getDownloadURL(imageRef);
+      console.log('Image upload successful:', downloadURL);
       return downloadURL;
     } catch (error) {
       console.error('Image upload failed:', error);
+      console.error('Error details:', {
+        code: error.code,
+        message: error.message,
+        stack: error.stack
+      });
       
       // Provide more specific error messages based on the error type
       if (error.code === 'storage/unauthorized') {
@@ -1200,6 +1211,8 @@ const ApplyLoan = () => {
         throw new Error('Upload was canceled');
       } else if (error.code === 'storage/unknown') {
         throw new Error('An unknown error occurred during upload');
+      } else if (error.code === 'storage/retry-limit-exceeded') {
+        throw new Error('Upload failed due to network issues. Please check your connection and try again.');
       } else {
         throw new Error('Failed to upload image: ' + error.message);
       }
@@ -1673,6 +1686,7 @@ const ApplyLoan = () => {
     }
   };
 
+  // UPDATED: Submit loan application with improved image upload handling
   const submitLoanApplication = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
@@ -1685,15 +1699,16 @@ const ApplyLoan = () => {
       if (requiresCollateral && proofOfCollateral.length > 0) {
         try {
           setIsUploadingImage(true);
-          console.log('Uploading collateral images to Firebase Storage...');
+          console.log('Starting collateral image uploads...');
           
-          // Upload all images in parallel
+          // UPDATED: Use Promise.all for parallel uploads like CreatePasswordPage
           const uploadPromises = proofOfCollateral.map((imageUri, index) => 
             uploadImageToFirebase(imageUri, 'collateral_proofs', memberId)
           );
           
+          console.log('Waiting for all image uploads to complete...');
           proofOfCollateralUrls = await Promise.all(uploadPromises);
-          console.log('Collateral images uploaded successfully:', proofOfCollateralUrls);
+          console.log('All collateral images uploaded successfully:', proofOfCollateralUrls);
           setIsUploadingImage(false);
         } catch (uploadError) {
           console.error('Failed to upload collateral images:', uploadError);
