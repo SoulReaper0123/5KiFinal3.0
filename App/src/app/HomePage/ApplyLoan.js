@@ -107,6 +107,7 @@ const ApplyLoan = () => {
 
   const accountNumberInput = useRef(null);
   const scrollViewRef = useRef(null);
+  const collateralModalScrollRef = useRef(null);
 
   // Per-loan-type interest rates from System Settings
   // Structure: { [loanType]: { [termMonths]: ratePercent } }
@@ -1921,6 +1922,20 @@ const ApplyLoan = () => {
     </Text>
   );
 
+  // Fix for collateral modal closing and scrolling issue
+  const handleSaveCollateral = () => {
+    if (isCollateralValid()) {
+      setRequiresCollateral(true);
+      setShowCollateralModal(false);
+      // Use setTimeout to ensure the modal is fully closed before showing alert
+      setTimeout(() => {
+        setAlertMessage('Collateral details saved successfully!');
+        setAlertType('success');
+        setAlertModalVisible(true);
+      }, 100);
+    }
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1932,6 +1947,7 @@ const ApplyLoan = () => {
         showsVerticalScrollIndicator={true}
         bounces={true}
         alwaysBounceVertical={true}
+        keyboardShouldPersistTaps="handled"
       >
         {/* Header with centered title and left back button using invisible spacers */}
         <View style={styles.headerRow}>
@@ -2136,9 +2152,12 @@ const ApplyLoan = () => {
       >
         <View style={styles.modalContainer}>
           <ScrollView 
+            ref={collateralModalScrollRef}
             style={styles.collateralScreen}
             contentContainerStyle={styles.collateralScreenContent}
             showsVerticalScrollIndicator={true}
+            bounces={true}
+            keyboardShouldPersistTaps="handled"
           >
             <View style={styles.headerRow}>
               <TouchableOpacity style={styles.headerSide} onPress={() => setShowCollateralModal(false)}>
@@ -2227,15 +2246,7 @@ const ApplyLoan = () => {
               <View style={{ marginTop: 20, gap: 12 }}>
                 <TouchableOpacity 
                   style={[styles.submitButton, !isCollateralValid() && styles.disabledButton]}
-                  onPress={() => {
-                    if (isCollateralValid()) {
-                      setRequiresCollateral(true);
-                      setShowCollateralModal(false);
-                      setAlertMessage('Collateral details saved successfully!');
-                      setAlertType('success');
-                      setAlertModalVisible(true);
-                    }
-                  }}
+                  onPress={handleSaveCollateral}
                   disabled={!isCollateralValid()}
                 >
                   <Text style={styles.submitButtonText}>Save Collateral Details</Text>
@@ -2632,6 +2643,7 @@ const styles = StyleSheet.create({
   collateralScreenContent: {
     flexGrow: 1,
     padding: 16,
+    paddingBottom: 32,
   },
   modalText: {
     marginTop: 15,
