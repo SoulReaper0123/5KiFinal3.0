@@ -106,6 +106,7 @@ const ApplyLoan = () => {
   const [browserInfo, setBrowserInfo] = useState({});
 
   const accountNumberInput = useRef(null);
+  const scrollViewRef = useRef(null);
 
   // Per-loan-type interest rates from System Settings
   // Structure: { [loanType]: { [termMonths]: ratePercent } }
@@ -1922,193 +1923,223 @@ const ApplyLoan = () => {
 
   return (
     <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      style={styles.keyboardAvoidingView}
+    >
+      <ScrollView 
+        ref={scrollViewRef}
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={true}
+        bounces={true}
+        alwaysBounceVertical={true}
       >
-    <ScrollView contentContainerStyle={styles.container}>
-      {/* Header with centered title and left back button using invisible spacers */}
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Apply Loan</Text>
-        <View style={styles.headerSide} />
-      </View>
-
-      <View style={styles.content}>
-        {/* Investment only */}
-        <Text style={styles.label}>Investment Limit</Text>
-        <Text style={styles.balanceText}>{formatCurrency(investment)}</Text>
-
-        <Text style={styles.label}><RequiredField>Loan Type</RequiredField></Text>
-        <ModalSelector
-          data={loanTypeOptions}
-          initValue="Select Loan Type"
-          onChange={handleLoanTypeChange}
-          style={styles.picker}
-          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-          overlayStyle={{ justifyContent: 'flex-end' }}
-        >
-          <TouchableOpacity style={styles.pickerContainer}>
-            <Text style={styles.pickerText}>{loanType}</Text>
-            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+        {/* Header with centered title and left back button using invisible spacers */}
+        <View style={styles.headerRow}>
+          <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
           </TouchableOpacity>
-        </ModalSelector>
+          <Text style={styles.headerTitle}>Apply Loan</Text>
+          <View style={styles.headerSide} />
+        </View>
 
-        <Text style={styles.label}><RequiredField>Loan Amount</RequiredField></Text>
-        <TextInput
-          placeholder="Enter Loan Amount"
-          value={loanAmount}
-          onChangeText={setLoanAmount}
-          style={styles.input}
-          keyboardType="numeric"
-        />
-        
-        {/* Collateral Required Indicator */}
-        {requiresCollateral && parseFloat(loanAmount) > parseFloat(balance) && (
-          <View style={styles.collateralIndicator}>
-            <MaterialIcons name="security" size={16} color="#ff9800" />
-            <Text style={styles.collateralIndicatorText}>
-              Collateral required - Loan amount exceeds your balance
-            </Text>
-          </View>
-        )}
+        <View style={styles.content}>
+          {/* Investment only */}
+          <Text style={styles.label}>Investment Limit</Text>
+          <Text style={styles.balanceText}>{formatCurrency(investment)}</Text>
 
-        {/* Collateral Details Button */}
-        {requiresCollateral && (
-          <TouchableOpacity 
-            style={styles.collateralButton}
-            onPress={() => setShowCollateralModal(true)}
+          <Text style={styles.label}><RequiredField>Loan Type</RequiredField></Text>
+          <ModalSelector
+            data={loanTypeOptions}
+            initValue="Select Loan Type"
+            onChange={handleLoanTypeChange}
+            style={styles.picker}
+            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+            overlayStyle={{ justifyContent: 'flex-end' }}
           >
-            <MaterialIcons name="security" size={20} color="#2D5783" />
-            <Text style={styles.collateralButtonText}>
-              {collateralType ? 'Edit Collateral Details' : 'Add Collateral Details'}
-            </Text>
-            <MaterialIcons name="arrow-forward-ios" size={16} color="#2D5783" />
-          </TouchableOpacity>
-        )}
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>{loanType}</Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+            </TouchableOpacity>
+          </ModalSelector>
 
-        {/* Collateral Summary */}
-        {requiresCollateral && collateralType && (
-          <View style={styles.collateralSummary}>
-            <Text style={styles.collateralSummaryTitle}>Collateral Summary</Text>
-            <Text style={styles.collateralSummaryText}>Type: {collateralType}</Text>
-            <Text style={styles.collateralSummaryText}>Value: ₱{parseFloat(collateralValue || 0).toLocaleString()}</Text>
-            <Text style={styles.collateralSummaryText}>Description: {collateralDescription}</Text>
-            <Text style={styles.collateralSummaryText}>Images: {proofOfCollateral.length} uploaded</Text>
-          </View>
-        )}
+          <Text style={styles.label}><RequiredField>Loan Amount</RequiredField></Text>
+          <TextInput
+            placeholder="Enter Loan Amount"
+            value={loanAmount}
+            onChangeText={setLoanAmount}
+            style={styles.input}
+            keyboardType="numeric"
+          />
+          
+          {/* Collateral Required Indicator */}
+          {requiresCollateral && parseFloat(loanAmount) > parseFloat(balance) && (
+            <View style={styles.collateralIndicator}>
+              <MaterialIcons name="security" size={16} color="#ff9800" />
+              <Text style={styles.collateralIndicatorText}>
+                Collateral required - Loan amount exceeds your balance
+              </Text>
+            </View>
+          )}
 
-        <Text style={styles.label}><RequiredField>Term</RequiredField></Text>
-        <ModalSelector
-          data={availableTerms}
-          initValue="Select Loan Term"
-          onChange={handleTermChange}
-          style={styles.picker}
-          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-          overlayStyle={{ justifyContent: 'flex-end' }}
-        >
-          <TouchableOpacity style={styles.pickerContainer}>
-            <Text style={styles.pickerText}>
-              {term ? `${term} ${term === '1' ? 'Month' : 'Months'}` : 'Select Loan Term'}
-            </Text>
-            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-          </TouchableOpacity>
-        </ModalSelector>
+          {/* Collateral Details Button */}
+          {requiresCollateral && (
+            <TouchableOpacity 
+              style={styles.collateralButton}
+              onPress={() => setShowCollateralModal(true)}
+            >
+              <MaterialIcons name="security" size={20} color="#2D5783" />
+              <Text style={styles.collateralButtonText}>
+                {collateralType ? 'Edit Collateral Details' : 'Add Collateral Details'}
+              </Text>
+              <MaterialIcons name="arrow-forward-ios" size={16} color="#2D5783" />
+            </TouchableOpacity>
+          )}
 
-        <Text style={styles.label}><RequiredField>Disbursement</RequiredField></Text>
-        <ModalSelector
-          data={disbursementOptions}
-          initValue="Select Disbursement Method"
-          onChange={(option) => {
-            const key = option.key;
-            setDisbursement(key);
-            // Clear all account fields when changing disbursement method
-            setAccountName('');
-            setAccountNumber('');
-            setBankType('');
-            setCustomBankName('');
-          }}
-          style={styles.picker}
-          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-          overlayStyle={{ justifyContent: 'flex-end' }}
-        >
-          <TouchableOpacity style={styles.pickerContainer}>
-            <Text style={styles.pickerText}>
-              {disbursement || 'Select Disbursement Method'}
-            </Text>
-            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-          </TouchableOpacity>
-        </ModalSelector>
+          {/* Collateral Summary */}
+          {requiresCollateral && collateralType && (
+            <View style={styles.collateralSummary}>
+              <Text style={styles.collateralSummaryTitle}>Collateral Summary</Text>
+              <Text style={styles.collateralSummaryText}>Type: {collateralType}</Text>
+              <Text style={styles.collateralSummaryText}>Value: ₱{parseFloat(collateralValue || 0).toLocaleString()}</Text>
+              <Text style={styles.collateralSummaryText}>Description: {collateralDescription}</Text>
+              <Text style={styles.collateralSummaryText}>Images: {proofOfCollateral.length} uploaded</Text>
+            </View>
+          )}
 
-        {disbursement !== 'Cash' && (
-          <>
-            <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
-            <TextInput
-              value={accountName}
-              onChangeText={setAccountName}
-              style={styles.input}
-              placeholder="Enter account name"
-            />
+          <Text style={styles.label}><RequiredField>Term</RequiredField></Text>
+          <ModalSelector
+            data={availableTerms}
+            initValue="Select Loan Term"
+            onChange={handleTermChange}
+            style={styles.picker}
+            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+            overlayStyle={{ justifyContent: 'flex-end' }}
+          >
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>
+                {term ? `${term} ${term === '1' ? 'Month' : 'Months'}` : 'Select Loan Term'}
+              </Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+            </TouchableOpacity>
+          </ModalSelector>
 
-            <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
-            <TextInput
-              value={accountNumber}
-              onChangeText={handleAccountNumberChange}
-              style={styles.input}
-              keyboardType="numeric"
-              ref={accountNumberInput}
-              placeholder="Enter account number"
-            />
+          <Text style={styles.label}><RequiredField>Disbursement</RequiredField></Text>
+          <ModalSelector
+            data={disbursementOptions}
+            initValue="Select Disbursement Method"
+            onChange={(option) => {
+              const key = option.key;
+              setDisbursement(key);
+              // Clear all account fields when changing disbursement method
+              setAccountName('');
+              setAccountNumber('');
+              setBankType('');
+              setCustomBankName('');
+            }}
+            style={styles.picker}
+            modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+            overlayStyle={{ justifyContent: 'flex-end' }}
+          >
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>
+                {disbursement || 'Select Disbursement Method'}
+              </Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+            </TouchableOpacity>
+          </ModalSelector>
 
-            {disbursement === 'Bank' && (
+          {disbursement !== 'Cash' && (
+            <>
+              <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
+              <TextInput
+                value={accountName}
+                onChangeText={setAccountName}
+                style={styles.input}
+                placeholder="Enter account name"
+              />
+
+              <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
+              <TextInput
+                value={accountNumber}
+                onChangeText={handleAccountNumberChange}
+                style={styles.input}
+                keyboardType="numeric"
+                ref={accountNumberInput}
+                placeholder="Enter account number"
+              />
+
+              {disbursement === 'Bank' && (
+                <>
+                  <Text style={styles.label}><RequiredField>Type of Bank</RequiredField></Text>
+                  <ModalSelector
+                    data={bankTypeOptions}
+                    initValue="Select Bank Type"
+                    onChange={(option) => {
+                      const key = option.key;
+                      setBankType(key);
+                      if (key !== 'Others') {
+                        setCustomBankName('');
+                      }
+                    }}
+                    style={styles.picker}
+                    modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+                    overlayStyle={{ justifyContent: 'flex-end' }}
+                  >
+                    <TouchableOpacity style={styles.pickerContainer}>
+                      <Text style={styles.pickerText}>
+                        {bankType === 'Others' && customBankName ? `Others: ${customBankName}` : (bankType || 'Select Bank Type')}
+                      </Text>
+                      <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+                    </TouchableOpacity>
+                  </ModalSelector>
+
+                  {bankType === 'Others' && (
+                    <View style={{ marginTop: 8 }}>
+                      <TextInput
+                        placeholder="Please specify the bank name"
+                        value={customBankName}
+                        onChangeText={setCustomBankName}
+                        style={styles.input}
+                      />
+                    </View>
+                  )}
+                </>
+              )}
+            </>
+          )}
+
+          <TouchableOpacity 
+            style={[styles.submitButton, (!isFormValid() || isLoading) && styles.disabledButton]} 
+            onPress={handleSubmit}
+            disabled={!isFormValid() || isLoading}
+          >
+            {isLoading ? (
               <>
-                <Text style={styles.label}><RequiredField>Type of Bank</RequiredField></Text>
-                <ModalSelector
-                  data={bankTypeOptions}
-                  initValue="Select Bank Type"
-                  onChange={(option) => {
-                    const key = option.key;
-                    setBankType(key);
-                    if (key !== 'Others') {
-                      setCustomBankName('');
-                    }
-                  }}
-                  style={styles.picker}
-                  modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-                  overlayStyle={{ justifyContent: 'flex-end' }}
-                >
-                  <TouchableOpacity style={styles.pickerContainer}>
-                    <Text style={styles.pickerText}>
-                      {bankType === 'Others' && customBankName ? `Others: ${customBankName}` : (bankType || 'Select Bank Type')}
-                    </Text>
-                    <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-                  </TouchableOpacity>
-                </ModalSelector>
-
-                {bankType === 'Others' && (
-                  <View style={{ marginTop: 8 }}>
-                    <TextInput
-                      placeholder="Please specify the bank name"
-                      value={customBankName}
-                      onChangeText={setCustomBankName}
-                      style={styles.input}
-                    />
-                  </View>
-                )}
+                <ActivityIndicator size="small" color="#000" />
+                <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
+                  {isUploadingImage ? 'Uploading Images...' : 'Submitting...'}
+                </Text>
               </>
+            ) : (
+              <Text style={styles.submitButtonText}>Submit</Text>
             )}
-          </>
-        )}
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
-        {/* Collateral Modal */}
-        <Modal
-          visible={showCollateralModal}
-          animationType="slide"
-          transparent={false}
-          onRequestClose={() => setShowCollateralModal(false)}
-        >
-          <ScrollView style={styles.collateralScreen}>
+      {/* Collateral Modal */}
+      <Modal
+        visible={showCollateralModal}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setShowCollateralModal(false)}
+      >
+        <View style={styles.modalContainer}>
+          <ScrollView 
+            style={styles.collateralScreen}
+            contentContainerStyle={styles.collateralScreenContent}
+            showsVerticalScrollIndicator={true}
+          >
             <View style={styles.headerRow}>
               <TouchableOpacity style={styles.headerSide} onPress={() => setShowCollateralModal(false)}>
                 <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
@@ -2219,26 +2250,8 @@ const ApplyLoan = () => {
               </View>
             </View>
           </ScrollView>
-        </Modal>
-
-        <TouchableOpacity 
-          style={[styles.submitButton, (!isFormValid() || isLoading) && styles.disabledButton]} 
-          onPress={handleSubmit}
-          disabled={!isFormValid() || isLoading}
-        >
-          {isLoading ? (
-            <>
-              <ActivityIndicator size="small" color="#000" />
-              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
-                {isUploadingImage ? 'Uploading Images...' : 'Submitting...'}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.submitButtonText}>Submit</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-      </ScrollView>
+        </View>
+      </Modal>
 
       {/* Source Selection Modal */}
       <Modal
@@ -2439,9 +2452,12 @@ const ApplyLoan = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
+  keyboardAvoidingView: {
+    flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     padding: 16,
     paddingBottom: 32,
   },
@@ -2608,9 +2624,14 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+    backgroundColor: '#F8FAFC',
+  },
+  collateralScreen: {
+    flex: 1,
+  },
+  collateralScreenContent: {
+    flexGrow: 1,
+    padding: 16,
   },
   modalText: {
     marginTop: 15,
@@ -2675,12 +2696,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 2,
     marginBottom: 10,
-  },
-  // Collateral screen container using same card layout as ApplyLoan form
-  collateralScreen: {
-    flex: 1,
-    backgroundColor: '#F8FAFC',
-    padding: 16,
   },
   descriptionHint: {
     fontSize: 14,
