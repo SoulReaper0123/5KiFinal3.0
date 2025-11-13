@@ -11,9 +11,8 @@ import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import * as ImagePicker from 'expo-image-picker';
-import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ref as dbRef, get, set } from 'firebase/database';
-import { storage, database, auth } from '../../firebaseConfig';
+import { ref as dbRef, get } from 'firebase/database';
+import { database, auth, uploadImageToFirebaseWithRetry, writeToDatabaseWithRetry } from '../../firebaseConfig';
 import { MemberDeposit } from '../../api';
 
 const Deposit = () => {
@@ -210,33 +209,9 @@ const Deposit = () => {
     setAccountName(selectedAccount?.accountName || '');
   };
 
-  // FIXED: Upload image to Firebase Storage - SIMPLIFIED AND WORKING
+  // FIXED: Upload image to Firebase Storage with retry logic
   const uploadImageToFirebase = async (uri, folder, userId) => {
-    try {
-      console.log(`Starting upload for ${folder}, user: ${userId}`);
-      
-      const timestamp = new Date().getTime();
-      const uniqueFilename = `${userId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
-      const fileExtension = uri.split('.').pop() || 'jpg';
-      const filename = `${uniqueFilename}.${fileExtension}`;
-      
-      const imageRef = storageRef(storage, `users/${userId}/${folder}/${filename}`);
-      
-      console.log('Fetching image blob...');
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      console.log('Uploading to Firebase Storage...');
-      await uploadBytes(imageRef, blob);
-      
-      console.log('Getting download URL...');
-      const downloadURL = await getDownloadURL(imageRef);
-      console.log('Image upload successful');
-      return downloadURL;
-    } catch (error) {
-      console.error('Image upload failed:', error);
-      throw new Error('Failed to upload image: ' + error.message);
-    }
+    return await uploadImageToFirebaseWithRetry(uri, folder, userId, 3);
   };
 
   // IMAGE HANDLING FUNCTIONS
@@ -1196,14 +1171,13 @@ const Deposit = () => {
     return { uri };
   };
 
+  // FIXED: Store deposit data with retry logic
   const storeDepositDataInDatabase = async (proofOfDepositUrl, transactionId = null) => {
     try {
       const txnId = transactionId || generateTransactionId();
       
-      const newDepositRef = dbRef(database, `Deposits/DepositApplications/${memberId}/${txnId}`);
-  
       const depositAmount = parseFloat(amountToBeDeposited);
-  
+
       const currentDate = new Date();
       const formattedDate = currentDate.toLocaleString('en-US', {
         year: 'numeric',
@@ -1227,10 +1201,11 @@ const Deposit = () => {
         status: 'pending',
       };
       
-      await set(newDepositRef, depositData);
+      const depositRefPath = `Deposits/DepositApplications/${memberId}/${txnId}`;
+      await writeToDatabaseWithRetry(depositRefPath, depositData);
 
-      const txnRef = dbRef(database, `Transactions/Deposits/${memberId}/${txnId}`);
-      await set(txnRef, {
+      const txnRefPath = `Transactions/Deposits/${memberId}/${txnId}`;
+      await writeToDatabaseWithRetry(txnRefPath, {
         ...depositData,
         amountToBeDeposited: parseFloat(depositAmount).toFixed(2),
         label: 'Deposit',
@@ -1240,9 +1215,7 @@ const Deposit = () => {
       return txnId;
     } catch (error) {
       console.error('Failed to store deposit data in Realtime Database:', error);
-      
       setErrorMessage('Failed to store deposit data: ' + (error.message || 'Unknown error'));
-      
       throw error;
     }
   };
