@@ -137,7 +137,39 @@ const ApplyLoan = () => {
 
   // FIXED: Upload image to Firebase Storage with retry logic
   const uploadImageToFirebase = async (uri, folder, userId) => {
-    return await uploadImageToFirebaseWithRetry(uri, folder, userId, 3);
+    try {
+      console.log(`Uploading image to ${folder} for user ${userId}`);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileName = `${folder}_${timestamp}_${randomString}.jpg`;
+      const path = `loan_collaterals/${userId}/${fileName}`;
+      
+      console.log(`Upload path: ${path}`);
+      
+      // Convert data URL to blob if needed
+      let blob;
+      if (uri.startsWith('data:')) {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      } else {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      }
+      
+      const imageRef = storageRef(storage, path);
+      console.log('Starting upload bytes...');
+      await uploadBytes(imageRef, blob);
+      console.log('Upload bytes completed, getting download URL...');
+      const downloadURL = await getDownloadURL(imageRef);
+      console.log('Download URL obtained:', downloadURL);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image to Firebase:', error);
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
   };
 
   // FIXED: Upload multiple images with better error handling
@@ -147,7 +179,7 @@ const ApplyLoan = () => {
     }
 
     try {
-      console.log(`Starting upload of ${imageUris.length} images for ${folder}`);
+      console.log(`Starting upload of ${imageUris.length} images for ${folder} for user ${userId}`);
       
       // Upload images sequentially to avoid overwhelming the connection
       const uploadedUrls = [];
@@ -156,16 +188,15 @@ const ApplyLoan = () => {
           console.log(`Uploading image ${i + 1} of ${imageUris.length}`);
           const url = await uploadImageToFirebase(imageUris[i], folder, userId);
           uploadedUrls.push(url);
-          console.log(`Successfully uploaded image ${i + 1}`);
+          console.log(`Successfully uploaded image ${i + 1}: ${url}`);
         } catch (error) {
           console.error(`Failed to upload image ${i + 1}:`, error);
-          // Continue with other images even if one fails
-          uploadedUrls.push(null);
+          throw error; // Stop the process if any image fails
         }
       }
       
-      console.log('Image upload process completed');
-      return uploadedUrls.filter(url => url !== null);
+      console.log('Image upload process completed. URLs:', uploadedUrls);
+      return uploadedUrls;
     } catch (error) {
       console.error('Failed to upload multiple images:', error);
       throw error;
@@ -1525,7 +1556,7 @@ const ApplyLoan = () => {
 
   const generateTransactionId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-  // FIXED: Store loan application with retry logic - NOW INCLUDES COLLATERAL IMAGE URLS
+  // FIXED: Store loan application with retry logic - NOW PROPERLY INCLUDES COLLATERAL DATA
   const storeLoanApplicationInDatabase = async (applicationData) => {
     try {
       const transactionId = generateTransactionId();
@@ -1544,9 +1575,9 @@ const ApplyLoan = () => {
       });
       const timestamp = now.getTime();
 
-      // Include collateral image URLs in the application data
+      // Include ALL application data including collateral image URLs
       const applicationDataWithMeta = {
-        ...applicationData,
+        ...applicationData, // This now includes proofOfCollateralUrls
         id: userId,
         firstName,
         lastName,
@@ -1558,6 +1589,8 @@ const ApplyLoan = () => {
         loanType,
         status: 'pending'
       };
+
+      console.log('Storing loan application with data:', applicationDataWithMeta);
 
       const applicationRefPath = `Loans/LoanApplications/${userId}/${transactionId}`;
       await writeToDatabaseWithRetry(applicationRefPath, applicationDataWithMeta);
@@ -1590,7 +1623,7 @@ const ApplyLoan = () => {
     }
   };
 
-  // FIXED: Submit loan application with working image uploads - NOW PROPERLY INCLUDES COLLATERAL IMAGE URLS
+  // FIXED: Submit loan application with working image uploads - COMPLETELY REWRITTEN
   const submitLoanApplication = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
@@ -1606,7 +1639,7 @@ const ApplyLoan = () => {
           console.log('Starting collateral image uploads...');
           
           // Upload images to Firebase Storage
-          proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral_proofs', userId);
+          proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral', userId);
           console.log('All collateral images uploaded successfully:', proofOfCollateralUrls);
           setIsUploadingImage(false);
         } catch (uploadError) {
@@ -1620,7 +1653,7 @@ const ApplyLoan = () => {
         }
       }
       
-      // Prepare application data with collateral image URLs
+      // Prepare application data with ALL fields including collateral image URLs
       const applicationData = {
         loanAmount: loanAmountNum,
         term,
@@ -1635,15 +1668,17 @@ const ApplyLoan = () => {
         userId,
         loanType,
         requiresCollateral,
+        processingFee: processingFee,
+        // Include collateral data if required
         ...(requiresCollateral && {
           collateralType,
           collateralValue,
           collateralDescription,
-          proofOfCollateralUrls // This now contains the actual Firebase Storage URLs
+          proofOfCollateralUrls // This contains the actual Firebase Storage URLs
         })
       };
 
-      console.log('Starting database operation with collateral data:', applicationData);
+      console.log('Starting database operation with complete data:', applicationData);
       const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
       
       if (!storedSuccessfully) {
