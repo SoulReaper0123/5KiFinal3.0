@@ -23,7 +23,7 @@ import ModalSelector from 'react-native-modal-selector';
 import * as ImagePicker from 'expo-image-picker';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { ref as dbRef, get, set } from 'firebase/database';
-import { storage, database, auth } from '../../firebaseConfig';
+import { storage, database, auth, uploadImageToFirebaseWithRetry, writeToDatabaseWithRetry } from '../../firebaseConfig';
 import { MemberLoan } from '../../api';
 
 // Safely extract an error message without assuming shape
@@ -135,55 +135,37 @@ const ApplyLoan = () => {
     { key: 'Other', label: 'Other' },
   ];
 
-  // FIXED: Upload image to Firebase Storage - SIMPLIFIED AND WORKING
+  // FIXED: Upload image to Firebase Storage with retry logic
   const uploadImageToFirebase = async (uri, folder, userId) => {
-    try {
-      console.log(`Starting upload for ${folder}, user: ${userId}`);
-      
-      // Create a unique filename
-      const timestamp = new Date().getTime();
-      const uniqueFilename = `${userId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
-      const fileExtension = uri.split('.').pop() || 'jpg';
-      const filename = `${uniqueFilename}.${fileExtension}`;
-      
-      // Use user-specific folder path
-      const imageRef = storageRef(storage, `users/${userId}/${folder}/${filename}`);
-      
-      console.log('Fetching image blob...');
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      console.log('Uploading to Firebase Storage...');
-      await uploadBytes(imageRef, blob);
-      
-      console.log('Getting download URL...');
-      const downloadURL = await getDownloadURL(imageRef);
-      console.log('Image upload successful');
-      return downloadURL;
-    } catch (error) {
-      console.error('Image upload failed:', error);
-      throw new Error('Failed to upload image: ' + error.message);
-    }
+    return await uploadImageToFirebaseWithRetry(uri, folder, userId, 3);
   };
 
-  // FIXED: Upload multiple images in parallel
+  // FIXED: Upload multiple images with better error handling
   const uploadMultipleImages = async (imageUris, folder, userId) => {
     if (!imageUris || imageUris.length === 0) {
       return [];
     }
 
     try {
-      console.log(`Starting parallel upload of ${imageUris.length} images for ${folder}`);
+      console.log(`Starting upload of ${imageUris.length} images for ${folder}`);
       
-      const uploadPromises = imageUris.map((imageUri, index) => 
-        uploadImageToFirebase(imageUri, folder, userId)
-      );
+      // Upload images sequentially to avoid overwhelming the connection
+      const uploadedUrls = [];
+      for (let i = 0; i < imageUris.length; i++) {
+        try {
+          console.log(`Uploading image ${i + 1} of ${imageUris.length}`);
+          const url = await uploadImageToFirebase(imageUris[i], folder, userId);
+          uploadedUrls.push(url);
+          console.log(`Successfully uploaded image ${i + 1}`);
+        } catch (error) {
+          console.error(`Failed to upload image ${i + 1}:`, error);
+          // Continue with other images even if one fails
+          uploadedUrls.push(null);
+        }
+      }
       
-      console.log('Waiting for all image uploads to complete...');
-      const uploadedUrls = await Promise.all(uploadPromises);
-      console.log('All images uploaded successfully');
-      
-      return uploadedUrls;
+      console.log('Image upload process completed');
+      return uploadedUrls.filter(url => url !== null);
     } catch (error) {
       console.error('Failed to upload multiple images:', error);
       throw error;
@@ -1543,6 +1525,7 @@ const ApplyLoan = () => {
 
   const generateTransactionId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
+  // FIXED: Store loan application with retry logic
   const storeLoanApplicationInDatabase = async (applicationData) => {
     try {
       const transactionId = generateTransactionId();
@@ -1575,11 +1558,15 @@ const ApplyLoan = () => {
         status: 'pending'
       };
 
-      const applicationRef = dbRef(database, `Loans/LoanApplications/${userId}/${transactionId}`);
-      await set(applicationRef, applicationDataWithMeta);
+      const applicationRefPath = `Loans/LoanApplications/${userId}/${transactionId}`;
+      await writeToDatabaseWithRetry(applicationRefPath, applicationDataWithMeta);
 
-      const txnRef = dbRef(database, `Transactions/Loans/${userId}/${transactionId}`);
-      await set(txnRef, { ...applicationDataWithMeta, label: 'Loan', type: 'Loans' });
+      const txnRefPath = `Transactions/Loans/${userId}/${transactionId}`;
+      await writeToDatabaseWithRetry(txnRefPath, { 
+        ...applicationDataWithMeta, 
+        label: 'Loan', 
+        type: 'Loans' 
+      });
 
       return true;
     } catch (error) {
