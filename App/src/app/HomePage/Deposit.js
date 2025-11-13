@@ -12,7 +12,8 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import * as ImagePicker from 'expo-image-picker';
 import { ref as dbRef, get } from 'firebase/database';
-import { database, auth, uploadImageToFirebaseWithRetry, writeToDatabaseWithRetry } from '../../firebaseConfig';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { database, storage, auth, writeToDatabaseWithRetry } from '../../firebaseConfig';
 import { MemberDeposit } from '../../api';
 
 const Deposit = () => {
@@ -29,6 +30,7 @@ const Deposit = () => {
   const [balance, setBalance] = useState(0);
   const [memberId, setMemberId] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -209,9 +211,41 @@ const Deposit = () => {
     setAccountName(selectedAccount?.accountName || '');
   };
 
-  // FIXED: Upload image to Firebase Storage with retry logic
+  // FIXED: Fast image upload to Firebase Storage
   const uploadImageToFirebase = async (uri, folder, userId) => {
-    return await uploadImageToFirebaseWithRetry(uri, folder, userId, 3);
+    try {
+      console.log(`Uploading image to ${folder} for user ${userId}`);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileName = `${folder}_${timestamp}_${randomString}.jpg`;
+      const path = `deposit_proofs/${userId}/${fileName}`;
+      
+      console.log(`Upload path: ${path}`);
+      
+      // Convert data URL to blob if needed
+      let blob;
+      if (uri.startsWith('data:')) {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      } else {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      }
+      
+      const imageRef = storageRef(storage, path);
+      console.log('Starting upload bytes...');
+      await uploadBytes(imageRef, blob);
+      console.log('Upload bytes completed, getting download URL...');
+      const downloadURL = await getDownloadURL(imageRef);
+      console.log('Download URL obtained:', downloadURL);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image to Firebase:', error);
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
   };
 
   // IMAGE HANDLING FUNCTIONS
@@ -1171,7 +1205,7 @@ const Deposit = () => {
     return { uri };
   };
 
-  // FIXED: Store deposit data with retry logic
+  // FIXED: Store deposit data with retry logic - NOW INCLUDES PROOF OF DEPOSIT URL
   const storeDepositDataInDatabase = async (proofOfDepositUrl, transactionId = null) => {
     try {
       const txnId = transactionId || generateTransactionId();
@@ -1195,12 +1229,14 @@ const Deposit = () => {
         depositOption,
         accountNumber,
         amountToBeDeposited: depositAmount,
-        proofOfDepositUrl,
+        proofOfDepositUrl, // This now contains the actual Firebase Storage URL
         dateApplied: formattedDate,
         timestamp: currentDate.getTime(),
         status: 'pending',
       };
       
+      console.log('Storing deposit data with proof URL:', depositData);
+
       const depositRefPath = `Deposits/DepositApplications/${memberId}/${txnId}`;
       await writeToDatabaseWithRetry(depositRefPath, depositData);
 
@@ -1245,6 +1281,7 @@ const Deposit = () => {
     setConfirmModalVisible(true);
   };
   
+  // FIXED: Submit deposit with optimized image upload
   const submitDeposit = async () => {
     setLoading(true);
     setConfirmModalVisible(false);
@@ -1253,10 +1290,25 @@ const Deposit = () => {
       const transactionId = generateTransactionId();
 
       let proofOfDepositUrl = null;
-      if (depositOption !== 'Cash') {
-        proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs', memberId);
+      if (depositOption !== 'Cash' && proofOfDeposit) {
+        try {
+          setIsUploadingImage(true);
+          console.log('Starting proof of deposit image upload...');
+          proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit', memberId);
+          console.log('Proof of deposit image uploaded successfully:', proofOfDepositUrl);
+          setIsUploadingImage(false);
+        } catch (uploadError) {
+          console.error('Failed to upload proof of deposit:', uploadError);
+          setIsUploadingImage(false);
+          setAlertMessage(uploadError.message || 'Failed to upload proof of deposit image. Please try again.');
+          setAlertType('error');
+          setAlertModalVisible(true);
+          setLoading(false);
+          return;
+        }
       }
 
+      console.log('Storing deposit data with transaction ID:', transactionId);
       await storeDepositDataInDatabase(proofOfDepositUrl, transactionId);
 
       const depositData = {
@@ -1428,7 +1480,16 @@ const Deposit = () => {
             loading
           }
         >
-          <Text style={styles.submitButtonText}>Submit</Text>
+          {loading ? (
+            <>
+              <ActivityIndicator size="small" color="#000" />
+              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
+                {isUploadingImage ? 'Uploading Image...' : 'Submitting...'}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.submitButtonText}>Submit</Text>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -1437,7 +1498,9 @@ const Deposit = () => {
         <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#4FE7AF" />
-            <Text style={styles.loadingText}>Processing...</Text>
+            <Text style={styles.loadingText}>
+              {isUploadingImage ? 'Uploading Image...' : 'Processing...'}
+            </Text>
           </View>
         </View>
       </Modal>
@@ -1721,6 +1784,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
     marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'center',
   },
   disabledButton: {
     backgroundColor: '#94A3B8',
