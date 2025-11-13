@@ -1,7 +1,7 @@
 import firebase from "firebase/compat/app";
 import "firebase/compat/storage";
-import "firebase/compat/database"; // Import the database module
-import "firebase/compat/auth"; // Import the auth module
+import "firebase/compat/database";
+import "firebase/compat/auth";
 
 // For Firebase AI (Vertex AI) - using v9 modular
 import { initializeApp } from 'firebase/app';
@@ -18,15 +18,48 @@ const firebaseConfig = {
     measurementId: "G-FNCX3QBYWB"
 };
 
-// Initialize Firebase v8 compat (for existing code)
-if (!firebase.apps.length) {
-    firebase.initializeApp(firebaseConfig);
-}
+// Initialize Firebase v8 compat (for existing code) with enhanced settings
+let storage, database, auth;
 
-// Initialize Firebase Storage and Realtime Database (v8 compat)
-const storage = firebase.storage();
-const database = firebase.database();
-const auth = firebase.auth();
+try {
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+
+    // Configure Firebase with optimized settings for serverless environments
+    const app = firebase.app();
+    
+    // Initialize Firebase Storage with optimized settings
+    storage = firebase.storage();
+    
+    // Set storage timeout and retry settings
+    storage.setMaxUploadRetryTime(30000); // 30 seconds
+    storage.setMaxOperationRetryTime(30000); // 30 seconds
+    
+    // Initialize Realtime Database with optimized settings
+    database = firebase.database();
+    
+    // Configure database for better performance
+    database.setLogLevel(firebase.database.LogLevel.WARN);
+    
+    // Initialize Auth
+    auth = firebase.auth();
+    
+    // Configure auth settings
+    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    
+    console.log('Firebase v8 compat initialized successfully');
+
+} catch (error) {
+    console.error('Error initializing Firebase v8 compat:', error);
+    // Fallback initialization
+    if (!firebase.apps.length) {
+        firebase.initializeApp(firebaseConfig);
+    }
+    storage = firebase.storage();
+    database = firebase.database();
+    auth = firebase.auth();
+}
 
 // Initialize Firebase v9 modular (for AI services)
 let app, vertexAI, aiModel;
@@ -50,4 +83,172 @@ try {
     aiModel = null;
 }
 
-export { auth, storage, database, app, vertexAI, aiModel };
+// Enhanced upload function with better timeout handling
+const uploadImageToFirebaseWithRetry = async (uri, folder, userId, maxRetries = 3) => {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Upload attempt ${attempt} for ${folder}, user: ${userId}`);
+            
+            // Create a unique filename
+            const timestamp = new Date().getTime();
+            const uniqueFilename = `${userId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+            const fileExtension = uri.split('.').pop() || 'jpg';
+            const filename = `${uniqueFilename}.${fileExtension}`;
+            
+            // Use user-specific folder path
+            const imageRef = storage.ref(`users/${userId}/${folder}/${filename}`);
+            
+            console.log('Fetching image blob...');
+            
+            // Fetch with timeout
+            const fetchPromise = fetch(uri);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Fetch timeout')), 15000)
+            );
+            
+            const response = await Promise.race([fetchPromise, timeoutPromise]);
+            const blob = await response.blob();
+            
+            console.log('Uploading to Firebase Storage...');
+            
+            // Upload with timeout
+            const uploadTask = imageRef.put(blob);
+            
+            const uploadPromise = new Promise((resolve, reject) => {
+                uploadTask.on(
+                    'state_changed',
+                    null,
+                    (error) => reject(error),
+                    () => resolve()
+                );
+            });
+            
+            const uploadTimeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Upload timeout')), 30000)
+            );
+            
+            await Promise.race([uploadPromise, uploadTimeoutPromise]);
+            
+            console.log('Getting download URL...');
+            
+            // Get download URL with timeout
+            const urlPromise = uploadTask.snapshot.ref.getDownloadURL();
+            const urlTimeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('URL fetch timeout')), 15000)
+            );
+            
+            const downloadURL = await Promise.race([urlPromise, urlTimeoutPromise]);
+            
+            console.log('Image upload successful');
+            return downloadURL;
+            
+        } catch (error) {
+            lastError = error;
+            console.error(`Upload attempt ${attempt} failed:`, error);
+            
+            if (attempt < maxRetries) {
+                // Wait before retry (exponential backoff)
+                const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+                console.log(`Waiting ${delay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    throw new Error(`All upload attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
+};
+
+// Enhanced database write function
+const writeToDatabaseWithRetry = async (refPath, data, maxRetries = 3) => {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`Database write attempt ${attempt} for path: ${refPath}`);
+            
+            const ref = database.ref(refPath);
+            
+            const writePromise = ref.set(data);
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Database write timeout')), 15000)
+            );
+            
+            await Promise.race([writePromise, timeoutPromise]);
+            
+            console.log('Database write successful');
+            return;
+            
+        } catch (error) {
+            lastError = error;
+            console.error(`Database write attempt ${attempt} failed:`, error);
+            
+            if (attempt < maxRetries) {
+                const delay = Math.min(1000 * Math.pow(2, attempt), 10000);
+                console.log(`Waiting ${delay}ms before retry...`);
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+    }
+    
+    throw new Error(`All database write attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
+};
+
+// Health check function
+const checkFirebaseHealth = async () => {
+    try {
+        // Test database connection
+        const testRef = database.ref('.info/connected');
+        const testPromise = new Promise((resolve) => {
+            const callback = testRef.on('value', (snapshot) => {
+                if (snapshot.val() === true) {
+                    testRef.off('value', callback);
+                    resolve(true);
+                }
+            });
+            
+            // Timeout after 10 seconds
+            setTimeout(() => {
+                testRef.off('value', callback);
+                resolve(false);
+            }, 10000);
+        });
+        
+        const dbConnected = await testPromise;
+        
+        // Test storage connection (simple operation)
+        const storageRef = storage.ref('health-check.txt');
+        await storageRef.putString('health-check', 'raw');
+        await storageRef.delete();
+        
+        return {
+            database: dbConnected,
+            storage: true,
+            auth: true,
+            timestamp: new Date().toISOString()
+        };
+        
+    } catch (error) {
+        console.error('Firebase health check failed:', error);
+        return {
+            database: false,
+            storage: false,
+            auth: false,
+            error: error.message,
+            timestamp: new Date().toISOString()
+        };
+    }
+};
+
+export { 
+    auth, 
+    storage, 
+    database, 
+    app, 
+    vertexAI, 
+    aiModel,
+    uploadImageToFirebaseWithRetry,
+    writeToDatabaseWithRetry,
+    checkFirebaseHealth
+};
