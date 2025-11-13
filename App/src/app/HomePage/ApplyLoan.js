@@ -93,7 +93,7 @@ const ApplyLoan = () => {
   // Track member investment only (pending applications not shown)
   const [investment, setInvestment] = useState(0);
 
-  // IMAGE HANDLING STATES (same as Deposit page)
+  // IMAGE HANDLING STATES
   const [showSourceOptions, setShowSourceOptions] = useState(false);
   const [showCropOptions, setShowCropOptions] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
@@ -110,7 +110,6 @@ const ApplyLoan = () => {
   const collateralModalScrollRef = useRef(null);
 
   // Per-loan-type interest rates from System Settings
-  // Structure: { [loanType]: { [termMonths]: ratePercent } }
   const [interestRatesByType, setInterestRatesByType] = useState({});
   const [availableTerms, setAvailableTerms] = useState([]); // [{ key, label, interestRate }]
 
@@ -136,59 +135,39 @@ const ApplyLoan = () => {
     { key: 'Other', label: 'Other' },
   ];
 
-  // OPTIMIZED: Upload image to Firebase Storage - MATCHES CreatePasswordPage APPROACH EXACTLY
-  const uploadImageToFirebase = async (uri, folder, memberId) => {
+  // FIXED: Upload image to Firebase Storage - SIMPLIFIED AND WORKING
+  const uploadImageToFirebase = async (uri, folder, userId) => {
     try {
-      console.log(`Starting upload for ${folder}, member: ${memberId}`);
+      console.log(`Starting upload for ${folder}, user: ${userId}`);
       
-      // Create a unique filename with timestamp and user ID to avoid collisions
+      // Create a unique filename
       const timestamp = new Date().getTime();
-      const uniqueFilename = `${memberId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
-      const fileExtension = uri.split('.').pop() || 'jpeg';
+      const uniqueFilename = `${userId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+      const fileExtension = uri.split('.').pop() || 'jpg';
       const filename = `${uniqueFilename}.${fileExtension}`;
       
-      // Use a user-specific folder path to improve security - MATCHES CreatePasswordPage STRUCTURE
-      const userFolder = `users/${memberId}/${folder}`;
-      const imageRef = storageRef(storage, `${userFolder}/${filename}`);
+      // Use user-specific folder path
+      const imageRef = storageRef(storage, `users/${userId}/${folder}/${filename}`);
       
       console.log('Fetching image blob...');
       const response = await fetch(uri);
       const blob = await response.blob();
       
       console.log('Uploading to Firebase Storage...');
-      // Upload the image - SIMPLIFIED LIKE CreatePasswordPage
       await uploadBytes(imageRef, blob);
       
       console.log('Getting download URL...');
-      // Get the download URL
       const downloadURL = await getDownloadURL(imageRef);
-      console.log('Image upload successful:', downloadURL);
+      console.log('Image upload successful');
       return downloadURL;
     } catch (error) {
       console.error('Image upload failed:', error);
-      console.error('Error details:', {
-        code: error.code,
-        message: error.message,
-        stack: error.stack
-      });
-      
-      // Provide more specific error messages based on the error type
-      if (error.code === 'storage/unauthorized') {
-        throw new Error('Permission denied: You do not have permission to upload images. Please contact support.');
-      } else if (error.code === 'storage/canceled') {
-        throw new Error('Upload was canceled');
-      } else if (error.code === 'storage/unknown') {
-        throw new Error('An unknown error occurred during upload');
-      } else if (error.code === 'storage/retry-limit-exceeded') {
-        throw new Error('Upload failed due to network issues. Please check your connection and try again.');
-      } else {
-        throw new Error('Failed to upload image: ' + error.message);
-      }
+      throw new Error('Failed to upload image: ' + error.message);
     }
   };
 
-  // OPTIMIZED: Upload multiple images in parallel
-  const uploadMultipleImages = async (imageUris, folder, memberId) => {
+  // FIXED: Upload multiple images in parallel
+  const uploadMultipleImages = async (imageUris, folder, userId) => {
     if (!imageUris || imageUris.length === 0) {
       return [];
     }
@@ -196,14 +175,13 @@ const ApplyLoan = () => {
     try {
       console.log(`Starting parallel upload of ${imageUris.length} images for ${folder}`);
       
-      // Use Promise.all for parallel uploads like CreatePasswordPage
       const uploadPromises = imageUris.map((imageUri, index) => 
-        uploadImageToFirebase(imageUri, folder, memberId)
+        uploadImageToFirebase(imageUri, folder, userId)
       );
       
       console.log('Waiting for all image uploads to complete...');
       const uploadedUrls = await Promise.all(uploadPromises);
-      console.log('All images uploaded successfully:', uploadedUrls);
+      console.log('All images uploaded successfully');
       
       return uploadedUrls;
     } catch (error) {
@@ -212,7 +190,7 @@ const ApplyLoan = () => {
     }
   };
 
-  // IMAGE HANDLING FUNCTIONS (same as Deposit page)
+  // IMAGE HANDLING FUNCTIONS
 
   // Show source selection options
   const showSourceSelection = (setImageFunction, imageType) => {
@@ -388,27 +366,24 @@ const ApplyLoan = () => {
         cleanup();
       };
       
-      // Add event listeners
       input.addEventListener('change', handleChange);
       input.addEventListener('cancel', handleCancel);
       
-      // Add to document and trigger click
       document.body.appendChild(input);
       
-      // Set timeout for safety
       setTimeout(() => {
         if (!resolved) {
           console.log('Gallery selection timeout');
           cleanup();
         }
-      }, 30000); // 30 second timeout
+      }, 30000);
       
       console.log('Triggering file input click');
       input.click();
     });
   };
 
-  // Web camera capture - CORRECT SELFIE ORIENTATION
+  // Web camera capture
   const handleWebCameraCapture = (imageType) => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -424,7 +399,6 @@ const ApplyLoan = () => {
         return;
       }
 
-      // Use back camera for collateral proof
       const facingMode = 'environment';
       
       navigator.mediaDevices.getUserMedia({ 
@@ -485,7 +459,6 @@ const ApplyLoan = () => {
           box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         `;
         
-        // Add camera frame/border that matches the camera size
         const cameraFrame = document.createElement('div');
         cameraFrame.style.cssText = `
           position: absolute;
@@ -537,7 +510,7 @@ const ApplyLoan = () => {
           border: none;
           border-radius: 10px;
           font-size: 14px;
-          fontWeight: 600;
+          font-weight: 600;
           cursor: pointer;
           width: 100%;
           max-width: 400px;
@@ -548,7 +521,6 @@ const ApplyLoan = () => {
         cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
         
         video.onloadedmetadata = () => {
-          // Set video to fill the container completely
           video.style.width = '100%';
           video.style.height = '100%';
           video.style.objectFit = 'cover';
@@ -557,7 +529,6 @@ const ApplyLoan = () => {
           canvas.height = video.videoHeight;
           
           captureButton.onclick = () => {
-            // For collateral proof, draw normally (back camera)
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -592,8 +563,6 @@ const ApplyLoan = () => {
         };
       }).catch((error) => {
         console.error('Camera access error:', error);
-        // If the preferred camera fails, try the other one as fallback
-        console.log('Trying fallback camera...');
         const fallbackFacingMode = 'user';
         
         navigator.mediaDevices.getUserMedia({ 
@@ -604,7 +573,6 @@ const ApplyLoan = () => {
           } 
         })
         .then((stream) => {
-          // Same camera setup code as above but with fallback camera
           const video = document.createElement('video');
           video.srcObject = stream;
           video.autoplay = true;
@@ -717,12 +685,10 @@ const ApplyLoan = () => {
           cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
           
           video.onloadedmetadata = () => {
-            // Set video to fill the container completely
             video.style.width = '100%';
             video.style.height = '100%';
             video.style.objectFit = 'cover';
             
-            // For front camera preview in fallback, mirror it
             if (fallbackFacingMode === 'user') {
               video.style.transform = 'scaleX(-1)';
             }
@@ -731,15 +697,12 @@ const ApplyLoan = () => {
             canvas.height = video.videoHeight;
             
             captureButton.onclick = () => {
-              // Handle the captured image based on camera type
               if (fallbackFacingMode === 'user') {
-                // For front camera, flip the captured image
                 context.save();
                 context.scale(-1, 1);
                 context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
                 context.restore();
               } else {
-                // For back camera, draw normally
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
               }
               
@@ -785,7 +748,7 @@ const ApplyLoan = () => {
     });
   };
 
-  // Handle crop selected image - PROPERLY SET THE CROPPED IMAGE
+  // Handle crop selected image
   const handleCropSelectedImage = async () => {
     if (!selectedImageUri) return;
 
@@ -795,7 +758,6 @@ const ApplyLoan = () => {
         console.log('Cropped image result:', croppedImage ? 'Success' : 'Failed');
         
         if (croppedImage && currentSetFunction) {
-          // For multiple images, add to the array
           if (currentSetFunction === setProofOfCollateral) {
             currentSetFunction(prev => [...prev, croppedImage]);
           } else {
@@ -806,7 +768,6 @@ const ApplyLoan = () => {
           console.log('No cropped image to set');
         }
       } else {
-        // For native, use Expo's built-in cropping
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
@@ -823,7 +784,6 @@ const ApplyLoan = () => {
         }
       }
       
-      // Close crop options regardless of success
       setShowCropOptions(false);
       setSelectedImageUri(null);
       setCurrentImageType(null);
@@ -831,12 +791,11 @@ const ApplyLoan = () => {
       
     } catch (error) {
       console.error('Crop error:', error);
-      // If crop fails, just use the original image
       handleUseAsIs();
     }
   };
 
-  // INTERACTIVE CROPPER WITH PROPER LANDSCAPE SUPPORT
+  // INTERACTIVE CROPPER
   const createInteractiveCrop = (imageUri, imageType) => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -976,7 +935,6 @@ const ApplyLoan = () => {
       cancelCropButton.onmouseover = () => cancelCropButton.style.background = '#b91c1c';
       cancelCropButton.onmouseout = () => cancelCropButton.style.background = '#dc2626';
 
-      // Zoom and drag variables
       let scale = 1;
       let posX = 0;
       let posY = 0;
@@ -984,17 +942,14 @@ const ApplyLoan = () => {
       let startX, startY;
       let initialDistance = null;
 
-      // Touch event handlers for mobile
       const handleTouchStart = (e) => {
         e.preventDefault();
         if (e.touches.length === 1) {
-          // Single touch - start dragging
           isDragging = true;
           startX = e.touches[0].clientX - posX;
           startY = e.touches[0].clientY - posY;
           img.style.cursor = 'grabbing';
         } else if (e.touches.length === 2) {
-          // Two touches - start pinch to zoom
           initialDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -1006,12 +961,10 @@ const ApplyLoan = () => {
         e.preventDefault();
         
         if (isDragging && e.touches.length === 1) {
-          // Dragging
           posX = e.touches[0].clientX - startX;
           posY = e.touches[0].clientY - startY;
           updateImageTransform();
         } else if (e.touches.length === 2 && initialDistance !== null) {
-          // Pinch to zoom
           const currentDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -1029,7 +982,6 @@ const ApplyLoan = () => {
         img.style.cursor = 'grab';
       };
 
-      // Mouse event handlers for desktop
       const handleMouseDown = (e) => {
         e.preventDefault();
         isDragging = true;
@@ -1052,13 +1004,11 @@ const ApplyLoan = () => {
         img.style.cursor = 'grab';
       };
 
-      // Wheel event for zoom on desktop
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = -e.deltaY * 0.01;
         const newScale = Math.max(0.5, Math.min(3, scale + delta));
         
-        // Zoom towards mouse position
         const rect = cropArea.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -1075,18 +1025,15 @@ const ApplyLoan = () => {
         img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
       };
 
-      // Add event listeners
       img.addEventListener('mousedown', handleMouseDown);
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       cropArea.addEventListener('wheel', handleWheel, { passive: false });
       
-      // Touch events - attach to cropArea for better mobile support
       cropArea.addEventListener('touchstart', handleTouchStart, { passive: false });
       cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
       cropArea.addEventListener('touchend', handleTouchEnd);
 
-      // Improved image centering logic for both portrait and landscape
       const centerImage = () => {
         const containerWidth = cropArea.clientWidth;
         const containerHeight = cropArea.clientHeight;
@@ -1097,84 +1044,57 @@ const ApplyLoan = () => {
           const imgAspectRatio = imgWidth / imgHeight;
           const containerAspectRatio = containerWidth / containerHeight;
           
-          console.log('Image dimensions:', { imgWidth, imgHeight, imgAspectRatio });
-          console.log('Container dimensions:', { containerWidth, containerHeight, containerAspectRatio });
-          
-          // Determine if image is portrait or landscape
           if (imgAspectRatio > containerAspectRatio) {
-            // Landscape image - fit to width
             scale = (containerWidth / imgWidth) * 0.9;
-            console.log('Landscape image - scaling to width');
           } else {
-            // Portrait image - fit to height
             scale = (containerHeight / imgHeight) * 0.9;
-            console.log('Portrait image - scaling to height');
           }
           
-          // Calculate centered position
           const scaledWidth = imgWidth * scale;
           const scaledHeight = imgHeight * scale;
           posX = (containerWidth - scaledWidth) / 2;
           posY = (containerHeight - scaledHeight) / 2;
           
-          console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
           updateImageTransform();
           img.style.cursor = 'grab';
         };
       };
 
-      // Proper cropping logic for both portrait and landscape images
       cropButton.onclick = () => {
         console.log('Crop button clicked');
         
-        // Get actual dimensions
         const containerWidth = cropArea.clientWidth;
         const containerHeight = cropArea.clientHeight;
         const imgWidth = img.naturalWidth;
         const imgHeight = img.naturalHeight;
         
-        console.log('Cropping dimensions:', {
-          containerWidth, containerHeight, imgWidth, imgHeight, scale, posX, posY
-        });
-        
-        // Create a canvas to crop the image
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Set canvas size to match the visible crop area
         canvas.width = containerWidth;
         canvas.height = containerHeight;
         
-        // Calculate the visible portion of the image in the crop area
-        // Convert crop area coordinates to original image coordinates
         const visibleSourceX = Math.max(0, -posX / scale);
         const visibleSourceY = Math.max(0, -posY / scale);
         const visibleSourceWidth = Math.min(imgWidth - visibleSourceX, containerWidth / scale);
         const visibleSourceHeight = Math.min(imgHeight - visibleSourceY, containerHeight / scale);
         
-        console.log('Visible source coordinates:', {
-          visibleSourceX, visibleSourceY, visibleSourceWidth, visibleSourceHeight
-        });
-        
-        // Clear canvas with white background
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         if (visibleSourceWidth > 0 && visibleSourceHeight > 0) {
-          // Draw exactly what's visible in the crop area
           ctx.drawImage(
             img,
-            visibleSourceX, visibleSourceY,           // Source x, y
-            visibleSourceWidth, visibleSourceHeight,   // Source width, height
-            0, 0,                                     // Destination x, y
-            canvas.width, canvas.height               // Destination width, height
+            visibleSourceX, visibleSourceY,
+            visibleSourceWidth, visibleSourceHeight,
+            0, 0,
+            canvas.width, canvas.height
           );
         }
         
         const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
         console.log('Image cropped successfully');
         
-        // Cleanup event listeners
         cleanupEventListeners();
         document.body.removeChild(cropUI);
         resolve(croppedImageDataUrl);
@@ -1207,7 +1127,6 @@ const ApplyLoan = () => {
       cropUI.appendChild(container);
       document.body.appendChild(cropUI);
       
-      // Center the image after it's added to DOM
       setTimeout(centerImage, 100);
       
       console.log('Crop interface created successfully');
@@ -1217,7 +1136,6 @@ const ApplyLoan = () => {
   // Handle using the image as-is (no cropping)
   const handleUseAsIs = () => {
     if (currentSetFunction && selectedImageUri) {
-      // For multiple images, add to the array
       if (currentSetFunction === setProofOfCollateral) {
         currentSetFunction(prev => [...prev, selectedImageUri]);
       } else {
@@ -1281,7 +1199,7 @@ const ApplyLoan = () => {
         collateralType &&
         collateralValue &&
         collateralDescription &&
-        proofOfCollateral.length > 0; // At least one image required
+        proofOfCollateral.length > 0;
     }
 
     return basicFieldsValid;
@@ -1309,7 +1227,6 @@ const ApplyLoan = () => {
     const computed = sortedTerms.map((t) => ({
       key: t,
       label: `${t} ${t === '1' ? 'Month' : 'Months'}`,
-      // Convert percent stored in DB to decimal for calculations
       interestRate: (Number(mapForType[t]) || 0) / 100,
     }));
     setAvailableTerms(computed);
@@ -1377,25 +1294,21 @@ const ApplyLoan = () => {
       const snapshot = await get(settingsRef);
       if (snapshot.exists()) {
         const settings = snapshot.val();
-        const loanPercentage = settings.LoanPercentage || 80; // Default to 80%
+        const loanPercentage = settings.LoanPercentage || 80;
         setLoanableAmountPercentage(loanPercentage);
         
-        // Processing fee
-        const processingFeeValue = settings.ProcessingFee || 0; // Default to 0
+        const processingFeeValue = settings.ProcessingFee || 0;
         setProcessingFee(processingFeeValue);
         
-        // Loan types (canonical map under Settings/LoanTypes only)
         const lt = settings.LoanTypes;
         const isMap = lt && typeof lt === 'object' && !Array.isArray(lt);
         const typesArr = isMap ? Object.keys(lt) : [];
         const formattedLoanTypes = typesArr.map(type => ({ key: type, label: type }));
         setLoanTypeOptions(formattedLoanTypes);
 
-        // Per-loan-type interest rates map from canonical LoanTypes only
         const byType = isMap ? lt : {};
         setInterestRatesByType(byType);
 
-        // Initialize available terms for current loanType from per-type map
         const mapForType = (byType && byType[loanType]) || {};
         const sorted = Object.keys(mapForType).sort((a,b)=>Number(a)-Number(b));
         const computed = sorted.map((t) => ({
@@ -1405,7 +1318,6 @@ const ApplyLoan = () => {
         }));
         setAvailableTerms(computed);
 
-        // If current selected term isn't allowed anymore, reset it
         if (!computed.find(o => o.key === term)) {
           if (computed.length > 0) {
             setTerm(computed[0].key);
@@ -1415,14 +1327,12 @@ const ApplyLoan = () => {
             setInterestRate(0);
           }
         } else {
-          // Ensure interest matches selected term
           const current = computed.find(o => o.key === term);
           if (current) setInterestRate(current.interestRate);
         }
       }
     } catch (error) {
       console.error('Error fetching system settings:', getErrorMessage(error));
-      // Keep defaults if error
     }
   };
 
@@ -1449,18 +1359,14 @@ const ApplyLoan = () => {
           setFirstName(foundUser.firstName || '');
           setLastName(foundUser.lastName || '');
 
-          // Capture saved disbursement accounts
           setBankAccName(foundUser.bankAccName || '');
           setBankAccNum(foundUser.bankAccNum || '');
           setGcashAccName(foundUser.gcashAccName || '');
           setGcashAccNum(foundUser.gcashAccNum || '');
           
-          // Calculate max loanable amount (legacy, but not used for gating anymore)
           calculateMaxLoanableAmount(userBalance, loanableAmountPercentage);
           
-          // Check for existing loans and pending applications
           await checkExistingLoans(userEmail);
-          // no need to compute total amount anymore
         } else {
           setAlertMessage('User not found');
           setAlertType('error');
@@ -1481,7 +1387,6 @@ const ApplyLoan = () => {
 
   const checkExistingLoans = async (userEmail) => {
     try {
-      // Check CurrentLoans table for existing active loans
       const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
       const currentSnapshot = await get(currentLoansRef);
 
@@ -1500,7 +1405,6 @@ const ApplyLoan = () => {
       }
       setHasExistingLoan(false);
 
-      // No longer block for "any" pending application; we'll compute total amount instead
       setHasPendingApplication(false);
     } catch (error) {
       console.error('Error checking existing loans and applications:', error);
@@ -1530,7 +1434,6 @@ const ApplyLoan = () => {
   useEffect(() => {
     const initializeData = async () => {
       try {
-        // First fetch system settings
         await fetchSystemSettings();
         
         const user = auth.currentUser;
@@ -1539,16 +1442,13 @@ const ApplyLoan = () => {
         if (userEmail) {
           setEmail(userEmail);
           
-          // If user data is passed via navigation (from fingerprint auth), use it
           if (route.params?.user) {
             const userData = route.params.user;
             setMemberId(userData.memberId || '');
             setFirstName(userData.firstName || '');
             setBalance(userData.balance || 0);
-            // Still fetch fresh data from database for consistency
             await fetchUserData(userEmail);
           } else {
-            // Fallback to database lookup
             await fetchUserData(userEmail);
           }
         } else {
@@ -1566,7 +1466,6 @@ const ApplyLoan = () => {
 
     initializeData();
 
-    // Detect browser and platform information
     if (Platform.OS === 'web') {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
       const isChrome = /chrome|chromium/i.test(userAgent);
@@ -1622,17 +1521,12 @@ const ApplyLoan = () => {
     
     if (loanAmountNum > 0 && memberBalance > 0) {
       if (loanAmountNum > memberBalance) {
-        // Loan amount exceeds balance, require collateral
         if (!requiresCollateral) {
           setRequiresCollateral(true);
-          // Show a brief message to inform the user
           setAlertMessage('Loan amount exceeds your balance. Collateral is required for this loan.');
           setAlertType('info');
           setAlertModalVisible(true);
         }
-      } else {
-        // Loan amount is within balance, collateral not required (but user can still choose to provide it)
-        // Don't automatically set to false as user might want to provide collateral anyway
       }
     }
   }, [loanAmount, balance, requiresCollateral]);
@@ -1640,7 +1534,7 @@ const ApplyLoan = () => {
   useEffect(() => {
     const handleBackPress = () => {
       navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
-      return true; // prevent default pop
+      return true;
     };
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
@@ -1654,14 +1548,12 @@ const ApplyLoan = () => {
       const transactionId = generateTransactionId();
       const now = new Date();
       
-      // Format date exactly as "October 19, 2025" or "October 9, 2025"
       const dateApplied = now.toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
         year: 'numeric',
       });
 
-      // Also capture time as 12-hour format like "11:59 PM" or "1:05 PM"
       const timeApplied = now.toLocaleTimeString('en-US', {
         hour: 'numeric',
         minute: '2-digit',
@@ -1676,17 +1568,16 @@ const ApplyLoan = () => {
         lastName,
         email,
         transactionId,
-        dateApplied, // "August 01, 2025 at 20:15"
-        timeApplied, // e.g., "20:15"
-        timestamp, // Unix ms
+        dateApplied,
+        timeApplied,
+        timestamp,
         loanType,
-        status: 'pending' // Explicit status
+        status: 'pending'
       };
 
       const applicationRef = dbRef(database, `Loans/LoanApplications/${userId}/${transactionId}`);
       await set(applicationRef, applicationDataWithMeta);
 
-      // Log into Transactions for unified feed (Applications table)
       const txnRef = dbRef(database, `Transactions/Loans/${userId}/${transactionId}`);
       await set(txnRef, { ...applicationDataWithMeta, label: 'Loan', type: 'Loans' });
 
@@ -1704,16 +1595,14 @@ const ApplyLoan = () => {
   const runApiOperationsInBackground = async (loanData) => {
     try {
       console.log('Running API operations in background...');
-      // Use centralized API client (picks URL from api.js)
       await MemberLoan(loanData);
       console.log('API call completed successfully in background');
     } catch (error) {
       console.log('API error in background (non-critical):', error?.message || error || 'Unknown API error');
-      // Don't show error to user since they've already moved on
     }
   };
 
-  // OPTIMIZED: Submit loan application with FAST parallel image uploads
+  // FIXED: Submit loan application with working image uploads
   const submitLoanApplication = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
@@ -1721,16 +1610,15 @@ const ApplyLoan = () => {
     try {
       const loanAmountNum = parseFloat(loanAmount);
       
-      // Upload collateral images to Firebase Storage if provided - OPTIMIZED LIKE CreatePasswordPage
+      // Upload collateral images to Firebase Storage if provided
       let proofOfCollateralUrls = [];
       if (requiresCollateral && proofOfCollateral.length > 0) {
         try {
           setIsUploadingImage(true);
           console.log('Starting collateral image uploads...');
           
-          // OPTIMIZED: Use parallel uploads like CreatePasswordPage
-          proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral_proofs', memberId);
-          console.log('All collateral images uploaded successfully:', proofOfCollateralUrls);
+          proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral_proofs', userId);
+          console.log('All collateral images uploaded successfully');
           setIsUploadingImage(false);
         } catch (uploadError) {
           console.error('Failed to upload collateral images:', uploadError);
@@ -1750,7 +1638,6 @@ const ApplyLoan = () => {
         accountName,
         accountNumber,
         bankType: disbursement === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
-        // Store percent value (e.g., 3 for 3%) from canonical LoanTypes only
         interestRate: Number(interestRatesByType?.[loanType]?.[term]) || 0,
         firstName,
         lastName,
@@ -1762,11 +1649,10 @@ const ApplyLoan = () => {
           collateralType,
           collateralValue,
           collateralDescription,
-          proofOfCollateralUrls // Now contains array of Firebase Storage URLs
+          proofOfCollateralUrls
         })
       };
 
-      // Store in database first and wait for completion
       console.log('Starting database operation...');
       const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
       
@@ -1777,7 +1663,6 @@ const ApplyLoan = () => {
 
       console.log('Database operation completed successfully');
 
-      // Prepare loan data for API call to run when user clicks OK
       const loanData = {
         email,
         firstName,
@@ -1787,17 +1672,13 @@ const ApplyLoan = () => {
         date: new Date().toISOString(),
       };
 
-      // Store loan data to be used when user clicks OK
       setPendingApiData(loanData);
 
-      // Only show success modal after database operations are complete
       setIsLoading(false);
       setAlertMessage('Loan application submitted successfully. You will receive a confirmation email shortly.');
       setAlertType('success');
       setSuccessAction(() => () => {
-        // Reset to Home to avoid stacking ApplyLoan on back stack
         navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
-        // Run API operations in background after navigation
         if (loanData) {
           runApiOperationsInBackground(loanData);
         }
@@ -1832,7 +1713,6 @@ const ApplyLoan = () => {
       }
     }
 
-    // Include collateral details if required
     if (requiresCollateral) {
       message += `\n\nCollateral Details\n` +
         `Type: ${collateralType}\n` +
@@ -1875,9 +1755,6 @@ const ApplyLoan = () => {
       return;
     }
 
-    // Allow multiple active loans as long as member's investment won't go down to 0
-
-    // 1) Optional: still prevent duplicate pending applications for same member
     if (memberId) {
       const exists = await hasAnyPendingApplication(memberId);
       if (exists) {
@@ -1888,7 +1765,6 @@ const ApplyLoan = () => {
       }
     }
 
-    // 2) Collateral rule: you can borrow up to your full balance without collateral. Above balance requires collateral.
     const loanAmountNum = Number(loanAmount) || 0;
     const userBalance = Number(balance) || 0;
 
@@ -1899,9 +1775,7 @@ const ApplyLoan = () => {
       return;
     }
 
-    // If amount exceeds balance, require collateral; otherwise, no collateral needed
     if (loanAmountNum > userBalance) {
-      // Ensure collateral details are provided
       if (!isCollateralValid()) {
         setRequiresCollateral(true);
         setAlertMessage('Loan amount exceeds your balance. Please add collateral or lower the amount.');
@@ -1909,7 +1783,6 @@ const ApplyLoan = () => {
         setAlertModalVisible(true);
         return;
       }
-      // Collateral provided; proceed
       setRequiresCollateral(true);
     } else {
       setRequiresCollateral(false);
@@ -1947,7 +1820,6 @@ const ApplyLoan = () => {
     if (isCollateralValid()) {
       setRequiresCollateral(true);
       setShowCollateralModal(false);
-      // Use setTimeout to ensure the modal is fully closed before showing alert
       setTimeout(() => {
         setAlertMessage('Collateral details saved successfully!');
         setAlertType('success');
@@ -2066,7 +1938,6 @@ const ApplyLoan = () => {
             onChange={(option) => {
               const key = option.key;
               setDisbursement(key);
-              // Clear all account fields when changing disbursement method
               setAccountName('');
               setAccountNumber('');
               setBankType('');
@@ -2389,12 +2260,10 @@ const ApplyLoan = () => {
         visible={alertModalVisible}
         onClose={() => {
           setAlertModalVisible(false);
-          // Execute success action (navigation + background API) if it exists
           if (alertType === 'success' && successAction) {
             successAction();
             setSuccessAction(null);
           }
-          // Clear any pending data
           setPendingApiData(null);
         }}
         message={alertMessage}
@@ -2847,7 +2716,7 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  // Image Picker Modal Styles (same as Deposit)
+  // Image Picker Modal Styles
   modalBackground: {
     flex: 1,
     justifyContent: 'flex-end',
