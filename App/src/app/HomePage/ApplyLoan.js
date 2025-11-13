@@ -1525,7 +1525,7 @@ const ApplyLoan = () => {
 
   const generateTransactionId = () => Math.floor(100000 + Math.random() * 900000).toString();
 
-  // FIXED: Store loan application with retry logic
+  // FIXED: Store loan application with retry logic - NOW INCLUDES COLLATERAL IMAGE URLS
   const storeLoanApplicationInDatabase = async (applicationData) => {
     try {
       const transactionId = generateTransactionId();
@@ -1544,6 +1544,7 @@ const ApplyLoan = () => {
       });
       const timestamp = now.getTime();
 
+      // Include collateral image URLs in the application data
       const applicationDataWithMeta = {
         ...applicationData,
         id: userId,
@@ -1589,7 +1590,7 @@ const ApplyLoan = () => {
     }
   };
 
-  // FIXED: Submit loan application with working image uploads
+  // FIXED: Submit loan application with working image uploads - NOW PROPERLY INCLUDES COLLATERAL IMAGE URLS
   const submitLoanApplication = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
@@ -1604,8 +1605,9 @@ const ApplyLoan = () => {
           setIsUploadingImage(true);
           console.log('Starting collateral image uploads...');
           
+          // Upload images to Firebase Storage
           proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral_proofs', userId);
-          console.log('All collateral images uploaded successfully');
+          console.log('All collateral images uploaded successfully:', proofOfCollateralUrls);
           setIsUploadingImage(false);
         } catch (uploadError) {
           console.error('Failed to upload collateral images:', uploadError);
@@ -1618,6 +1620,7 @@ const ApplyLoan = () => {
         }
       }
       
+      // Prepare application data with collateral image URLs
       const applicationData = {
         loanAmount: loanAmountNum,
         term,
@@ -1636,11 +1639,11 @@ const ApplyLoan = () => {
           collateralType,
           collateralValue,
           collateralDescription,
-          proofOfCollateralUrls
+          proofOfCollateralUrls // This now contains the actual Firebase Storage URLs
         })
       };
 
-      console.log('Starting database operation...');
+      console.log('Starting database operation with collateral data:', applicationData);
       const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
       
       if (!storedSuccessfully) {
