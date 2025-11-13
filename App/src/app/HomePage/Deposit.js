@@ -49,7 +49,7 @@ const Deposit = () => {
   const [receivedBy, setReceivedBy] = useState('');
   const [dateReceived, setDateReceived] = useState('');
 
-  // Image handling states (same as RegisterPage2)
+  // Image handling states
   const [showSourceOptions, setShowSourceOptions] = useState(false);
   const [showCropOptions, setShowCropOptions] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
@@ -70,16 +70,13 @@ const Deposit = () => {
         if (userEmail) {
           setEmail(userEmail);
           
-          // If user data is passed via navigation (from fingerprint auth), use it
           if (route.params?.user) {
             const userData = route.params.user;
             setMemberId(userData.memberId || '');
             setFirstName(userData.firstName || '');
             setBalance(userData.balance || 0);
-            // Still fetch fresh data from database for consistency
             await fetchUserData(userEmail);
           } else {
-            // Fallback to database lookup
             await fetchUserData(userEmail);
           }
         } else {
@@ -98,7 +95,6 @@ const Deposit = () => {
     initializeUserData();
     fetchDepositSettings();
     
-    // Detect browser and platform information
     if (Platform.OS === 'web') {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
       const isChrome = /chrome|chromium/i.test(userAgent);
@@ -158,7 +154,6 @@ const Deposit = () => {
       if (snapshot.exists()) {
         setDepositAccounts(snapshot.val());
       } else {
-        // Fallback to old path if Accounts doesn't exist
         const oldSettingsRef = dbRef(database, 'Settings/DepositAccounts');
         const oldSnapshot = await get(oldSettingsRef);
         if (oldSnapshot.exists()) {
@@ -215,7 +210,36 @@ const Deposit = () => {
     setAccountName(selectedAccount?.accountName || '');
   };
 
-  // IMAGE HANDLING FUNCTIONS (same as RegisterPage2)
+  // FIXED: Upload image to Firebase Storage - SIMPLIFIED AND WORKING
+  const uploadImageToFirebase = async (uri, folder, userId) => {
+    try {
+      console.log(`Starting upload for ${folder}, user: ${userId}`);
+      
+      const timestamp = new Date().getTime();
+      const uniqueFilename = `${userId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
+      const fileExtension = uri.split('.').pop() || 'jpg';
+      const filename = `${uniqueFilename}.${fileExtension}`;
+      
+      const imageRef = storageRef(storage, `users/${userId}/${folder}/${filename}`);
+      
+      console.log('Fetching image blob...');
+      const response = await fetch(uri);
+      const blob = await response.blob();
+      
+      console.log('Uploading to Firebase Storage...');
+      await uploadBytes(imageRef, blob);
+      
+      console.log('Getting download URL...');
+      const downloadURL = await getDownloadURL(imageRef);
+      console.log('Image upload successful');
+      return downloadURL;
+    } catch (error) {
+      console.error('Image upload failed:', error);
+      throw new Error('Failed to upload image: ' + error.message);
+    }
+  };
+
+  // IMAGE HANDLING FUNCTIONS
 
   // Show source selection options
   const showSourceSelection = (setImageFunction, imageType) => {
@@ -391,27 +415,24 @@ const Deposit = () => {
         cleanup();
       };
       
-      // Add event listeners
       input.addEventListener('change', handleChange);
       input.addEventListener('cancel', handleCancel);
       
-      // Add to document and trigger click
       document.body.appendChild(input);
       
-      // Set timeout for safety
       setTimeout(() => {
         if (!resolved) {
           console.log('Gallery selection timeout');
           cleanup();
         }
-      }, 30000); // 30 second timeout
+      }, 30000);
       
       console.log('Triggering file input click');
       input.click();
     });
   };
 
-  // Web camera capture - CORRECT SELFIE ORIENTATION
+  // Web camera capture
   const handleWebCameraCapture = (imageType) => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -427,7 +448,6 @@ const Deposit = () => {
         return;
       }
 
-      // Use back camera for deposit proof
       const facingMode = 'environment';
       
       navigator.mediaDevices.getUserMedia({ 
@@ -488,7 +508,6 @@ const Deposit = () => {
           box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         `;
         
-        // Add camera frame/border that matches the camera size
         const cameraFrame = document.createElement('div');
         cameraFrame.style.cssText = `
           position: absolute;
@@ -551,7 +570,6 @@ const Deposit = () => {
         cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
         
         video.onloadedmetadata = () => {
-          // Set video to fill the container completely
           video.style.width = '100%';
           video.style.height = '100%';
           video.style.objectFit = 'cover';
@@ -560,7 +578,6 @@ const Deposit = () => {
           canvas.height = video.videoHeight;
           
           captureButton.onclick = () => {
-            // For deposit proof, draw normally (back camera)
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
@@ -595,8 +612,6 @@ const Deposit = () => {
         };
       }).catch((error) => {
         console.error('Camera access error:', error);
-        // If the preferred camera fails, try the other one as fallback
-        console.log('Trying fallback camera...');
         const fallbackFacingMode = 'user';
         
         navigator.mediaDevices.getUserMedia({ 
@@ -607,7 +622,6 @@ const Deposit = () => {
           } 
         })
         .then((stream) => {
-          // Same camera setup code as above but with fallback camera
           const video = document.createElement('video');
           video.srcObject = stream;
           video.autoplay = true;
@@ -720,12 +734,10 @@ const Deposit = () => {
           cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
           
           video.onloadedmetadata = () => {
-            // Set video to fill the container completely
             video.style.width = '100%';
             video.style.height = '100%';
             video.style.objectFit = 'cover';
             
-            // For front camera preview in fallback, mirror it
             if (fallbackFacingMode === 'user') {
               video.style.transform = 'scaleX(-1)';
             }
@@ -734,15 +746,12 @@ const Deposit = () => {
             canvas.height = video.videoHeight;
             
             captureButton.onclick = () => {
-              // Handle the captured image based on camera type
               if (fallbackFacingMode === 'user') {
-                // For front camera, flip the captured image
                 context.save();
                 context.scale(-1, 1);
                 context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
                 context.restore();
               } else {
-                // For back camera, draw normally
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
               }
               
@@ -788,7 +797,7 @@ const Deposit = () => {
     });
   };
 
-  // Handle crop selected image - PROPERLY SET THE CROPPED IMAGE
+  // Handle crop selected image
   const handleCropSelectedImage = async () => {
     if (!selectedImageUri) return;
 
@@ -798,14 +807,12 @@ const Deposit = () => {
         console.log('Cropped image result:', croppedImage ? 'Success' : 'Failed');
         
         if (croppedImage && currentSetFunction) {
-          // FIX: Actually set the cropped image to the state
           currentSetFunction(croppedImage);
           console.log('Cropped image set to state successfully');
         } else {
           console.log('No cropped image to set');
         }
       } else {
-        // For native, use Expo's built-in cropping
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
@@ -818,7 +825,6 @@ const Deposit = () => {
         }
       }
       
-      // Close crop options regardless of success
       setShowCropOptions(false);
       setSelectedImageUri(null);
       setCurrentImageType(null);
@@ -826,12 +832,11 @@ const Deposit = () => {
       
     } catch (error) {
       console.error('Crop error:', error);
-      // If crop fails, just use the original image
       handleUseAsIs();
     }
   };
 
-  // INTERACTIVE CROPPER WITH PROPER LANDSCAPE SUPPORT
+  // INTERACTIVE CROPPER
   const createInteractiveCrop = (imageUri, imageType) => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -971,7 +976,6 @@ const Deposit = () => {
       cancelCropButton.onmouseover = () => cancelCropButton.style.background = '#b91c1c';
       cancelCropButton.onmouseout = () => cancelCropButton.style.background = '#dc2626';
 
-      // Zoom and drag variables
       let scale = 1;
       let posX = 0;
       let posY = 0;
@@ -979,17 +983,14 @@ const Deposit = () => {
       let startX, startY;
       let initialDistance = null;
 
-      // Touch event handlers for mobile
       const handleTouchStart = (e) => {
         e.preventDefault();
         if (e.touches.length === 1) {
-          // Single touch - start dragging
           isDragging = true;
           startX = e.touches[0].clientX - posX;
           startY = e.touches[0].clientY - posY;
           img.style.cursor = 'grabbing';
         } else if (e.touches.length === 2) {
-          // Two touches - start pinch to zoom
           initialDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -1001,12 +1002,10 @@ const Deposit = () => {
         e.preventDefault();
         
         if (isDragging && e.touches.length === 1) {
-          // Dragging
           posX = e.touches[0].clientX - startX;
           posY = e.touches[0].clientY - startY;
           updateImageTransform();
         } else if (e.touches.length === 2 && initialDistance !== null) {
-          // Pinch to zoom
           const currentDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -1024,7 +1023,6 @@ const Deposit = () => {
         img.style.cursor = 'grab';
       };
 
-      // Mouse event handlers for desktop
       const handleMouseDown = (e) => {
         e.preventDefault();
         isDragging = true;
@@ -1047,13 +1045,11 @@ const Deposit = () => {
         img.style.cursor = 'grab';
       };
 
-      // Wheel event for zoom on desktop
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = -e.deltaY * 0.01;
         const newScale = Math.max(0.5, Math.min(3, scale + delta));
         
-        // Zoom towards mouse position
         const rect = cropArea.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -1070,18 +1066,15 @@ const Deposit = () => {
         img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
       };
 
-      // Add event listeners
       img.addEventListener('mousedown', handleMouseDown);
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       cropArea.addEventListener('wheel', handleWheel, { passive: false });
       
-      // Touch events - attach to cropArea for better mobile support
       cropArea.addEventListener('touchstart', handleTouchStart, { passive: false });
       cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
       cropArea.addEventListener('touchend', handleTouchEnd);
 
-      // Improved image centering logic for both portrait and landscape
       const centerImage = () => {
         const containerWidth = cropArea.clientWidth;
         const containerHeight = cropArea.clientHeight;
@@ -1092,84 +1085,57 @@ const Deposit = () => {
           const imgAspectRatio = imgWidth / imgHeight;
           const containerAspectRatio = containerWidth / containerHeight;
           
-          console.log('Image dimensions:', { imgWidth, imgHeight, imgAspectRatio });
-          console.log('Container dimensions:', { containerWidth, containerHeight, containerAspectRatio });
-          
-          // Determine if image is portrait or landscape
           if (imgAspectRatio > containerAspectRatio) {
-            // Landscape image - fit to width
             scale = (containerWidth / imgWidth) * 0.9;
-            console.log('Landscape image - scaling to width');
           } else {
-            // Portrait image - fit to height
             scale = (containerHeight / imgHeight) * 0.9;
-            console.log('Portrait image - scaling to height');
           }
           
-          // Calculate centered position
           const scaledWidth = imgWidth * scale;
           const scaledHeight = imgHeight * scale;
           posX = (containerWidth - scaledWidth) / 2;
           posY = (containerHeight - scaledHeight) / 2;
           
-          console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
           updateImageTransform();
           img.style.cursor = 'grab';
         };
       };
 
-      // Proper cropping logic for both portrait and landscape images
       cropButton.onclick = () => {
         console.log('Crop button clicked');
         
-        // Get actual dimensions
         const containerWidth = cropArea.clientWidth;
         const containerHeight = cropArea.clientHeight;
         const imgWidth = img.naturalWidth;
         const imgHeight = img.naturalHeight;
         
-        console.log('Cropping dimensions:', {
-          containerWidth, containerHeight, imgWidth, imgHeight, scale, posX, posY
-        });
-        
-        // Create a canvas to crop the image
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Set canvas size to match the visible crop area
         canvas.width = containerWidth;
         canvas.height = containerHeight;
         
-        // Calculate the visible portion of the image in the crop area
-        // Convert crop area coordinates to original image coordinates
         const visibleSourceX = Math.max(0, -posX / scale);
         const visibleSourceY = Math.max(0, -posY / scale);
         const visibleSourceWidth = Math.min(imgWidth - visibleSourceX, containerWidth / scale);
         const visibleSourceHeight = Math.min(imgHeight - visibleSourceY, containerHeight / scale);
         
-        console.log('Visible source coordinates:', {
-          visibleSourceX, visibleSourceY, visibleSourceWidth, visibleSourceHeight
-        });
-        
-        // Clear canvas with white background
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         if (visibleSourceWidth > 0 && visibleSourceHeight > 0) {
-          // Draw exactly what's visible in the crop area
           ctx.drawImage(
             img,
-            visibleSourceX, visibleSourceY,           // Source x, y
-            visibleSourceWidth, visibleSourceHeight,   // Source width, height
-            0, 0,                                     // Destination x, y
-            canvas.width, canvas.height               // Destination width, height
+            visibleSourceX, visibleSourceY,
+            visibleSourceWidth, visibleSourceHeight,
+            0, 0,
+            canvas.width, canvas.height
           );
         }
         
         const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
         console.log('Image cropped successfully');
         
-        // Cleanup event listeners
         cleanupEventListeners();
         document.body.removeChild(cropUI);
         resolve(croppedImageDataUrl);
@@ -1202,7 +1168,6 @@ const Deposit = () => {
       cropUI.appendChild(container);
       document.body.appendChild(cropUI);
       
-      // Center the image after it's added to DOM
       setTimeout(centerImage, 100);
       
       console.log('Crop interface created successfully');
@@ -1231,57 +1196,14 @@ const Deposit = () => {
     return { uri };
   };
 
-  const uploadImageToFirebase = async (uri, folder) => {
-    try {
-      // Create a unique filename with timestamp and user ID to avoid collisions
-      const timestamp = new Date().getTime();
-      const uniqueFilename = `${memberId}_${timestamp}_${Math.floor(Math.random() * 1000)}`;
-      const fileExtension = uri.split('.').pop() || 'jpeg';
-      const filename = `${uniqueFilename}.${fileExtension}`;
-      
-      // Use a user-specific folder path to improve security
-      const userFolder = `users/${memberId}/${folder}`;
-      const imageRef = storageRef(storage, `${userFolder}/${filename}`);
-      
-      const response = await fetch(uri);
-      const blob = await response.blob();
-      
-      // Upload the image
-      await uploadBytes(imageRef, blob);
-      
-      // Get the download URL
-      const downloadURL = await getDownloadURL(imageRef);
-      return downloadURL;
-    } catch (error) {
-      console.error('Image upload failed:', error);
-      
-      // Provide more specific error messages based on the error type
-      if (error.code === 'storage/unauthorized') {
-        setErrorMessage('Permission denied: You do not have permission to upload images. Please contact support.');
-      } else if (error.code === 'storage/canceled') {
-        setErrorMessage('Upload was canceled');
-      } else if (error.code === 'storage/unknown') {
-        setErrorMessage('An unknown error occurred during upload');
-      } else {
-        setErrorMessage('Failed to upload image: ' + error.message);
-      }
-      
-      throw error;
-    }
-  };
-
   const storeDepositDataInDatabase = async (proofOfDepositUrl, transactionId = null) => {
     try {
-      // Use provided transaction ID or generate a new one
       const txnId = transactionId || generateTransactionId();
       
-      // Create a reference to the deposit application in the database
       const newDepositRef = dbRef(database, `Deposits/DepositApplications/${memberId}/${txnId}`);
   
-      // Parse the deposit amount
       const depositAmount = parseFloat(amountToBeDeposited);
   
-      // Format the current date
       const currentDate = new Date();
       const formattedDate = currentDate.toLocaleString('en-US', {
         year: 'numeric',
@@ -1289,7 +1211,6 @@ const Deposit = () => {
         day: 'numeric',
       });
       
-      // Create the deposit data object
       const depositData = {
         transactionId: txnId,
         id: memberId,
@@ -1302,14 +1223,12 @@ const Deposit = () => {
         amountToBeDeposited: depositAmount,
         proofOfDepositUrl,
         dateApplied: formattedDate,
-        timestamp: currentDate.getTime(), // Add timestamp for easier sorting
+        timestamp: currentDate.getTime(),
         status: 'pending',
       };
       
-      // Store the data in the database
       await set(newDepositRef, depositData);
 
-      // Also log into Transactions for unified feed (Applications table)
       const txnRef = dbRef(database, `Transactions/Deposits/${memberId}/${txnId}`);
       await set(txnRef, {
         ...depositData,
@@ -1318,12 +1237,10 @@ const Deposit = () => {
         type: 'Deposits',
       });
       
-      // Return the transaction ID in case it was generated here
       return txnId;
     } catch (error) {
       console.error('Failed to store deposit data in Realtime Database:', error);
       
-      // Set error message for the modal
       setErrorMessage('Failed to store deposit data: ' + (error.message || 'Unknown error'));
       
       throw error;
@@ -1338,7 +1255,6 @@ const Deposit = () => {
       return;
     }
 
-    // Proof of deposit is only required for non-cash deposits
     if (depositOption !== 'Cash' && !proofOfDeposit) {
       setAlertMessage('All fields are required');
       setAlertType('error');
@@ -1353,7 +1269,6 @@ const Deposit = () => {
       return;
     }
 
-    // Show confirmation modal
     setConfirmModalVisible(true);
   };
   
@@ -1362,19 +1277,15 @@ const Deposit = () => {
     setConfirmModalVisible(false);
 
     try {
-      // Generate a single transaction ID to use for both database entries
       const transactionId = generateTransactionId();
 
-      // Proof of deposit is only required for non-cash deposits
       let proofOfDepositUrl = null;
       if (depositOption !== 'Cash') {
-        proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs');
+        proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit_proofs', memberId);
       }
 
-      // Store in Firebase Realtime Database with the transaction ID
       await storeDepositDataInDatabase(proofOfDepositUrl, transactionId);
 
-      // Prepare data for API call to run when user clicks OK
       const depositData = {
         email,
         accountName,
@@ -1382,16 +1293,14 @@ const Deposit = () => {
         lastName,
         depositOption,
         accountNumber,
-        amountToBeDeposited: parseFloat(amountToBeDeposited), // Keep original field name
+        amountToBeDeposited: parseFloat(amountToBeDeposited),
         proofOfDepositUrl,
         transactionId,
-        date: new Date().toISOString(), // Added date field
+        date: new Date().toISOString(),
       };
 
-      // Store deposit data to be used when user clicks OK
       setPendingDepositData(depositData);
 
-      // Show success modal
       setAlertMessage('Your deposit request has been submitted successfully. It will be processed shortly.');
       setAlertType('success');
       setAlertModalVisible(true);
@@ -1399,14 +1308,11 @@ const Deposit = () => {
     } catch (error) {
       console.error('Error during deposit submission:', error);
       
-      // Handle different types of errors
       if (error.code && error.code.startsWith('storage/')) {
-        // Firebase Storage errors are already handled in uploadImageToFirebase
         setAlertMessage(errorMessage || 'Failed to upload image');
         setAlertType('error');
         setAlertModalVisible(true);
       } else {
-        // Generic errors
         setAlertMessage('An unexpected error occurred. Please try again later.');
         setAlertType('error');
         setAlertModalVisible(true);
@@ -1675,24 +1581,19 @@ const Deposit = () => {
         onClose={() => {
           setAlertModalVisible(false);
           if (alertType === 'success' && pendingDepositData) {
-            // Navigate immediately and run API in background
             resetFormFields();
             navigation.navigate('AppHome');
             
-            // Run API call in background after navigation
             setTimeout(async () => {
               try {
                 await MemberDeposit(pendingDepositData);
                 console.log('Deposit API call completed successfully in background');
               } catch (apiError) {
                 console.error('Background API call failed:', apiError);
-                // API failure doesn't affect user experience since data is already in database
               }
-              // Clear pending data
               setPendingDepositData(null);
             }, 100);
           } else if (alertType === 'success') {
-            // Fallback for success without pending data
             resetFormFields();
             navigation.navigate('AppHome');
           }
