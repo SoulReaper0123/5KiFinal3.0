@@ -56,6 +56,105 @@ const formatTime = (date) => {
   return `${hours}:${minutes}:${seconds} ${ampm}`;
 };
 
+// Optimized image compression function
+const compressImage = (file, maxWidth = 1024, quality = 0.7) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        // Calculate new dimensions
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to blob with specified quality
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Canvas to Blob conversion failed'));
+            }
+          },
+          'image/jpeg',
+          quality
+        );
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
+// Optimized upload function
+const uploadImageToStorage = async (file, path, onProgress = null) => {
+  try {
+    // Compress image first
+    const compressedBlob = await compressImage(file);
+    
+    const fileRef = storageRef(storage, path);
+    
+    // Create upload task
+    const uploadTask = uploadBytes(fileRef, compressedBlob);
+    
+    // If progress callback provided, simulate progress
+    if (onProgress) {
+      let progress = 0;
+      const interval = setInterval(() => {
+        progress += 10;
+        if (progress >= 90) {
+          clearInterval(interval);
+        }
+        onProgress(progress);
+      }, 100);
+    }
+    
+    await uploadTask;
+    const downloadURL = await getDownloadURL(fileRef);
+    
+    if (onProgress) {
+      onProgress(100);
+    }
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
+};
+
+// Optimized database operations - batch where possible
+const executeBatchDatabaseOperations = async (operations) => {
+  try {
+    const results = await Promise.allSettled(operations);
+    
+    const failures = results.filter(result => result.status === 'rejected');
+    if (failures.length > 0) {
+      console.error('Some database operations failed:', failures);
+      throw new Error(`${failures.length} database operations failed`);
+    }
+    
+    return results.map(result => result.value);
+  } catch (error) {
+    console.error('Batch database operations error:', error);
+    throw error;
+  }
+};
+
 const styles = {
   safeAreaView: {
     flex: 1,
@@ -549,7 +648,6 @@ const styles = {
     color: '#64748b',
     margin: '4px 0 0 0'
   },
-  // Confirmation modal styles
   centeredModal: {
     position: 'fixed',
     top: 0,
@@ -588,32 +686,25 @@ const styles = {
     lineHeight: '1.5',
     fontWeight: '500'
   },
-  // Loading overlay
-  loadingOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1500,
-    backdropFilter: 'blur(4px)',
+  progressContainer: {
+    width: '100%',
+    backgroundColor: '#f3f4f6',
+    borderRadius: '4px',
+    marginTop: '8px',
+    overflow: 'hidden'
   },
-  loadingContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '14px',
+  progressBar: {
+    height: '6px',
+    backgroundColor: '#3b82f6',
+    transition: 'width 0.3s ease',
+    borderRadius: '4px'
   },
-  loadingTextOverlay: {
-    color: 'white',
-    fontSize: '14px',
-    fontWeight: '500'
+  progressText: {
+    fontSize: '12px',
+    color: '#6b7280',
+    marginTop: '4px',
+    textAlign: 'center'
   },
-  // Error text styles
   errorText: {
     color: '#dc2626',
     fontSize: '12px',
@@ -689,6 +780,10 @@ const Deposits = () => {
   // New states for the process flow
   const [actionInProgress, setActionInProgress] = useState(false);
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  
+  // Progress tracking
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [currentStep, setCurrentStep] = useState('');
 
   const pageSize = 10;
 
@@ -921,7 +1016,6 @@ const Deposits = () => {
   // Fetch member data when member ID is entered - AUTO FETCH
   const fetchMemberData = async (memberId) => {
     if (!memberId) {
-      // Reset form if member ID is cleared
       setFormData(prev => ({
         ...prev,
         firstName: '',
@@ -974,7 +1068,6 @@ const Deposits = () => {
         activeSection === 'approvedDeposits' ? 'Approved Deposits' :
         'Rejected Deposits';
 
-      // Get the data that's currently displayed in the table (paginated)
       const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
       const printContent = document.createElement('div');
@@ -984,7 +1077,6 @@ const Deposits = () => {
       printContent.style.boxSizing = 'border-box';
       printContent.style.margin = '0';
 
-      // Create your custom header
       const header = document.createElement('div');
       header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
@@ -992,12 +1084,10 @@ const Deposits = () => {
       header.style.marginBottom = '20px';
       header.style.boxSizing = 'border-box';
 
-      // Logo and Report Title (Centered)
       const logoSection = document.createElement('div');
       logoSection.style.textAlign = 'center';
       logoSection.style.marginBottom = '15px';
 
-      // Add logo image
       const logoImg = document.createElement('img');
       logoImg.src = logoImage;
       logoImg.style.width = '80px';
@@ -1024,7 +1114,6 @@ const Deposits = () => {
       logoSection.appendChild(logo);
       logoSection.appendChild(reportTitle);
 
-      // Info Row (Generated Date on left, Prepared By on right)
       const infoRow = document.createElement('div');
       infoRow.style.display = 'flex';
       infoRow.style.justifyContent = 'space-between';
@@ -1033,7 +1122,6 @@ const Deposits = () => {
       infoRow.style.marginBottom = '10px';
       infoRow.style.boxSizing = 'border-box';
 
-      // Left side - Generated Date
       const generatedDate = document.createElement('div');
       generatedDate.style.textAlign = 'left';
       generatedDate.style.flex = '1';
@@ -1042,7 +1130,6 @@ const Deposits = () => {
         ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
       `;
 
-      // Right side - Prepared By
       const preparedBy = document.createElement('div');
       preparedBy.style.textAlign = 'right';
       preparedBy.style.flex = '1';
@@ -1057,7 +1144,6 @@ const Deposits = () => {
       infoRow.appendChild(generatedDate);
       infoRow.appendChild(preparedBy);
 
-      // Report Details
       const reportDetails = document.createElement('div');
       reportDetails.style.textAlign = 'center';
       reportDetails.style.marginBottom = '15px';
@@ -1072,7 +1158,6 @@ const Deposits = () => {
       header.appendChild(reportDetails);
       printContent.appendChild(header);
 
-      // Table
       if (displayedData.length > 0) {
         const table = document.createElement('table');
         table.style.width = '100%';
@@ -1080,12 +1165,10 @@ const Deposits = () => {
         table.style.marginTop = '20px';
         table.style.boxSizing = 'border-box';
 
-        // Table Header - Define columns based on active section
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.style.backgroundColor = '#f8f9fa';
         
-        // Define columns for each section
         let headers = [];
         
         switch(activeSection) {
@@ -1102,7 +1185,6 @@ const Deposits = () => {
             headers = [];
         }
 
-        // Create header cells
         headers.forEach(headerText => {
           const th = document.createElement('th');
           th.textContent = headerText;
@@ -1118,7 +1200,6 @@ const Deposits = () => {
         thead.appendChild(headerRow);
         table.appendChild(thead);
 
-        // Table Body
         const tbody = document.createElement('tbody');
         displayedData.forEach((item, index) => {
           const row = document.createElement('tr');
@@ -1128,7 +1209,6 @@ const Deposits = () => {
             const td = document.createElement('td');
             let cellValue = '';
             
-            // Handle data extraction based on header and active section
             switch(header) {
               case 'Member ID':
                 cellValue = item.id || '';
@@ -1186,7 +1266,6 @@ const Deposits = () => {
         printContent.appendChild(noData);
       }
 
-      // Create a hidden iframe for printing to avoid browser headers
       const printFrame = document.createElement('iframe');
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
@@ -1203,7 +1282,6 @@ const Deposits = () => {
         printDocument = printDocument.document;
       }
 
-      // Write the print content to the iframe with CSS to remove headers/footers
       printDocument.open();
       printDocument.write(`
         <!DOCTYPE html>
@@ -1211,7 +1289,6 @@ const Deposits = () => {
           <head>
             <title>${sectionTitle} Report</title>
             <style>
-              /* Reset all margins and remove browser headers/footers */
               @page {
                 margin: 0.5in !important;
                 size: auto;
@@ -1231,7 +1308,6 @@ const Deposits = () => {
                 padding: 20px;
               }
               
-              /* Hide any potential browser elements */
               header, footer, .header, .footer {
                 display: none !important;
               }
@@ -1261,18 +1337,15 @@ const Deposits = () => {
       `);
       printDocument.close();
 
-      // Wait for content to load then print
       printFrame.onload = function() {
         try {
           if (format === 'pdf') {
             printFrame.contentWindow.print();
 
-            // Export to Excel
             const workbook = new ExcelJS.Workbook();
             const worksheet = workbook.addWorksheet(sectionTitle);
 
             if (displayedData.length > 0) {
-              // Define headers for Excel based on active section
               let excelHeaders = [];
               
               switch(activeSection) {
@@ -1351,11 +1424,9 @@ const Deposits = () => {
               window.URL.revokeObjectURL(url);
             });
           } else {
-            // Direct print
             printFrame.contentWindow.print();
           }
           
-          // Clean up after printing
           setTimeout(() => {
             document.body.removeChild(printFrame);
             setPrintModalVisible(false);
@@ -1418,7 +1489,6 @@ const Deposits = () => {
     }));
 
     if (name === 'depositOption' && value) {
-      // FIX: Safely access depositAccounts with fallback
       const selectedAccount = depositAccounts[value] || { accountName: '', accountNumber: '' };
       setFormData(prev => ({
         ...prev,
@@ -1426,13 +1496,11 @@ const Deposits = () => {
         accountNumber: selectedAccount.accountNumber || ''
       }));
 
-      // Clear proof of deposit for Cash
       if (value === 'Cash') {
         setProofOfDepositFile(null);
       }
     }
 
-    // AUTO FETCH member data when member ID is entered
     if (name === 'memberId') {
       fetchMemberData(value);
     }
@@ -1481,7 +1549,6 @@ const Deposits = () => {
       setErrorModalVisible(true);
       return false;
     }
-    // Only require proof of deposit for non-Cash deposits
     if (formData.depositOption !== 'Cash' && !proofOfDepositFile) {
       setErrorMessage('Proof of deposit is required for non-cash deposits');
       setErrorModalVisible(true);
@@ -1495,23 +1562,11 @@ const Deposits = () => {
     setConfirmModalVisible(true);
   };
 
-  const uploadImageToStorage = async (file, path) => {
-    try {
-      const fileRef = storageRef(storage, path);
-      await uploadBytes(fileRef, file);
-      const downloadURL = await getDownloadURL(fileRef);
-      return downloadURL;
-    } catch (error) {
-      console.error('Error uploading image:', error);
-      throw error;
-    }
-  };
-
   const generateTransactionId = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  // FIXED: Process database addition to match ApplyDeposits behavior
+  // OPTIMIZED: Process database addition with parallel operations
   const processDatabaseAddition = async (depositData) => {
     try {
       const transactionId = generateTransactionId();
@@ -1520,11 +1575,7 @@ const Deposits = () => {
       const approvalTime = formatTime(now);
       const amount = parseFloat(depositData.amount);
 
-      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${depositData.memberId}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Deposits/${depositData.memberId}/${transactionId}`);
       const memberRef = database.ref(`Members/${depositData.memberId}`);
-      const fundsRef = database.ref('Settings/Funds');
-
       const memberSnap = await memberRef.once('value');
 
       if (memberSnap.exists()) {
@@ -1540,7 +1591,6 @@ const Deposits = () => {
           timeApproved: approvalTime,
           timestamp: now.getTime(),
           status: 'approved',
-          // Include all necessary fields for consistency
           id: depositData.memberId,
           firstName: depositData.firstName,
           lastName: depositData.lastName,
@@ -1551,31 +1601,42 @@ const Deposits = () => {
           proofOfDepositUrl: depositData.proofOfDepositUrl || null
         };
 
-        await approvedRef.set(fullDepositData);
-        await transactionRef.set(fullDepositData);
-
-        // FIXED: Update both balance AND investment like in ApplyDeposits
+        // Calculate new balances
         const currentBalance = parseFloat(member.balance || 0);
         const currentInvestment = parseFloat(member.investment || 0);
-        
         const newBalance = currentBalance + amount;
         const newInvestment = currentInvestment + amount;
-        
-        await memberRef.update({ 
-          balance: newBalance,
-          investment: newInvestment
-        });
 
-        // FIXED: Update funds for non-cash deposits only (like in ApplyDeposits)
+        // Prepare all database operations
+        const databaseOperations = [
+          memberRef.update({ 
+            balance: newBalance,
+            investment: newInvestment
+          }),
+          
+          database.ref(`Deposits/ApprovedDeposits/${depositData.memberId}/${transactionId}`).set(fullDepositData),
+          
+          database.ref(`Transactions/Deposits/${depositData.memberId}/${transactionId}`).set(fullDepositData)
+        ];
+
+        // Add funds update for non-cash deposits
         if (depositData.depositOption !== 'Cash') {
+          const fundsRef = database.ref('Settings/Funds');
           const fundSnap = await fundsRef.once('value');
           const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
-          await fundsRef.set(updatedFund);
+          
+          databaseOperations.push(
+            fundsRef.set(updatedFund)
+          );
           
           const dateKey = now.toISOString().split('T')[0];
-          const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
-          await fundsHistoryRef.set(updatedFund);
+          databaseOperations.push(
+            database.ref(`Settings/FundsHistory/${dateKey}`).set(updatedFund)
+          );
         }
+
+        // Execute all database operations in parallel
+        await executeBatchDatabaseOperations(databaseOperations);
 
         return { transactionId, fullDepositData };
       } else {
@@ -1587,7 +1648,7 @@ const Deposits = () => {
     }
   };
 
-  // FIXED: Call API approve with proper data structure
+  // Background API call (don't block UI)
   const callApiApprove = async (depositData) => {
     try {
       const response = await ApproveDeposits({
@@ -1614,17 +1675,25 @@ const Deposits = () => {
     setConfirmModalVisible(false);
     setActionInProgress(true);
     setIsProcessing(true);
+    setUploadProgress(0);
+    setCurrentStep('Preparing deposit...');
 
     try {
       let proofOfDepositUrl = '';
       
       // Only upload proof of deposit for non-Cash deposits
       if (formData.depositOption !== 'Cash' && proofOfDepositFile) {
+        setCurrentStep('Uploading proof of deposit...');
+        
         proofOfDepositUrl = await uploadImageToStorage(
           proofOfDepositFile, 
-          `proofsOfDeposit/${formData.memberId}_${Date.now()}`
+          `proofsOfDeposit/${formData.memberId}_${Date.now()}`,
+          (progress) => setUploadProgress(progress)
         );
       }
+
+      setCurrentStep('Processing deposit...');
+      setUploadProgress(0);
 
       const depositData = {
         ...formData,
@@ -1645,13 +1714,15 @@ const Deposits = () => {
       setErrorModalVisible(true);
       setIsProcessing(false);
       setActionInProgress(false);
+      setUploadProgress(0);
+      setCurrentStep('');
     }
   };
 
   const handleSuccessOk = async () => {
-    // Show loading spinner and hide success modal
     setIsProcessing(true);
     setSuccessModalVisible(false);
+    setCurrentStep('Finalizing transaction...');
 
     let transactionResult = null;
 
@@ -1665,29 +1736,31 @@ const Deposits = () => {
       setErrorMessage('Failed to add deposit to database: ' + err.message);
       setErrorModalVisible(true);
       setIsProcessing(false);
+      setCurrentStep('');
       return;
     }
 
-    // Trigger background email after DB success; do not block UI
-    try {
-      if (transactionResult && transactionResult.fullDepositData) {
-        callApiApprove(transactionResult.fullDepositData);
-      }
-    } catch (error) {
-      console.error('Error calling API:', error);
-    } finally {
-      setPendingApiCall(null);
+    // Trigger background email after DB success (don't wait for it)
+    if (transactionResult && transactionResult.fullDepositData) {
+      setCurrentStep('Sending notification...');
+      callApiApprove(transactionResult.fullDepositData).finally(() => {
+        console.log('Background API call completed');
+      });
     }
 
     // Close modal and clean state
     closeAddModal();
     setActionInProgress(false);
 
-    // Finally refresh
-    fetchAllData();
+    // Refresh data in background
+    fetchAllData().finally(() => {
+      console.log('Background data refresh completed');
+    });
 
     // Hide loading spinner
     setIsProcessing(false);
+    setUploadProgress(0);
+    setCurrentStep('');
   };
 
   const handleMouseEnter = (element) => {
@@ -2205,7 +2278,7 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Confirmation Modal - Same style as ApplyDeposits */}
+        {/* Confirmation Modal */}
         {confirmModalVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
@@ -2239,7 +2312,7 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Success Modal - Same style as ApplyDeposits */}
+        {/* Success Modal */}
         {successModalVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
@@ -2259,7 +2332,7 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Error Modal - Same style as ApplyDeposits */}
+        {/* Error Modal */}
         {errorModalVisible && (
           <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
@@ -2279,10 +2352,28 @@ const Deposits = () => {
           </div>
         )}
 
-        {/* Loading Spinner - Same style as ApplyDeposits */}
+        {/* Enhanced Loading Overlay with Progress */}
         {isProcessing && (
           <div style={styles.centeredModal}>
-            <div style={styles.spinner}></div>
+            <div style={styles.modalCardSmall}>
+              <div style={styles.spinner}></div>
+              <p style={{...styles.modalText, marginTop: '16px'}}>
+                {currentStep || 'Processing...'}
+              </p>
+              {uploadProgress > 0 && (
+                <div style={styles.progressContainer}>
+                  <div 
+                    style={{
+                      ...styles.progressBar,
+                      width: `${uploadProgress}%`
+                    }}
+                  ></div>
+                  <div style={styles.progressText}>
+                    {uploadProgress}% complete
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>
