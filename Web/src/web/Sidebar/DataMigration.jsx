@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FaSearch, FaDownload, FaFilter, FaChevronLeft, FaChevronRight, FaPlus, FaSave, FaTimes, FaCheckCircle, FaUser, FaUserCheck, FaUserTimes, FaEye, FaEdit, FaTrash, FaPhone, FaEnvelope, FaCalendarAlt, FaIdCard, FaMapMarkerAlt, FaMoneyBillWave, FaSpinner } from 'react-icons/fa';
+import { FaSearch, FaDownload, FaFilter, FaChevronLeft, FaChevronRight, FaPlus, FaSave, FaTimes, FaCheckCircle, FaUser, FaUserCheck, FaUserTimes, FaEye, FaEdit } from 'react-icons/fa';
 import { AiOutlineClose } from 'react-icons/ai';
 import { FiAlertCircle } from 'react-icons/fi';
 import { database, auth, storage } from '../../../../Database/firebaseConfig';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { sendMemberCredentialsEmail, sendMemberDeleteData } from '../../../../Server/api';
+import { sendMemberCredentialsEmail } from '../../../../Server/api';
 import ExcelJS from 'exceljs';
 
 // Options (simplified as requested)
@@ -309,8 +309,7 @@ const styles = {
     alignItems: 'center',
     zIndex: 1000,
     padding: '20px',
-    overflowY: 'auto',
-    backdropFilter: 'blur(4px)'
+    overflowY: 'auto'
   },
   modalCard: {
     backgroundColor: 'white',
@@ -321,156 +320,162 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
-    flexDirection: 'column',
-    border: '1px solid #F1F5F9'
+    flexDirection: 'column'
   },
   modalHeader: {
-    background: 'linear-gradient(135deg, #1E3A8A 0%, #2563EB 100%)',
-    color: 'white',
-    padding: '1.5rem 2rem',
+    padding: '24px',
+    borderBottom: '1px solid #e2e8f0',
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderBottom: '1px solid #E5E7EB'
+    flexShrink: 0
   },
   modalTitle: {
-    fontSize: '1.5rem',
+    fontSize: '24px',
     fontWeight: '700',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.75rem',
+    color: '#1e293b',
     margin: 0
   },
   closeButton: {
-    background: 'rgba(255, 255, 255, 0.1)',
+    background: 'none',
     border: 'none',
-    borderRadius: '8px',
-    color: 'white',
+    fontSize: '20px',
+    color: '#64748b',
     cursor: 'pointer',
-    padding: '0.5rem',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'all 0.2s ease',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    transition: 'all 0.2s ease',
-    backdropFilter: 'blur(10px)',
-    '&:hover': {
-      background: 'rgba(255, 255, 255, 0.2)',
-      transform: 'rotate(90deg)'
-    }
+    justifyContent: 'center'
+  },
+  closeButtonHover: {
+    backgroundColor: '#f1f5f9',
+    color: '#374151'
   },
   modalContent: {
-    padding: '2rem',
+    padding: '24px',
     overflowY: 'auto',
-    flex: 1,
-    minHeight: 0
+    flex: 1
   },
-  columnsContainer: {
+  formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
-    gap: '2rem',
-    marginBottom: '1.5rem'
+    gap: '16px'
   },
-  column: {
+  formSection: {
+    marginBottom: '16px'
+  },
+  formLabel: {
+    display: 'block',
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151',
+    marginBottom: '6px'
+  },
+  requiredAsterisk: {
+    color: '#dc2626',
+    marginLeft: '2px'
+  },
+  formInput: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    transition: 'all 0.2s ease',
+    backgroundColor: '#fff',
+    boxSizing: 'border-box'
+  },
+  formInputFocus: {
+    borderColor: '#3b82f6',
+    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
+  },
+  formSelect: {
+    width: '100%',
+    padding: '10px 12px',
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    fontSize: '14px',
+    backgroundColor: '#fff',
+    transition: 'all 0.2s ease',
+    boxSizing: 'border-box'
+  },
+  fileUploadSection: {
+    border: '2px dashed #d1d5db',
+    borderRadius: '8px',
+    padding: '16px',
+    textAlign: 'center',
+    transition: 'all 0.2s ease',
+    cursor: 'pointer',
+    backgroundColor: '#fafafa',
+    minHeight: '80px',
     display: 'flex',
     flexDirection: 'column',
-    gap: '1rem'
+    justifyContent: 'center',
+    alignItems: 'center'
   },
-  section: {
-    background: '#f8fafc',
-    borderRadius: '8px',
-    padding: '1.5rem',
-    border: '1px solid #e2e8f0'
+  fileUploadSectionHover: {
+    borderColor: '#3b82f6',
+    backgroundColor: '#f0f9ff'
   },
-  sectionTitle: {
-    fontSize: '1rem',
-    fontWeight: '600',
-    color: '#1e3a8a',
-    marginBottom: '1rem',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    paddingBottom: '0.5rem',
-    borderBottom: '2px solid #e2e8f0'
+  fileInput: {
+    display: 'none'
   },
-  fieldGroup: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: '0.75rem',
-    padding: '0.5rem 0'
-  },
-  fieldLabel: {
-    fontWeight: '500',
+  fileUploadText: {
+    fontSize: '14px',
     color: '#64748b',
-    fontSize: '0.875rem',
-    minWidth: '120px',
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem'
+    marginBottom: '4px',
+    textAlign: 'center'
   },
-  fieldValue: {
-    textAlign: 'right',
-    flex: 1,
-    wordBreak: 'break-word',
-    color: '#1f2937',
-    fontSize: '0.875rem',
-    fontWeight: '500'
+  fileName: {
+    fontSize: '12px',
+    color: '#059669',
+    fontWeight: '500',
+    marginTop: '4px',
+    textAlign: 'center',
+    wordBreak: 'break-word'
   },
   modalActions: {
+    padding: '24px',
+    borderTop: '1px solid #e2e8f0',
     display: 'flex',
-    justifyContent: 'center',
-    gap: '1rem',
-    padding: '1.5rem 2rem',
-    borderTop: '1px solid #e5e7eb',
-    background: '#f8fafc',
+    justifyContent: 'flex-end',
+    gap: '12px',
     flexShrink: 0
   },
-  actionButton: {
-    padding: '0.75rem 2rem',
-    borderRadius: '8px',
+  primaryButton: {
+    padding: '10px 20px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
     border: 'none',
+    borderRadius: '8px',
     cursor: 'pointer',
+    fontSize: '14px',
     fontWeight: '600',
-    fontSize: '0.875rem',
+    transition: 'background-color 0.2s ease',
     display: 'flex',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.2s ease',
-    minWidth: '140px'
+    gap: '8px',
+    whiteSpace: 'nowrap'
   },
-  primaryButton: {
-    background: 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
-    }
+  primaryButtonHover: {
+    backgroundColor: '#1e3a8a'
   },
   secondaryButton: {
-    background: '#6b7280',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
-    }
+    padding: '10px 20px',
+    backgroundColor: '#6b7280',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
+    whiteSpace: 'nowrap'
   },
-  deleteButton: {
-    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
-    }
-  },
-  disabledButton: {
-    background: '#9ca3af',
-    cursor: 'not-allowed',
-    opacity: '0.7',
-    '&:hover': {
-      transform: 'none',
-      boxShadow: 'none'
-    }
+  secondaryButtonHover: {
+    backgroundColor: '#4b5563'
   },
   loadingContainer: {
     display: 'flex',
@@ -602,114 +607,54 @@ const styles = {
     lineHeight: '1.5',
     fontWeight: '500'
   },
-  formGrid: {
-    display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
-    gap: '16px'
-  },
-  formSection: {
-    marginBottom: '16px'
-  },
-  formLabel: {
-    display: 'block',
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: '6px'
-  },
-  requiredAsterisk: {
-    color: '#dc2626',
-    marginLeft: '2px'
-  },
-  formInput: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #d1d5db',
+  actionButton: {
+    padding: '0.75rem 2rem',
     borderRadius: '8px',
-    fontSize: '14px',
-    transition: 'all 0.2s ease',
-    backgroundColor: '#fff',
-    boxSizing: 'border-box'
-  },
-  formInputFocus: {
-    borderColor: '#3b82f6',
-    boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
-  },
-  formSelect: {
-    width: '100%',
-    padding: '10px 12px',
-    border: '1px solid #d1d5db',
-    borderRadius: '8px',
-    fontSize: '14px',
-    backgroundColor: '#fff',
-    transition: 'all 0.2s ease',
-    boxSizing: 'border-box'
-  },
-  fileUploadSection: {
-    border: '2px dashed #d1d5db',
-    borderRadius: '8px',
-    padding: '16px',
-    textAlign: 'center',
-    transition: 'all 0.2s ease',
+    border: 'none',
     cursor: 'pointer',
-    backgroundColor: '#fafafa',
-    minHeight: '80px',
+    fontWeight: '600',
+    fontSize: '0.875rem',
     display: 'flex',
-    flexDirection: 'column',
+    alignItems: 'center',
     justifyContent: 'center',
-    alignItems: 'center'
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
   },
-  fileUploadSectionHover: {
-    borderColor: '#3b82f6',
-    backgroundColor: '#f0f9ff'
+  approveButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
   },
-  fileInput: {
-    display: 'none'
+  rejectButton: {
+    background: 'linear-gradient(135deg, #dc2626 0%, #ef4444 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
+    }
   },
-  fileUploadText: {
-    fontSize: '14px',
-    color: '#64748b',
-    marginBottom: '4px',
-    textAlign: 'center'
-  },
-  fileName: {
-    fontSize: '12px',
-    color: '#059669',
-    fontWeight: '500',
-    marginTop: '4px',
-    textAlign: 'center',
-    wordBreak: 'break-word'
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
   },
   errorText: {
     color: '#dc2626',
     fontSize: '12px',
     marginTop: '4px'
-  },
-  financialCard: {
-    background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
-    border: '1px solid #bae6fd',
-    borderRadius: '8px',
-    padding: '1rem',
-    marginBottom: '1rem'
-  },
-  financialItem: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '0.5rem 0'
-  },
-  financialLabel: {
-    fontSize: '0.875rem',
-    color: '#0369a1',
-    fontWeight: '500'
-  },
-  financialValue: {
-    fontSize: '1rem',
-    fontWeight: '600'
   }
 };
 
 const emptyForm = {
+  memberId: '',
   email: '',
   phoneNumber: '',
   firstName: '',
@@ -719,8 +664,8 @@ const emptyForm = {
   placeOfBirth: '',
   address: '',
   governmentId: '',
-  balance: '',
-  investment: '',
+  currentBalance: '',
+  currentInvestment: '',
   loans: ''
 };
 
@@ -735,11 +680,9 @@ const DataMigration = () => {
   const pageSize = 10;
   const [currentPage, setCurrentPage] = useState(0);
 
-  // Modals
+  // Add/Edit modal
   const [addModalVisible, setAddModalVisible] = useState(false);
-  const [viewModalVisible, setViewModalVisible] = useState(false);
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
   const [editingMember, setEditingMember] = useState(null);
   const [formData, setFormData] = useState(emptyForm);
 
@@ -758,18 +701,17 @@ const DataMigration = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
-  const [confirmDeleteVisible, setConfirmDeleteVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
   const [pendingAdd, setPendingAdd] = useState(null);
-  const [pendingDelete, setPendingDelete] = useState(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [actionInProgress, setActionInProgress] = useState(false);
 
   // Form validation errors
   const [emailError, setEmailError] = useState('');
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [phoneNumberError, setPhoneNumberError] = useState('');
+  const [memberIdError, setMemberIdError] = useState('');
+  const [balanceError, setBalanceError] = useState('');
+  const [investmentError, setInvestmentError] = useState('');
 
   // Create style element and append to head
   useEffect(() => {
@@ -906,6 +848,49 @@ const DataMigration = () => {
     setFirstNameError('');
     setLastNameError('');
     setPhoneNumberError('');
+    setMemberIdError('');
+    setBalanceError('');
+    setInvestmentError('');
+
+    // Member ID validation
+    if (!formData.memberId.trim()) {
+      setMemberIdError('Member ID is required');
+      isValid = false;
+    } else if (!/^\d+$/.test(formData.memberId)) {
+      setMemberIdError('Member ID must be a number');
+      isValid = false;
+    } else {
+      const memberId = parseInt(formData.memberId);
+      const existingMember = members.find(m => m.id === memberId);
+      if (existingMember) {
+        setMemberIdError(`Member ID ${memberId} already exists`);
+        isValid = false;
+      }
+    }
+
+    // Balance validation
+    if (!formData.currentBalance.trim()) {
+      setBalanceError('Current balance is required');
+      isValid = false;
+    } else if (!/^\d+(\.\d{1,2})?$/.test(formData.currentBalance)) {
+      setBalanceError('Current balance must be a valid number');
+      isValid = false;
+    } else if (parseFloat(formData.currentBalance) < 0) {
+      setBalanceError('Current balance cannot be negative');
+      isValid = false;
+    }
+
+    // Investment validation
+    if (!formData.currentInvestment.trim()) {
+      setInvestmentError('Current investment is required');
+      isValid = false;
+    } else if (!/^\d+(\.\d{1,2})?$/.test(formData.currentInvestment)) {
+      setInvestmentError('Current investment must be a valid number');
+      isValid = false;
+    } else if (parseFloat(formData.currentInvestment) < 0) {
+      setInvestmentError('Current investment cannot be negative');
+      isValid = false;
+    }
 
     if (!formData.email.trim()) {
       setEmailError('Email is required');
@@ -945,17 +930,16 @@ const DataMigration = () => {
     setFirstNameError('');
     setLastNameError('');
     setPhoneNumberError('');
+    setMemberIdError('');
+    setBalanceError('');
+    setInvestmentError('');
     setAddModalVisible(true);
-  };
-
-  const openViewModal = (member) => {
-    setSelectedMember(member);
-    setViewModalVisible(true);
   };
 
   const openEditModal = (member) => {
     setEditingMember(member);
     setFormData({
+      memberId: String(member.id || ''),
       email: member.email || '',
       phoneNumber: member.phoneNumber || '',
       firstName: member.firstName || '',
@@ -965,8 +949,8 @@ const DataMigration = () => {
       placeOfBirth: member.placeOfBirth || '',
       address: member.address || '',
       governmentId: member.governmentId || '',
-      balance: String(member.balance ?? 0),
-      investment: String(member.investment ?? 0),
+      currentBalance: String(member.balance ?? 0),
+      currentInvestment: String(member.currentInvestment ?? 0),
       loans: String(member.loans ?? 0)
     });
     setValidIdFrontFile(null);
@@ -977,9 +961,7 @@ const DataMigration = () => {
 
   const closeModals = () => {
     setAddModalVisible(false);
-    setViewModalVisible(false);
     setEditModalVisible(false);
-    setSelectedMember(null);
     setEditingMember(null);
     setSuccessMessage('');
     setErrorMessage('');
@@ -1038,6 +1020,30 @@ const DataMigration = () => {
     return true;
   };
 
+  const updateFunds = async (balance, investment) => {
+    try {
+      // Get current funds
+      const fundsSnap = await database.ref('Funds').once('value');
+      const currentFunds = fundsSnap.val() || { totalFunds: 0, availableFunds: 0, investedFunds: 0 };
+      
+      const totalBalance = parseFloat(balance) || 0;
+      const totalInvestment = parseFloat(investment) || 0;
+      
+      // Update funds
+      const updatedFunds = {
+        totalFunds: (parseFloat(currentFunds.totalFunds) || 0) + totalBalance + totalInvestment,
+        availableFunds: (parseFloat(currentFunds.availableFunds) || 0) + totalBalance,
+        investedFunds: (parseFloat(currentFunds.investedFunds) || 0) + totalInvestment
+      };
+      
+      await database.ref('Funds').set(updatedFunds);
+      console.log('Funds updated successfully:', updatedFunds);
+    } catch (error) {
+      console.error('Error updating funds:', error);
+      throw new Error('Failed to update funds');
+    }
+  };
+
   const handleSubmitConfirmation = () => {
     if (!validateAddFields()) return;
     setPendingAction('add');
@@ -1053,20 +1059,18 @@ const DataMigration = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, password);
       const userId = userCredential.user.uid;
 
-      const newId = await getNextMemberId();
+      const newId = parseInt(formData.memberId);
+      const currentBalance = parseFloat(formData.currentBalance) || 0;
+      const currentInvestment = parseFloat(formData.currentInvestment) || 0;
 
       const now = new Date();
       const dateAdded = formatDate(now);
       const timeAdded = formatTime(now);
 
-      // Upload images
+      // Upload images (only required ones as per your request)
       const validIdFrontUrl = await uploadImageToStorage(validIdFrontFile, `member_docs/${newId}/valid_id_front_${Date.now()}`);
       const selfieUrl = await uploadImageToStorage(selfieFile, `member_docs/${newId}/selfie_${Date.now()}`);
       const proofOfPaymentUrl = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${newId}/registration_payment_proof_${Date.now()}`);
-
-      const balance = parseFloat(formData.balance || 0);
-      const investment = parseFloat(formData.investment || 0);
-      const loans = parseFloat(formData.loans || 0);
 
       const memberData = {
         id: newId,
@@ -1083,9 +1087,9 @@ const DataMigration = () => {
         dateAdded,
         timeAdded,
         status: 'active',
-        balance: balance,
-        investment: investment,
-        loans: loans,
+        balance: currentBalance,
+        currentInvestment: currentInvestment,
+        loans: parseFloat(formData.loans) || 0.0,
         validIdFront: validIdFrontUrl,
         selfie: selfieUrl,
         registrationPaymentProof: proofOfPaymentUrl,
@@ -1094,6 +1098,9 @@ const DataMigration = () => {
 
       // Save member data
       await database.ref(`Members/${newId}`).set(memberData);
+
+      // Update funds with the new balance and investment
+      await updateFunds(currentBalance, currentInvestment);
 
       // Store pending add for email sending
       setPendingAdd({
@@ -1105,7 +1112,7 @@ const DataMigration = () => {
         dateAdded: memberData.dateAdded
       });
 
-      setSuccessMessage('Member added successfully! Credentials have been sent to the member.');
+      setSuccessMessage('Member added successfully! Funds have been updated and credentials have been sent to the member.');
       setSuccessModalVisible(true);
       closeModals();
       await fetchMembers();
@@ -1124,6 +1131,11 @@ const DataMigration = () => {
 
     try {
       const id = editingMember.id;
+      const currentBalance = parseFloat(formData.currentBalance) || 0;
+      const currentInvestment = parseFloat(formData.currentInvestment) || 0;
+      const previousBalance = parseFloat(editingMember.balance) || 0;
+      const previousInvestment = parseFloat(editingMember.currentInvestment) || 0;
+
       const updates = {
         phoneNumber: formData.phoneNumber || '',
         firstName: formData.firstName || '',
@@ -1133,8 +1145,8 @@ const DataMigration = () => {
         placeOfBirth: formData.placeOfBirth || '',
         address: formData.address || '',
         governmentId: formData.governmentId || '',
-        balance: parseFloat(formData.balance || editingMember.balance || 0),
-        investment: parseFloat(formData.investment || editingMember.investment || 0),
+        balance: currentBalance,
+        currentInvestment: currentInvestment,
         loans: parseFloat(formData.loans || editingMember.loans || 0)
       };
 
@@ -1144,7 +1156,17 @@ const DataMigration = () => {
 
       await database.ref(`Members/${id}`).update(updates);
 
-      setSuccessMessage('Member updated successfully!');
+      // Update funds if balance or investment changed
+      if (currentBalance !== previousBalance || currentInvestment !== previousInvestment) {
+        const balanceDiff = currentBalance - previousBalance;
+        const investmentDiff = currentInvestment - previousInvestment;
+        
+        if (balanceDiff !== 0 || investmentDiff !== 0) {
+          await updateFunds(balanceDiff, investmentDiff);
+        }
+      }
+
+      setSuccessMessage('Member updated successfully! Funds have been updated accordingly.');
       setSuccessModalVisible(true);
       closeModals();
       await fetchMembers();
@@ -1157,63 +1179,6 @@ const DataMigration = () => {
     }
   };
 
-  // Function to delete Firebase user (would typically be handled via Cloud Function)
-  const deleteFirebaseUser = async (uid) => {
-    try {
-      // Note: Client-side Firebase Auth doesn't allow deleting other users
-      // This would need to be handled via a Cloud Function
-      console.log('Attempting to delete Firebase user with UID:', uid);
-      
-      // If you have a Cloud Function set up, you would call it here:
-      // await fetch('/deleteUser', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ uid: uid })
-      // });
-      
-      console.log(`Firebase user with UID ${uid} should be deleted via Cloud Function`);
-      return true;
-    } catch (error) {
-      console.error('Error deleting Firebase user:', error);
-      throw new Error('Failed to delete user authentication: ' + error.message);
-    }
-  };
-
-  const handleDeleteMember = async () => {
-    setConfirmDeleteVisible(false);
-    setIsProcessing(true);
-    setActionInProgress(true);
-
-    try {
-      const idToDelete = pendingDelete.id;
-      const uidToDelete = pendingDelete.authUid;
-
-      // Delete from database
-      await database.ref(`Members/${idToDelete}`).remove();
-
-      // Delete Firebase authentication user if UID exists
-      if (uidToDelete) {
-        try {
-          await deleteFirebaseUser(uidToDelete);
-          console.log('Firebase authentication user deletion initiated for UID:', uidToDelete);
-        } catch (authError) {
-          console.warn('Could not delete Firebase auth user, but proceeding with database deletion:', authError);
-          // Continue with success even if auth deletion fails
-        }
-      }
-
-      setSuccessMessage(`Member account deleted successfully!`);
-      setSuccessModalVisible(true);
-    } catch (error) {
-      console.error('Error deleting member:', error);
-      setErrorMessage(error.message || 'Failed to delete member');
-      setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
-      setActionInProgress(false);
-    }
-  };
-
   const handleMouseEnter = (element) => {
     setIsHovered(prev => ({ ...prev, [element]: true }));
   };
@@ -1222,34 +1187,28 @@ const DataMigration = () => {
     setIsHovered(prev => ({ ...prev, [element]: false }));
   };
 
-  const handleSuccessOk = () => {
+  const handleSuccessOk = async () => {
     setSuccessModalVisible(false);
     
     // Send member credentials email after successful addition
     if (pendingAdd) {
-      sendMemberCredentialsEmail({
-        firstName: pendingAdd.firstName,
-        lastName: pendingAdd.lastName,
-        email: pendingAdd.email,
-        password: pendingAdd.password,
-        memberId: pendingAdd.memberId,
-        dateAdded: pendingAdd.dateAdded
-      }).catch(error => console.error('Error sending member credentials email:', error));
+      try {
+        await sendMemberCredentialsEmail({
+          firstName: pendingAdd.firstName,
+          lastName: pendingAdd.lastName,
+          email: pendingAdd.email,
+          password: pendingAdd.password,
+          memberId: pendingAdd.memberId,
+          dateAdded: pendingAdd.dateAdded
+        });
+        console.log('Member credentials email sent successfully');
+      } catch (error) {
+        console.error('Error sending member credentials email:', error);
+        // Don't show error to user since member was already created successfully
+        // Just log it for debugging
+      }
       
       setPendingAdd(null);
-    }
-
-    // Send delete notification after successful deletion
-    if (pendingDelete) {
-      sendMemberDeleteData({
-        email: pendingDelete.email,
-        firstName: pendingDelete.firstName || '',
-        lastName: pendingDelete.lastName || ''
-      }).catch(error => console.error('Error sending member delete notification:', error));
-      
-      // Close the view modal if it's open (after delete action)
-      setViewModalVisible(false);
-      setSelectedMember(null);
     }
     
     if (pendingAction) {
@@ -1320,14 +1279,19 @@ const DataMigration = () => {
     );
   };
 
-  const renderAddEditModal = (mode) => (
+  const renderModal = (mode) => (
     <div style={styles.modalOverlay} onClick={closeModals}>
       <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
         <div style={styles.modalHeader}>
-          <h2 style={styles.modalTitle}>{mode === 'add' ? 'Add New Member' : `Edit Member #${editingMember?.id}`}</h2>
+          <h2 style={styles.modalTitle}>{mode === 'add' ? 'Register New Member' : `Edit Member #${editingMember?.id}`}</h2>
           <button 
             onClick={closeModals}
-            style={styles.closeButton}
+            style={{
+              ...styles.closeButton,
+              ...(isHovered.closeModal ? styles.closeButtonHover : {})
+            }}
+            onMouseEnter={() => handleMouseEnter('closeModal')}
+            onMouseLeave={() => handleMouseLeave('closeModal')}
           >
             <AiOutlineClose />
           </button>
@@ -1337,257 +1301,501 @@ const DataMigration = () => {
           <div style={styles.formGrid}>
             {/* Left Column */}
             <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  First Name<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter first name"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  autoCapitalize="words"
-                />
-                {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Last Name<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter last name"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  autoCapitalize="words"
-                />
-                {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Email Address<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter email address"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  type="email"
-                  autoCapitalize="none"
-                  disabled={mode === 'edit'}
-                />
-                {emailError && <span style={styles.errorText}>{emailError}</span>}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Phone Number<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter 11-digit contact number"
-                  value={formData.phoneNumber}
-                  onChange={(e) => {
-                    const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
-                    handleInputChange('phoneNumber', numericText);
-                  }}
-                  type="tel"
-                />
-                {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
-              </div>
-
-              {mode === 'add' && (
-                <div style={styles.formSection}>
-                  <label style={styles.formLabel}>
-                    Valid ID Front<span style={styles.requiredAsterisk}>*</span>
-                  </label>
-                  <div 
-                    style={styles.fileUploadSection}
-                    onClick={() => document.getElementById('validIdFront').click()}
-                  >
+              {mode === 'add' ? (
+                <>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Member ID<span style={styles.requiredAsterisk}>*</span>
+                    </label>
                     <input
-                      id='validIdFront'
-                      style={styles.fileInput}
-                      type="file"
-                      onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
-                      accept="image/*"
+                      style={styles.formInput}
+                      placeholder="Enter custom member ID (e.g., 5002)"
+                      value={formData.memberId}
+                      onChange={(e) => {
+                        const numericText = e.target.value.replace(/[^0-9]/g, '');
+                        handleInputChange('memberId', numericText);
+                      }}
+                      type="text"
                     />
-                    <p style={styles.fileUploadText}>
-                      {validIdFrontFile ? 'Change file' : 'Click to upload'}
-                    </p>
-                    {validIdFrontFile && (
-                      <p style={styles.fileName}>{validIdFrontFile.name}</p>
-                    )}
+                    {memberIdError && <span style={styles.errorText}>{memberIdError}</span>}
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      Enter a custom numeric ID for migration purposes
+                    </div>
                   </div>
-                </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      First Name<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter first name"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange('firstName', e.target.value)}
+                      autoCapitalize="words"
+                    />
+                    {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Last Name<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter last name"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange('lastName', e.target.value)}
+                      autoCapitalize="words"
+                    />
+                    {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Email Address<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter email address"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      type="email"
+                      autoCapitalize="none"
+                    />
+                    {emailError && <span style={styles.errorText}>{emailError}</span>}
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Phone Number<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter 11-digit contact number"
+                      value={formData.phoneNumber}
+                      onChange={(e) => {
+                        const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                        handleInputChange('phoneNumber', numericText);
+                      }}
+                      type="tel"
+                    />
+                    {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Member ID</label>
+                    <input
+                      disabled
+                      style={styles.formInput}
+                      value={formData.memberId}
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      First Name<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter first name"
+                      value={formData.firstName}
+                      onChange={(e) => handleInputChange('firstName', e.target.value)}
+                      autoCapitalize="words"
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Last Name<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter last name"
+                      value={formData.lastName}
+                      onChange={(e) => handleInputChange('lastName', e.target.value)}
+                      autoCapitalize="words"
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Email</label>
+                    <input
+                      disabled
+                      style={styles.formInput}
+                      value={formData.email}
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Phone Number
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter phone number"
+                      value={formData.phoneNumber}
+                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      type="tel"
+                    />
+                  </div>
+                </>
               )}
             </div>
 
             {/* Right Column */}
             <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>Middle Name</label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter middle name"
-                  value={formData.middleName}
-                  onChange={(e) => handleInputChange('middleName', e.target.value)}
-                  autoCapitalize="words"
-                />
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Government ID<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <select
-                  style={styles.formSelect}
-                  value={formData.governmentId}
-                  onChange={(e) => handleInputChange('governmentId', e.target.value)}
-                >
-                  <option value="">Select Government ID</option>
-                  {governmentIdOptions.map((option) => (
-                    <option key={option.key} value={option.label}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>Current Balance</label>
-                <input
-                  style={styles.formInput}
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter current balance"
-                  value={formData.balance}
-                  onChange={(e) => handleInputChange('balance', e.target.value)}
-                />
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>Investment</label>
-                <input
-                  style={styles.formInput}
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter investment amount"
-                  value={formData.investment}
-                  onChange={(e) => handleInputChange('investment', e.target.value)}
-                />
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>Loans</label>
-                <input
-                  style={styles.formInput}
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter loans amount"
-                  value={formData.loans}
-                  onChange={(e) => handleInputChange('loans', e.target.value)}
-                />
-              </div>
-
-              {mode === 'add' && (
-                <div style={styles.formSection}>
-                  <label style={styles.formLabel}>
-                    Selfie Photo<span style={styles.requiredAsterisk}>*</span>
-                  </label>
-                  <div 
-                    style={styles.fileUploadSection}
-                    onClick={() => document.getElementById('selfie').click()}
-                  >
+              {mode === 'add' ? (
+                <>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Middle Name</label>
                     <input
-                      id='selfie'
-                      style={styles.fileInput}
-                      type="file"
-                      onChange={(e) => handleFileChange(e, setSelfieFile)}
-                      accept="image/*"
+                      style={styles.formInput}
+                      placeholder="Enter middle name"
+                      value={formData.middleName}
+                      onChange={(e) => handleInputChange('middleName', e.target.value)}
+                      autoCapitalize="words"
                     />
-                    <p style={styles.fileUploadText}>
-                      {selfieFile ? 'Change file' : 'Click to upload selfie'}
-                    </p>
-                    {selfieFile && (
-                      <p style={styles.fileName}>{selfieFile.name}</p>
-                    )}
                   </div>
-                </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Government ID<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <select
+                      style={styles.formSelect}
+                      value={formData.governmentId}
+                      onChange={(e) => handleInputChange('governmentId', e.target.value)}
+                    >
+                      <option value="">Select Government ID</option>
+                      {governmentIdOptions.map((option) => (
+                        <option key={option.key} value={option.label}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Current Balance<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter current balance"
+                      value={formData.currentBalance}
+                      onChange={(e) => handleInputChange('currentBalance', e.target.value)}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                    />
+                    {balanceError && <span style={styles.errorText}>{balanceError}</span>}
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      This amount will be added to available funds
+                    </div>
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>
+                      Current Investment<span style={styles.requiredAsterisk}>*</span>
+                    </label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter current investment"
+                      value={formData.currentInvestment}
+                      onChange={(e) => handleInputChange('currentInvestment', e.target.value)}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                    />
+                    {investmentError && <span style={styles.errorText}>{investmentError}</span>}
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      This amount will be added to invested funds
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Middle Name</label>
+                    <input
+                      style={styles.formInput}
+                      placeholder="Enter middle name"
+                      value={formData.middleName}
+                      onChange={(e) => handleInputChange('middleName', e.target.value)}
+                      autoCapitalize="words"
+                    />
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Government ID</label>
+                    <select
+                      style={styles.formSelect}
+                      value={formData.governmentId}
+                      onChange={(e) => handleInputChange('governmentId', e.target.value)}
+                    >
+                      <option value="">Select Government ID</option>
+                      {governmentIdOptions.map((option) => (
+                        <option key={option.key} value={option.label}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Current Balance</label>
+                    <input
+                      style={styles.formInput}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.currentBalance}
+                      onChange={(e) => handleInputChange('currentBalance', e.target.value)}
+                    />
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      Changes will update available funds
+                    </div>
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Current Investment</label>
+                    <input
+                      style={styles.formInput}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.currentInvestment}
+                      onChange={(e) => handleInputChange('currentInvestment', e.target.value)}
+                    />
+                    <div style={{ fontSize: '12px', color: '#64748b', marginTop: '4px' }}>
+                      Changes will update invested funds
+                    </div>
+                  </div>
+
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Loans</label>
+                    <input
+                      style={styles.formInput}
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={formData.loans}
+                      onChange={(e) => handleInputChange('loans', e.target.value)}
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>
 
-          {/* Additional Required Fields */}
+          {/* File Upload Sections */}
           <div style={styles.formGrid}>
             <div>
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
-                  Date of Birth<span style={styles.requiredAsterisk}>*</span>
+                  Valid ID Front<span style={styles.requiredAsterisk}>*</span>
                 </label>
-                <input
-                  style={styles.formInput}
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                  type="date"
-                />
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Place of Birth<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter place of birth"
-                  value={formData.placeOfBirth}
-                  onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
-                  autoCapitalize="words"
-                />
+                <div 
+                  style={{
+                    ...styles.fileUploadSection,
+                    ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('validIdFront')}
+                  onMouseLeave={() => handleMouseLeave('validIdFront')}
+                  onClick={() => document.getElementById('validIdFront').click()}
+                >
+                  <input
+                    id="validIdFront"
+                    style={styles.fileInput}
+                    type="file"
+                    onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                    accept="image/*"
+                  />
+                  <p style={styles.fileUploadText}>
+                    {validIdFrontFile ? 'Change file' : 'Click to upload'}
+                  </p>
+                  {validIdFrontFile && (
+                    <p style={styles.fileName}>{validIdFrontFile.name}</p>
+                  )}
+                </div>
               </div>
             </div>
 
             <div>
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
-                  Address<span style={styles.requiredAsterisk}>*</span>
+                  Selfie Photo<span style={styles.requiredAsterisk}>*</span>
                 </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter complete address"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  autoCapitalize="words"
-                />
+                <div 
+                  style={{
+                    ...styles.fileUploadSection,
+                    ...(isHovered.selfie ? styles.fileUploadSectionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('selfie')}
+                  onMouseLeave={() => handleMouseLeave('selfie')}
+                  onClick={() => document.getElementById('selfie').click()}
+                >
+                  <input
+                    id="selfie"
+                    style={styles.fileInput}
+                    type="file"
+                    onChange={(e) => handleFileChange(e, setSelfieFile)}
+                    accept="image/*"
+                  />
+                  <p style={styles.fileUploadText}>
+                    {selfieFile ? 'Change file' : 'Click to upload selfie'}
+                  </p>
+                  {selfieFile && (
+                    <p style={styles.fileName}>{selfieFile.name}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Proof of Payment for Add */}
+          {/* Additional Required Fields for Add */}
           {mode === 'add' && (
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
-                Proof of Payment<span style={styles.requiredAsterisk}>*</span>
-              </label>
-              <div 
-                style={styles.fileUploadSection}
-                onClick={() => document.getElementById('proofOfPayment').click()}
-              >
-                <input
-                  id='proofOfPayment'
-                  style={styles.fileInput}
-                  type="file"
-                  onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
-                  accept="image/*,application/pdf"
-                />
-                <p style={styles.fileUploadText}>
-                  {proofOfPaymentFile ? 'Change file' : 'Click to upload proof of payment'}
-                </p>
-                {proofOfPaymentFile && (
-                  <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
-                )}
+            <div style={styles.formGrid}>
+              <div>
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>
+                    Date of Birth<span style={styles.requiredAsterisk}>*</span>
+                  </label>
+                  <input
+                    style={styles.formInput}
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                    type="date"
+                  />
+                </div>
+
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>
+                    Place of Birth<span style={styles.requiredAsterisk}>*</span>
+                  </label>
+                  <input
+                    style={styles.formInput}
+                    placeholder="Enter place of birth"
+                    value={formData.placeOfBirth}
+                    onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
+                    autoCapitalize="words"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>
+                    Address<span style={styles.requiredAsterisk}>*</span>
+                  </label>
+                  <input
+                    style={styles.formInput}
+                    placeholder="Enter complete address"
+                    value={formData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    autoCapitalize="words"
+                  />
+                </div>
+
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>
+                    Proof of Payment<span style={styles.requiredAsterisk}>*</span>
+                  </label>
+                  <div 
+                    style={{
+                      ...styles.fileUploadSection,
+                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
+                    }}
+                    onMouseEnter={() => handleMouseEnter('proofOfPayment')}
+                    onMouseLeave={() => handleMouseLeave('proofOfPayment')}
+                    onClick={() => document.getElementById('proofOfPayment').click()}
+                  >
+                    <input
+                      id="proofOfPayment"
+                      style={styles.fileInput}
+                      type="file"
+                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                      accept="image/*,application/pdf"
+                    />
+                    <p style={styles.fileUploadText}>
+                      {proofOfPaymentFile ? 'Change file' : 'Click to upload proof of payment'}
+                    </p>
+                    {proofOfPaymentFile && (
+                      <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Additional Required Fields for Edit */}
+          {mode === 'edit' && (
+            <div style={styles.formGrid}>
+              <div>
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>Date of Birth</label>
+                  <input
+                    style={styles.formInput}
+                    value={formData.dateOfBirth}
+                    onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                    type="date"
+                  />
+                </div>
+
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>Place of Birth</label>
+                  <input
+                    style={styles.formInput}
+                    placeholder="Enter place of birth"
+                    value={formData.placeOfBirth}
+                    onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
+                    autoCapitalize="words"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>Address</label>
+                  <input
+                    style={styles.formInput}
+                    placeholder="Enter complete address"
+                    value={formData.address}
+                    onChange={(e) => handleInputChange('address', e.target.value)}
+                    autoCapitalize="words"
+                  />
+                </div>
+
+                <div style={styles.formSection}>
+                  <label style={styles.formLabel}>Replace Proof of Payment</label>
+                  <div 
+                    style={{
+                      ...styles.fileUploadSection,
+                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
+                    }}
+                    onMouseEnter={() => handleMouseEnter('proofOfPayment')}
+                    onMouseLeave={() => handleMouseLeave('proofOfPayment')}
+                    onClick={() => document.getElementById('proofOfPayment').click()}
+                  >
+                    <input
+                      id="proofOfPayment"
+                      style={styles.fileInput}
+                      type="file"
+                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                      accept="image/*,application/pdf"
+                    />
+                    <p style={styles.fileUploadText}>
+                      {proofOfPaymentFile ? 'Change file' : 'Click to upload replacement proof of payment'}
+                    </p>
+                    {proofOfPaymentFile && (
+                      <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
+                    )}
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1596,9 +1804,11 @@ const DataMigration = () => {
         <div style={styles.modalActions}>
           <button
             style={{
-              ...styles.actionButton,
-              ...styles.secondaryButton
+              ...styles.secondaryButton,
+              ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
             }}
+            onMouseEnter={() => handleMouseEnter('cancelButton')}
+            onMouseLeave={() => handleMouseLeave('cancelButton')}
             onClick={closeModals}
             disabled={uploading}
           >
@@ -1606,17 +1816,18 @@ const DataMigration = () => {
           </button>
           <button
             style={{
-              ...styles.actionButton,
               ...styles.primaryButton,
-              ...(uploading ? styles.disabledButton : {})
+              ...(isHovered.submitButton ? styles.primaryButtonHover : {})
             }}
+            onMouseEnter={() => handleMouseEnter('submitButton')}
+            onMouseLeave={() => handleMouseLeave('submitButton')}
             onClick={mode === 'add' ? handleSubmitConfirmation : submitEditMember}
             disabled={uploading}
           >
             {uploading ? (
               <>
-                <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
-                <span>{mode === 'add' ? 'Adding...' : 'Updating...'}</span>
+                <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
+                <span>{mode === 'add' ? 'Adding Member...' : 'Updating Member...'}</span>
               </>
             ) : (
               <>
@@ -1760,8 +1971,8 @@ const DataMigration = () => {
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Contact</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Balance</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Investment</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Loans</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Date Added</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Status</th>
                     <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
                   </tr>
                 </thead>
@@ -1777,16 +1988,23 @@ const DataMigration = () => {
                       <td style={styles.tableCell}>{m.email}</td>
                       <td style={styles.tableCell}>{m.phoneNumber || m.contactNumber || 'N/A'}</td>
                       <td style={styles.tableCell}>{toPeso(m.balance)}</td>
-                      <td style={styles.tableCell}>{toPeso(m.investment)}</td>
-                      <td style={styles.tableCell}>{toPeso(m.loans)}</td>
+                      <td style={styles.tableCell}>{toPeso(m.currentInvestment)}</td>
                       <td style={styles.tableCell}>{m.dateAdded || m.dateApproved || 'N/A'}</td>
+                      <td style={styles.tableCell}>
+                        <span style={{
+                          ...styles.statusBadge,
+                          ...(m.status === 'active' ? styles.statusActive : styles.statusInactive)
+                        }}>
+                          {m.status || 'active'}
+                        </span>
+                      </td>
                       <td style={styles.tableCell}>
                         <button 
                           style={styles.viewButton}
-                          onClick={() => openViewModal(m)}
+                          onClick={() => openEditModal(m)}
                         >
-                          <FaEye />
-                          View
+                          <FaEdit />
+                          Edit
                         </button>
                       </td>
                     </tr>
@@ -1812,243 +2030,36 @@ const DataMigration = () => {
         </button>
 
         {/* Add Member Modal */}
-        {addModalVisible && renderAddEditModal('add')}
+        {addModalVisible && renderModal('add')}
 
         {/* Edit Member Modal */}
-        {editModalVisible && renderAddEditModal('edit')}
+        {editModalVisible && renderModal('edit')}
 
-        {/* View Member Modal */}
-        {viewModalVisible && selectedMember && (
-          <div style={styles.modalOverlay} onClick={closeModals}>
-            <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>
-                  <FaUser />
-                  Member Details
-                </h2>
-                <button 
-                  onClick={closeModals}
-                  style={styles.closeButton}
-                >
-                  <AiOutlineClose />
-                </button>
-              </div>
-              
-              <div style={styles.modalContent}>
-                <div style={styles.columnsContainer}>
-                  {/* Left Column - Personal Information */}
-                  <div style={styles.column}>
-                    <div style={styles.section}>
-                      <h3 style={styles.sectionTitle}>
-                        <FaUser />
-                        Personal Information
-                      </h3>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>
-                          <FaIdCard />
-                          ID:
-                        </span>
-                        <span style={styles.fieldValue}>#{selectedMember.id}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>First Name:</span>
-                        <span style={styles.fieldValue}>{selectedMember.firstName || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Middle Name:</span>
-                        <span style={styles.fieldValue}>{selectedMember.middleName || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Last Name:</span>
-                        <span style={styles.fieldValue}>{selectedMember.lastName || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Date of Birth:</span>
-                        <span style={styles.fieldValue}>
-                          {selectedMember.dateOfBirth ? new Date(selectedMember.dateOfBirth).toLocaleDateString() : 'N/A'}
-                        </span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Place of Birth:</span>
-                        <span style={styles.fieldValue}>{selectedMember.placeOfBirth || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Address:</span>
-                        <span style={styles.fieldValue}>{selectedMember.address || 'N/A'}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column - Contact & Financial Information */}
-                  <div style={styles.column}>
-                    <div style={styles.section}>
-                      <h3 style={styles.sectionTitle}>
-                        <FaEnvelope />
-                        Contact Information
-                      </h3>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>
-                          <FaEnvelope />
-                          Email:
-                        </span>
-                        <span style={styles.fieldValue}>{selectedMember.email || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>
-                          <FaPhone />
-                          Contact Number:
-                        </span>
-                        <span style={styles.fieldValue}>{selectedMember.phoneNumber || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Government ID:</span>
-                        <span style={styles.fieldValue}>{selectedMember.governmentId || 'N/A'}</span>
-                      </div>
-                    </div>
-
-                    <div style={styles.financialCard}>
-                      <h3 style={styles.sectionTitle}>
-                        <FaMoneyBillWave />
-                        Financial Information
-                      </h3>
-                      <div style={styles.financialItem}>
-                        <span style={styles.financialLabel}>Current Balance:</span>
-                        <span style={styles.financialValue}>{toPeso(selectedMember.balance)}</span>
-                      </div>
-                      <div style={styles.financialItem}>
-                        <span style={styles.financialLabel}>Investment:</span>
-                        <span style={styles.financialValue}>{toPeso(selectedMember.investment)}</span>
-                      </div>
-                      <div style={styles.financialItem}>
-                        <span style={styles.financialLabel}>Loans:</span>
-                        <span style={styles.financialValue}>{toPeso(selectedMember.loans)}</span>
-                      </div>
-                    </div>
-
-                    <div style={styles.section}>
-                      <h3 style={styles.sectionTitle}>
-                        <FaCalendarAlt />
-                        Account Information
-                      </h3>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Date Added:</span>
-                        <span style={styles.fieldValue}>{selectedMember.dateAdded || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Time Added:</span>
-                        <span style={styles.fieldValue}>{selectedMember.timeAdded || 'N/A'}</span>
-                      </div>
-                      <div style={styles.fieldGroup}>
-                        <span style={styles.fieldLabel}>Status:</span>
-                        <span style={styles.fieldValue}>
-                          <span style={{
-                            ...styles.statusBadge,
-                            ...(selectedMember.status === 'active' ? styles.statusActive : styles.statusInactive)
-                          }}>
-                            {selectedMember.status || 'active'}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div style={styles.modalActions}>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.primaryButton
-                  }}
-                  onClick={() => {
-                    setViewModalVisible(false);
-                    openEditModal(selectedMember);
-                  }}
-                >
-                  <FaEdit />
-                  Edit Member
-                </button>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.deleteButton,
-                    ...(isProcessing ? styles.disabledButton : {})
-                  }}
-                  onClick={() => {
-                    setPendingDelete(selectedMember);
-                    setConfirmDeleteVisible(true);
-                  }}
-                  disabled={isProcessing}
-                >
-                  <FaTrash />
-                  Delete Member
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Confirmation Modals */}
+        {/* Confirmation Modal */}
         {confirmModalVisible && (
           <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
-            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f59e0b' }} />
-              <p style={styles.modalText}>
-                Are you sure you want to add this member? This will create their account and send them login credentials.
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.primaryButton
-                  }} 
-                  onClick={submitAddMember}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Yes'}
-                </button>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.secondaryButton
-                  }} 
-                  onClick={() => setConfirmModalVisible(false)}
-                  disabled={actionInProgress}
-                >
-                  No
-                </button>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Confirm Registration</h2>
               </div>
-            </div>
-          </div>
-        )}
-
-        {confirmDeleteVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmDeleteVisible(false)}>
-            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
-              <p style={styles.modalText}>
-                Are you sure you want to delete this member account? This action cannot be undone.
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.deleteButton
-                  }} 
-                  onClick={handleDeleteMember}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Delete Account'}
-                </button>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.secondaryButton
-                  }} 
-                  onClick={() => setConfirmDeleteVisible(false)}
-                  disabled={actionInProgress}
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  Are you sure you want to register this new member? This will create their account, update the funds, and send them login credentials.
+                </p>
+              </div>
+              <div style={styles.modalActions}>
+                <button
+                  style={styles.secondaryButton}
+                  onClick={() => setConfirmModalVisible(false)}
                 >
                   Cancel
+                </button>
+                <button
+                  style={styles.primaryButton}
+                  onClick={submitAddMember}
+                >
+                  Confirm Registration
                 </button>
               </div>
             </div>
@@ -2058,21 +2069,20 @@ const DataMigration = () => {
         {/* Success Modal */}
         {successModalVisible && (
           <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
-              <h2 style={{ margin: '0 0 12px 0', color: '#1e293b' }}>Success!</h2>
-              <p style={styles.modalText}>
-                {successMessage}
-              </p>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }}
-                onClick={handleSuccessOk}
-              >
-                Continue
-              </button>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {successMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={handleSuccessOk}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -2080,21 +2090,20 @@ const DataMigration = () => {
         {/* Error Modal */}
         {errorModalVisible && (
           <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
-              <FiAlertCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
-              <h2 style={{ margin: '0 0 12px 0', color: '#1e293b' }}>Error</h2>
-              <p style={styles.modalText}>
-                {errorMessage}
-              </p>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton
-                }}
-                onClick={() => setErrorModalVisible(false)}
-              >
-                Try Again
-              </button>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FiAlertCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {errorMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => setErrorModalVisible(false)}
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
           </div>
         )}
