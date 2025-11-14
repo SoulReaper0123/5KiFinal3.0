@@ -948,6 +948,27 @@ const DataMigration = () => {
     return newId;
   };
 
+  // Function to update funds in Settings/Funds (same as in Registrations)
+  const updateFunds = async (amount) => {
+    try {
+      const fundsRef = database.ref('Settings/Funds');
+      const snapshot = await fundsRef.once('value');
+      const currentFunds = snapshot.val() || 0;
+      const newFundsAmount = currentFunds + parseFloat(amount);
+      
+      await fundsRef.set(newFundsAmount);
+      
+      const now = new Date();
+      const dateKey = now.toISOString().split('T')[0];
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+      await fundsHistoryRef.set(newFundsAmount);
+      
+    } catch (error) {
+      console.error('Error updating funds:', error);
+      throw error;
+    }
+  };
+
   const validateAddFields = () => {
     if (!validateFields()) {
       return false;
@@ -1002,6 +1023,25 @@ const DataMigration = () => {
       const selfieUrl = await uploadImageToStorage(selfieFile, `member_docs/${newId}/selfie_${Date.now()}`);
       const proofOfPaymentUrl = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${newId}/registration_payment_proof_${Date.now()}`);
 
+      const registrationFee = parseFloat(formData.registrationFee || minRegistrationFee);
+      
+      // Create transaction data (same as in Registrations)
+      const transactionData = {
+        type: 'registration',
+        amount: registrationFee,
+        dateApplied: dateAdded,
+        dateApproved: dateAdded,
+        approvedTime: timeAdded,
+        timestamp: now.getTime(),
+        status: 'approved',
+        memberId: newId,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        transactionId: `REG-${Date.now()}`,
+        description: 'Registration fee payment'
+      };
+
       const memberData = {
         id: newId,
         authUid: userId,
@@ -1017,16 +1057,24 @@ const DataMigration = () => {
         dateAdded,
         timeAdded,
         status: 'active',
-        balance: 0.0,
+        balance: registrationFee, // Set balance to registration fee (same as in Registrations)
+        investment: registrationFee, // Set investment to registration fee (same as in Registrations)
         loans: 0.0,
         validIdFront: validIdFrontUrl,
         selfie: selfieUrl,
-        registrationFee: parseFloat(formData.registrationFee || minRegistrationFee),
+        registrationFee: registrationFee,
         registrationPaymentProof: proofOfPaymentUrl,
         initialPassword: password
       };
 
+      // Save member data
       await database.ref(`Members/${newId}`).set(memberData);
+
+      // Save transaction record (same as in Registrations)
+      await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+
+      // Update funds in Settings/Funds (same as in Registrations)
+      await updateFunds(registrationFee);
 
       // Store pending add for email sending
       setPendingAdd({
@@ -1865,6 +1913,7 @@ const DataMigration = () => {
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Contact</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Balance</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Investment</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Loans</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Date Added</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Status</th>
@@ -1883,6 +1932,7 @@ const DataMigration = () => {
                       <td style={styles.tableCell}>{m.email}</td>
                       <td style={styles.tableCell}>{m.phoneNumber || m.contactNumber || 'N/A'}</td>
                       <td style={styles.tableCell}>{toPeso(m.balance)}</td>
+                      <td style={styles.tableCell}>{toPeso(m.investment)}</td>
                       <td style={styles.tableCell}>{toPeso(m.loans)}</td>
                       <td style={styles.tableCell}>{m.dateAdded || m.dateApproved || 'N/A'}</td>
                       <td style={styles.tableCell}>
@@ -1940,7 +1990,7 @@ const DataMigration = () => {
               <div style={{padding: '24px', textAlign: 'center'}}>
                 <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
                 <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to register this new member? This will create their account and send them login credentials.
+                  Are you sure you want to register this new member? This will create their account, add their investment to the funds, and send them login credentials.
                 </p>
               </div>
               <div style={styles.modalActions}>
