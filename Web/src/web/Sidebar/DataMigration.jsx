@@ -3,7 +3,7 @@ import { FaSearch, FaDownload, FaFilter, FaChevronLeft, FaChevronRight, FaPlus, 
 import { AiOutlineClose } from 'react-icons/ai';
 import { FiAlertCircle } from 'react-icons/fi';
 import { database, auth, storage } from '../../../../Database/firebaseConfig';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, deleteUser } from 'firebase/auth';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendMemberCredentialsEmail, sendMemberDeleteData } from '../../../../Server/api';
 import ExcelJS from 'exceljs';
@@ -710,6 +710,7 @@ const styles = {
 };
 
 const emptyForm = {
+  memberId: '',
   email: '',
   phoneNumber: '',
   firstName: '',
@@ -770,6 +771,7 @@ const DataMigration = () => {
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [phoneNumberError, setPhoneNumberError] = useState('');
+  const [memberIdError, setMemberIdError] = useState('');
 
   // Create style element and append to head
   useEffect(() => {
@@ -900,12 +902,46 @@ const DataMigration = () => {
     }
   };
 
+  const getNextAvailableMemberId = () => {
+    if (members.length === 0) return 5001;
+    
+    const existingIds = members.map(m => Number(m.id)).filter(n => !Number.isNaN(n)).sort((a, b) => a - b);
+    let newId = 5001;
+    
+    for (const id of existingIds) {
+      if (id === newId) newId++;
+      else if (id > newId) break;
+    }
+    
+    return newId;
+  };
+
   const validateFields = () => {
     let isValid = true;
     setEmailError('');
     setFirstNameError('');
     setLastNameError('');
     setPhoneNumberError('');
+    setMemberIdError('');
+
+    // Member ID validation
+    if (!formData.memberId.trim()) {
+      setMemberIdError('Member ID is required');
+      isValid = false;
+    } else {
+      const memberId = parseInt(formData.memberId);
+      if (isNaN(memberId) || memberId < 5001) {
+        setMemberIdError('Member ID must be a number starting from 5001');
+        isValid = false;
+      } else {
+        // Check if member ID already exists
+        const idExists = members.some(member => member.id === memberId);
+        if (idExists) {
+          setMemberIdError(`Member ID ${memberId} is already taken`);
+          isValid = false;
+        }
+      }
+    }
 
     if (!formData.email.trim()) {
       setEmailError('Email is required');
@@ -937,7 +973,11 @@ const DataMigration = () => {
   };
 
   const openAddModal = () => {
-    setFormData({ ...emptyForm });
+    const nextAvailableId = getNextAvailableMemberId();
+    setFormData({ 
+      ...emptyForm, 
+      memberId: nextAvailableId.toString() 
+    });
     setValidIdFrontFile(null);
     setSelfieFile(null);
     setProofOfPaymentFile(null);
@@ -945,6 +985,7 @@ const DataMigration = () => {
     setFirstNameError('');
     setLastNameError('');
     setPhoneNumberError('');
+    setMemberIdError('');
     setAddModalVisible(true);
   };
 
@@ -956,6 +997,7 @@ const DataMigration = () => {
   const openEditModal = (member) => {
     setEditingMember(member);
     setFormData({
+      memberId: member.id.toString(),
       email: member.email || '',
       phoneNumber: member.phoneNumber || '',
       firstName: member.firstName || '',
@@ -990,6 +1032,15 @@ const DataMigration = () => {
       ...prev,
       [name]: value
     }));
+
+    // Auto-suggest next available ID when typing in memberId field
+    if (name === 'memberId' && value.trim() === '') {
+      const nextAvailableId = getNextAvailableMemberId();
+      setFormData(prev => ({
+        ...prev,
+        memberId: nextAvailableId.toString()
+      }));
+    }
   };
 
   const handleFileChange = (e, setFileFunction) => {
@@ -1003,18 +1054,6 @@ const DataMigration = () => {
     const fileRef = storageRef(storage, path);
     await uploadBytes(fileRef, file);
     return await getDownloadURL(fileRef);
-  };
-
-  const getNextMemberId = async () => {
-    const membersSnap = await database.ref('Members').once('value');
-    const membersData = membersSnap.val() || {};
-    const existingIds = Object.keys(membersData).map(Number).filter(n => !Number.isNaN(n)).sort((a, b) => a - b);
-    let newId = 5001;
-    for (const id of existingIds) {
-      if (id === newId) newId++;
-      else if (id > newId) break;
-    }
-    return newId;
   };
 
   const validateAddFields = () => {
@@ -1053,7 +1092,16 @@ const DataMigration = () => {
       const userCredential = await createUserWithEmailAndPassword(auth, formData.email, password);
       const userId = userCredential.user.uid;
 
-      const newId = await getNextMemberId();
+      const newId = parseInt(formData.memberId);
+      if (isNaN(newId) || newId < 5001) {
+        throw new Error('Invalid member ID');
+      }
+
+      // Double-check if member ID already exists
+      const idExists = members.some(member => member.id === newId);
+      if (idExists) {
+        throw new Error(`Member ID ${newId} is already taken`);
+      }
 
       const now = new Date();
       const dateAdded = formatDate(now);
@@ -1157,21 +1205,32 @@ const DataMigration = () => {
     }
   };
 
-  // Function to delete Firebase user (would typically be handled via Cloud Function)
+  // Function to delete Firebase user
   const deleteFirebaseUser = async (uid) => {
     try {
-      // Note: Client-side Firebase Auth doesn't allow deleting other users
-      // This would need to be handled via a Cloud Function
-      console.log('Attempting to delete Firebase user with UID:', uid);
+      if (!uid) {
+        console.log('No UID provided for Firebase user deletion');
+        return true;
+      }
+
+      // Get current user
+      const currentUser = auth.currentUser;
       
-      // If you have a Cloud Function set up, you would call it here:
-      // await fetch('/deleteUser', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({ uid: uid })
-      // });
+      if (currentUser && currentUser.uid === uid) {
+        // If deleting current user, use deleteUser directly
+        await deleteUser(currentUser);
+        console.log('Current Firebase user deleted successfully');
+      } else {
+        // For deleting other users, you would typically use a Cloud Function
+        // This is a limitation of Firebase Auth client-side SDK
+        console.warn('Cannot delete other users client-side. UID:', uid);
+        console.log('Note: To delete other users, implement a Cloud Function');
+        
+        // Alternative: Sign in as admin user first (not recommended for production)
+        // This would require having admin credentials in the client, which is insecure
+        throw new Error('Cannot delete other users client-side. Implement a Cloud Function for this operation.');
+      }
       
-      console.log(`Firebase user with UID ${uid} should be deleted via Cloud Function`);
       return true;
     } catch (error) {
       console.error('Error deleting Firebase user:', error);
@@ -1188,22 +1247,30 @@ const DataMigration = () => {
       const idToDelete = pendingDelete.id;
       const uidToDelete = pendingDelete.authUid;
 
-      // Delete from database
+      // Delete from database first
       await database.ref(`Members/${idToDelete}`).remove();
 
       // Delete Firebase authentication user if UID exists
       if (uidToDelete) {
         try {
           await deleteFirebaseUser(uidToDelete);
-          console.log('Firebase authentication user deletion initiated for UID:', uidToDelete);
+          console.log('Firebase authentication user deletion completed for UID:', uidToDelete);
         } catch (authError) {
           console.warn('Could not delete Firebase auth user, but proceeding with database deletion:', authError);
           // Continue with success even if auth deletion fails
+          // In production, you might want to implement a Cloud Function to handle this
         }
       }
 
-      setSuccessMessage(`Member account deleted successfully!`);
+      setSuccessMessage(`Member account #${idToDelete} deleted successfully!`);
       setSuccessModalVisible(true);
+      
+      // Store pending delete for notification
+      setPendingDelete({
+        ...pendingDelete,
+        id: idToDelete
+      });
+      
     } catch (error) {
       console.error('Error deleting member:', error);
       setErrorMessage(error.message || 'Failed to delete member');
@@ -1244,7 +1311,8 @@ const DataMigration = () => {
       sendMemberDeleteData({
         email: pendingDelete.email,
         firstName: pendingDelete.firstName || '',
-        lastName: pendingDelete.lastName || ''
+        lastName: pendingDelete.lastName || '',
+        memberId: pendingDelete.id
       }).catch(error => console.error('Error sending member delete notification:', error));
       
       // Close the view modal if it's open (after delete action)
@@ -1339,6 +1407,27 @@ const DataMigration = () => {
             <div>
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
+                  Member ID<span style={styles.requiredAsterisk}>*</span>
+                </label>
+                <input
+                  style={styles.formInput}
+                  placeholder="Enter member ID"
+                  value={formData.memberId}
+                  onChange={(e) => handleInputChange('memberId', e.target.value)}
+                  type="number"
+                  min="5001"
+                  disabled={mode === 'edit'}
+                />
+                {memberIdError && <span style={styles.errorText}>{memberIdError}</span>}
+                {mode === 'add' && !memberIdError && (
+                  <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                    Next available ID: {getNextAvailableMemberId()}
+                  </span>
+                )}
+              </div>
+
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
                   First Name<span style={styles.requiredAsterisk}>*</span>
                 </label>
                 <input
@@ -1379,23 +1468,6 @@ const DataMigration = () => {
                   disabled={mode === 'edit'}
                 />
                 {emailError && <span style={styles.errorText}>{emailError}</span>}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Phone Number<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter 11-digit contact number"
-                  value={formData.phoneNumber}
-                  onChange={(e) => {
-                    const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
-                    handleInputChange('phoneNumber', numericText);
-                  }}
-                  type="tel"
-                />
-                {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
               </div>
 
               {mode === 'add' && (
@@ -1440,6 +1512,23 @@ const DataMigration = () => {
 
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
+                  Phone Number<span style={styles.requiredAsterisk}>*</span>
+                </label>
+                <input
+                  style={styles.formInput}
+                  placeholder="Enter 11-digit contact number"
+                  value={formData.phoneNumber}
+                  onChange={(e) => {
+                    const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                    handleInputChange('phoneNumber', numericText);
+                  }}
+                  type="tel"
+                />
+                {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
+              </div>
+
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
                   Government ID<span style={styles.requiredAsterisk}>*</span>
                 </label>
                 <select
@@ -1477,18 +1566,6 @@ const DataMigration = () => {
                   placeholder="Enter investment amount"
                   value={formData.investment}
                   onChange={(e) => handleInputChange('investment', e.target.value)}
-                />
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>Loans</label>
-                <input
-                  style={styles.formInput}
-                  type="number"
-                  step="0.01"
-                  placeholder="Enter loans amount"
-                  value={formData.loans}
-                  onChange={(e) => handleInputChange('loans', e.target.value)}
                 />
               </div>
 
@@ -1560,6 +1637,18 @@ const DataMigration = () => {
                   value={formData.address}
                   onChange={(e) => handleInputChange('address', e.target.value)}
                   autoCapitalize="words"
+                />
+              </div>
+
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>Loans</label>
+                <input
+                  style={styles.formInput}
+                  type="number"
+                  step="0.01"
+                  placeholder="Enter loans amount"
+                  value={formData.loans}
+                  onChange={(e) => handleInputChange('loans', e.target.value)}
                 />
               </div>
             </div>
