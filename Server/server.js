@@ -3225,6 +3225,192 @@ app.post('/send-member-credentials', async (req, res) => {
   }
 });
 
+// ==============================================
+// MEMBER DELETION
+// ==============================================
+
+app.post('/send-member-delete-data', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating member deletion emails', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    memberId,
+    dateDeleted,
+    websiteLink 
+  } = req.body;
+
+  // Validate required fields
+  if (!email || !firstName || !lastName) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for member deletion');
+    return res.status(400).json({ 
+      success: false,
+      message: 'Missing required fields: email, firstName, and lastName are required'
+    });
+  }
+
+  // Validate email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid email format'
+    });
+  }
+
+  const fullName = `${firstName} ${lastName}`.trim();
+  const currentDate = dateDeleted || new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  try {
+    // Email to system owner
+    console.log('[NOTIFICATION] Sending member deletion notification to owner');
+    const ownerMailOptions = {
+      to: process.env.MAILJET_FROM_EMAIL || email,
+      subject: 'Member Account Deleted - 5KI Financial Services',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Member Account Deletion Notification
+          </h2>
+          
+          <p>Dear Admin,</p>
+          
+          <p>A member account has been permanently removed from the system.</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Member Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+            </tr>
+            ${memberId ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Member ID</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${memberId}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Deleted</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+            </tr>
+          </table>
+          
+          <p style="font-weight: bold; color: #e74c3c;">
+            Note: This action is irreversible. All member data and access privileges have been removed.
+          </p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+          <ul style="padding-left: 20px;">
+            <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+            <li><a href="${DASHBOARD_LINK}" style="color: #3498db;">Admin Dashboard</a></li>
+          </ul>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            5KI Financial Services &copy; ${new Date().getFullYear()}
+          </p>
+        </div>
+      `
+    };
+
+    // Email to deleted member
+    console.log('[NOTIFICATION] Sending member deletion notification to deleted member');
+    const memberMailOptions = {
+      to: email,
+      subject: 'Your 5KI Financial Services Account Has Been Deleted',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Account Deletion Confirmation
+          </h2>
+          
+          <p>Dear ${firstName},</p>
+          
+          <p>We're writing to inform you that your 5KI Financial Services member account has been permanently deleted as of ${currentDate}.</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Account Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+            </tr>
+            ${memberId ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Member ID</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${memberId}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Effective Date</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+            </tr>
+          </table>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">What This Means:</h3>
+          <ul style="margin-bottom: 20px;">
+            <li>Your member account has been permanently removed</li>
+            <li>All access to 5KI Financial Services has been revoked</li>
+            <li>Your personal data has been deleted from our systems</li>
+            <li>This action is permanent and cannot be undone</li>
+          </ul>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+            <p style="margin: 0; color: #64748b; font-size: 0.9em;">
+              <strong>Note:</strong> If this action was taken in error or you have any questions, 
+              please contact our support team immediately at 
+              <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.
+            </p>
+          </div>
+          
+          <p>We thank you for being part of 5KI Financial Services and wish you the best in your future endeavors.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Sincerely,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    };
+
+    // Send both emails using retry logic
+    const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+    const memberResult = await sendEmailWithRetry(memberMailOptions);
+
+    console.log('[NOTIFICATION SUCCESS] Member deletion emails sent successfully');
+    res.status(200).json({ 
+      success: true,
+      message: 'Member deletion emails sent successfully',
+      data: {
+        memberEmail: email,
+        memberName: fullName,
+        dateSent: currentDate,
+        emailsSent: {
+          owner: ownerResult.success,
+          member: memberResult.success
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending member deletion emails:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to send member deletion emails',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
 // Initialize the server
 // Add self-ping function RIGHT BEFORE startServer
 const startSelfPing = () => {
