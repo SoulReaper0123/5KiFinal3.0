@@ -60,6 +60,8 @@ const Dashboard = () => {
   const [distributionProcessing, setDistributionProcessing] = useState(false);
   const [distributionConfirmVisible, setDistributionConfirmVisible] = useState(false);
   const [distributionSuccessVisible, setDistributionSuccessVisible] = useState(false);
+  const [dividendsDistributionHistory, setDividendsDistributionHistory] = useState({});
+  const [memberInvestmentData, setMemberInvestmentData] = useState({}); // Store member investment data for advanced view
 
   const checkDueDates = async () => {
     try {
@@ -251,6 +253,37 @@ const Dashboard = () => {
     fetchDashboardData();
   }, [selectedYear, isAdvancedView]);
 
+  // Load dividends distribution history and member investment data
+  useEffect(() => {
+    const loadHistoricalData = async () => {
+      try {
+        const [historySnapshot, membersSnapshot] = await Promise.all([
+          database.ref('DividendsDistributionHistory').once('value'),
+          database.ref('Members').once('value')
+        ]);
+        
+        setDividendsDistributionHistory(historySnapshot.val() || {});
+        
+        // Store member investment data for advanced view calculations
+        const membersData = membersSnapshot.val() || {};
+        const investmentData = {};
+        
+        Object.entries(membersData).forEach(([memberId, member]) => {
+          investmentData[memberId] = {
+            investment: parseFloat(member.investment) || 0,
+            registrationDate: member.registrationDate,
+            activeMonths: calculateAdvancedActiveMonths(member.registrationDate, advancedYear)
+          };
+        });
+        
+        setMemberInvestmentData(investmentData);
+      } catch (error) {
+        console.error('Error loading historical data:', error);
+      }
+    };
+    loadHistoricalData();
+  }, [advancedYear]);
+
   const parseCustomDate = (dateString) => {
     if (!dateString) return null;
     const parsedDate = new Date(dateString);
@@ -361,20 +394,49 @@ const Dashboard = () => {
     return { overdueDays, penalty, newTotalMonthly };
   };
 
-  const calculateActiveMonths = (registrationDate, targetYear, isAdvancedView) => {
-    if (!registrationDate) return 12; // Default to full year if no registration date
+  const calculateAdvancedActiveMonths = (registrationDate, targetYear) => {
+    if (!registrationDate) return 12;
     
     const regDate = new Date(registrationDate);
     const targetYearNum = parseInt(targetYear);
+    const regYear = regDate.getFullYear();
+    
+    if (regYear < targetYearNum) {
+      return 12; // Registered in previous year - full year in advanced view
+    } else if (regYear > targetYearNum) {
+      return 0; // Registered in future year - no active months
+    } else {
+      // Registered in same year - calculate months from registration to end of year
+      const regMonthIdx = regDate.getMonth();
+      return Math.max(0, 12 - regMonthIdx);
+    }
+  };
+
+  const calculateActiveMonths = (registrationDate, targetYear, isAdvancedView, dividendsHistory = {}) => {
+    if (!registrationDate) return 12;
+    
+    const regDate = new Date(registrationDate);
+    const targetYearNum = parseInt(targetYear);
+    const currentYearNum = new Date().getFullYear();
     
     if (isAdvancedView) {
-      // In advanced view, all members get full 12 months regardless of registration date
-      return 12;
+      // In advanced view, use the advanced calculation that carries over registration data
+      return calculateAdvancedActiveMonths(registrationDate, targetYear);
     }
     
-    // For current year view, calculate based on actual registration date
+    // For current year view, calculate based on actual registration date and dividends distribution
     const regYear = regDate.getFullYear();
-    const regMonthIdx = regDate.getMonth(); // 0-11
+    const regMonthIdx = regDate.getMonth();
+    
+    // Check if dividends were already distributed this year
+    const currentYearDividendsDistributed = dividendsHistory[targetYearNum] === true;
+    
+    if (currentYearDividendsDistributed) {
+      // If dividends were already distributed, active months should continue counting
+      // from the distribution date to end of year
+      const distributionMonth = 11; // Assuming distribution happens in December
+      return Math.max(0, 12 - distributionMonth);
+    }
     
     if (regYear < targetYearNum) {
       return 12; // Registered in previous year - full year
@@ -404,7 +466,9 @@ const Dashboard = () => {
         currentLoansSnapshot,
         approvedLoansSnapshot,
         paymentsSnapshot,
-        settingsSnapshot
+        settingsSnapshot,
+        dividendsHistorySnapshot,
+        dividendsTransactionsSnapshot
       ] = await Promise.all([
         database.ref('Settings/Funds').once('value'),
         database.ref('Settings/Savings').once('value'),
@@ -416,7 +480,9 @@ const Dashboard = () => {
         database.ref('Loans/CurrentLoans').once('value'),
         database.ref('Loans/ApprovedLoans').once('value'),
         database.ref('Payments/ApprovedPayments').once('value'),
-        database.ref('Settings').once('value')
+        database.ref('Settings').once('value'),
+        database.ref('DividendsDistributionHistory').once('value'),
+        database.ref('Transactions/Dividends').once('value')
       ]);
 
       const availableFunds = fundsSnapshot.val() || 0;
@@ -440,6 +506,11 @@ const Dashboard = () => {
       const approvedLoansData = approvedLoansSnapshot.val() || {};
       const paymentsData = paymentsSnapshot.val() || {};
       const settingsData = settingsSnapshot.val() || {};
+      const dividendsHistoryData = dividendsHistorySnapshot.val() || {};
+      const dividendsTransactionsData = dividendsTransactionsSnapshot.val() || {};
+      
+      // Update dividends distribution history state
+      setDividendsDistributionHistory(dividendsHistoryData);
       
       // Extract percentage settings
       const investmentSharePercentage = parseFloat(settingsData.InvestmentSharePercentage || 0) / 100;
@@ -622,146 +693,170 @@ const Dashboard = () => {
         
         // Compute Investment from Transactions within the selected year
         let totalInvestment = 0;
-        try {
-          // Sum registration amount(s) within selected year
-          const regsSnapForInvestment = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
-          if (regsSnapForInvestment.exists()) {
-            Object.values(regsSnapForInvestment.val()).forEach(reg => {
-              const d = parseTransactionDate(reg.dateApproved || reg.date);
-              if (d && d.getFullYear() === parseInt(targetYear)) {
-                const amt = parseFloat(reg.amount) || 0;
-                totalInvestment += amt;
+        
+        if (isAdvancedView) {
+          // In advanced view, use the member's current investment from their profile
+          // This carries over their investment to the next year
+          totalInvestment = parseFloat(member.investment) || 0;
+          
+          // Also include any projected dividends from previous years
+          if (dividendsTransactionsData[memberId]) {
+            Object.values(dividendsTransactionsData[memberId]).forEach(dividend => {
+              if (dividend.status === 'distributed') {
+                totalInvestment += parseFloat(dividend.amount) || 0;
               }
             });
           }
-        } catch (e) {
-          console.error(`Error computing registration part of investment for member ${memberId}:`, e);
-        }
-        
-        try {
-          // Sum approved deposit amounts within selected year
-          const depsSnapForInvestment = await database.ref(`Transactions/Deposits/${memberId}`).once('value');
-          if (depsSnapForInvestment.exists()) {
-            Object.values(depsSnapForInvestment.val()).forEach(dep => {
-              const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
-              if (d && d.getFullYear() === parseInt(targetYear)) {
-                // Only consider deposits that were approved/completed if such a field exists
-                const status = (dep.status || '').toLowerCase();
-                if (!status || status === 'approved' || status === 'completed') {
-                  const amt = parseFloat(dep.amountToBeDeposited || dep.amount) || 0;
+        } else {
+          // Current year view - calculate investment from transactions as before
+          try {
+            // Sum registration amount(s) within selected year
+            const regsSnapForInvestment = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
+            if (regsSnapForInvestment.exists()) {
+              Object.values(regsSnapForInvestment.val()).forEach(reg => {
+                const d = parseTransactionDate(reg.dateApproved || reg.date);
+                if (d && d.getFullYear() === parseInt(targetYear)) {
+                  const amt = parseFloat(reg.amount) || 0;
                   totalInvestment += amt;
                 }
-              }
-            });
+              });
+            }
+          } catch (e) {
+            console.error(`Error computing registration part of investment for member ${memberId}:`, e);
           }
-        } catch (e) {
-          console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
-        }
-
-        try {
-          const withdrawalsSnap = await database.ref(`Transactions/Withdrawals/${memberId}`).once('value');
-          if (withdrawalsSnap.exists()) {
-            Object.values(withdrawalsSnap.val()).forEach(withdrawal => {
-              const d = parseTransactionDate(withdrawal.dateApproved || withdrawal.date);
-              if (d && d.getFullYear() === parseInt(targetYear)) {
-                const status = (withdrawal.status || '').toLowerCase();
-                if (status === 'approved' || status === 'distributed') {
-                  const amt = parseFloat(withdrawal.amountWithdrawn || withdrawal.amount) || 0;
-                  totalInvestment -= amt; // Subtract withdrawals
+          
+          try {
+            // Sum approved deposit amounts within selected year
+            const depsSnapForInvestment = await database.ref(`Transactions/Deposits/${memberId}`).once('value');
+            if (depsSnapForInvestment.exists()) {
+              Object.values(depsSnapForInvestment.val()).forEach(dep => {
+                const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
+                if (d && d.getFullYear() === parseInt(targetYear)) {
+                  // Only consider deposits that were approved/completed if such a field exists
+                  const status = (dep.status || '').toLowerCase();
+                  if (!status || status === 'approved' || status === 'completed') {
+                    const amt = parseFloat(dep.amountToBeDeposited || dep.amount) || 0;
+                    totalInvestment += amt;
+                  }
                 }
-              }
-            });
+              });
+            }
+          } catch (e) {
+            console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
           }
-        } catch (e) {
-          console.error(`Error computing withdrawal part of investment for member ${memberId}:`, e);
+
+          try {
+            const withdrawalsSnap = await database.ref(`Transactions/Withdrawals/${memberId}`).once('value');
+            if (withdrawalsSnap.exists()) {
+              Object.values(withdrawalsSnap.val()).forEach(withdrawal => {
+                const d = parseTransactionDate(withdrawal.dateApproved || withdrawal.date);
+                if (d && d.getFullYear() === parseInt(targetYear)) {
+                  const status = (withdrawal.status || '').toLowerCase();
+                  if (status === 'approved' || status === 'distributed') {
+                    const amt = parseFloat(withdrawal.amountWithdrawn || withdrawal.amount) || 0;
+                    totalInvestment -= amt; // Subtract withdrawals
+                  }
+                }
+              });
+            }
+          } catch (e) {
+            console.error(`Error computing withdrawal part of investment for member ${memberId}:`, e);
+          }
         }
         
         // Filter transactions by selected year and process them
-        memberTransactions.forEach(transaction => {
-          const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
-          if (transactionDate && transactionDate.getFullYear() === parseInt(targetYear)) {
-            const month = transactionDate.getMonth();
+        if (!isAdvancedView) {
+          // Only process transactions for current year view
+          memberTransactions.forEach(transaction => {
+            const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
+            if (transactionDate && transactionDate.getFullYear() === parseInt(targetYear)) {
+              const month = transactionDate.getMonth();
 
-            // Only include approved transactions for dividends (ignore any 'paid' status)
-            const status = (transaction.status || '').toLowerCase();
-            if (status !== 'approved') {
-              return; // skip non-approved or missing status
+              // Only include approved transactions for dividends (ignore any 'paid' status)
+              const status = (transaction.status || '').toLowerCase();
+              if (status !== 'approved') {
+                return; // skip non-approved or missing status
+              }
+              
+              // Extract amount using correct field name for each transaction type
+              // Exclude Deposits from monthly table (Jan-Dec)
+              if (transaction.type === 'Deposits') {
+                return; // skip counting deposits in monthly breakdown
+              }
+              let amount = 0;
+              switch (transaction.type) {
+                case 'Registrations':
+                  // Registrations don't have monetary amounts, skip them
+                  return;
+                case 'Loans':
+                  amount = parseFloat(transaction.loanAmount) || 0;
+                  break;
+                case 'Payments':
+                  amount = parseFloat(transaction.amountToBePaid) || 0;
+                  break;
+                case 'Withdrawals':
+                  amount = parseFloat(transaction.amountWithdrawn) || 0;
+                  break;
+                default:
+                  // Fallback to generic amount field
+                  amount = parseFloat(transaction.amount) || 0;
+              }
+              
+              // Determine if transaction is positive or negative
+              let adjustedAmount = amount;
+              if (transaction.type === 'Loans' || transaction.type === 'Withdrawals') {
+                adjustedAmount = -amount; // Loans and Withdrawals are negative (money going out)
+              } else {
+                adjustedAmount = amount; // Deposits and Payments are positive (money coming in)
+              }
+              
+              monthlyDividends[month] += adjustedAmount;
+              
+              // Store the actual transaction with processed amount
+              monthlyTransactions[month].push({
+                ...transaction,
+                adjustedAmount,
+                originalAmount: amount,
+                transactionDate: transactionDate,
+                formattedDate: transactionDate.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+              });
             }
-            
-            // Extract amount using correct field name for each transaction type
-            // Exclude Deposits from monthly table (Jan-Dec)
-            if (transaction.type === 'Deposits') {
-              return; // skip counting deposits in monthly breakdown
-            }
-            let amount = 0;
-            switch (transaction.type) {
-              case 'Registrations':
-                // Registrations don't have monetary amounts, skip them
-                return;
-              case 'Loans':
-                amount = parseFloat(transaction.loanAmount) || 0;
-                break;
-              case 'Payments':
-                amount = parseFloat(transaction.amountToBePaid) || 0;
-                break;
-              case 'Withdrawals':
-                amount = parseFloat(transaction.amountWithdrawn) || 0;
-                break;
-              default:
-                // Fallback to generic amount field
-                amount = parseFloat(transaction.amount) || 0;
-            }
-            
-            // Determine if transaction is positive or negative
-            let adjustedAmount = amount;
-            if (transaction.type === 'Loans' || transaction.type === 'Withdrawals') {
-              adjustedAmount = -amount; // Loans and Withdrawals are negative (money going out)
-            } else {
-              adjustedAmount = amount; // Deposits and Payments are positive (money coming in)
-            }
-            
-            monthlyDividends[month] += adjustedAmount;
-            
-            // Store the actual transaction with processed amount
-            monthlyTransactions[month].push({
-              ...transaction,
-              adjustedAmount,
-              originalAmount: amount,
-              transactionDate: transactionDate,
-              formattedDate: transactionDate.toLocaleDateString('en-US', {
-                month: 'short',
-                day: 'numeric',
-                year: 'numeric'
-              })
-            });
-          }
-        });
+          });
+        }
         
         const totalDividends = monthlyDividends.reduce((sum, dividend) => sum + dividend, 0);
         
         // Count approved loans and calculate total loan amount for this member from Transactions/Loans
         let approvedLoansCount = 0;
         let totalLoanAmount = 0;
-        try {
-          const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
-          if (memberLoansSnapshot.exists()) {
-            const memberLoans = memberLoansSnapshot.val();
-            // Count transactions with dateApproved field and sum loan amounts
-            Object.values(memberLoans).forEach(loan => {
-              if (loan.dateApproved) {
-                // Check if the loan was approved in the selected year
-                const approvedDate = parseTransactionDate(loan.dateApproved);
-                if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
-                  approvedLoansCount++;
-                  // Add the loan amount to the total
-                  const loanAmount = parseFloat(loan.loanAmount) || 0;
-                  totalLoanAmount += loanAmount;
+        
+        if (!isAdvancedView) {
+          // Only count loans for current year view
+          try {
+            const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
+            if (memberLoansSnapshot.exists()) {
+              const memberLoans = memberLoansSnapshot.val();
+              // Count transactions with dateApproved field and sum loan amounts
+              Object.values(memberLoans).forEach(loan => {
+                if (loan.dateApproved) {
+                  // Check if the loan was approved in the selected year
+                  const approvedDate = parseTransactionDate(loan.dateApproved);
+                  if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
+                    approvedLoansCount++;
+                    // Add the loan amount to the total
+                    const loanAmount = parseFloat(loan.loanAmount) || 0;
+                    totalLoanAmount += loanAmount;
+                  }
                 }
-              }
-            });
+              });
+            }
+          } catch (error) {
+            console.error(`Error fetching approved loans count for member ${memberId}:`, error);
           }
-        } catch (error) {
-          console.error(`Error fetching approved loans count for member ${memberId}:`, error);
         }
 
         // Determine Active Months based on registration dateApproved in Transactions/Registrations
@@ -783,7 +878,12 @@ const Dashboard = () => {
           console.error(`Error fetching registration for member ${memberId}:`, error);
         }
         
-        const activeMonthsCount = calculateActiveMonths(registrationDate, targetYear, isAdvancedView);
+        // If no registration date found in transactions, use the member's registration date
+        if (!registrationDate && member.registrationDate) {
+          registrationDate = new Date(member.registrationDate);
+        }
+        
+        const activeMonthsCount = calculateActiveMonths(registrationDate, targetYear, isAdvancedView, dividendsHistoryData);
         
         // INCLUDE ALL ACTIVE MEMBERS (except admin/coadmin) regardless of transactions or investment
         return {
@@ -913,7 +1013,16 @@ const Dashboard = () => {
         updates[`${txnPath}/status`] = 'distributed';
       });
 
+      // Record dividends distribution in history
+      updates[`DividendsDistributionHistory/${year}`] = true;
+
       await database.ref().update(updates);
+
+      // Update local state
+      setDividendsDistributionHistory(prev => ({
+        ...prev,
+        [year]: true
+      }));
 
       setDistributionSuccessVisible(true);
     } catch (e) {
@@ -1438,14 +1547,14 @@ const Dashboard = () => {
     modalCard: {
       backgroundColor: 'white',
       borderRadius: '16px',
-      padding: '32px',
+      padding: '24px',
       boxShadow: '0 20px 60px rgba(0, 0, 0, 0.2)',
       width: '90%',
-      maxWidth: '900px',
+      maxWidth: '600px',
       border: '1px solid #e2e8f0',
       maxHeight: '80vh',
       overflow: 'auto',
-        position: 'relative' 
+      position: 'relative' 
     },
     modalCardSmall: {
       backgroundColor: 'white',
@@ -1646,6 +1755,27 @@ const Dashboard = () => {
       backgroundColor: '#F3F4F6',
       color: '#6B7280',
       marginLeft: '8px'
+    },
+    // Compact table styles for distribution modal
+    compactTable: {
+      width: '100%',
+      borderCollapse: 'collapse',
+      fontSize: '13px'
+    },
+    compactHeaderCell: {
+      padding: '12px 8px',
+      textAlign: 'left',
+      fontWeight: '600',
+      color: '#374151',
+      borderBottom: '2px solid #e2e8f0',
+      fontSize: '12px',
+      textTransform: 'uppercase',
+      letterSpacing: '0.5px'
+    },
+    compactDataCell: {
+      padding: '12px 8px',
+      borderBottom: '1px solid #f1f5f9',
+      verticalAlign: 'middle'
     }
   };
 
@@ -2026,7 +2156,7 @@ if (loading) {
             <div style={styles.sectionHeader}>
               <h3 style={styles.sectionTitle}>Member Dividends Breakdown</h3>
               {isAdvancedView && (
-                <span style={styles.viewBadge}>Projection View - No Distribution</span>
+                <span style={styles.viewBadge}>Projection View - Carrying Over Member Data</span>
               )}
             </div>
             <div style={styles.dividendsTableContainer}>
@@ -2075,8 +2205,8 @@ if (loading) {
                         <div style={styles.memberInfo}>
                           <span style={styles.memberName}>
                             {member.memberName}
-                            {!member.hasTransactions && (
-                              <span style={styles.noActivityBadge}>No Activity</span>
+                            {!member.hasTransactions && isAdvancedView && (
+                              <span style={styles.noActivityBadge}>Projected</span>
                             )}
                           </span>
                           <span style={styles.memberId}>ID: {member.memberId}</span>
@@ -2089,6 +2219,11 @@ if (loading) {
                       </td>
                       <td style={styles.dividendsDataCell}>
                         ₱{formatCurrency(member.investment)}
+                        {isAdvancedView && (
+                          <div style={{fontSize: '11px', color: '#6B7280', marginTop: '2px'}}>
+                            Carried Over
+                          </div>
+                        )}
                       </td>
                       {member.monthlyDividends.map((dividend, monthIndex) => {
                         const hasTransactions = member.monthlyTransactions[monthIndex]?.length > 0;
@@ -2249,31 +2384,42 @@ if (loading) {
               >
                 <FaTimes />
               </button>
-              <h3 style={styles.modalTitle}>Distribute Dividends</h3>
-              <div style={{ overflowX: 'auto', marginTop: '20px' }}>
-                <table style={styles.dividendsTable}>
-                  <thead>
+              <h3 style={{...styles.sectionTitle, marginBottom: '20px', textAlign: 'center'}}>Distribute Dividends</h3>
+              
+              <div style={{marginBottom: '16px', textAlign: 'center', color: '#6B7280', fontSize: '14px'}}>
+                Total to distribute: <strong style={{color: '#1E3A8A'}}>₱{formatCurrency(distributionMembers.reduce((sum, member) => sum + (member.dividend || 0), 0))}</strong>
+              </div>
+
+              <div style={{maxHeight: '400px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px'}}>
+                <table style={styles.compactTable}>
+                  <thead style={{backgroundColor: '#f8fafc', position: 'sticky', top: 0}}>
                     <tr>
-                      <th style={styles.dividendsHeaderCell}>Member ID</th>
-                      <th style={styles.dividendsHeaderCell}>Member</th>
-                      <th style={styles.dividendsHeaderCell}>Investments</th>
-                      <th style={styles.dividendsHeaderCell}>Savings</th>
-                      <th style={styles.dividendsHeaderCell}>Dividends</th>
+                      <th style={styles.compactHeaderCell}>Member</th>
+                      <th style={styles.compactHeaderCell}>Investment</th>
+                      <th style={styles.compactHeaderCell}>Dividend</th>
                     </tr>
                   </thead>
                   <tbody>
                     {distributionMembers.map(r => (
-                      <tr key={r.memberId}>
-                        <td style={styles.dividendsDataCell}>{r.memberId}</td>
-                        <td style={styles.dividendsDataCell}>{r.name}</td>
-                        <td style={styles.dividendsDataCell}>₱{formatCurrency(r.investment)}</td>
-                        <td style={styles.dividendsDataCell}>₱{formatCurrency(r.savings)}</td>
-                        <td style={styles.dividendsDataCell}><strong>₱{formatCurrency(r.dividend)}</strong></td>
+                      <tr key={r.memberId} style={styles.dividendsDataRow}>
+                        <td style={styles.compactDataCell}>
+                          <div style={styles.memberInfo}>
+                            <span style={styles.memberName}>{r.name}</span>
+                            <span style={styles.memberId}>ID: {r.memberId}</span>
+                          </div>
+                        </td>
+                        <td style={styles.compactDataCell}>
+                          ₱{formatCurrency(r.investment)}
+                        </td>
+                        <td style={styles.compactDataCell}>
+                          <strong style={{color: '#059669'}}>₱{formatCurrency(r.dividend)}</strong>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
+
               <div style={{...styles.modalActions, marginTop: '24px'}}>
                 <button 
                   style={{...styles.actionButton, ...styles.secondaryActionButton}}
