@@ -137,24 +137,6 @@ const uploadImageToStorage = async (file, path, onProgress = null) => {
   }
 };
 
-// Optimized database operations - batch where possible
-const executeBatchDatabaseOperations = async (operations) => {
-  try {
-    const results = await Promise.allSettled(operations);
-    
-    const failures = results.filter(result => result.status === 'rejected');
-    if (failures.length > 0) {
-      console.error('Some database operations failed:', failures);
-      throw new Error(`${failures.length} database operations failed`);
-    }
-    
-    return results.map(result => result.value);
-  } catch (error) {
-    console.error('Batch database operations error:', error);
-    throw error;
-  }
-};
-
 const styles = {
   safeAreaView: {
     flex: 1,
@@ -777,9 +759,10 @@ const Deposits = () => {
   // Admin data for print report
   const [adminData, setAdminData] = useState(null);
 
-  // New states for the process flow
+  // EXACT SAME STATES AS ApplyDeposits
   const [actionInProgress, setActionInProgress] = useState(false);
   const [pendingApiCall, setPendingApiCall] = useState(null);
+  const [currentAction, setCurrentAction] = useState(null);
   
   // Progress tracking
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -1566,7 +1549,7 @@ const Deposits = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  // FIXED: Process database addition - NOW PROPERLY HANDLES APPROVAL LIKE ApplyDeposits
+  // EXACT SAME AS ApplyDeposits: Process database approval
   const processDatabaseApprove = async (deposit) => {
     try {
       const now = new Date();
@@ -1634,7 +1617,7 @@ const Deposits = () => {
           await fundsHistoryRef.set(updatedFund);
         }
 
-        return transactionId;
+        return { transactionId, approvedDeposit };
       } else {
         throw new Error('Member not found');
       }
@@ -1644,7 +1627,7 @@ const Deposits = () => {
     }
   };
 
-  // Background API call (don't block UI)
+  // EXACT SAME AS ApplyDeposits: Background API call
   const callApiApprove = async (depositData) => {
     try {
       const response = await ApproveDeposits({
@@ -1667,12 +1650,12 @@ const Deposits = () => {
     }
   };
 
+  // STEP 1: Confirmation modal -> Process action (like ApplyDeposits)
   const confirmAddDeposit = async () => {
     setConfirmModalVisible(false);
     setActionInProgress(true);
     setIsProcessing(true);
-    setUploadProgress(0);
-    setCurrentStep('Preparing deposit...');
+    setCurrentAction('approve');
 
     try {
       let proofOfDepositUrl = '';
@@ -1696,22 +1679,16 @@ const Deposits = () => {
         proofOfDepositUrl: proofOfDepositUrl || undefined
       };
 
-      // Process the approval (similar to ApplyDeposits)
-      const transactionId = await processDatabaseApprove(depositData);
+      // STEP 2: Show success message immediately (like ApplyDeposits)
+      setSuccessMessage('Deposit added and approved successfully!');
 
-      // Store pending API call for background processing
+      // Store pending API call for background processing (EXACT SAME AS ApplyDeposits)
       setPendingApiCall({
         type: 'approve',
-        data: {
-          ...depositData,
-          transactionId,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date()),
-          status: 'approved'
-        }
+        data: depositData
       });
 
-      setSuccessMessage('Deposit added and approved successfully!');
+      // STEP 3: Show success modal (like ApplyDeposits)
       setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error preparing deposit:', error);
@@ -1724,28 +1701,44 @@ const Deposits = () => {
     }
   };
 
+  // STEP 4: Handle success OK - Finalize everything (EXACT SAME AS ApplyDeposits)
   const handleSuccessOk = async () => {
+    // Show loading spinner and hide success modal (EXACT SAME FLOW)
     setIsProcessing(true);
     setSuccessModalVisible(false);
-    setCurrentStep('Finalizing transaction...');
 
-    // Trigger background email after DB success (don't wait for it)
-    if (pendingApiCall && pendingApiCall.data) {
+    let transactionResult = null;
+
+    try {
+      // Finalize DB changes (EXACT SAME AS ApplyDeposits)
+      if (pendingApiCall && pendingApiCall.type === 'approve') {
+        transactionResult = await processDatabaseApprove(pendingApiCall.data);
+      }
+    } catch (err) {
+      console.error('Finalize DB on OK error:', err);
+      setErrorMessage('Failed to add deposit to database: ' + err.message);
+      setErrorModalVisible(true);
+      setIsProcessing(false);
+      setCurrentStep('');
+      return;
+    }
+
+    // STEP 5: Trigger background email after DB success (EXACT SAME AS ApplyDeposits)
+    if (transactionResult && transactionResult.approvedDeposit) {
       setCurrentStep('Sending notification...');
-      callApiApprove(pendingApiCall.data).finally(() => {
+      callApiApprove(transactionResult.approvedDeposit).finally(() => {
         console.log('Background API call completed');
       });
     }
 
-    // Close modal and clean state
+    // STEP 6: Close modal and clean state (EXACT SAME AS ApplyDeposits)
     closeAddModal();
     setActionInProgress(false);
+    setCurrentAction(null);
     setPendingApiCall(null);
 
-    // Refresh data in background
-    fetchAllData().finally(() => {
-      console.log('Background data refresh completed');
-    });
+    // STEP 7: Finally refresh (EXACT SAME AS ApplyDeposits)
+    fetchAllData();
 
     // Hide loading spinner
     setIsProcessing(false);
