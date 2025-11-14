@@ -1511,7 +1511,7 @@ const Deposits = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  // FIXED: Process database addition to match ApplyDeposits behavior
+  // STREAMLINED: Process database addition with same flow as ApplyDeposits
   const processDatabaseAddition = async (depositData) => {
     try {
       const transactionId = generateTransactionId();
@@ -1554,7 +1554,7 @@ const Deposits = () => {
         await approvedRef.set(fullDepositData);
         await transactionRef.set(fullDepositData);
 
-        // FIXED: Update both balance AND investment like in ApplyDeposits
+        // Update both balance AND investment
         const currentBalance = parseFloat(member.balance || 0);
         const currentInvestment = parseFloat(member.investment || 0);
         
@@ -1566,7 +1566,7 @@ const Deposits = () => {
           investment: newInvestment
         });
 
-        // FIXED: Update funds for non-cash deposits only (like in ApplyDeposits)
+        // Update funds for non-cash deposits only
         if (depositData.depositOption !== 'Cash') {
           const fundSnap = await fundsRef.once('value');
           const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
@@ -1587,7 +1587,7 @@ const Deposits = () => {
     }
   };
 
-  // FIXED: Call API approve with proper data structure
+  // STREAMLINED: Call API approve with proper data structure
   const callApiApprove = async (depositData) => {
     try {
       const response = await ApproveDeposits({
@@ -1610,10 +1610,10 @@ const Deposits = () => {
     }
   };
 
+  // STREAMLINED: Confirm add deposit with same flow as ApplyDeposits
   const confirmAddDeposit = async () => {
     setConfirmModalVisible(false);
     setActionInProgress(true);
-    setIsProcessing(true);
 
     try {
       let proofOfDepositUrl = '';
@@ -1643,11 +1643,11 @@ const Deposits = () => {
       console.error('Error preparing deposit:', error);
       setErrorMessage(error.message || 'An error occurred. Please try again.');
       setErrorModalVisible(true);
-      setIsProcessing(false);
       setActionInProgress(false);
     }
   };
 
+  // STREAMLINED: Handle success with same flow as ApplyDeposits
   const handleSuccessOk = async () => {
     // Show loading spinner and hide success modal
     setIsProcessing(true);
