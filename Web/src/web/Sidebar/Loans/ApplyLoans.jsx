@@ -1540,33 +1540,46 @@ const handleSuccessOk = async () => {
   }
 };
 
-  const openImageViewer = (url, label, index) => {
-    const images = [];
-    
-    if (selectedLoan.proofOfIncomeUrl) {
+const openImageViewer = (url, label, index) => {
+  if (!selectedLoan) return;
+  
+  const images = [];
+  
+  // Add all collateral images from proofOfCollateralUrls array
+  if (selectedLoan.proofOfCollateralUrls && selectedLoan.proofOfCollateralUrls.length > 0) {
+    selectedLoan.proofOfCollateralUrls.forEach((imgUrl, idx) => {
       images.push({ 
-        url: selectedLoan.proofOfIncomeUrl, 
-        label: 'Proof of Income' 
+        url: imgUrl, 
+        label: `Collateral Image ${idx + 1}` 
       });
-    }
-    if (selectedLoan.proofOfIdentityUrl) {
-      images.push({ 
-        url: selectedLoan.proofOfIdentityUrl, 
-        label: 'Proof of Identity' 
-      });
-    }
-    if (selectedLoan.proofOfCollateralUrl) {
-      images.push({ 
-        url: selectedLoan.proofOfCollateralUrl, 
-        label: 'Proof of Collateral' 
-      });
-    }
+    });
+  }
+  
+  // Also include individual proof images if they exist
+  if (selectedLoan.proofOfIncomeUrl) {
+    images.push({ 
+      url: selectedLoan.proofOfIncomeUrl, 
+      label: 'Proof of Income' 
+    });
+  }
+  if (selectedLoan.proofOfIdentityUrl) {
+    images.push({ 
+      url: selectedLoan.proofOfIdentityUrl, 
+      label: 'Proof of Identity' 
+    });
+  }
+  if (selectedLoan.proofOfCollateralUrl) {
+    images.push({ 
+      url: selectedLoan.proofOfCollateralUrl, 
+      label: 'Proof of Collateral' 
+    });
+  }
 
-    setAvailableImages(images);
-    setCurrentImage({ url, label });
-    setCurrentImageIndex(index);
-    setImageViewerVisible(true);
-  };
+  setAvailableImages(images);
+  setCurrentImage({ url, label });
+  setCurrentImageIndex(index);
+  setImageViewerVisible(true);
+};
 
   const closeImageViewer = () => {
     setImageViewerVisible(false);
@@ -1588,9 +1601,12 @@ const handleSuccessOk = async () => {
     setCurrentImage(availableImages[newIndex]);
   };
 
-  const hasDocuments = (loan) => {
-    return loan.proofOfIncomeUrl || loan.proofOfIdentityUrl || loan.proofOfCollateralUrl;
-  };
+const hasDocuments = (loan) => {
+  return loan.proofOfIncomeUrl || 
+         loan.proofOfIdentityUrl || 
+         loan.proofOfCollateralUrl || 
+         (loan.proofOfCollateralUrls && loan.proofOfCollateralUrls.length > 0);
+};
 
   if (!loans.length) return (
     <div style={styles.noDataContainer}>
@@ -1820,55 +1836,35 @@ const handleSuccessOk = async () => {
                   </div>
 
                   {/* Documents Section */}
-                  {hasDocuments(selectedLoan) && (
-                    <div style={styles.section}>
-                      <h3 style={styles.sectionTitle}>
-                        <FaIdCard />
-                        Submitted Documents
-                      </h3>
-                      <div style={styles.documentsGrid}>
-                        {selectedLoan.proofOfIncomeUrl && (
-                          <div 
-                            style={styles.documentCard}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIncomeUrl, 'Proof of Income', 0)}
-                          >
-                            <img
-                              src={selectedLoan.proofOfIncomeUrl}
-                              alt="Proof of Income"
-                              style={styles.documentImage}
-                            />
-                            <div style={styles.documentLabel}>Proof of Income</div>
-                          </div>
-                        )}
-                        {selectedLoan.proofOfIdentityUrl && (
-                          <div 
-                            style={styles.documentCard}
-                            onClick={() => openImageViewer(selectedLoan.proofOfIdentityUrl, 'Proof of Identity', 1)}
-                          >
-                            <img
-                              src={selectedLoan.proofOfIdentityUrl}
-                              alt="Proof of Identity"
-                              style={styles.documentImage}
-                            />
-                            <div style={styles.documentLabel}>Proof of Identity</div>
-                          </div>
-                        )}
-                        {selectedLoan.proofOfCollateralUrl && (
-                          <div 
-                            style={styles.documentCard}
-                            onClick={() => openImageViewer(selectedLoan.proofOfCollateralUrl, 'Proof of Collateral', 2)}
-                          >
-                            <img
-                              src={selectedLoan.proofOfCollateralUrl}
-                              alt="Proof of Collateral"
-                              style={styles.documentImage}
-                            />
-                            <div style={styles.documentLabel}>Proof of Collateral</div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
+{/* Collateral Images Section */}
+{selectedLoan.requiresCollateral && selectedLoan.proofOfCollateralUrls && selectedLoan.proofOfCollateralUrls.length > 0 && (
+  <div style={styles.section}>
+    <h3 style={styles.sectionTitle}>
+      <FaIdCard />
+      Collateral Images
+    </h3>
+    <div style={styles.documentsGrid}>
+      {selectedLoan.proofOfCollateralUrls.map((url, index) => (
+        <div 
+          key={index}
+          style={styles.documentCard}
+          onClick={() => openImageViewer(url, `Collateral Image ${index + 1}`, index)}
+        >
+          <img
+            src={url}
+            alt={`Collateral ${index + 1}`}
+            style={styles.documentImage}
+            onError={(e) => {
+              console.error('Failed to load collateral image:', url);
+              e.target.style.display = 'none';
+            }}
+          />
+          <div style={styles.documentLabel}>Collateral Image {index + 1}</div>
+        </div>
+      ))}
+    </div>
+  </div>
+)}
                 </div>
               </div>
             </div>
