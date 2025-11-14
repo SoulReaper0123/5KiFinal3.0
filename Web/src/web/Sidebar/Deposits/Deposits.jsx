@@ -1511,6 +1511,7 @@ const Deposits = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
+  // FIXED: Process database addition to match ApplyDeposits behavior
   const processDatabaseAddition = async (depositData) => {
     try {
       const transactionId = generateTransactionId();
@@ -1538,20 +1539,34 @@ const Deposits = () => {
           dateApproved: approvalDate,
           timeApproved: approvalTime,
           timestamp: now.getTime(),
-          status: 'approved'
+          status: 'approved',
+          // Include all necessary fields for consistency
+          id: depositData.memberId,
+          firstName: depositData.firstName,
+          lastName: depositData.lastName,
+          email: depositData.email,
+          depositOption: depositData.depositOption,
+          accountName: depositData.accountName,
+          accountNumber: depositData.accountNumber,
+          proofOfDepositUrl: depositData.proofOfDepositUrl || null
         };
 
         await approvedRef.set(fullDepositData);
         await transactionRef.set(fullDepositData);
 
-        const newBalance = parseFloat(member.balance || 0) + amount;
-        const newInvestment = parseFloat(member.investment || 0) + amount;
+        // FIXED: Update both balance AND investment like in ApplyDeposits
+        const currentBalance = parseFloat(member.balance || 0);
+        const currentInvestment = parseFloat(member.investment || 0);
+        
+        const newBalance = currentBalance + amount;
+        const newInvestment = currentInvestment + amount;
         
         await memberRef.update({ 
           balance: newBalance,
           investment: newInvestment
         });
 
+        // FIXED: Update funds for non-cash deposits only (like in ApplyDeposits)
         if (depositData.depositOption !== 'Cash') {
           const fundSnap = await fundsRef.once('value');
           const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
@@ -1562,7 +1577,7 @@ const Deposits = () => {
           await fundsHistoryRef.set(updatedFund);
         }
 
-        return transactionId;
+        return { transactionId, fullDepositData };
       } else {
         throw new Error('Member not found');
       }
@@ -1572,12 +1587,13 @@ const Deposits = () => {
     }
   };
 
+  // FIXED: Call API approve with proper data structure
   const callApiApprove = async (depositData) => {
     try {
       const response = await ApproveDeposits({
-        memberId: depositData.memberId,
+        memberId: depositData.id || depositData.memberId,
         transactionId: depositData.transactionId,
-        amount: depositData.amount,
+        amount: depositData.amountToBeDeposited || depositData.amount,
         dateApproved: depositData.dateApproved,
         timeApproved: depositData.timeApproved,
         email: depositData.email,
@@ -1621,7 +1637,7 @@ const Deposits = () => {
         data: depositData
       });
 
-      setSuccessMessage('Deposit added successfully!');
+      setSuccessMessage('Deposit added and approved successfully!');
       setSuccessModalVisible(true);
     } catch (error) {
       console.error('Error preparing deposit:', error);
@@ -1637,14 +1653,16 @@ const Deposits = () => {
     setIsProcessing(true);
     setSuccessModalVisible(false);
 
+    let transactionResult = null;
+
     try {
       // Finalize DB changes
       if (pendingApiCall && pendingApiCall.type === 'add') {
-        await processDatabaseAddition(pendingApiCall.data);
+        transactionResult = await processDatabaseAddition(pendingApiCall.data);
       }
     } catch (err) {
       console.error('Finalize DB on OK error:', err);
-      setErrorMessage('Failed to add deposit to database');
+      setErrorMessage('Failed to add deposit to database: ' + err.message);
       setErrorModalVisible(true);
       setIsProcessing(false);
       return;
@@ -1652,8 +1670,8 @@ const Deposits = () => {
 
     // Trigger background email after DB success; do not block UI
     try {
-      if (pendingApiCall && pendingApiCall.type === 'add') {
-        callApiApprove(pendingApiCall.data);
+      if (transactionResult && transactionResult.fullDepositData) {
+        callApiApprove(transactionResult.fullDepositData);
       }
     } catch (error) {
       console.error('Error calling API:', error);
