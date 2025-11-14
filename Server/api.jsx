@@ -2,7 +2,7 @@ import axios from 'axios';
 
 axios.defaults.withCredentials = false; 
 
-const API_URL = 'https://five5ki.onrender.com';
+const API_URL = 'http://192.168.8.38:10000';
 const WEBSITE_URL = 'https://fivekiapp.onrender.com';
 const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
@@ -142,6 +142,25 @@ export const sendMemberCredentialsEmail = async (memberData) => {
     return response;
   } catch (error) {
     console.error('Error sending member credentials email:', error);
+    throw error;
+  }
+};
+
+// Member Deletion
+export const sendMemberDeleteData = async (memberData) => {
+  try {
+    const response = await axios.post(`${API_URL}/send-member-delete-data`, {
+      email: memberData.email,
+      firstName: memberData.firstName,
+      lastName: memberData.lastName,
+      memberId: memberData.memberId,
+      dateDeleted: memberData.dateDeleted,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending member delete notification:', error);
     throw error;
   }
 };
