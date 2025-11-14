@@ -1566,85 +1566,81 @@ const Deposits = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
-  // OPTIMIZED: Process database addition with parallel operations
-  const processDatabaseAddition = async (depositData) => {
+  // FIXED: Process database addition - NOW PROPERLY HANDLES APPROVAL LIKE ApplyDeposits
+  const processDatabaseApprove = async (deposit) => {
     try {
-      const transactionId = generateTransactionId();
       const now = new Date();
       const approvalDate = formatDate(now);
       const approvalTime = formatTime(now);
-      const amount = parseFloat(depositData.amount);
+      const status = 'approved';
 
-      const memberRef = database.ref(`Members/${depositData.memberId}`);
+      const transactionId = generateTransactionId();
+
+      const approvedRef = database.ref(`Deposits/ApprovedDeposits/${deposit.memberId}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Deposits/${deposit.memberId}/${transactionId}`);
+      const memberRef = database.ref(`Members/${deposit.memberId}`);
+      const fundsRef = database.ref('Settings/Funds');
+
       const memberSnap = await memberRef.once('value');
 
       if (memberSnap.exists()) {
         const member = memberSnap.val();
 
-        const fullDepositData = { 
-          ...depositData, 
-          transactionId,
-          amountToBeDeposited: amount,
+        const approvedDeposit = { 
+          ...deposit,
+          transactionId: transactionId,
+          amountToBeDeposited: parseFloat(deposit.amount),
           dateApplied: approvalDate,
           timeApplied: approvalTime,
           dateApproved: approvalDate,
           timeApproved: approvalTime,
           timestamp: now.getTime(),
-          status: 'approved',
-          id: depositData.memberId,
-          firstName: depositData.firstName,
-          lastName: depositData.lastName,
-          email: depositData.email,
-          depositOption: depositData.depositOption,
-          accountName: depositData.accountName,
-          accountNumber: depositData.accountNumber,
-          proofOfDepositUrl: depositData.proofOfDepositUrl || null
+          status: status,
+          id: deposit.memberId,
+          firstName: deposit.firstName,
+          lastName: deposit.lastName,
+          email: deposit.email,
+          depositOption: deposit.depositOption,
+          accountName: deposit.accountName,
+          accountNumber: deposit.accountNumber,
+          proofOfDepositUrl: deposit.proofOfDepositUrl || null
         };
 
-        // Calculate new balances
+        await approvedRef.set(approvedDeposit);
+        await transactionRef.set(approvedDeposit);
+
+        const depositAmount = parseFloat(deposit.amount);
+
+        // Use the correct field names from your Members structure
         const currentBalance = parseFloat(member.balance || 0);
         const currentInvestment = parseFloat(member.investment || 0);
-        const newBalance = currentBalance + amount;
-        const newInvestment = currentInvestment + amount;
+        
+        const newBalance = currentBalance + depositAmount;
+        const newInvestment = currentInvestment + depositAmount;
+        
+        await memberRef.update({ 
+          balance: newBalance, 
+          investment: newInvestment 
+        });
 
-        // Prepare all database operations
-        const databaseOperations = [
-          memberRef.update({ 
-            balance: newBalance,
-            investment: newInvestment
-          }),
-          
-          database.ref(`Deposits/ApprovedDeposits/${depositData.memberId}/${transactionId}`).set(fullDepositData),
-          
-          database.ref(`Transactions/Deposits/${depositData.memberId}/${transactionId}`).set(fullDepositData)
-        ];
-
-        // Add funds update for non-cash deposits
-        if (depositData.depositOption !== 'Cash') {
-          const fundsRef = database.ref('Settings/Funds');
+        // Update funds for non-cash deposits
+        if (deposit.depositOption !== 'Cash') {
           const fundSnap = await fundsRef.once('value');
-          const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
-          
-          databaseOperations.push(
-            fundsRef.set(updatedFund)
-          );
+          const updatedFund = (parseFloat(fundSnap.val()) || 0) + depositAmount;
+          await fundsRef.set(updatedFund);
           
           const dateKey = now.toISOString().split('T')[0];
-          databaseOperations.push(
-            database.ref(`Settings/FundsHistory/${dateKey}`).set(updatedFund)
-          );
+          const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+          await fundsHistoryRef.set(updatedFund);
         }
 
-        // Execute all database operations in parallel
-        await executeBatchDatabaseOperations(databaseOperations);
-
-        return { transactionId, fullDepositData };
+        return transactionId;
       } else {
         throw new Error('Member not found');
       }
     } catch (err) {
-      console.error('Database addition error:', err);
-      throw new Error(err.message || 'Failed to add deposit');
+      console.error('Approval DB error:', err);
+      throw new Error(err.message || 'Failed to approve deposit');
     }
   };
 
@@ -1692,7 +1688,7 @@ const Deposits = () => {
         );
       }
 
-      setCurrentStep('Processing deposit...');
+      setCurrentStep('Processing deposit approval...');
       setUploadProgress(0);
 
       const depositData = {
@@ -1700,10 +1696,19 @@ const Deposits = () => {
         proofOfDepositUrl: proofOfDepositUrl || undefined
       };
 
+      // Process the approval (similar to ApplyDeposits)
+      const transactionId = await processDatabaseApprove(depositData);
+
       // Store pending API call for background processing
       setPendingApiCall({
-        type: 'add',
-        data: depositData
+        type: 'approve',
+        data: {
+          ...depositData,
+          transactionId,
+          dateApproved: formatDate(new Date()),
+          timeApproved: formatTime(new Date()),
+          status: 'approved'
+        }
       });
 
       setSuccessMessage('Deposit added and approved successfully!');
@@ -1724,26 +1729,10 @@ const Deposits = () => {
     setSuccessModalVisible(false);
     setCurrentStep('Finalizing transaction...');
 
-    let transactionResult = null;
-
-    try {
-      // Finalize DB changes
-      if (pendingApiCall && pendingApiCall.type === 'add') {
-        transactionResult = await processDatabaseAddition(pendingApiCall.data);
-      }
-    } catch (err) {
-      console.error('Finalize DB on OK error:', err);
-      setErrorMessage('Failed to add deposit to database: ' + err.message);
-      setErrorModalVisible(true);
-      setIsProcessing(false);
-      setCurrentStep('');
-      return;
-    }
-
     // Trigger background email after DB success (don't wait for it)
-    if (transactionResult && transactionResult.fullDepositData) {
+    if (pendingApiCall && pendingApiCall.data) {
       setCurrentStep('Sending notification...');
-      callApiApprove(transactionResult.fullDepositData).finally(() => {
+      callApiApprove(pendingApiCall.data).finally(() => {
         console.log('Background API call completed');
       });
     }
@@ -1751,6 +1740,7 @@ const Deposits = () => {
     // Close modal and clean state
     closeAddModal();
     setActionInProgress(false);
+    setPendingApiCall(null);
 
     // Refresh data in background
     fetchAllData().finally(() => {
