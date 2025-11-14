@@ -8,19 +8,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 import { sendMemberCredentialsEmail } from '../../../../Server/api';
 import ExcelJS from 'exceljs';
 
-// Options (match Register.jsx)
-const genderOptions = [
-  { key: 'Male', label: 'Male' },
-  { key: 'Female', label: 'Female' }
-];
-
-const civilStatusOptions = [
-  { key: 'Single', label: 'Single' },
-  { key: 'Married', label: 'Married' },
-  { key: 'Widowed', label: 'Widowed' },
-  { key: 'Separated', label: 'Separated' }
-];
-
+// Options (simplified as requested)
 const governmentIdOptions = [
   { key: 'national', label: 'National ID (PhilSys)' },
   { key: 'sss', label: 'SSS ID' },
@@ -38,6 +26,17 @@ const generateRandomPassword = () => {
     return generateRandomPassword();
   }
   return pwd;
+};
+
+const formatDate = (date) => {
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
+};
+
+const formatTime = (date) => {
+  const hours = date.getHours().toString().padStart(2, '0');
+  const minutes = date.getMinutes().toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
 };
 
 const styles = {
@@ -506,7 +505,6 @@ const styles = {
     fontSize: '16px',
     margin: 0
   },
-  // Updated table styles to match Registrations component
   tableContainer: {
     borderRadius: '12px',
     overflow: 'hidden',
@@ -647,6 +645,11 @@ const styles = {
       transform: 'none',
       boxShadow: 'none'
     }
+  },
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px'
   }
 };
 
@@ -656,9 +659,6 @@ const emptyForm = {
   firstName: '',
   middleName: '',
   lastName: '',
-  gender: '',
-  civilStatus: '',
-  age: '',
   dateOfBirth: '',
   placeOfBirth: '',
   address: '',
@@ -668,7 +668,7 @@ const emptyForm = {
   loans: ''
 };
 
-const MembersManagement = () => {
+const DataMigration = () => {
   // Data
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -687,9 +687,7 @@ const MembersManagement = () => {
 
   // Files
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
-  const [validIdBackFile, setValidIdBackFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
-  const [selfieWithIdFile, setSelfieWithIdFile] = useState(null);
   const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
 
   // UX
@@ -703,6 +701,13 @@ const MembersManagement = () => {
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [pendingAction, setPendingAction] = useState(null);
+  const [pendingAdd, setPendingAdd] = useState(null);
+
+  // Form validation errors
+  const [emailError, setEmailError] = useState('');
+  const [firstNameError, setFirstNameError] = useState('');
+  const [lastNameError, setLastNameError] = useState('');
+  const [phoneNumberError, setPhoneNumberError] = useState('');
 
   // Create style element and append to head
   useEffect(() => {
@@ -833,13 +838,51 @@ const MembersManagement = () => {
     }
   };
 
+  const validateFields = () => {
+    let isValid = true;
+    setEmailError('');
+    setFirstNameError('');
+    setLastNameError('');
+    setPhoneNumberError('');
+
+    if (!formData.email.trim()) {
+      setEmailError('Email is required');
+      isValid = false;
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      setEmailError('Invalid email format');
+      isValid = false;
+    }
+
+    if (!formData.firstName.trim()) {
+      setFirstNameError('First name is required');
+      isValid = false;
+    }
+
+    if (!formData.lastName.trim()) {
+      setLastNameError('Last name is required');
+      isValid = false;
+    }
+
+    if (!formData.phoneNumber.trim()) {
+      setPhoneNumberError('Contact number is required');
+      isValid = false;
+    } else if (!/^\d{11}$/.test(formData.phoneNumber)) {
+      setPhoneNumberError('Contact number must be exactly 11 digits');
+      isValid = false;
+    }
+
+    return isValid;
+  };
+
   const openAddModal = () => {
     setFormData({ ...emptyForm, registrationFee: String(minRegistrationFee) });
     setValidIdFrontFile(null);
-    setValidIdBackFile(null);
     setSelfieFile(null);
-    setSelfieWithIdFile(null);
     setProofOfPaymentFile(null);
+    setEmailError('');
+    setFirstNameError('');
+    setLastNameError('');
+    setPhoneNumberError('');
     setAddModalVisible(true);
   };
 
@@ -851,9 +894,6 @@ const MembersManagement = () => {
       firstName: member.firstName || '',
       middleName: member.middleName || '',
       lastName: member.lastName || '',
-      gender: member.gender || '',
-      civilStatus: member.civilStatus || '',
-      age: member.age || '',
       dateOfBirth: member.dateOfBirth || '',
       placeOfBirth: member.placeOfBirth || '',
       address: member.address || '',
@@ -863,9 +903,7 @@ const MembersManagement = () => {
       loans: String(member.loans ?? 0)
     });
     setValidIdFrontFile(null);
-    setValidIdBackFile(null);
     setSelfieFile(null);
-    setSelfieWithIdFile(null);
     setProofOfPaymentFile(null);
     setEditModalVisible(true);
   };
@@ -911,24 +949,30 @@ const MembersManagement = () => {
   };
 
   const validateAddFields = () => {
-    if (!formData.email || !formData.firstName || !formData.lastName || !formData.phoneNumber || 
-        !formData.placeOfBirth || !formData.gender || !formData.dateOfBirth || !formData.address || 
-        !formData.age || !formData.civilStatus || !formData.governmentId) {
-      setErrorMessage('Please complete all required fields.');
-      setErrorModalVisible(true);
+    if (!validateFields()) {
       return false;
     }
-    if (!validIdFrontFile || !validIdBackFile || !selfieFile || !selfieWithIdFile || !proofOfPaymentFile) {
+
+    if (!validIdFrontFile || !selfieFile || !proofOfPaymentFile) {
       setErrorMessage('Please upload all required images/documents.');
       setErrorModalVisible(true);
       return false;
     }
+
     const amt = parseFloat(formData.registrationFee);
     if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
       setErrorMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
       setErrorModalVisible(true);
       return false;
     }
+
+    // Check if email already exists
+    const emailExists = members.some(member => member.email.toLowerCase() === formData.email.toLowerCase());
+    if (emailExists) {
+      setEmailError('Email address is already in use');
+      return false;
+    }
+
     return true;
   };
 
@@ -950,14 +994,12 @@ const MembersManagement = () => {
       const newId = await getNextMemberId();
 
       const now = new Date();
-      const dateAdded = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const timeAdded = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+      const dateAdded = formatDate(now);
+      const timeAdded = formatTime(now);
 
-      // Upload images
+      // Upload images (only required ones as per your request)
       const validIdFrontUrl = await uploadImageToStorage(validIdFrontFile, `member_docs/${newId}/valid_id_front_${Date.now()}`);
-      const validIdBackUrl = await uploadImageToStorage(validIdBackFile, `member_docs/${newId}/valid_id_back_${Date.now()}`);
       const selfieUrl = await uploadImageToStorage(selfieFile, `member_docs/${newId}/selfie_${Date.now()}`);
-      const selfieWithIdUrl = await uploadImageToStorage(selfieWithIdFile, `member_docs/${newId}/selfie_with_id_${Date.now()}`);
       const proofOfPaymentUrl = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${newId}/registration_payment_proof_${Date.now()}`);
 
       const memberData = {
@@ -968,9 +1010,6 @@ const MembersManagement = () => {
         middleName: formData.middleName || '',
         lastName: formData.lastName,
         phoneNumber: formData.phoneNumber,
-        gender: formData.gender,
-        civilStatus: formData.civilStatus,
-        age: formData.age,
         dateOfBirth: formData.dateOfBirth,
         placeOfBirth: formData.placeOfBirth,
         address: formData.address,
@@ -981,25 +1020,25 @@ const MembersManagement = () => {
         balance: 0.0,
         loans: 0.0,
         validIdFront: validIdFrontUrl,
-        validIdBack: validIdBackUrl,
         selfie: selfieUrl,
-        selfieWithId: selfieWithIdUrl,
         registrationFee: parseFloat(formData.registrationFee || minRegistrationFee),
-        registrationPaymentProof: proofOfPaymentUrl
+        registrationPaymentProof: proofOfPaymentUrl,
+        initialPassword: password
       };
 
       await database.ref(`Members/${newId}`).set(memberData);
 
-      await sendMemberCredentialsEmail({
+      // Store pending add for email sending
+      setPendingAdd({
         firstName: memberData.firstName,
         lastName: memberData.lastName,
         email: memberData.email,
-        password,
+        password: password,
         memberId: memberData.id,
         dateAdded: memberData.dateAdded
       });
 
-      setSuccessMessage('Member added successfully!');
+      setSuccessMessage('Member added successfully! Credentials have been sent to the member.');
       setSuccessModalVisible(true);
       closeModals();
       await fetchMembers();
@@ -1023,9 +1062,6 @@ const MembersManagement = () => {
         firstName: formData.firstName || '',
         middleName: formData.middleName || '',
         lastName: formData.lastName || '',
-        gender: formData.gender || '',
-        civilStatus: formData.civilStatus || '',
-        age: formData.age || '',
         dateOfBirth: formData.dateOfBirth || '',
         placeOfBirth: formData.placeOfBirth || '',
         address: formData.address || '',
@@ -1036,9 +1072,7 @@ const MembersManagement = () => {
       };
 
       if (validIdFrontFile) updates.validIdFront = await uploadImageToStorage(validIdFrontFile, `member_docs/${id}/valid_id_front_${Date.now()}`);
-      if (validIdBackFile) updates.validIdBack = await uploadImageToStorage(validIdBackFile, `member_docs/${id}/valid_id_back_${Date.now()}`);
       if (selfieFile) updates.selfie = await uploadImageToStorage(selfieFile, `member_docs/${id}/selfie_${Date.now()}`);
-      if (selfieWithIdFile) updates.selfieWithId = await uploadImageToStorage(selfieWithIdFile, `member_docs/${id}/selfie_with_id_${Date.now()}`);
       if (proofOfPaymentFile) updates.registrationPaymentProof = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${id}/registration_payment_proof_${Date.now()}`);
 
       await database.ref(`Members/${id}`).update(updates);
@@ -1066,6 +1100,21 @@ const MembersManagement = () => {
 
   const handleSuccessOk = () => {
     setSuccessModalVisible(false);
+    
+    // Send member credentials email after successful addition
+    if (pendingAdd) {
+      sendMemberCredentialsEmail({
+        firstName: pendingAdd.firstName,
+        lastName: pendingAdd.lastName,
+        email: pendingAdd.email,
+        password: pendingAdd.password,
+        memberId: pendingAdd.memberId,
+        dateAdded: pendingAdd.dateAdded
+      }).catch(error => console.error('Error sending member credentials email:', error));
+      
+      setPendingAdd(null);
+    }
+    
     if (pendingAction) {
       setPendingAction(null);
     }
@@ -1169,6 +1218,7 @@ const MembersManagement = () => {
                       onChange={(e) => handleInputChange('firstName', e.target.value)}
                       autoCapitalize="words"
                     />
+                    {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
                   </div>
 
                   <div style={styles.formSection}>
@@ -1182,6 +1232,7 @@ const MembersManagement = () => {
                       onChange={(e) => handleInputChange('lastName', e.target.value)}
                       autoCapitalize="words"
                     />
+                    {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
                   </div>
 
                   <div style={styles.formSection}>
@@ -1196,6 +1247,7 @@ const MembersManagement = () => {
                       type="email"
                       autoCapitalize="none"
                     />
+                    {emailError && <span style={styles.errorText}>{emailError}</span>}
                   </div>
 
                   <div style={styles.formSection}>
@@ -1204,29 +1256,15 @@ const MembersManagement = () => {
                     </label>
                     <input
                       style={styles.formInput}
-                      placeholder="Enter phone number"
+                      placeholder="Enter 11-digit contact number"
                       value={formData.phoneNumber}
-                      onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
+                      onChange={(e) => {
+                        const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                        handleInputChange('phoneNumber', numericText);
+                      }}
                       type="tel"
                     />
-                  </div>
-
-                  <div style={styles.formSection}>
-                    <label style={styles.formLabel}>
-                      Gender<span style={styles.requiredAsterisk}>*</span>
-                    </label>
-                    <select
-                      style={styles.formSelect}
-                      value={formData.gender}
-                      onChange={(e) => handleInputChange('gender', e.target.value)}
-                    >
-                      <option value="">Select Gender</option>
-                      {genderOptions.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
                   </div>
 
                   <div style={styles.formSection}>
@@ -1309,24 +1347,6 @@ const MembersManagement = () => {
                   </div>
 
                   <div style={styles.formSection}>
-                    <label style={styles.formLabel}>
-                      Gender
-                    </label>
-                    <select
-                      style={styles.formSelect}
-                      value={formData.gender}
-                      onChange={(e) => handleInputChange('gender', e.target.value)}
-                    >
-                      <option value="">Select Gender</option>
-                      {genderOptions.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={styles.formSection}>
                     <label style={styles.formLabel}>Replace Valid ID Front</label>
                     <div 
                       style={{
@@ -1373,24 +1393,6 @@ const MembersManagement = () => {
 
                   <div style={styles.formSection}>
                     <label style={styles.formLabel}>
-                      Civil Status<span style={styles.requiredAsterisk}>*</span>
-                    </label>
-                    <select
-                      style={styles.formSelect}
-                      value={formData.civilStatus}
-                      onChange={(e) => handleInputChange('civilStatus', e.target.value)}
-                    >
-                      <option value="">Select Civil Status</option>
-                      {civilStatusOptions.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div style={styles.formSection}>
-                    <label style={styles.formLabel}>
                       Government ID<span style={styles.requiredAsterisk}>*</span>
                     </label>
                     <select
@@ -1424,29 +1426,29 @@ const MembersManagement = () => {
 
                   <div style={styles.formSection}>
                     <label style={styles.formLabel}>
-                      Valid ID Back<span style={styles.requiredAsterisk}>*</span>
+                      Selfie Photo<span style={styles.requiredAsterisk}>*</span>
                     </label>
                     <div 
                       style={{
                         ...styles.fileUploadSection,
-                        ...(isHovered.validIdBack ? styles.fileUploadSectionHover : {})
+                        ...(isHovered.selfie ? styles.fileUploadSectionHover : {})
                       }}
-                      onMouseEnter={() => handleMouseEnter('validIdBack')}
-                      onMouseLeave={() => handleMouseLeave('validIdBack')}
-                      onClick={() => document.getElementById('validIdBack').click()}
+                      onMouseEnter={() => handleMouseEnter('selfie')}
+                      onMouseLeave={() => handleMouseLeave('selfie')}
+                      onClick={() => document.getElementById('selfie').click()}
                     >
                       <input
-                        id="validIdBack"
+                        id="selfie"
                         style={styles.fileInput}
                         type="file"
-                        onChange={(e) => handleFileChange(e, setValidIdBackFile)}
+                        onChange={(e) => handleFileChange(e, setSelfieFile)}
                         accept="image/*"
                       />
                       <p style={styles.fileUploadText}>
-                        {validIdBackFile ? 'Change file' : 'Click to upload'}
+                        {selfieFile ? 'Change file' : 'Click to upload selfie'}
                       </p>
-                      {validIdBackFile && (
-                        <p style={styles.fileName}>{validIdBackFile.name}</p>
+                      {selfieFile && (
+                        <p style={styles.fileName}>{selfieFile.name}</p>
                       )}
                     </div>
                   </div>
@@ -1462,22 +1464,6 @@ const MembersManagement = () => {
                       onChange={(e) => handleInputChange('middleName', e.target.value)}
                       autoCapitalize="words"
                     />
-                  </div>
-
-                  <div style={styles.formSection}>
-                    <label style={styles.formLabel}>Civil Status</label>
-                    <select
-                      style={styles.formSelect}
-                      value={formData.civilStatus}
-                      onChange={(e) => handleInputChange('civilStatus', e.target.value)}
-                    >
-                      <option value="">Select Civil Status</option>
-                      {civilStatusOptions.map((option) => (
-                        <option key={option.key} value={option.key}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
                   </div>
 
                   <div style={styles.formSection}>
@@ -1530,28 +1516,28 @@ const MembersManagement = () => {
                   </div>
 
                   <div style={styles.formSection}>
-                    <label style={styles.formLabel}>Replace Valid ID Back</label>
+                    <label style={styles.formLabel}>Replace Selfie</label>
                     <div 
                       style={{
                         ...styles.fileUploadSection,
-                        ...(isHovered.validIdBack ? styles.fileUploadSectionHover : {})
+                        ...(isHovered.selfie ? styles.fileUploadSectionHover : {})
                       }}
-                      onMouseEnter={() => handleMouseEnter('validIdBack')}
-                      onMouseLeave={() => handleMouseLeave('validIdBack')}
-                      onClick={() => document.getElementById('validIdBack').click()}
+                      onMouseEnter={() => handleMouseEnter('selfie')}
+                      onMouseLeave={() => handleMouseLeave('selfie')}
+                      onClick={() => document.getElementById('selfie').click()}
                     >
                       <input
-                        id="validIdBack"
+                        id="selfie"
                         style={styles.fileInput}
                         type="file"
-                        onChange={(e) => handleFileChange(e, setValidIdBackFile)}
+                        onChange={(e) => handleFileChange(e, setSelfieFile)}
                         accept="image/*"
                       />
                       <p style={styles.fileUploadText}>
-                        {validIdBackFile ? 'Change file' : 'Click to upload'}
+                        {selfieFile ? 'Change file' : 'Click to upload replacement selfie'}
                       </p>
-                      {validIdBackFile && (
-                        <p style={styles.fileName}>{validIdBackFile.name}</p>
+                      {selfieFile && (
+                        <p style={styles.fileName}>{selfieFile.name}</p>
                       )}
                     </div>
                   </div>
@@ -1591,19 +1577,6 @@ const MembersManagement = () => {
               </div>
 
               <div>
-                <div style={styles.formSection}>
-                  <label style={styles.formLabel}>
-                    Age<span style={styles.requiredAsterisk}>*</span>
-                  </label>
-                  <input
-                    style={styles.formInput}
-                    placeholder="Enter age"
-                    value={formData.age}
-                    onChange={(e) => handleInputChange('age', e.target.value)}
-                    type="number"
-                  />
-                </div>
-
                 <div style={styles.formSection}>
                   <label style={styles.formLabel}>
                     Address<span style={styles.requiredAsterisk}>*</span>
@@ -1648,17 +1621,6 @@ const MembersManagement = () => {
 
               <div>
                 <div style={styles.formSection}>
-                  <label style={styles.formLabel}>Age</label>
-                  <input
-                    style={styles.formInput}
-                    placeholder="Enter age"
-                    value={formData.age}
-                    onChange={(e) => handleInputChange('age', e.target.value)}
-                    type="number"
-                  />
-                </div>
-
-                <div style={styles.formSection}>
                   <label style={styles.formLabel}>Address</label>
                   <input
                     style={styles.formInput}
@@ -1671,71 +1633,6 @@ const MembersManagement = () => {
               </div>
             </div>
           )}
-
-          {/* Additional File Uploads */}
-          <div style={styles.formGrid}>
-            <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  {mode === 'add' ? 'Selfie Photo' : 'Replace Selfie'}<span style={mode === 'add' ? styles.requiredAsterisk : {}}>{mode === 'add' ? '*' : ''}</span>
-                </label>
-                <div 
-                  style={{
-                    ...styles.fileUploadSection,
-                    ...(isHovered.selfie ? styles.fileUploadSectionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('selfie')}
-                  onMouseLeave={() => handleMouseLeave('selfie')}
-                  onClick={() => document.getElementById('selfie').click()}
-                >
-                  <input
-                    id="selfie"
-                    style={styles.fileInput}
-                    type="file"
-                    onChange={(e) => handleFileChange(e, setSelfieFile)}
-                    accept="image/*"
-                  />
-                  <p style={styles.fileUploadText}>
-                    {selfieFile ? 'Change file' : `Click to upload ${mode === 'add' ? 'selfie' : 'replace selfie'}`}
-                  </p>
-                  {selfieFile && (
-                    <p style={styles.fileName}>{selfieFile.name}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  {mode === 'add' ? 'Selfie with ID' : 'Replace Selfie with ID'}<span style={mode === 'add' ? styles.requiredAsterisk : {}}>{mode === 'add' ? '*' : ''}</span>
-                </label>
-                <div 
-                  style={{
-                    ...styles.fileUploadSection,
-                    ...(isHovered.selfieWithId ? styles.fileUploadSectionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('selfieWithId')}
-                  onMouseLeave={() => handleMouseLeave('selfieWithId')}
-                  onClick={() => document.getElementById('selfieWithId').click()}
-                >
-                  <input
-                    id="selfieWithId"
-                    style={styles.fileInput}
-                    type="file"
-                    onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
-                    accept="image/*"
-                  />
-                  <p style={styles.fileUploadText}>
-                    {selfieWithIdFile ? 'Change file' : `Click to upload ${mode === 'add' ? 'selfie with ID' : 'replace selfie with ID'}`}
-                  </p>
-                  {selfieWithIdFile && (
-                    <p style={styles.fileName}>{selfieWithIdFile.name}</p>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
 
           {/* Proof of Payment */}
           {mode === 'add' && (
@@ -2043,7 +1940,7 @@ const MembersManagement = () => {
               <div style={{padding: '24px', textAlign: 'center'}}>
                 <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
                 <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to register this new member? This action cannot be undone.
+                  Are you sure you want to register this new member? This will create their account and send them login credentials.
                 </p>
               </div>
               <div style={styles.modalActions}>
@@ -2110,4 +2007,4 @@ const MembersManagement = () => {
   );
 };
 
-export default MembersManagement;
+export default DataMigration;
