@@ -30,13 +30,12 @@ const Deposit = () => {
   const [balance, setBalance] = useState(0);
   const [memberId, setMemberId] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [depositAccounts, setDepositAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
     GCash: { accountName: '', accountNumber: '' }
@@ -1258,23 +1257,20 @@ const Deposit = () => {
 
   const handleSubmit = async () => {
     if (!depositOption || !amountToBeDeposited) {
-      setAlertMessage('All fields are required');
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage('All fields are required');
+      setErrorModalVisible(true);
       return;
     }
 
     if (depositOption !== 'Cash' && !proofOfDeposit) {
-      setAlertMessage('All fields are required');
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage('All fields are required');
+      setErrorModalVisible(true);
       return;
     }
 
     if (isNaN(amountToBeDeposited) || parseFloat(amountToBeDeposited) <= 0) {
-      setAlertMessage('Please enter a valid amount');
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage('Please enter a valid amount');
+      setErrorModalVisible(true);
       return;
     }
 
@@ -1283,26 +1279,26 @@ const Deposit = () => {
   
   // FIXED: Submit deposit with optimized image upload
   const submitDeposit = async () => {
-    setLoading(true);
-    setConfirmModalVisible(false);
+    if (!validateForm()) {
+      setErrorModalVisible(true);
+      return;
+    }
 
     try {
+      setLoading(true);
+
       const transactionId = generateTransactionId();
 
       let proofOfDepositUrl = null;
       if (depositOption !== 'Cash' && proofOfDeposit) {
         try {
-          setIsUploadingImage(true);
           console.log('Starting proof of deposit image upload...');
           proofOfDepositUrl = await uploadImageToFirebase(proofOfDeposit, 'deposit', memberId);
           console.log('Proof of deposit image uploaded successfully:', proofOfDepositUrl);
-          setIsUploadingImage(false);
         } catch (uploadError) {
           console.error('Failed to upload proof of deposit:', uploadError);
-          setIsUploadingImage(false);
-          setAlertMessage(uploadError.message || 'Failed to upload proof of deposit image. Please try again.');
-          setAlertType('error');
-          setAlertModalVisible(true);
+          setErrorMessage(uploadError.message || 'Failed to upload proof of deposit image. Please try again.');
+          setErrorModalVisible(true);
           setLoading(false);
           return;
         }
@@ -1326,25 +1322,70 @@ const Deposit = () => {
 
       setPendingDepositData(depositData);
 
-      setAlertMessage('Your deposit request has been submitted successfully. It will be processed shortly.');
-      setAlertType('success');
-      setAlertModalVisible(true);
+      setSuccessModalVisible(true);
       
     } catch (error) {
       console.error('Error during deposit submission:', error);
       
       if (error.code && error.code.startsWith('storage/')) {
-        setAlertMessage(errorMessage || 'Failed to upload image');
-        setAlertType('error');
-        setAlertModalVisible(true);
+        setErrorMessage(errorMessage || 'Failed to upload image');
+        setErrorModalVisible(true);
       } else {
-        setAlertMessage('An unexpected error occurred. Please try again later.');
-        setAlertType('error');
-        setAlertModalVisible(true);
+        setErrorMessage('An unexpected error occurred. Please try again later.');
+        setErrorModalVisible(true);
       }
     } finally {
       setLoading(false);
     }
+  };
+
+  const validateForm = () => {
+    if (!depositOption || !amountToBeDeposited) {
+      setErrorMessage('All fields are required');
+      return false;
+    }
+
+    if (depositOption !== 'Cash' && !proofOfDeposit) {
+      setErrorMessage('All fields are required');
+      return false;
+    }
+
+    if (isNaN(amountToBeDeposited) || parseFloat(amountToBeDeposited) <= 0) {
+      setErrorMessage('Please enter a valid amount');
+      return false;
+    }
+
+    return true;
+  };
+
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+    
+    // Navigate immediately to AppHome
+    navigation.navigate('AppHome');
+    
+    // Run API call in background after navigation
+    if (pendingDepositData) {
+      // Use setTimeout to ensure navigation happens first
+      setTimeout(async () => {
+        try {
+          await MemberDeposit(pendingDepositData);
+          console.log('Deposit API call completed successfully in background');
+        } catch (apiError) {
+          console.error('Background API call failed:', apiError);
+          // API failure doesn't affect user experience since data is already in database
+        }
+      }, 100);
+      
+      // Clear pending data
+      setPendingDepositData(null);
+    }
+
+    resetFormFields();
+  };
+
+  const handleErrorOk = () => {
+    setErrorModalVisible(false);
   };
 
   const resetFormFields = () => {
@@ -1480,27 +1521,37 @@ const Deposit = () => {
             loading
           }
         >
-          {loading ? (
-            <>
-              <ActivityIndicator size="small" color="#000" />
-              <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
-                {isUploadingImage ? 'Uploading Image...' : 'Submitting...'}
-              </Text>
-            </>
-          ) : (
-            <Text style={styles.submitButtonText}>Submit</Text>
-          )}
+          <Text style={styles.submitButtonText}>Submit</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Full-screen loading modal */}
-      <Modal transparent={true} visible={loading} animationType="fade">
-        <View style={{ flex: 1, backgroundColor: 'rgba(0, 0, 0, 0.5)', justifyContent: 'center', alignItems: 'center' }}>
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#4FE7AF" />
-            <Text style={styles.loadingText}>
-              {isUploadingImage ? 'Uploading Image...' : 'Processing...'}
+      {/* Success Modal */}
+      <Modal visible={successModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
+            <Text style={styles.modalText}>
+              Deposit request submitted successfully! It will be processed shortly.
             </Text>
+            <TouchableOpacity 
+              style={styles.modalButton} 
+              onPress={handleSuccessOk}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal visible={errorModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
+            <Text style={styles.modalText}>{errorMessage}</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={handleErrorOk}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -1611,34 +1662,6 @@ const Deposit = () => {
         }}
       />
 
-      {/* Custom Alert Modal */}
-      <CustomModal
-        visible={alertModalVisible}
-        onClose={() => {
-          setAlertModalVisible(false);
-          if (alertType === 'success' && pendingDepositData) {
-            resetFormFields();
-            navigation.navigate('AppHome');
-            
-            setTimeout(async () => {
-              try {
-                await MemberDeposit(pendingDepositData);
-                console.log('Deposit API call completed successfully in background');
-              } catch (apiError) {
-                console.error('Background API call failed:', apiError);
-              }
-              setPendingDepositData(null);
-            }, 100);
-          } else if (alertType === 'success') {
-            resetFormFields();
-            navigation.navigate('AppHome');
-          }
-        }}
-        message={alertMessage}
-        type={alertType}
-        buttonText="OK"
-      />
-
       {/* Custom Modal for general errors */}
       <CustomModal
         visible={modalVisible}
@@ -1646,6 +1669,16 @@ const Deposit = () => {
         message={modalMessage}
         type={modalType}
       />
+
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Processing...</Text>
+          </View>
+        </View>
+      )}
     </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -1795,6 +1828,52 @@ const styles = StyleSheet.create({
     color: 'black',
     fontSize: 16,
     fontWeight: '700',
+  },
+  // Modal styles (matching CreatePasswordPage design)
+  centeredModal: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    marginBottom: 15,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButton: {
+    backgroundColor: '#2C5282',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
   },
   loadingBox: {
     backgroundColor: 'white',
