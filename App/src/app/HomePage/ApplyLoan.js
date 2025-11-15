@@ -59,8 +59,10 @@ const ApplyLoan = () => {
   const [email, setEmail] = useState('');
   const [userId, setUserId] = useState('');
   const [memberId, setMemberId] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   // Collateral related states
   const [requiresCollateral, setRequiresCollateral] = useState(false);
@@ -1289,9 +1291,8 @@ const ApplyLoan = () => {
   const validateAccountNumber = (value) => {
     const maxLength = disbursement === 'GCash' ? 11 : disbursement === 'Bank' ? 16 : 0;
     if (maxLength > 0 && value.length > maxLength) {
-      setAlertMessage(`Account Number for ${disbursement} must be ${maxLength} digits long`);
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage(`Account Number for ${disbursement} must be ${maxLength} digits long`);
+      setErrorModalVisible(true);
       return value.slice(0, maxLength);
     }
     return value;
@@ -1381,20 +1382,17 @@ const ApplyLoan = () => {
           
           await checkExistingLoans(userEmail);
         } else {
-          setAlertMessage('User not found');
-          setAlertType('error');
-          setAlertModalVisible(true);
+          setErrorMessage('User not found');
+          setErrorModalVisible(true);
         }
       } else {
-        setAlertMessage('No members found');
-        setAlertType('error');
-        setAlertModalVisible(true);
+        setErrorMessage('No members found');
+        setErrorModalVisible(true);
       }
     } catch (error) {
       console.error('Error fetching user data:', getErrorMessage(error));
-      setAlertMessage('Error loading user information.');
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage('Error loading user information.');
+      setErrorModalVisible(true);
     }
   };
 
@@ -1465,15 +1463,13 @@ const ApplyLoan = () => {
             await fetchUserData(userEmail);
           }
         } else {
-          setAlertMessage('Unable to identify user. Please log in again.');
-          setAlertType('error');
-          setAlertModalVisible(true);
+          setErrorMessage('Unable to identify user. Please log in again.');
+          setErrorModalVisible(true);
         }
       } catch (error) {
         console.error('Error initializing data:', error);
-        setAlertMessage('Error loading information.');
-        setAlertType('error');
-        setAlertModalVisible(true);
+        setErrorMessage('Error loading information.');
+        setErrorModalVisible(true);
       }
     };
 
@@ -1536,9 +1532,8 @@ const ApplyLoan = () => {
       if (loanAmountNum > memberBalance) {
         if (!requiresCollateral) {
           setRequiresCollateral(true);
-          setAlertMessage('Loan amount exceeds your balance. Collateral is required for this loan.');
-          setAlertType('info');
-          setAlertModalVisible(true);
+          setErrorMessage('Loan amount exceeds your balance. Collateral is required for this loan.');
+          setErrorModalVisible(true);
         }
       }
     }
@@ -1605,9 +1600,8 @@ const ApplyLoan = () => {
       return true;
     } catch (error) {
       console.error('Failed to store loan application:', getErrorMessage(error));
-      setAlertMessage('Failed to submit loan application');
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage('Failed to submit loan application');
+      setErrorModalVisible(true);
       return false;
     }
   };
@@ -1623,32 +1617,45 @@ const ApplyLoan = () => {
     }
   };
 
+  const validateForm = () => {
+    if (!isFormValid()) {
+      let message = 'All required fields must be filled';
+      if (requiresCollateral && !isCollateralValid()) {
+        message = 'Please complete all collateral details including uploading at least one proof of collateral image';
+      }
+      setErrorMessage(message);
+      return false;
+    }
+
+    return true;
+  };
+
   // FIXED: Submit loan application with working image uploads - COMPLETELY REWRITTEN
   const submitLoanApplication = async () => {
-    setIsLoading(true);
-    setConfirmModalVisible(false);
-    
+    if (!validateForm()) {
+      setErrorModalVisible(true);
+      return;
+    }
+
     try {
+      setLoading(true);
+
       const loanAmountNum = parseFloat(loanAmount);
       
       // Upload collateral images to Firebase Storage if provided
       let proofOfCollateralUrls = [];
       if (requiresCollateral && proofOfCollateral.length > 0) {
         try {
-          setIsUploadingImage(true);
           console.log('Starting collateral image uploads...');
           
           // Upload images to Firebase Storage
           proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral', userId);
           console.log('All collateral images uploaded successfully:', proofOfCollateralUrls);
-          setIsUploadingImage(false);
         } catch (uploadError) {
           console.error('Failed to upload collateral images:', uploadError);
-          setIsUploadingImage(false);
-          setAlertMessage(uploadError.message || 'Failed to upload collateral images. Please try again.');
-          setAlertType('error');
-          setAlertModalVisible(true);
-          setIsLoading(false);
+          setErrorMessage(uploadError.message || 'Failed to upload collateral images. Please try again.');
+          setErrorModalVisible(true);
+          setLoading(false);
           return;
         }
       }
@@ -1682,7 +1689,7 @@ const ApplyLoan = () => {
       const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
       
       if (!storedSuccessfully) {
-        setIsLoading(false);
+        setLoading(false);
         return;
       }
 
@@ -1699,24 +1706,43 @@ const ApplyLoan = () => {
 
       setPendingApiData(loanData);
 
-      setIsLoading(false);
-      setAlertMessage('Loan application submitted successfully. You will receive a confirmation email shortly.');
-      setAlertType('success');
-      setSuccessAction(() => () => {
-        navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
-        if (loanData) {
-          runApiOperationsInBackground(loanData);
-        }
-      });
-      setAlertModalVisible(true);
-
+      setSuccessModalVisible(true);
+      
     } catch (error) {
       console.error('Error during loan submission:', error?.message || error || 'Unknown error');
-      setAlertMessage('An unexpected error occurred. Please try again later.');
-      setAlertType('error');
-      setAlertModalVisible(true);
-      setIsLoading(false);
+      setErrorMessage('An unexpected error occurred. Please try again later.');
+      setErrorModalVisible(true);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+    
+    // Navigate immediately to AppHome
+    navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
+    
+    // Run API call in background after navigation
+    if (pendingApiData) {
+      // Use setTimeout to ensure navigation happens first
+      setTimeout(async () => {
+        try {
+          await MemberLoan(pendingApiData);
+          console.log('Loan API call completed successfully in background');
+        } catch (apiError) {
+          console.error('Background API call failed:', apiError);
+          // API failure doesn't affect user experience since data is already in database
+        }
+      }, 100);
+      
+      // Clear pending data
+      setPendingApiData(null);
+    }
+  };
+
+  const handleErrorOk = () => {
+    setErrorModalVisible(false);
   };
 
   const showConfirmationAlert = () => {
@@ -1769,23 +1795,16 @@ const ApplyLoan = () => {
       accountNumber
     });
     
-    if (!isFormValid()) {
-      let message = 'All required fields must be filled';
-      if (requiresCollateral && !isCollateralValid()) {
-        message = 'Please complete all collateral details including uploading at least one proof of collateral image';
-      }
-      setAlertMessage(message);
-      setAlertType('error');
-      setAlertModalVisible(true);
+    if (!validateForm()) {
+      setErrorModalVisible(true);
       return;
     }
 
     if (memberId) {
       const exists = await hasAnyPendingApplication(memberId);
       if (exists) {
-        setAlertMessage('You already have a pending loan application. Please wait for it to be processed before submitting another.');
-        setAlertType('error');
-        setAlertModalVisible(true);
+        setErrorMessage('You already have a pending loan application. Please wait for it to be processed before submitting another.');
+        setErrorModalVisible(true);
         return;
       }
     }
@@ -1794,18 +1813,16 @@ const ApplyLoan = () => {
     const userBalance = Number(balance) || 0;
 
     if (userBalance <= 0) {
-      setAlertMessage('You have no available balance to support a new loan.');
-      setAlertType('error');
-      setAlertModalVisible(true);
+      setErrorMessage('You have no available balance to support a new loan.');
+      setErrorModalVisible(true);
       return;
     }
 
     if (loanAmountNum > userBalance) {
       if (!isCollateralValid()) {
         setRequiresCollateral(true);
-        setAlertMessage('Loan amount exceeds your balance. Please add collateral or lower the amount.');
-        setAlertType('error');
-        setAlertModalVisible(true);
+        setErrorMessage('Loan amount exceeds your balance. Please add collateral or lower the amount.');
+        setErrorModalVisible(true);
         return;
       }
       setRequiresCollateral(true);
@@ -1846,9 +1863,8 @@ const ApplyLoan = () => {
       setRequiresCollateral(true);
       setShowCollateralModal(false);
       setTimeout(() => {
-        setAlertMessage('Collateral details saved successfully!');
-        setAlertType('success');
-        setAlertModalVisible(true);
+        setErrorMessage('Collateral details saved successfully!');
+        setErrorModalVisible(true);
       }, 100);
     }
   };
@@ -2041,20 +2057,11 @@ const ApplyLoan = () => {
           )}
 
           <TouchableOpacity 
-            style={[styles.submitButton, (!isFormValid() || isLoading) && styles.disabledButton]} 
+            style={[styles.submitButton, (!isFormValid() || loading) && styles.disabledButton]} 
             onPress={handleSubmit}
-            disabled={!isFormValid() || isLoading}
+            disabled={!isFormValid() || loading}
           >
-            {isLoading ? (
-              <>
-                <ActivityIndicator size="small" color="#000" />
-                <Text style={[styles.submitButtonText, { marginLeft: 8 }]}>
-                  {isUploadingImage ? 'Uploading Images...' : 'Submitting...'}
-                </Text>
-              </>
-            ) : (
-              <Text style={styles.submitButtonText}>Submit</Text>
-            )}
+            <Text style={styles.submitButtonText}>Submit</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -2270,8 +2277,39 @@ const ApplyLoan = () => {
         </View>
       </Modal>
 
+      {/* Success Modal */}
+      <Modal visible={successModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
+            <Text style={styles.modalText}>
+              Loan application submitted successfully! You will receive a confirmation email shortly.
+            </Text>
+            <TouchableOpacity 
+              style={styles.modalButton} 
+              onPress={handleSuccessOk}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Error Modal */}
+      <Modal visible={errorModalVisible} transparent animationType="fade">
+        <View style={styles.centeredModal}>
+          <View style={styles.modalCard}>
+            <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
+            <Text style={styles.modalText}>{errorMessage}</Text>
+            <TouchableOpacity style={styles.modalButton} onPress={handleErrorOk}>
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Loading Overlay */}
-      {isLoading && (
+      {loading && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingBox}>
             <ActivityIndicator size="large" color="#4FE7AF" />
@@ -2279,21 +2317,6 @@ const ApplyLoan = () => {
           </View>
         </View>
       )}
-
-      {/* Custom Alert Modal */}
-      <CustomModal
-        visible={alertModalVisible}
-        onClose={() => {
-          setAlertModalVisible(false);
-          if (alertType === 'success' && successAction) {
-            successAction();
-            setSuccessAction(null);
-          }
-          setPendingApiData(null);
-        }}
-        message={alertMessage}
-        type={alertType}
-      />
 
       {/* Custom Modal for general errors */}
       <CustomModal
