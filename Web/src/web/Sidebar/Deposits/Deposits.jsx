@@ -2212,6 +2212,17 @@ const Deposits = () => {
               <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
               <p style={styles.modalText}>Are you sure you want to add this deposit?</p>
               <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                               <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.primaryButton,
+                    flex: 1
+                  }}
+                  onClick={confirmAddDeposit}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Processing...' : 'Yes'}
+                </button>
                 <button 
                   style={{
                     ...styles.actionButton,
@@ -2223,17 +2234,7 @@ const Deposits = () => {
                 >
                   {actionInProgress ? 'Processing...' : 'No'}
                 </button>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.primaryButton,
-                    flex: 1
-                  }}
-                  onClick={confirmAddDeposit}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Yes'}
-                </button>
+ 
               </div>
             </div>
           </div>
