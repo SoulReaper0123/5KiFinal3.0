@@ -146,7 +146,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // Handle gallery selection - FIXED VERSION
+    // FIXED: Handle gallery selection - IMPROVED FOR CHROME MOBILE
     const handleGallerySelection = async () => {
         console.log('Gallery selected');
         setShowSourceOptions(false);
@@ -193,7 +193,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // UNIVERSAL GALLERY SELECTION - IMPROVED VERSION
+    // FIXED: UNIVERSAL GALLERY SELECTION - IMPROVED FOR CHROME MOBILE
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -206,6 +206,7 @@ const RegisterPage2 = () => {
             input.type = 'file';
             input.accept = 'image/*';
             input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            input.setAttribute('capture', 'environment');
             
             let resolved = false;
             
@@ -220,17 +221,40 @@ const RegisterPage2 = () => {
             };
             
             const handleChange = (e) => {
-                console.log('File input change event');
+                console.log('File input change event triggered');
                 const file = e.target.files[0];
                 if (file) {
                     console.log('File selected:', file.name, file.type, file.size);
+                    
+                    // Validate file type
+                    if (!file.type.startsWith('image/')) {
+                        console.error('Selected file is not an image');
+                        setModalMessage('Please select a valid image file');
+                        setModalType('error');
+                        setModalVisible(true);
+                        cleanup();
+                        return;
+                    }
+                    
+                    // Validate file size (max 10MB)
+                    if (file.size > 10 * 1024 * 1024) {
+                        console.error('File too large:', file.size);
+                        setModalMessage('Image size should be less than 10MB');
+                        setModalType('error');
+                        setModalVisible(true);
+                        cleanup();
+                        return;
+                    }
+                    
                     const reader = new FileReader();
                     
                     reader.onload = (event) => {
                         console.log('File read successfully');
                         if (!resolved) {
                             resolved = true;
-                            document.body.removeChild(input);
+                            if (document.body.contains(input)) {
+                                document.body.removeChild(input);
+                            }
                             resolve(event.target.result);
                         }
                     };
@@ -239,7 +263,12 @@ const RegisterPage2 = () => {
                         console.error('File read error');
                         if (!resolved) {
                             resolved = true;
-                            document.body.removeChild(input);
+                            if (document.body.contains(input)) {
+                                document.body.removeChild(input);
+                            }
+                            setModalMessage('Failed to read the selected image');
+                            setModalType('error');
+                            setModalVisible(true);
                             resolve(null);
                         }
                     };
@@ -248,7 +277,9 @@ const RegisterPage2 = () => {
                         console.log('File read aborted');
                         if (!resolved) {
                             resolved = true;
-                            document.body.removeChild(input);
+                            if (document.body.contains(input)) {
+                                document.body.removeChild(input);
+                            }
                             resolve(null);
                         }
                     };
@@ -273,12 +304,13 @@ const RegisterPage2 = () => {
             // Add event listeners
             input.addEventListener('change', handleChange);
             input.addEventListener('cancel', handleCancel);
+            input.addEventListener('blur', handleCancel);
             
             // Add to document and trigger click
             document.body.appendChild(input);
             
             // Set timeout for safety
-            setTimeout(() => {
+            const timeoutId = setTimeout(() => {
                 if (!resolved) {
                     console.log('Gallery selection timeout');
                     cleanup();
@@ -286,223 +318,51 @@ const RegisterPage2 = () => {
             }, 30000); // 30 second timeout
             
             console.log('Triggering file input click');
-            input.click();
+            
+            // Force click with error handling
+            try {
+                input.click();
+            } catch (error) {
+                console.error('Error triggering file input:', error);
+                cleanup();
+            }
+            
+            // Clean up timeout when resolved
+            const originalResolve = resolve;
+            resolve = (value) => {
+                clearTimeout(timeoutId);
+                originalResolve(value);
+            };
         });
     };
 
-    // Web camera capture
-// FIXED Web camera capture - CORRECT SELFIE ORIENTATION
-const handleWebCameraCapture = (imageType) => {
-    return new Promise((resolve) => {
-        if (Platform.OS !== 'web') {
-            resolve(null);
-            return;
-        }
-
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            setModalMessage('Camera not supported in this browser. Please use gallery instead.');
-            setModalType('error');
-            setModalVisible(true);
-            resolve(null);
-            return;
-        }
-
-        // Use back camera for ID, front camera for selfie
-        const facingMode = imageType === 'selfie' ? 'user' : 'environment';
-        
-        navigator.mediaDevices.getUserMedia({ 
-            video: { 
-                facingMode: facingMode,
-                width: { ideal: 1920 },
-                height: { ideal: 1080 }
-            } 
-        })
-        .then((stream) => {
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.autoplay = true;
-            video.playsInline = true;
-            
-            const canvas = document.createElement('canvas');
-            const context = canvas.getContext('2d');
-            
-            const captureUI = document.createElement('div');
-            captureUI.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100%;
-                height: 100%;
-                background: rgba(0,0,0,0.95);
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                justify-content: center;
-                z-index: 10000;
-                padding: 20px;
-                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-                box-sizing: border-box;
-            `;
-            
-            const contentContainer = document.createElement('div');
-            contentContainer.style.cssText = `
-                width: 100%;
-                max-width: 400px;
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 20px;
-            `;
-            
-            const cameraContainer = document.createElement('div');
-            cameraContainer.style.cssText = `
-                width: 100%;
-                height: 400px;
-                border-radius: 12px;
-                overflow: hidden;
-                background: #000;
-                position: relative;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-                box-shadow: 0 4px 20px rgba(0,0,0,0.3);
-            `;
-            
-            // Add camera frame/border that matches the camera size
-            const cameraFrame = document.createElement('div');
-            cameraFrame.style.cssText = `
-                position: absolute;
-                top: 10px;
-                left: 10px;
-                right: 10px;
-                bottom: 10px;
-                border: 3px solid white;
-                border-radius: 8px;
-                pointer-events: none;
-                z-index: 2;
-                box-shadow: 0 0 0 1px rgba(255,255,255,0.3);
-            `;
-            
-            const buttonContainer = document.createElement('div');
-            buttonContainer.style.cssText = `
-                display: flex;
-                flex-direction: column;
-                align-items: center;
-                gap: 12px;
-                width: 100%;
-            `;
-            
-            const captureButton = document.createElement('button');
-            captureButton.textContent = 'Capture Photo';
-            captureButton.style.cssText = `
-                padding: 16px 24px;
-                background: #1E3A5F;
-                color: white;
-                border: none;
-                border-radius: 10px;
-                font-size: 16px;
-                font-weight: 600;
-                cursor: pointer;
-                width: 100%;
-                max-width: 400px;
-                transition: background 0.2s;
-                box-shadow: 0 2px 8px rgba(30, 58, 95, 0.3);
-            `;
-            captureButton.onmouseover = () => captureButton.style.background = '#0F2A4A';
-            captureButton.onmouseout = () => captureButton.style.background = '#1E3A5F';
-            
-            const cancelButton = document.createElement('button');
-            cancelButton.textContent = 'Cancel';
-            cancelButton.style.cssText = `
-                padding: 14px 24px;
-                background: #dc2626;
-                color: white;
-                border: none;
-                border-radius: 10px;
-                font-size: 14px;
-                font-weight: 600;
-                cursor: pointer;
-                width: 100%;
-                max-width: 400px;
-                transition: background 0.2s;
-                box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
-            `;
-            cancelButton.onmouseover = () => cancelButton.style.background = '#b91c1c';
-            cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
-            
-            video.onloadedmetadata = () => {
-                // Set video to fill the container completely
-                video.style.width = '100%';
-                video.style.height = '100%';
-                video.style.objectFit = 'cover';
-                
-                // For front camera preview, we want the mirrored view (like a mirror)
-                // This is what users expect to see when taking selfies
-                if (imageType === 'selfie') {
-                    video.style.transform = 'scaleX(-1)'; // Mirror the preview
-                }
-                
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                captureButton.onclick = () => {
-                    // FIX: For selfies, we need to handle the captured image differently
-                    if (imageType === 'selfie') {
-                        // Method 1: Draw normally but flip horizontally to correct the mirroring
-                        context.save();
-                        context.scale(-1, 1); // Flip horizontally
-                        context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-                        context.restore();
-                    } else {
-                        // For back camera, draw normally
-                        context.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    }
-                    
-                    const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-                    
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(captureUI);
-                    resolve(imageDataUrl);
-                };
-                
-                cancelButton.onclick = () => {
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(captureUI);
-                    resolve(null);
-                };
-                
-                cameraContainer.appendChild(video);
-                cameraContainer.appendChild(cameraFrame);
-                buttonContainer.appendChild(captureButton);
-                buttonContainer.appendChild(cancelButton);
-                contentContainer.appendChild(cameraContainer);
-                contentContainer.appendChild(buttonContainer);
-                captureUI.appendChild(contentContainer);
-                document.body.appendChild(captureUI);
-            };
-            
-            video.onerror = () => {
-                stream.getTracks().forEach(track => track.stop());
-                if (document.body.contains(captureUI)) {
-                    document.body.removeChild(captureUI);
-                }
+    // Web camera capture - CORRECT SELFIE ORIENTATION
+    const handleWebCameraCapture = (imageType) => {
+        return new Promise((resolve) => {
+            if (Platform.OS !== 'web') {
                 resolve(null);
-            };
-        }).catch((error) => {
-            console.error('Camera access error:', error);
-            // If the preferred camera fails, try the other one as fallback
-            console.log('Trying fallback camera...');
-            const fallbackFacingMode = imageType === 'selfie' ? 'environment' : 'user';
+                return;
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setModalMessage('Camera not supported in this browser. Please use gallery instead.');
+                setModalType('error');
+                setModalVisible(true);
+                resolve(null);
+                return;
+            }
+
+            // Use back camera for ID, front camera for selfie
+            const facingMode = imageType === 'selfie' ? 'user' : 'environment';
             
             navigator.mediaDevices.getUserMedia({ 
                 video: { 
-                    facingMode: fallbackFacingMode,
+                    facingMode: facingMode,
                     width: { ideal: 1920 },
                     height: { ideal: 1080 }
                 } 
             })
             .then((stream) => {
-                // Same camera setup code as above but with fallback camera
                 const video = document.createElement('video');
                 video.srcObject = stream;
                 video.autoplay = true;
@@ -553,6 +413,7 @@ const handleWebCameraCapture = (imageType) => {
                     box-shadow: 0 4px 20px rgba(0,0,0,0.3);
                 `;
                 
+                // Add camera frame/border that matches the camera size
                 const cameraFrame = document.createElement('div');
                 cameraFrame.style.cssText = `
                     position: absolute;
@@ -620,20 +481,21 @@ const handleWebCameraCapture = (imageType) => {
                     video.style.height = '100%';
                     video.style.objectFit = 'cover';
                     
-                    // For front camera preview in fallback, also mirror it
-                    if (fallbackFacingMode === 'user') {
-                        video.style.transform = 'scaleX(-1)';
+                    // For front camera preview, we want the mirrored view (like a mirror)
+                    // This is what users expect to see when taking selfies
+                    if (imageType === 'selfie') {
+                        video.style.transform = 'scaleX(-1)'; // Mirror the preview
                     }
                     
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
                     
                     captureButton.onclick = () => {
-                        // Handle the captured image based on camera type
-                        if (fallbackFacingMode === 'user') {
-                            // For front camera, flip the captured image
+                        // FIX: For selfies, we need to handle the captured image differently
+                        if (imageType === 'selfie') {
+                            // Method 1: Draw normally but flip horizontally to correct the mirroring
                             context.save();
-                            context.scale(-1, 1);
+                            context.scale(-1, 1); // Flip horizontally
                             context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
                             context.restore();
                         } else {
@@ -671,17 +533,200 @@ const handleWebCameraCapture = (imageType) => {
                     }
                     resolve(null);
                 };
-            })
-            .catch((fallbackError) => {
-                console.error('Fallback camera also failed:', fallbackError);
-                setModalMessage('Camera not available. Please use gallery instead.');
-                setModalType('error');
-                setModalVisible(true);
-                resolve(null);
+            }).catch((error) => {
+                console.error('Camera access error:', error);
+                // If the preferred camera fails, try the other one as fallback
+                console.log('Trying fallback camera...');
+                const fallbackFacingMode = imageType === 'selfie' ? 'environment' : 'user';
+                
+                navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: fallbackFacingMode,
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
+                    } 
+                })
+                .then((stream) => {
+                    // Same camera setup code as above but with fallback camera
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    video.autoplay = true;
+                    video.playsInline = true;
+                    
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    const captureUI = document.createElement('div');
+                    captureUI.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100%;
+                        height: 100%;
+                        background: rgba(0,0,0,0.95);
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        justify-content: center;
+                        z-index: 10000;
+                        padding: 20px;
+                        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                        box-sizing: border-box;
+                    `;
+                    
+                    const contentContainer = document.createElement('div');
+                    contentContainer.style.cssText = `
+                        width: 100%;
+                        max-width: 400px;
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 20px;
+                    `;
+                    
+                    const cameraContainer = document.createElement('div');
+                    cameraContainer.style.cssText = `
+                        width: 100%;
+                        height: 400px;
+                        border-radius: 12px;
+                        overflow: hidden;
+                        background: #000;
+                        position: relative;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+                    `;
+                    
+                    const cameraFrame = document.createElement('div');
+                    cameraFrame.style.cssText = `
+                        position: absolute;
+                        top: 10px;
+                        left: 10px;
+                        right: 10px;
+                        bottom: 10px;
+                        border: 3px solid white;
+                        border-radius: 8px;
+                        pointer-events: none;
+                        z-index: 2;
+                        box-shadow: 0 0 0 1px rgba(255,255,255,0.3);
+                    `;
+                    
+                    const buttonContainer = document.createElement('div');
+                    buttonContainer.style.cssText = `
+                        display: flex;
+                        flex-direction: column;
+                        align-items: center;
+                        gap: 12px;
+                        width: 100%;
+                    `;
+                    
+                    const captureButton = document.createElement('button');
+                    captureButton.textContent = 'Capture Photo';
+                    captureButton.style.cssText = `
+                        padding: 16px 24px;
+                        background: #1E3A5F;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 16px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        width: 100%;
+                        max-width: 400px;
+                        transition: background 0.2s;
+                        box-shadow: 0 2px 8px rgba(30, 58, 95, 0.3);
+                    `;
+                    captureButton.onmouseover = () => captureButton.style.background = '#0F2A4A';
+                    captureButton.onmouseout = () => captureButton.style.background = '#1E3A5F';
+                    
+                    const cancelButton = document.createElement('button');
+                    cancelButton.textContent = 'Cancel';
+                    cancelButton.style.cssText = `
+                        padding: 14px 24px;
+                        background: #dc2626;
+                        color: white;
+                        border: none;
+                        border-radius: 10px;
+                        font-size: 14px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        width: 100%;
+                        max-width: 400px;
+                        transition: background 0.2s;
+                        box-shadow: 0 2px 8px rgba(220, 38, 38, 0.3);
+                    `;
+                    cancelButton.onmouseover = () => cancelButton.style.background = '#b91c1c';
+                    cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
+                    
+                    video.onloadedmetadata = () => {
+                        // Set video to fill the container completely
+                        video.style.width = '100%';
+                        video.style.height = '100%';
+                        video.style.objectFit = 'cover';
+                        
+                        // For front camera preview in fallback, also mirror it
+                        if (fallbackFacingMode === 'user') {
+                            video.style.transform = 'scaleX(-1)';
+                        }
+                        
+                        canvas.width = video.videoWidth;
+                        canvas.height = video.videoHeight;
+                        
+                        captureButton.onclick = () => {
+                            // Handle the captured image based on camera type
+                            if (fallbackFacingMode === 'user') {
+                                // For front camera, flip the captured image
+                                context.save();
+                                context.scale(-1, 1);
+                                context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
+                                context.restore();
+                            } else {
+                                // For back camera, draw normally
+                                context.drawImage(video, 0, 0, canvas.width, canvas.height);
+                            }
+                            
+                            const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                            
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(imageDataUrl);
+                        };
+                        
+                        cancelButton.onclick = () => {
+                            stream.getTracks().forEach(track => track.stop());
+                            document.body.removeChild(captureUI);
+                            resolve(null);
+                        };
+                        
+                        cameraContainer.appendChild(video);
+                        cameraContainer.appendChild(cameraFrame);
+                        buttonContainer.appendChild(captureButton);
+                        buttonContainer.appendChild(cancelButton);
+                        contentContainer.appendChild(cameraContainer);
+                        contentContainer.appendChild(buttonContainer);
+                        captureUI.appendChild(contentContainer);
+                        document.body.appendChild(captureUI);
+                    };
+                    
+                    video.onerror = () => {
+                        stream.getTracks().forEach(track => track.stop());
+                        if (document.body.contains(captureUI)) {
+                            document.body.removeChild(captureUI);
+                        }
+                        resolve(null);
+                    };
+                })
+                .catch((fallbackError) => {
+                    console.error('Fallback camera also failed:', fallbackError);
+                    setModalMessage('Camera not available. Please use gallery instead.');
+                    setModalType('error');
+                    setModalVisible(true);
+                    resolve(null);
+                });
             });
         });
-    });
-};
+    };
 
     // FIXED: Handle crop selected image - PROPERLY SET THE CROPPED IMAGE
     const handleCropSelectedImage = async () => {
