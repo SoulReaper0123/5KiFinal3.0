@@ -38,6 +38,7 @@ const RegisterPage2 = () => {
     const [modalMessage, setModalMessage] = useState('');
     const [modalType, setModalType] = useState('error');
     const [browserInfo, setBrowserInfo] = useState({});
+    const fileInputRef = useRef(null);
 
     const {
         firstName, middleName, lastName, email, phoneNumber, placeOfBirth,
@@ -193,7 +194,7 @@ const RegisterPage2 = () => {
         setPendingImageAction(null);
     };
 
-    // FIXED: UNIVERSAL GALLERY SELECTION - IMPROVED FOR CHROME MOBILE
+    // FIXED: UNIVERSAL GALLERY SELECTION - COMPLETELY REWRITTEN FOR CHROME MOBILE
     const handleUniversalGallerySelection = () => {
         return new Promise((resolve) => {
             if (Platform.OS !== 'web') {
@@ -201,19 +202,38 @@ const RegisterPage2 = () => {
                 return;
             }
 
-            console.log('Creating file input for gallery');
+            console.log('Creating file input for gallery - CHROME MOBILE FIX');
+
+            // Clean up any existing file input first
+            if (fileInputRef.current) {
+                document.body.removeChild(fileInputRef.current);
+                fileInputRef.current = null;
+            }
+
             const input = document.createElement('input');
+            fileInputRef.current = input;
+            
             input.type = 'file';
             input.accept = 'image/*';
-            input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+            input.style.cssText = `
+                position: fixed !important;
+                top: 0 !important;
+                left: 0 !important;
+                width: 100% !important;
+                height: 100% !important;
+                opacity: 0.001 !important;
+                z-index: 999999 !important;
+                cursor: pointer !important;
+            `;
             
             let resolved = false;
             
             const cleanup = () => {
                 if (!resolved) {
                     resolved = true;
-                    if (document.body.contains(input)) {
-                        document.body.removeChild(input);
+                    if (fileInputRef.current && document.body.contains(fileInputRef.current)) {
+                        document.body.removeChild(fileInputRef.current);
+                        fileInputRef.current = null;
                     }
                     resolve(null);
                 }
@@ -228,7 +248,7 @@ const RegisterPage2 = () => {
                     // Validate file type
                     if (!file.type.startsWith('image/')) {
                         console.error('Selected file is not an image');
-                        setModalMessage('Please select a valid image file');
+                        setModalMessage('Please select a valid image file (JPEG, PNG, etc.)');
                         setModalType('error');
                         setModalVisible(true);
                         cleanup();
@@ -251,8 +271,9 @@ const RegisterPage2 = () => {
                         console.log('File read successfully');
                         if (!resolved) {
                             resolved = true;
-                            if (document.body.contains(input)) {
-                                document.body.removeChild(input);
+                            if (fileInputRef.current && document.body.contains(fileInputRef.current)) {
+                                document.body.removeChild(fileInputRef.current);
+                                fileInputRef.current = null;
                             }
                             resolve(event.target.result);
                         }
@@ -262,8 +283,9 @@ const RegisterPage2 = () => {
                         console.error('File read error');
                         if (!resolved) {
                             resolved = true;
-                            if (document.body.contains(input)) {
-                                document.body.removeChild(input);
+                            if (fileInputRef.current && document.body.contains(fileInputRef.current)) {
+                                document.body.removeChild(fileInputRef.current);
+                                fileInputRef.current = null;
                             }
                             setModalMessage('Failed to read the selected image');
                             setModalType('error');
@@ -274,13 +296,7 @@ const RegisterPage2 = () => {
                     
                     reader.onabort = () => {
                         console.log('File read aborted');
-                        if (!resolved) {
-                            resolved = true;
-                            if (document.body.contains(input)) {
-                                document.body.removeChild(input);
-                            }
-                            resolve(null);
-                        }
+                        cleanup();
                     };
                     
                     try {
@@ -299,32 +315,80 @@ const RegisterPage2 = () => {
                 console.log('File selection cancelled');
                 cleanup();
             };
+
+            const handleFocus = () => {
+                console.log('File input focused');
+                // Some browsers need a small delay
+                setTimeout(() => {
+                    if (!resolved && fileInputRef.current) {
+                        console.log('Forcing click after focus');
+                        try {
+                            fileInputRef.current.click();
+                        } catch (error) {
+                            console.error('Error in focus click:', error);
+                        }
+                    }
+                }, 100);
+            };
             
             // Add event listeners
             input.addEventListener('change', handleChange);
             input.addEventListener('cancel', handleCancel);
             input.addEventListener('blur', handleCancel);
+            input.addEventListener('focus', handleFocus);
             
-            // Add to document and trigger click
+            // Add to document
             document.body.appendChild(input);
             
             // Set timeout for safety
             const timeoutId = setTimeout(() => {
                 if (!resolved) {
-                    console.log('Gallery selection timeout');
+                    console.log('Gallery selection timeout - cleaning up');
                     cleanup();
                 }
-            }, 30000); // 30 second timeout
+            }, 60000); // 60 second timeout
             
-            console.log('Triggering file input click');
+            console.log('Triggering file input click for Chrome Mobile');
             
-            // Force click with error handling
-            try {
-                input.click();
-            } catch (error) {
-                console.error('Error triggering file input:', error);
-                cleanup();
-            }
+            // Multiple strategies to trigger the file dialog
+            const triggerFileDialog = () => {
+                try {
+                    // Method 1: Direct click
+                    input.click();
+                    
+                    // Method 2: Try again after a short delay (for Chrome mobile)
+                    setTimeout(() => {
+                        if (!resolved && fileInputRef.current) {
+                            console.log('Retrying file input click');
+                            try {
+                                fileInputRef.current.click();
+                            } catch (error) {
+                                console.error('Error in retry click:', error);
+                            }
+                        }
+                    }, 300);
+                    
+                    // Method 3: Focus and click (for some mobile browsers)
+                    setTimeout(() => {
+                        if (!resolved && fileInputRef.current) {
+                            console.log('Trying focus approach');
+                            try {
+                                fileInputRef.current.focus();
+                                fileInputRef.current.click();
+                            } catch (error) {
+                                console.error('Error in focus click:', error);
+                            }
+                        }
+                    }, 600);
+                    
+                } catch (error) {
+                    console.error('Error triggering file input:', error);
+                    cleanup();
+                }
+            };
+            
+            // Trigger with a small delay to ensure DOM is ready
+            setTimeout(triggerFileDialog, 50);
             
             // Clean up timeout when resolved
             const originalResolve = resolve;
