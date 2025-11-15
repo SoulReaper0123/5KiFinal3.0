@@ -206,7 +206,6 @@ const RegisterPage2 = () => {
             input.type = 'file';
             input.accept = 'image/*';
             input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
-            input.setAttribute('capture', 'environment');
             
             let resolved = false;
             
