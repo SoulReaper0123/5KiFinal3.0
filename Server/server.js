@@ -22,9 +22,12 @@ const GMAIL_OWNER = '5kifinancials@gmail.com';
 app.use(cors({
   origin: [
     'https://fiveki.onrender.com',
-    'https://fivekiapp.onrender.com',
+    'https://fivekiapp.onrender.com', 
+    'https://five5ki.onrender.com',
     'http://localhost:10000',
-    'http://localhost:5173'
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:5174'
   ],
   credentials: true
 }));
@@ -249,6 +252,7 @@ app.get('/health', async (req, res) => {
     res.status(503).json(healthcheck);
   }
 });
+
 
 app.get('/', (req, res) => {
   res.send(`
