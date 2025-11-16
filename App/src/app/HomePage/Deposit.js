@@ -1412,7 +1412,7 @@ const Deposit = () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header with centered title and left back button using invisible spacers */}
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
@@ -1424,283 +1424,292 @@ const Deposit = () => {
         </View>
 
         <View style={styles.content}>
-        <Text style={styles.label}>Balance</Text>
-        <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
+          <Text style={styles.label}>Balance</Text>
+          <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-        <Text style={styles.label}>Deposit Option</Text>
-        <ModalSelector
-          data={depositOptions}
-          initValue="Select Deposit Option"
-          onChange={handleDepositOptionChange}
-          style={styles.picker}
-          overlayStyle={{ 
-            justifyContent: 'flex-end',
-            paddingHorizontal: 0 
-          }}
-          optionContainerStyle={{
-            borderTopLeftRadius: 16,
-            borderTopRightRadius: 16,
-            paddingVertical: 10,
-          }}
-        >
-          <TouchableOpacity style={styles.pickerContainer}>
-            <Text style={styles.pickerText}>{depositOption || 'Select Deposit Option'}</Text>
-            <MaterialIcons name="arrow-drop-down" size={24} color="black" /> 
-          </TouchableOpacity>
-        </ModalSelector>
-
-        {depositOption !== 'Cash' && (
-          <>
-            <Text style={styles.label}>Account Name</Text>
-            <TextInput
-              value={accountName}
-              placeholder={''}
-              style={[styles.input, styles.fixedInput]}
-              editable={false}
-            />
-
-            <Text style={styles.label}>Account Number</Text>
-            <TextInput
-              value={accountNumber}
-              placeholder={''}
-              style={[styles.input, styles.fixedInput]}
-              editable={false}
-            />
-          </>
-        )}
-
-        <Text style={styles.label}>
-          Deposit Amount <Text style={styles.required}>*</Text>
-        </Text>
-        <TextInput
-          placeholder="Enter Amount"
-          value={amountToBeDeposited}
-          onChangeText={setAmountToBeDeposited}
-          style={styles.input}
-          keyboardType="numeric"
-        />
-
-        {depositOption !== 'Cash' && (
-          <>
-            <Text style={styles.label}>
-              Proof of Deposit <Text style={styles.required}>*</Text>
-            </Text>
-            <TouchableOpacity onPress={handleProofOfDepositPress} style={styles.imagePreviewContainer}>
-              {proofOfDeposit ? (
-                <Image source={getImageSource(proofOfDeposit)} style={styles.imagePreview} />
-              ) : (
-                <View style={styles.iconContainer}>
-                  <Icon name="add" size={40} color="#1E3A5F" />
-                  <Text style={styles.uploadText}>Tap to upload</Text>
-                  <Text style={styles.uploadSubText}>Camera or Gallery</Text>
-                </View>
-              )}
+          <Text style={styles.label}>Deposit Option</Text>
+          <ModalSelector
+            data={depositOptions}
+            initValue="Select Deposit Option"
+            onChange={handleDepositOptionChange}
+            style={styles.picker}
+            overlayStyle={{ 
+              justifyContent: 'flex-end',
+              paddingHorizontal: 0 
+            }}
+            optionContainerStyle={{
+              borderTopLeftRadius: 16,
+              borderTopRightRadius: 16,
+              paddingVertical: 10,
+            }}
+          >
+            <TouchableOpacity style={styles.pickerContainer}>
+              <Text style={styles.pickerText}>{depositOption || 'Select Deposit Option'}</Text>
+              <MaterialIcons name="arrow-drop-down" size={24} color="black" /> 
             </TouchableOpacity>
-          </>
-        )}
+          </ModalSelector>
 
-        <TouchableOpacity
-          style={[
-            styles.submitButton,
-            (
+          {depositOption !== 'Cash' && (
+            <>
+              <Text style={styles.label}>Account Name</Text>
+              <TextInput
+                value={accountName}
+                placeholder={''}
+                style={[styles.input, styles.fixedInput]}
+                editable={false}
+              />
+
+              <Text style={styles.label}>Account Number</Text>
+              <TextInput
+                value={accountNumber}
+                placeholder={''}
+                style={[styles.input, styles.fixedInput]}
+                editable={false}
+              />
+            </>
+          )}
+
+          <Text style={styles.label}>
+            Deposit Amount <Text style={styles.required}>*</Text>
+          </Text>
+          <TextInput
+            placeholder="Enter Amount"
+            value={amountToBeDeposited}
+            onChangeText={setAmountToBeDeposited}
+            style={styles.input}
+            keyboardType="numeric"
+          />
+
+          {depositOption !== 'Cash' && (
+            <>
+              <Text style={styles.label}>
+                Proof of Deposit <Text style={styles.required}>*</Text>
+              </Text>
+              <TouchableOpacity onPress={handleProofOfDepositPress} style={styles.imagePreviewContainer}>
+                {proofOfDeposit ? (
+                  <Image source={getImageSource(proofOfDeposit)} style={styles.imagePreview} />
+                ) : (
+                  <View style={styles.iconContainer}>
+                    <Icon name="add" size={40} color="#1E3A5F" />
+                    <Text style={styles.uploadText}>Tap to upload</Text>
+                    <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
+
+          <TouchableOpacity
+            style={[
+              styles.submitButton,
+              (
+                !depositOption ||
+                !amountToBeDeposited ||
+                isNaN(parseFloat(amountToBeDeposited)) ||
+                parseFloat(amountToBeDeposited) <= 0 ||
+                (depositOption !== 'Cash' && !proofOfDeposit) ||
+                loading
+              ) && styles.disabledButton
+            ]}
+            onPress={handleSubmit}
+            disabled={
               !depositOption ||
               !amountToBeDeposited ||
               isNaN(parseFloat(amountToBeDeposited)) ||
               parseFloat(amountToBeDeposited) <= 0 ||
               (depositOption !== 'Cash' && !proofOfDeposit) ||
               loading
-            ) && styles.disabledButton
-          ]}
-          onPress={handleSubmit}
-          disabled={
-            !depositOption ||
-            !amountToBeDeposited ||
-            isNaN(parseFloat(amountToBeDeposited)) ||
-            parseFloat(amountToBeDeposited) <= 0 ||
-            (depositOption !== 'Cash' && !proofOfDeposit) ||
-            loading
-          }
-        >
-          <Text style={styles.submitButtonText}>Submit</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Success Modal */}
-      <Modal visible={successModalVisible} transparent animationType="fade">
-        <View style={styles.centeredModal}>
-          <View style={styles.modalCard}>
-            <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
-            <Text style={styles.modalText}>
-              Deposit request submitted successfully! It will be processed shortly.
-            </Text>
-            <TouchableOpacity 
-              style={styles.modalButton} 
-              onPress={handleSuccessOk}
-            >
-              <Text style={styles.modalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
+            }
+          >
+            <Text style={styles.submitButtonText}>Submit</Text>
+          </TouchableOpacity>
         </View>
-      </Modal>
 
-      {/* Error Modal */}
-      <Modal visible={errorModalVisible} transparent animationType="fade">
-        <View style={styles.centeredModal}>
-          <View style={styles.modalCard}>
-            <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
-            <Text style={styles.modalText}>{errorMessage}</Text>
-            <TouchableOpacity style={styles.modalButton} onPress={handleErrorOk}>
-              <Text style={styles.modalButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Source Selection Modal */}
-      <Modal
-        transparent={true}
-        visible={showSourceOptions}
-        onRequestClose={() => setShowSourceOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.sourceOptionsModal}>
-            <Text style={styles.modalTitle}>Select Image Source</Text>
-            
-            <View style={styles.sourceButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.sourceOptionButton, styles.cameraButton]}
-                onPress={handleCameraSelection}
-              >
-                <MaterialIcons name="photo-camera" size={30} color="#fff" />
-                <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.sourceOptionButton, styles.galleryButton]}
-                onPress={handleGallerySelection}
-              >
-                <MaterialIcons name="photo-library" size={30} color="#fff" />
-                <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => setShowSourceOptions(false)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Crop Options Modal */}
-      <Modal
-        transparent={true}
-        visible={showCropOptions}
-        onRequestClose={() => setShowCropOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.cropOptionsModal}>
-            <Text style={styles.modalTitle}>
-              Proof of Deposit Preview
-            </Text>
-            
-            {selectedImageUri && (
-              <View style={styles.previewImageContainer}>
-                <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
+        {/* Success Modal - FIXED FULL SCREEN OVERLAY */}
+        <Modal visible={successModalVisible} transparent animationType="fade" statusBarTranslucent={true}>
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.centeredModal}>
+              <View style={styles.modalCard}>
+                <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
+                <Text style={styles.modalText}>
+                  Deposit request submitted successfully! It will be processed shortly.
+                </Text>
+                <TouchableOpacity 
+                  style={styles.modalButton} 
+                  onPress={handleSuccessOk}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
               </View>
-            )}
-            
-            <Text style={styles.cropInstructions}>
-              Would you like to crop this image?
-            </Text>
-            
-            <View style={styles.cropButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.cropOptionButton, styles.useAsIsButton]}
-                onPress={handleUseAsIs}
-              >
-                <MaterialIcons name="check" size={20} color="#fff" />
-                <Text style={styles.cropOptionButtonText}>Use as is</Text>
-              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal - FIXED FULL SCREEN OVERLAY */}
+        <Modal visible={errorModalVisible} transparent animationType="fade" statusBarTranslucent={true}>
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.centeredModal}>
+              <View style={styles.modalCard}>
+                <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
+                <Text style={styles.modalText}>{errorMessage}</Text>
+                <TouchableOpacity style={styles.modalButton} onPress={handleErrorOk}>
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Source Selection Modal - FIXED FULL SCREEN OVERLAY */}
+        <Modal
+          transparent={true}
+          visible={showSourceOptions}
+          onRequestClose={() => setShowSourceOptions(false)}
+          animationType="slide"
+          statusBarTranslucent={true}
+        >
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.sourceOptionsModal}>
+              <Text style={styles.modalTitle}>Select Image Source</Text>
+              
+              <View style={styles.sourceButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.sourceOptionButton, styles.cameraButton]}
+                  onPress={handleCameraSelection}
+                >
+                  <MaterialIcons name="photo-camera" size={30} color="#fff" />
+                  <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.sourceOptionButton, styles.galleryButton]}
+                  onPress={handleGallerySelection}
+                >
+                  <MaterialIcons name="photo-library" size={30} color="#fff" />
+                  <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
+                </TouchableOpacity>
+              </View>
               
               <TouchableOpacity 
-                style={[styles.cropOptionButton, styles.cropImageButton]}
-                onPress={handleCropSelectedImage}
+                style={styles.cancelButton}
+                onPress={() => setShowSourceOptions(false)}
               >
-                <MaterialIcons name="crop" size={20} color="#fff" />
-                <Text style={styles.cropOptionButtonText}>Crop Image</Text>
+                <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => setShowCropOptions(false)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Custom Confirmation Modal */}
-      <CustomConfirmModal
-        visible={confirmModalVisible}
-        onClose={() => setConfirmModalVisible(false)}
-        title="Confirm Deposit"
-        message={`Are you sure you want to submit this deposit request for ${formatCurrency(amountToBeDeposited)}?`}
-        type="info"
-        cancelText="Cancel"
-        confirmText="Confirm"
-        onCancel={() => setConfirmModalVisible(false)}
-        onConfirm={() => {
-          setConfirmModalVisible(false);
-          submitDeposit();
-        }}
-      />
-
-      {/* Custom Modal for general errors */}
-      <CustomModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        message={modalMessage}
-        type={modalType}
-      />
-
-      {/* Loading Overlay */}
-      {loading && (
-        <View style={styles.loadingOverlay}>
-          <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#4FE7AF" />
-            <Text style={styles.loadingText}>Processing...</Text>
+        {/* Crop Options Modal - FIXED FULL SCREEN OVERLAY */}
+        <Modal
+          transparent={true}
+          visible={showCropOptions}
+          onRequestClose={() => setShowCropOptions(false)}
+          animationType="slide"
+          statusBarTranslucent={true}
+        >
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.cropOptionsModal}>
+              <Text style={styles.modalTitle}>
+                Proof of Deposit Preview
+              </Text>
+              
+              {selectedImageUri && (
+                <View style={styles.previewImageContainer}>
+                  <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
+                </View>
+              )}
+              
+              <Text style={styles.cropInstructions}>
+                Would you like to crop this image?
+              </Text>
+              
+              <View style={styles.cropButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.cropOptionButton, styles.useAsIsButton]}
+                  onPress={handleUseAsIs}
+                >
+                  <MaterialIcons name="check" size={20} color="#fff" />
+                  <Text style={styles.cropOptionButtonText}>Use as is</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.cropOptionButton, styles.cropImageButton]}
+                  onPress={handleCropSelectedImage}
+                >
+                  <MaterialIcons name="crop" size={20} color="#fff" />
+                  <Text style={styles.cropOptionButtonText}>Crop Image</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowCropOptions(false)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      )}
-    </ScrollView>
+        </Modal>
+
+        {/* Custom Confirmation Modal */}
+        <CustomConfirmModal
+          visible={confirmModalVisible}
+          onClose={() => setConfirmModalVisible(false)}
+          title="Confirm Deposit"
+          message={`Are you sure you want to submit this deposit request for ${formatCurrency(amountToBeDeposited)}?`}
+          type="info"
+          cancelText="Cancel"
+          confirmText="Confirm"
+          onCancel={() => setConfirmModalVisible(false)}
+          onConfirm={() => {
+            setConfirmModalVisible(false);
+            submitDeposit();
+          }}
+        />
+
+        {/* Custom Modal for general errors */}
+        <CustomModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          message={modalMessage}
+          type={modalType}
+        />
+
+        {/* Loading Overlay */}
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#4FE7AF" />
+              <Text style={styles.loadingText}>Processing...</Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     padding: 16,
     paddingBottom: 32,
   },
   // Header styles for centered title with left back button
   headerRow: {
-    marginTop: 10, // not too upper
+    marginTop: 10,
     marginBottom: 12,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   headerSide: {
-    width: 44, // balances the icon width and touch area
+    width: 44,
     height: 44,
     justifyContent: 'center',
     alignItems: 'flex-start',
@@ -1721,13 +1730,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#0F172A',
-    textAlign: 'left',
-    marginBottom: 16,
   },
   label: {
     fontSize: 15,
@@ -1829,12 +1831,22 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  // Modal styles (matching CreatePasswordPage design)
-  centeredModal: {
-    flex: 1,
+  // FIXED: Full screen modal backgrounds
+  fullScreenModalBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  centeredModal: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   modalCard: {
     width: '80%',
@@ -1887,25 +1899,26 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: '#2C5282',
   },
-  // Modal styles (matching RegisterPage2 design)
-  modalBackground: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-  },
+  // Modal styles with full screen backgrounds
   sourceOptionsModal: {
     backgroundColor: 'white',
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
   },
   cropOptionsModal: {
     backgroundColor: 'white',
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%', 
-    minHeight: 300, 
+    maxHeight: '80%',
+    minHeight: 300,
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
   },
   modalTitle: {
     fontSize: 18,
