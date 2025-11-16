@@ -53,6 +53,9 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
 
+  // Auto-refresh interval reference
+  const refreshIntervalRef = useRef(null);
+
   // --- new code: check for new transactions and show red dot on bell ---
   const checkForNewTransactions = async () => {
     try {
@@ -130,10 +133,9 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   }, []);
 
   useEffect(() => {
-  const unsubscribe = MarqueeData(setMarqueeMessages);
-  return () => unsubscribe(); // Clean up when component unmounts
-}, []);
-
+    const unsubscribe = MarqueeData(setMarqueeMessages);
+    return () => unsubscribe(); // Clean up when component unmounts
+  }, []);
 
   const formatBalance = (amount) => {
     const validAmount = Number(amount) || 0;
@@ -144,6 +146,13 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   };
 
   const fetchUserData = async (userEmail) => {
+    if (!userEmail) {
+      console.log('No email provided for fetchUserData');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
+
     const db = getDatabase();
     const dbRef = ref(db, 'Members');
     try {
@@ -159,7 +168,12 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
           setInvestment(foundUser.investment || foundUser.investments || 0);
           setEmail(foundUser.email || 'No email provided');
           setSelfie(foundUser.selfie || null);
+          setMemberId(foundUser.memberId || null);
+        } else {
+          console.log('User not found in database:', userEmail);
         }
+      } else {
+        console.log('No members found in database');
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
@@ -169,66 +183,77 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     }
   };
 
-  useEffect(() => {
-    const loadUserData = async () => {
+  // Enhanced user data loading with auto-refresh
+  const loadUserData = async (forceRefresh = false) => {
+    if (forceRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    try {
+      const user = auth.currentUser;
+      const paramEmail = route.params?.user?.email;
+      const routeEmail = route.params?.email;
+      let storedEmail = null;
+      
+      // Try to get email from SecureStore (for biometric login)
       try {
-        const user = auth.currentUser;
-        const paramEmail = route.params?.user?.email;
-        const routeEmail = route.params?.email;
-        let storedEmail = null;
-        
-        // Try to get email from SecureStore (for biometric login)
-        try {
-          storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-        } catch (error) {
-          console.error('Error getting email from SecureStore:', error);
-        }
-        
-        console.log('AppHome - Loading user data with:', { 
-          authEmail: user?.email, 
-          paramEmail, 
-          routeEmail,
-          storedEmail,
-          email
-        });
-        
-        // First try to use the email passed directly to this component
-        if (email) {
-          console.log('Using email prop:', email);
-          fetchUserData(email);
-        }
-        // Then try the email from SecureStore (for biometric login)
-        else if (storedEmail) {
-          console.log('Using email from SecureStore:', storedEmail);
-          fetchUserData(storedEmail);
-        }
-        // Then try the email from Firebase auth
-        else if (user?.email) {
-          console.log('Using Firebase auth email:', user.email);
-          fetchUserData(user.email);
-        }
-        // Then try the email from route params (user object)
-        else if (paramEmail) {
-          console.log('Using param email from user object:', paramEmail);
-          fetchUserData(paramEmail);
-        }
-        // Finally try the direct email from route params (used in biometric login)
-        else if (routeEmail) {
-          console.log('Using direct route email:', routeEmail);
-          fetchUserData(routeEmail);
-        }
-        else {
-          console.log('No email found, setting loading to false');
-          setLoading(false);
-        }
+        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
       } catch (error) {
-        console.error('Error in loadUserData:', error);
+        console.error('Error getting email from SecureStore:', error);
+      }
+      
+      console.log('AppHome - Loading user data with:', { 
+        authEmail: user?.email, 
+        paramEmail, 
+        routeEmail,
+        storedEmail,
+        email
+      });
+      
+      // Priority order for email sources
+      let targetEmail = email || storedEmail || user?.email || paramEmail || routeEmail;
+      
+      if (targetEmail) {
+        console.log('Using email for data fetch:', targetEmail);
+        await fetchUserData(targetEmail);
+      } else {
+        console.log('No email found for data fetch');
         setLoading(false);
+        setRefreshing(false);
+      }
+    } catch (error) {
+      console.error('Error in loadUserData:', error);
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  // Initial load and auto-refresh setup
+  useEffect(() => {
+    loadUserData();
+
+    // Set up auto-refresh every 2 minutes
+    refreshIntervalRef.current = setInterval(() => {
+      console.log('Auto-refreshing user data...');
+      loadUserData(true);
+    }, 120000); // 2 minutes
+
+    return () => {
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
       }
     };
-    
-    loadUserData();
-  }, [route.params, email]);
+  }, []);
+
+  // Reload when email changes
+  useEffect(() => {
+    if (email) {
+      console.log('Email changed, reloading data:', email);
+      loadUserData();
+    }
+  }, [email]);
 
   // Check if biometric setup should be prompted
   useEffect(() => {
@@ -299,56 +324,11 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   }, [navigation]);
 
   const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const user = auth.currentUser;
-      const paramEmail = route.params?.user?.email;
-      const routeEmail = route.params?.email;
-      let storedEmail = null;
-      
-      // Try to get email from SecureStore (for biometric login)
-      try {
-        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-      } catch (error) {
-        console.error('Error getting email from SecureStore during refresh:', error);
-      }
-      
-      console.log('AppHome - Refreshing user data with:', { 
-        authEmail: user?.email, 
-        paramEmail, 
-        routeEmail,
-        storedEmail,
-        email
-      });
-      
-      // Use the same priority order as initial load
-      if (email) {
-        console.log('Refreshing with email prop:', email);
-        fetchUserData(email);
-      }
-      else if (storedEmail) {
-        console.log('Refreshing with email from SecureStore:', storedEmail);
-        fetchUserData(storedEmail);
-      }
-      else if (user?.email) {
-        console.log('Refreshing with Firebase auth email:', user.email);
-        fetchUserData(user.email);
-      }
-      else if (paramEmail) {
-        console.log('Refreshing with param email from user object:', paramEmail);
-        fetchUserData(paramEmail);
-      }
-      else if (routeEmail) {
-        console.log('Refreshing with direct route email:', routeEmail);
-        fetchUserData(routeEmail);
-      }
-      else {
-        console.log('No email found during refresh, stopping refresh');
-        setRefreshing(false);
-      }
-    } catch (error) {
-      console.error('Error in onRefresh:', error);
-      setRefreshing(false);
+    console.log('Manual refresh triggered');
+    await loadUserData(true);
+    // Also check for new transactions immediately
+    if (email) {
+      checkForNewTransactions();
     }
   };
 
@@ -379,6 +359,11 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   const handleLogoutFallback = async () => {
     try {
+      // Clear auto-refresh interval
+      if (refreshIntervalRef.current) {
+        clearInterval(refreshIntervalRef.current);
+      }
+      
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
       await auth.signOut();
@@ -392,11 +377,19 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     <SafeAreaView style={styles.container}>
       {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="white" />
+          <ActivityIndicator size="large" color="#1E3A5F" />
+          <Text style={styles.loadingText}>Loading your data...</Text>
         </View>
       ) : (
         <ScrollView
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <RefreshControl 
+              refreshing={refreshing} 
+              onRefresh={onRefresh}
+              colors={['#1E3A5F']}
+              tintColor="#1E3A5F"
+            />
+          }
           contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
         >
@@ -617,8 +610,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               
               <Text style={styles.fallbackProfileName}>{firstName}</Text>
               <Text style={styles.fallbackProfileEmail}>{email}</Text>
-              
-
             </View>
 
             {/* Navigation Items */}
@@ -780,8 +771,6 @@ export default function AppHome() {
     }
   }, [route.params, email]);
 
-
-
   const navigation = useNavigation();
 
   const handleAIButtonPress = () => {
@@ -860,14 +849,20 @@ const styles = StyleSheet.create({
   // Layout
   container: {
     flex: 1,
-    backgroundColor: '#fffff',
+    backgroundColor: '#ffffff',
     marginTop: 30,
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#f0f4f8',
+    backgroundColor: '#ffffff',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#1E3A5F',
+    fontWeight: '500',
   },
 
   // New Header Bar
@@ -921,11 +916,11 @@ const styles = StyleSheet.create({
 
   // Wallet Card
   walletCard: {
-    backgroundColor: '#f2f4f7ff',
+    backgroundColor: '#f2f4f7',
     marginTop: 12,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#00000091',
+    shadowColor: '#000000',
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 3,
@@ -936,14 +931,20 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.5,
   },
-  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  balanceRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between' 
+  },
   walletAmount: {
     fontSize: 32,
     color: '#1E3A5F',
     fontWeight: '700',
   },
-  eyeBtn: { marginLeft: 12, padding: 6 }
-  ,
+  eyeBtn: { 
+    marginLeft: 12, 
+    padding: 6 
+  },
   walletActionsRow: {
     flexDirection: 'row',
     marginTop: 14,
@@ -1051,7 +1052,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 12,
     borderRadius: 12,
-    backgroundColor: '#f2f4f7ff',
+    backgroundColor: '#f2f4f7',
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -1438,8 +1439,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
-
-
 
   // Floating AI Button styles
   floatingAIButton: {
