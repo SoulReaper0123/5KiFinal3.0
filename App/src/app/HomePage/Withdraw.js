@@ -56,6 +56,62 @@ const Withdraw = () => {
     { key: 'Others', label: 'Others' },
   ];
 
+  // Validate account number based on withdrawal type
+  const validateAccountNumber = (value, withdrawalType) => {
+    // Remove any non-digit characters
+    const cleanValue = value.replace(/\D/g, '');
+    
+    if (withdrawalType === 'GCash') {
+      // GCash: exactly 11 digits
+      if (cleanValue.length > 11) {
+        return cleanValue.slice(0, 11);
+      }
+    } else if (withdrawalType === 'Bank') {
+      // Bank: minimum 8 digits, maximum 16 digits
+      if (cleanValue.length > 16) {
+        return cleanValue.slice(0, 16);
+      }
+    }
+    
+    return cleanValue;
+  };
+
+  // Check if account number meets requirements
+  const isAccountNumberValid = () => {
+    if (withdrawOption === 'Cash') return true;
+    
+    const cleanAccountNumber = accountNumber.replace(/\D/g, '');
+    
+    if (withdrawOption === 'GCash') {
+      return cleanAccountNumber.length === 11;
+    } else if (withdrawOption === 'Bank') {
+      return cleanAccountNumber.length >= 8 && cleanAccountNumber.length <= 16;
+    }
+    
+    return false;
+  };
+
+  // Get account number validation message
+  const getAccountNumberValidationMessage = () => {
+    if (withdrawOption === 'Cash') return '';
+    
+    const cleanAccountNumber = accountNumber.replace(/\D/g, '');
+    
+    if (withdrawOption === 'GCash') {
+      if (cleanAccountNumber.length === 0) return '';
+      if (cleanAccountNumber.length < 11) return 'GCash number must be 11 digits';
+      if (cleanAccountNumber.length > 11) return 'GCash number cannot exceed 11 digits';
+      return 'Valid GCash number';
+    } else if (withdrawOption === 'Bank') {
+      if (cleanAccountNumber.length === 0) return '';
+      if (cleanAccountNumber.length < 8) return 'Bank account must be at least 8 digits';
+      if (cleanAccountNumber.length > 16) return 'Bank account cannot exceed 16 digits';
+      return 'Valid bank account number';
+    }
+    
+    return '';
+  };
+
   const fetchUserData = async (userEmail) => {
     const membersRef = dbRef(database, 'Members');
     try {
@@ -191,13 +247,16 @@ const Withdraw = () => {
       hasEmptyFields = !withdrawOption || !withdrawAmount || !accountName || !accountNumber;
     }
 
+    // Check account number validation
+    const accountNumberValid = withdrawOption === 'Cash' ? true : isAccountNumberValid();
+
     // Check balance - NEW LOGIC: balance after withdrawal must be at least ₱5,000
     const balanceAfterWithdrawal = balance - amount;
     const insufficientBalance = balanceAfterWithdrawal < 5000;
     const invalidAmount = isNaN(amount) || amount <= 0;
 
     // Enable button only when all conditions are met
-    setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
+    setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount || !accountNumberValid);
   }, [withdrawOption, accountName, accountNumber, bankType, customBankName, withdrawAmount, balance]);
 
   const handleSubmit = async () => {
@@ -206,6 +265,18 @@ const Withdraw = () => {
 
     if (missingFields) {
       setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    // Check account number validation
+    if (withdrawOption !== 'Cash' && !isAccountNumberValid()) {
+      if (withdrawOption === 'GCash') {
+        setAlertMessage('GCash account number must be exactly 11 digits');
+      } else if (withdrawOption === 'Bank') {
+        setAlertMessage('Bank account number must be between 8-16 digits');
+      }
       setAlertType('error');
       setAlertModalVisible(true);
       return;
@@ -335,6 +406,11 @@ const submitWithdrawal = async () => {
     }
 };
 
+  const handleAccountNumberChange = (value) => {
+    const validatedValue = validateAccountNumber(value, withdrawOption);
+    setAccountNumber(validatedValue);
+  };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -385,11 +461,26 @@ const submitWithdrawal = async () => {
               <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
               <TextInput
                 value={accountNumber}
-                onChangeText={setAccountNumber}
+                onChangeText={handleAccountNumberChange}
                 style={styles.input}
                 keyboardType="numeric"
-                placeholder="Enter account number"
+                placeholder={
+                  withdrawOption === 'GCash' 
+                    ? 'Enter 11-digit GCash number' 
+                    : 'Enter 8-16 digit bank account number'
+                }
+                maxLength={withdrawOption === 'GCash' ? 11 : 16}
               />
+              
+              {/* Account Number Validation Message */}
+              {accountNumber.length > 0 && (
+                <Text style={[
+                  styles.validationText,
+                  isAccountNumberValid() ? styles.validText : styles.invalidText
+                ]}>
+                  {getAccountNumberValidationMessage()}
+                </Text>
+              )}
 
               {withdrawOption === 'Bank' && (
                 <>
@@ -658,6 +749,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     paddingHorizontal: 10,
     marginBottom: 15,
+  },
+  // Validation text styles
+  validationText: {
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 15,
+    paddingHorizontal: 5,
+  },
+  validText: {
+    color: '#059669',
+  },
+  invalidText: {
+    color: '#dc2626',
   },
   noteText: {
     fontSize: 14,
