@@ -24,6 +24,7 @@ app.use(cors({
     'https://fiveki.onrender.com',
     'https://fivekiapp.onrender.com', 
     'https://five5ki.onrender.com',
+    'https://fiveki-backend-app.onrender.com',
     'http://localhost:10000',
     'http://localhost:5173',
     'http://localhost:3000',
