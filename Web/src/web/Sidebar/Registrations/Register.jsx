@@ -11,7 +11,8 @@ import {
   FaUserCheck,
   FaUserTimes,
   FaFileAlt,
-  FaPrint
+  FaPrint,
+  FaTimes
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -26,7 +27,7 @@ import Registrations from './Registrations';
 import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
-import PermanentWithdrawals from '../Withdraws/PermanentWithdraws';
+import PermanentWithdrawals from '../Withdraws/PermanentWithdrawals';
 
 const governmentIdOptions = [
   { key: 'national', label: 'National ID (PhilSys)' },
@@ -429,6 +430,10 @@ const styles = {
     backgroundColor: '#fff',
     boxSizing: 'border-box'
   },
+  formInputError: {
+    borderColor: '#dc2626',
+    boxShadow: '0 0 0 3px rgba(220, 38, 38, 0.1)'
+  },
   formInputFocus: {
     borderColor: '#3b82f6',
     boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -590,6 +595,69 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     margin: '4px 0 0 0'
+  },
+  // New styles for validation and modals matching Registrations component
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px',
+    marginLeft: '2px'
+  },
+  modalCardSmall: {
+    width: '340px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  actionButton: {
+    padding: '0.75rem 2rem',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
+  },
+  approveButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
   }
 };
 
@@ -622,6 +690,19 @@ const Register = () => {
     address: '',
     governmentId: '',
     registrationFee: ''
+  });
+  const [formErrors, setFormErrors] = useState({
+    email: '',
+    phoneNumber: '',
+    firstName: '',
+    lastName: '',
+    placeOfBirth: '',
+    address: '',
+    governmentId: '',
+    registrationFee: '',
+    validIdFront: '',
+    selfie: '',
+    proofOfPayment: ''
   });
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
@@ -774,6 +855,150 @@ const Register = () => {
       filterMembers();
     }
   }, [memberFilter, members, activeSection]);
+
+  // Validation functions matching RegisterPage
+  const validateEmail = (email) => {
+    const emailValue = (email || '').trim();
+    if (!emailValue) {
+      return 'Email is required';
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailValue)) {
+      return 'Please enter a valid email address (e.g., name@example.com)';
+    }
+    return '';
+  };
+
+  const validatePhoneNumber = (phoneNumber) => {
+    const digits = String(phoneNumber || '').replace(/\D/g, '');
+    if (!digits) {
+      return 'Phone number is required';
+    }
+    if (digits.length !== 11) {
+      return 'Phone number should be exactly 11 digits';
+    }
+    return '';
+  };
+
+  const validateFirstName = (firstName) => {
+    if (!firstName || !firstName.trim()) {
+      return 'First name is required';
+    }
+    return '';
+  };
+
+  const validateLastName = (lastName) => {
+    if (!lastName || !lastName.trim()) {
+      return 'Last name is required';
+    }
+    return '';
+  };
+
+  const validatePlaceOfBirth = (placeOfBirth) => {
+    if (!placeOfBirth || !placeOfBirth.trim()) {
+      return 'Place of birth is required';
+    }
+    return '';
+  };
+
+  const validateAddress = (address) => {
+    if (!address || !address.trim()) {
+      return 'Address is required';
+    }
+    return '';
+  };
+
+  const validateGovernmentId = (governmentId) => {
+    if (!governmentId) {
+      return 'Government ID is required';
+    }
+    return '';
+  };
+
+  const validateRegistrationFee = (fee) => {
+    const amt = parseFloat(fee);
+    if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
+      return `Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`;
+    }
+    return '';
+  };
+
+  const validateFile = (file, fieldName) => {
+    if (!file) {
+      return `${fieldName} is required`;
+    }
+    return '';
+  };
+
+  const validateField = (name, value) => {
+    switch (name) {
+      case 'email':
+        return validateEmail(value);
+      case 'phoneNumber':
+        return validatePhoneNumber(value);
+      case 'firstName':
+        return validateFirstName(value);
+      case 'lastName':
+        return validateLastName(value);
+      case 'placeOfBirth':
+        return validatePlaceOfBirth(value);
+      case 'address':
+        return validateAddress(value);
+      case 'governmentId':
+        return validateGovernmentId(value);
+      case 'registrationFee':
+        return validateRegistrationFee(value);
+      default:
+        return '';
+    }
+  };
+
+  const handleInputChange = (name, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Real-time validation
+    const error = validateField(name, value);
+    setFormErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
+  };
+
+  const handleFileChange = (e, setFileFunction, fieldName) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+      // Clear file error when file is selected
+      setFormErrors(prev => ({
+        ...prev,
+        [fieldName]: ''
+      }));
+    }
+  };
+
+  const validateAllFields = () => {
+    const errors = {
+      email: validateEmail(formData.email),
+      phoneNumber: validatePhoneNumber(formData.phoneNumber),
+      firstName: validateFirstName(formData.firstName),
+      lastName: validateLastName(formData.lastName),
+      placeOfBirth: validatePlaceOfBirth(formData.placeOfBirth),
+      address: validateAddress(formData.address),
+      governmentId: validateGovernmentId(formData.governmentId),
+      registrationFee: validateRegistrationFee(formData.registrationFee),
+      validIdFront: validateFile(validIdFrontFile, 'Valid ID Front'),
+      selfie: validateFile(selfieFile, 'Selfie'),
+      proofOfPayment: validateFile(proofOfPaymentFile, 'Proof of Payment')
+    };
+
+    setFormErrors(errors);
+
+    // Check if any errors exist
+    return !Object.values(errors).some(error => error !== '');
+  };
 
   const filterMembers = () => {
     let filtered = members;
@@ -1176,6 +1401,20 @@ const Register = () => {
 
   const openAddModal = () => {
     setAddModalVisible(true);
+    // Reset form errors when opening modal
+    setFormErrors({
+      email: '',
+      phoneNumber: '',
+      firstName: '',
+      lastName: '',
+      placeOfBirth: '',
+      address: '',
+      governmentId: '',
+      registrationFee: '',
+      validIdFront: '',
+      selfie: '',
+      proofOfPayment: ''
+    });
   };
 
   const closeAddModal = () => {
@@ -1195,80 +1434,27 @@ const Register = () => {
     setValidIdFrontFile(null);
     setSelfieFile(null);
     setProofOfPaymentFile(null);
-  };
-
-  const handleInputChange = (name, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleFileChange = (e, setFileFunction) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFileFunction(file);
-    }
-  };
-
-  const validateFields = () => {
-    if (!formData.email) {
-      setErrorMessage('Email is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.firstName) {
-      setErrorMessage('First name is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.lastName) {
-      setErrorMessage('Last name is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.phoneNumber) {
-      setErrorMessage('Phone number is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.placeOfBirth) {
-      setErrorMessage('Place of birth is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.address) {
-      setErrorMessage('Address is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.governmentId) {
-      setErrorMessage('Government ID is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!validIdFrontFile || !selfieFile) {
-      setErrorMessage('Valid ID Front and Selfie are required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    // Amount and proof validation (like App RegistrationFeePage)
-    const amt = parseFloat(formData.registrationFee);
-    if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
-      setErrorMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!proofOfPaymentFile) {
-      setErrorMessage('Proof of payment is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    return true;
+    setFormErrors({
+      email: '',
+      phoneNumber: '',
+      firstName: '',
+      lastName: '',
+      placeOfBirth: '',
+      address: '',
+      governmentId: '',
+      registrationFee: '',
+      validIdFront: '',
+      selfie: '',
+      proofOfPayment: ''
+    });
   };
 
   const handleSubmitConfirmation = () => {
-    if (!validateFields()) return;
+    if (!validateAllFields()) {
+      setErrorMessage('Please fix all validation errors before submitting.');
+      setErrorModalVisible(true);
+      return;
+    }
     setPendingAdd({ ...formData });
     setConfirmModalVisible(true);
   };
@@ -1829,12 +2015,18 @@ const Register = () => {
                         First Name<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.firstName ? styles.formInputError : {})
+                        }}
                         placeholder="Enter first name"
                         value={formData.firstName}
                         onChange={(e) => handleInputChange('firstName', e.target.value)}
                         autoCapitalize="words"
                       />
+                      {formErrors.firstName && (
+                        <div style={styles.errorText}>{formErrors.firstName}</div>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1842,12 +2034,18 @@ const Register = () => {
                         Last Name<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.lastName ? styles.formInputError : {})
+                        }}
                         placeholder="Enter last name"
                         value={formData.lastName}
                         onChange={(e) => handleInputChange('lastName', e.target.value)}
                         autoCapitalize="words"
                       />
+                      {formErrors.lastName && (
+                        <div style={styles.errorText}>{formErrors.lastName}</div>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1855,13 +2053,19 @@ const Register = () => {
                         Email Address<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.email ? styles.formInputError : {})
+                        }}
                         placeholder="Enter email address"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         type="email"
                         autoCapitalize="none"
                       />
+                      {formErrors.email && (
+                        <div style={styles.errorText}>{formErrors.email}</div>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1869,12 +2073,19 @@ const Register = () => {
                         Phone Number<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
-                        placeholder="Enter phone number"
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.phoneNumber ? styles.formInputError : {})
+                        }}
+                        placeholder="Enter 11-digit phone number"
                         value={formData.phoneNumber}
                         onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                         type="tel"
+                        maxLength={11}
                       />
+                      {formErrors.phoneNumber && (
+                        <div style={styles.errorText}>{formErrors.phoneNumber}</div>
+                      )}
                     </div>
                   </div>
 
@@ -1910,7 +2121,10 @@ const Register = () => {
                         Government ID<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <select
-                        style={styles.formSelect}
+                        style={{
+                          ...styles.formSelect,
+                          ...(formErrors.governmentId ? styles.formInputError : {})
+                        }}
                         value={formData.governmentId}
                         onChange={(e) => handleInputChange('governmentId', e.target.value)}
                       >
@@ -1921,6 +2135,9 @@ const Register = () => {
                           </option>
                         ))}
                       </select>
+                      {formErrors.governmentId && (
+                        <div style={styles.errorText}>{formErrors.governmentId}</div>
+                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -1928,7 +2145,10 @@ const Register = () => {
                         Registration Fee<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.registrationFee ? styles.formInputError : {})
+                        }}
                         placeholder={`Minimum ₱${minRegistrationFee.toFixed(2)}`}
                         value={formData.registrationFee}
                         onChange={(e) => handleInputChange('registrationFee', e.target.value)}
@@ -1936,6 +2156,9 @@ const Register = () => {
                         min={minRegistrationFee}
                         step="0.01"
                       />
+                      {formErrors.registrationFee && (
+                        <div style={styles.errorText}>{formErrors.registrationFee}</div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1948,12 +2171,18 @@ const Register = () => {
                         Place of Birth<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.placeOfBirth ? styles.formInputError : {})
+                        }}
                         placeholder="Enter place of birth"
                         value={formData.placeOfBirth}
                         onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
                         autoCapitalize="words"
                       />
+                      {formErrors.placeOfBirth && (
+                        <div style={styles.errorText}>{formErrors.placeOfBirth}</div>
+                      )}
                     </div>
                   </div>
 
@@ -1963,12 +2192,18 @@ const Register = () => {
                         Address<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={styles.formInput}
+                        style={{
+                          ...styles.formInput,
+                          ...(formErrors.address ? styles.formInputError : {})
+                        }}
                         placeholder="Enter complete address"
                         value={formData.address}
                         onChange={(e) => handleInputChange('address', e.target.value)}
                         autoCapitalize="words"
                       />
+                      {formErrors.address && (
+                        <div style={styles.errorText}>{formErrors.address}</div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1983,7 +2218,8 @@ const Register = () => {
                       <div 
                         style={{
                           ...styles.fileUploadSection,
-                          ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {})
+                          ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {}),
+                          ...(formErrors.validIdFront ? { borderColor: '#dc2626' } : {})
                         }}
                         onMouseEnter={() => handleMouseEnter('validIdFront')}
                         onMouseLeave={() => handleMouseLeave('validIdFront')}
@@ -1993,7 +2229,7 @@ const Register = () => {
                           id="validIdFront"
                           style={styles.fileInput}
                           type="file"
-                          onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                          onChange={(e) => handleFileChange(e, setValidIdFrontFile, 'validIdFront')}
                           accept="image/*"
                         />
                         <p style={styles.fileUploadText}>
@@ -2003,6 +2239,9 @@ const Register = () => {
                           <p style={styles.fileName}>{validIdFrontFile.name}</p>
                         )}
                       </div>
+                      {formErrors.validIdFront && (
+                        <div style={styles.errorText}>{formErrors.validIdFront}</div>
+                      )}
                     </div>
                   </div>
 
@@ -2014,7 +2253,8 @@ const Register = () => {
                       <div 
                         style={{
                           ...styles.fileUploadSection,
-                          ...(isHovered.selfie ? styles.fileUploadSectionHover : {})
+                          ...(isHovered.selfie ? styles.fileUploadSectionHover : {}),
+                          ...(formErrors.selfie ? { borderColor: '#dc2626' } : {})
                         }}
                         onMouseEnter={() => handleMouseEnter('selfie')}
                         onMouseLeave={() => handleMouseLeave('selfie')}
@@ -2024,7 +2264,7 @@ const Register = () => {
                           id="selfie"
                           style={styles.fileInput}
                           type="file"
-                          onChange={(e) => handleFileChange(e, setSelfieFile)}
+                          onChange={(e) => handleFileChange(e, setSelfieFile, 'selfie')}
                           accept="image/*"
                         />
                         <p style={styles.fileUploadText}>
@@ -2034,6 +2274,9 @@ const Register = () => {
                           <p style={styles.fileName}>{selfieFile.name}</p>
                         )}
                       </div>
+                      {formErrors.selfie && (
+                        <div style={styles.errorText}>{formErrors.selfie}</div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2046,7 +2289,8 @@ const Register = () => {
                   <div 
                     style={{
                       ...styles.fileUploadSection,
-                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
+                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {}),
+                      ...(formErrors.proofOfPayment ? { borderColor: '#dc2626' } : {})
                     }}
                     onMouseEnter={() => handleMouseEnter('proofOfPayment')}
                     onMouseLeave={() => handleMouseLeave('proofOfPayment')}
@@ -2056,7 +2300,7 @@ const Register = () => {
                       id="proofOfPayment"
                       style={styles.fileInput}
                       type="file"
-                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
+                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile, 'proofOfPayment')}
                       accept="image/*,application/pdf"
                     />
                     <p style={styles.fileUploadText}>
@@ -2066,6 +2310,9 @@ const Register = () => {
                       <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
                     )}
                   </div>
+                  {formErrors.proofOfPayment && (
+                    <div style={styles.errorText}>{formErrors.proofOfPayment}</div>
+                  )}
                 </div>
               </div>
 
@@ -2109,76 +2356,81 @@ const Register = () => {
           </div>
         )}
 
-        {/* Confirmation Modal */}
+        {/* Confirmation Modal - Matching Registrations component design */}
         {confirmModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Registration</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to register this new member? This action cannot be undone.
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmModalVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={styles.primaryButton}
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalCardSmall}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+              <p style={styles.modalText}>Are you sure you want to register this new member?</p>
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.approveButton,
+                    ...(uploading ? styles.disabledButton : {})
+                  }} 
                   onClick={submitManualMember}
+                  disabled={uploading}
                 >
-                  Confirm Registration
+                  {uploading ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.secondaryButton
+                  }} 
+                  onClick={() => setConfirmModalVisible(false)}
+                  disabled={uploading}
+                >
+                  No
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal */}
+        {/* Success Modal - Matching Registrations component design */}
         {successModalVisible && (
-          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {successMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={handleSuccessOk}
-                >
-                  Continue
-                </button>
-              </div>
+          <div style={styles.modalOverlay}>
+            <div style={styles.modalCardSmall}>
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+              <p style={styles.modalText}>{successMessage}</p>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  ...styles.approveButton
+                }} 
+                onClick={handleSuccessOk}
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
 
-        {/* Error Modal */}
+        {/* Error Modal - Matching Registrations component design */}
         {errorModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {errorMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={() => setErrorModalVisible(false)}
-                >
-                  Try Again
-                </button>
-              </div>
+          <div style={{ ...styles.modalOverlay, zIndex: 3000 }}>
+            <div style={styles.modalCardSmall}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
+              <p style={styles.modalText}>{errorMessage}</p>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  ...styles.approveButton
+                }} 
+                onClick={() => setErrorModalVisible(false)}
+              >
+                OK
+              </button>
             </div>
+          </div>
+        )}
+
+        {/* Loading Spinner - Matching Registrations component */}
+        {uploading && (
+          <div style={styles.modalOverlay}>
+            <div style={styles.spinner}></div>
           </div>
         )}
       </div>
