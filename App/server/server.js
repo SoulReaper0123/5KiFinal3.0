@@ -3225,88 +3225,322 @@ app.post('/send-member-credentials', async (req, res) => {
   }
 });
 
-// Initialize the server
-// Add self-ping function RIGHT BEFORE startServer
-const startSelfPing = () => {
-  if (process.env.NODE_ENV === 'production') {
-    const PING_INTERVAL = 14 * 60 * 1000; // 14 minutes
-    
-    setInterval(async () => {
-      try {
-        const response = await fetch(`http://localhost:${PORT}/health`);
-        console.log(`Self-ping: ${response.status} - ${new Date().toISOString()}`);
-      } catch (error) {
-        console.log('Self-ping failed:', error.message);
-      }
-    }, PING_INTERVAL);
+// ==============================================
+// MEMBER DELETION
+// ==============================================
+
+app.post('/send-member-delete-data', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating member deletion emails', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    memberId,
+    dateDeleted,
+    websiteLink 
+  } = req.body;
+
+  // Validate required fields
+  if (!email || !firstName || !lastName) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for member deletion');
+    return res.status(400).json({ 
+      success: false,
+      message: 'Missing required fields: email, firstName, and lastName are required'
+    });
   }
+
+  // Validate email format
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({
+      success: false,
+      message: 'Invalid email format'
+    });
+  }
+
+  const fullName = `${firstName} ${lastName}`.trim();
+  const currentDate = dateDeleted || new Date().toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  });
+
+  try {
+    // Email to system owner
+    console.log('[NOTIFICATION] Sending member deletion notification to owner');
+    const ownerMailOptions = {
+      to: process.env.MAILJET_FROM_EMAIL || email,
+      subject: 'Member Account Deleted - 5KI Financial Services',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Member Account Deletion Notification
+          </h2>
+          
+          <p>Dear Admin,</p>
+          
+          <p>A member account has been permanently removed from the system.</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Member Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+            </tr>
+            ${memberId ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Member ID</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${memberId}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Date Deleted</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+            </tr>
+          </table>
+          
+          <p style="font-weight: bold; color: #e74c3c;">
+            Note: This action is irreversible. All member data and access privileges have been removed.
+          </p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
+          <ul style="padding-left: 20px;">
+            <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+            <li><a href="${DASHBOARD_LINK}" style="color: #3498db;">Admin Dashboard</a></li>
+          </ul>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            5KI Financial Services &copy; ${new Date().getFullYear()}
+          </p>
+        </div>
+      `
+    };
+
+    // Email to deleted member
+    console.log('[NOTIFICATION] Sending member deletion notification to deleted member');
+    const memberMailOptions = {
+      to: email,
+      subject: 'Your 5KI Financial Services Account Has Been Deleted',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #e74c3c; border-bottom: 2px solid #e74c3c; padding-bottom: 10px;">
+            Account Deletion Confirmation
+          </h2>
+          
+          <p>Dear ${firstName},</p>
+          
+          <p>We're writing to inform you that your 5KI Financial Services member account has been permanently deleted as of ${currentDate}.</p>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Account Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 30%;">Name</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${fullName}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Email</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
+            </tr>
+            ${memberId ? `
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Member ID</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${memberId}</td>
+            </tr>
+            ` : ''}
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Effective Date</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${currentDate}</td>
+            </tr>
+          </table>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">What This Means:</h3>
+          <ul style="margin-bottom: 20px;">
+            <li>Your member account has been permanently removed</li>
+            <li>All access to 5KI Financial Services has been revoked</li>
+            <li>Your personal data has been deleted from our systems</li>
+            <li>This action is permanent and cannot be undone</li>
+          </ul>
+          
+          <div style="background-color: #f8f9fa; padding: 15px; border-left: 4px solid #3498db; margin: 20px 0;">
+            <p style="margin: 0; color: #64748b; font-size: 0.9em;">
+              <strong>Note:</strong> If this action was taken in error or you have any questions, 
+              please contact our support team immediately at 
+              <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.
+            </p>
+          </div>
+          
+          <p>We thank you for being part of 5KI Financial Services and wish you the best in your future endeavors.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Sincerely,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    };
+
+    // Send both emails using retry logic
+    const ownerResult = await sendEmailWithRetry(ownerMailOptions);
+    const memberResult = await sendEmailWithRetry(memberMailOptions);
+
+    console.log('[NOTIFICATION SUCCESS] Member deletion emails sent successfully');
+    res.status(200).json({ 
+      success: true,
+      message: 'Member deletion emails sent successfully',
+      data: {
+        memberEmail: email,
+        memberName: fullName,
+        dateSent: currentDate,
+        emailsSent: {
+          owner: ownerResult.success,
+          member: memberResult.success
+        }
+      }
+    });
+  } catch (error) {
+    console.error('[NOTIFICATION ERROR] Error sending member deletion emails:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to send member deletion emails',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+// ==============================================
+// SERVER INITIALIZATION - ALWAYS RUNNING
+// ==============================================
+
+// Continuous self-ping to prevent shutdown
+const startSelfPing = () => {
+  const PING_INTERVAL = 5 * 60 * 1000; // 5 minutes (more frequent)
+  const PING_URL = `https://fivekiapp.onrender.com/health`;
+  
+  console.log(`🔄 Starting continuous self-ping to: ${PING_URL}`);
+  
+  setInterval(async () => {
+    try {
+      const response = await fetch(PING_URL, { 
+        timeout: 10000,
+        headers: {
+          'User-Agent': '5KI-KeepAlive/1.0'
+        }
+      });
+      console.log(`✅ Keep-alive ping: ${response.status} - ${new Date().toISOString()}`);
+    } catch (error) {
+      console.log(`⚠️ Ping failed (but continuing): ${error.message}`);
+      // NEVER shutdown on ping failures
+    }
+  }, PING_INTERVAL);
 };
 
-// Enhanced server initialization with auto-recovery
+// Continuous activity to prevent idle shutdown
+const startActivityMonitor = () => {
+  const ACTIVITY_INTERVAL = 30000; // 30 seconds
+  
+  setInterval(() => {
+    // Keep the event loop busy with occasional activity
+    const uptime = Math.round(process.uptime());
+    const memory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    console.log(`🏃 Server active - Uptime: ${uptime}s, Memory: ${memory}MB`);
+  }, ACTIVITY_INTERVAL);
+};
+
+// IGNORE all shutdown signals
+const ignoreShutdownSignals = () => {
+  process.on('SIGTERM', (signal) => {
+    console.log(`🚫 IGNORING ${signal} - Server continues running`);
+    console.log('🛡️  Server protected from shutdown');
+  });
+
+  process.on('SIGINT', (signal) => {
+    console.log(`🚫 IGNORING ${signal} - Server continues running`);
+    console.log('🛡️  Use Render dashboard to stop if needed');
+  });
+
+  process.on('SIGUSR1', (signal) => {
+    console.log(`🚫 IGNORING ${signal} - Server continues running`);
+  });
+
+  process.on('SIGUSR2', (signal) => {
+    console.log(`🚫 IGNORING ${signal} - Server continues running`);
+  });
+
+  console.log('🛡️  Shutdown signal protection activated');
+};
+
+// Never crash on errors
+const setupErrorProtection = () => {
+  process.on('uncaughtException', (error) => {
+    console.error('💥 Uncaught Exception (BUT CONTINUING):', error);
+    console.log('🔄 Server continues despite error');
+  });
+
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('💥 Unhandled Rejection (BUT CONTINUING):', reason);
+    console.log('🔄 Server continues despite rejection');
+  });
+};
+
+// Main server startup - ALWAYS RUNNING
 const startServer = async () => {
   try {
-    // Initialize email transporter
+    console.log('🚀 Starting 5KI Email Server - ALWAYS RUNNING MODE');
+    
+    // Initialize email service
     await initializeTransporter();
     
-    // Start the server
+    // Start continuous protection
+    ignoreShutdownSignals();
+    setupErrorProtection();
+    startActivityMonitor();
+    
+    // Start server
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+      console.log(`✅ Server PERMANENTLY running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📧 Email service: ${transporter ? 'Mailjet Ready' : 'Console Fallback'}`);
-      console.log(`📍 Health check: http://localhost:${PORT}/health`);
-      console.log(`🧪 Test endpoint: http://localhost:${PORT}/test-mailjet`);
+      console.log(`📍 Health: https://fivekiapp.onrender.com/health`);
+      console.log(`⏰ Started: ${new Date().toISOString()}`);
+      console.log('🛡️  SERVER WILL NEVER SHUTDOWN AUTOMATICALLY');
       
-      // Start self-ping AFTER server is listening
+      // Start keep-alive pings
       startSelfPing();
     });
 
-    // Enhanced error handling for server
+    // Enhanced server settings for continuous operation
+    server.keepAliveTimeout = 120000;
+    server.headersTimeout = 130000;
+    
+    // Handle server errors without crashing
     server.on('error', (error) => {
-      console.error('Server error:', error);
+      console.error('❌ Server error (BUT CONTINUING):', error);
+      
       if (error.code === 'EADDRINUSE') {
-        console.log(`Port ${PORT} is busy, retrying...`);
-        setTimeout(() => {
-          server.close();
-          startServer();
-        }, 1000);
+        console.log('🔄 Port busy, but server continues other operations');
       }
     });
 
-    // Enhanced graceful shutdown
-    process.on('SIGTERM', () => {
-      console.log('SIGTERM received, starting graceful shutdown...');
-      server.close(() => {
-        console.log('Process terminated gracefully');
-        // Don't force exit, let the platform handle it
-      });
-    });
-
-    // Handle other termination signals
-    process.on('SIGINT', () => {
-      console.log('SIGINT received, shutting down...');
-      server.close(() => {
-        process.exit(0);
-      });
-    });
-
-    // Prevent uncaught exceptions from crashing the app
-    process.on('uncaughtException', (error) => {
-      console.error('Uncaught Exception:', error);
-      // Don't exit, keep the process running
-    });
-
-    process.on('unhandledRejection', (reason, promise) => {
-      console.error('Unhandled Rejection at:', promise, 'reason:', reason);
-      // Don't exit, keep the process running
-    });
+    // Monitor server health continuously
+    setInterval(() => {
+      const uptime = process.uptime();
+      const memory = process.memoryUsage();
+      console.log(`❤️  Heartbeat - Uptime: ${Math.round(uptime)}s, Memory: ${Math.round(memory.heapUsed / 1024 / 1024)}MB`);
+    }, 60000); // Every minute
 
   } catch (error) {
-    console.error('Failed to start server:', error);
-    // Retry after delay instead of exiting
-    console.log('Retrying in 5 seconds...');
-    setTimeout(startServer, 5000);
+    console.error('❌ Startup error (BUT RETRYING):', error);
+    console.log('🔄 Retrying startup in 10 seconds...');
+    
+    // Always retry on failure
+    setTimeout(startServer, 10000);
   }
 };
 
-// Start the server
+// Start server with infinite persistence
+console.log('🎯 Starting 5KI Server - INFINITE RUN MODE');
 startServer();
