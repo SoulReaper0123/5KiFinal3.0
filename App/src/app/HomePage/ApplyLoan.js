@@ -658,7 +658,7 @@ const ApplyLoan = () => {
             flex-direction: column;
             align-items: center;
             gap: 12px;
-            width: 100%;
+            width: '100%';
           `;
           
           const captureButton = document.createElement('button');
@@ -1190,6 +1190,62 @@ const ApplyLoan = () => {
     }
   }, [loanAmount, balance]);
 
+  // Validate account number based on disbursement type
+  const validateAccountNumber = (value, disbursementType) => {
+    // Remove any non-digit characters
+    const cleanValue = value.replace(/\D/g, '');
+    
+    if (disbursementType === 'GCash') {
+      // GCash: exactly 11 digits
+      if (cleanValue.length > 11) {
+        return cleanValue.slice(0, 11);
+      }
+    } else if (disbursementType === 'Bank') {
+      // Bank: minimum 8 digits, maximum 16 digits
+      if (cleanValue.length > 16) {
+        return cleanValue.slice(0, 16);
+      }
+    }
+    
+    return cleanValue;
+  };
+
+  // Check if account number meets requirements
+  const isAccountNumberValid = () => {
+    if (disbursement === 'Cash') return true;
+    
+    const cleanAccountNumber = accountNumber.replace(/\D/g, '');
+    
+    if (disbursement === 'GCash') {
+      return cleanAccountNumber.length === 11;
+    } else if (disbursement === 'Bank') {
+      return cleanAccountNumber.length >= 8 && cleanAccountNumber.length <= 16;
+    }
+    
+    return false;
+  };
+
+  // Get account number validation message
+  const getAccountNumberValidationMessage = () => {
+    if (disbursement === 'Cash') return '';
+    
+    const cleanAccountNumber = accountNumber.replace(/\D/g, '');
+    
+    if (disbursement === 'GCash') {
+      if (cleanAccountNumber.length === 0) return '';
+      if (cleanAccountNumber.length < 11) return 'GCash number must be 11 digits';
+      if (cleanAccountNumber.length > 11) return 'GCash number cannot exceed 11 digits';
+      return 'Valid GCash number';
+    } else if (disbursement === 'Bank') {
+      if (cleanAccountNumber.length === 0) return '';
+      if (cleanAccountNumber.length < 8) return 'Bank account must be at least 8 digits';
+      if (cleanAccountNumber.length > 16) return 'Bank account cannot exceed 16 digits';
+      return 'Valid bank account number';
+    }
+    
+    return '';
+  };
+
   // Check if all required fields are filled
   const isFormValid = () => {
     const disb = disbursement;
@@ -1198,9 +1254,9 @@ const ApplyLoan = () => {
     if (disb === 'Cash') {
       accountsOk = true;
     } else if (disb === 'Bank') {
-      accountsOk = accountName && accountNumber && bankType && (bankType !== 'Others' || customBankName);
+      accountsOk = accountName && accountNumber && bankType && (bankType !== 'Others' || customBankName) && isAccountNumberValid();
     } else {
-      accountsOk = accountName && accountNumber;
+      accountsOk = accountName && accountNumber && isAccountNumberValid();
     }
 
     const basicFieldsValid =
@@ -1288,18 +1344,9 @@ const ApplyLoan = () => {
     }
   }, [loanType, interestRatesByType]);
 
-  const validateAccountNumber = (value) => {
-    const maxLength = disbursement === 'GCash' ? 11 : disbursement === 'Bank' ? 16 : 0;
-    if (maxLength > 0 && value.length > maxLength) {
-      setErrorMessage(`Account Number for ${disbursement} must be ${maxLength} digits long`);
-      setErrorModalVisible(true);
-      return value.slice(0, maxLength);
-    }
-    return value;
-  };
-
   const handleAccountNumberChange = (value) => {
-    setAccountNumber(validateAccountNumber(value));
+    const validatedValue = validateAccountNumber(value, disbursement);
+    setAccountNumber(validatedValue);
   };
 
   const fetchSystemSettings = async () => {
@@ -1620,9 +1667,18 @@ const ApplyLoan = () => {
   const validateForm = () => {
     if (!isFormValid()) {
       let message = 'All required fields must be filled';
-      if (requiresCollateral && !isCollateralValid()) {
+      
+      // Check account number validation
+      if (disbursement !== 'Cash' && !isAccountNumberValid()) {
+        if (disbursement === 'GCash') {
+          message = 'GCash account number must be exactly 11 digits';
+        } else if (disbursement === 'Bank') {
+          message = 'Bank account number must be between 8-16 digits';
+        }
+      } else if (requiresCollateral && !isCollateralValid()) {
         message = 'Please complete all collateral details including uploading at least one proof of collateral image';
       }
+      
       setErrorMessage(message);
       return false;
     }
@@ -1792,7 +1848,8 @@ const ApplyLoan = () => {
       term,
       disbursement,
       accountName,
-      accountNumber
+      accountNumber,
+      isAccountNumberValid: isAccountNumberValid()
     });
     
     if (!validateForm()) {
@@ -2013,8 +2070,23 @@ const ApplyLoan = () => {
                 style={styles.input}
                 keyboardType="numeric"
                 ref={accountNumberInput}
-                placeholder="Enter account number"
+                placeholder={
+                  disbursement === 'GCash' 
+                    ? 'Enter 11-digit GCash number' 
+                    : 'Enter 8-16 digit bank account number'
+                }
+                maxLength={disbursement === 'GCash' ? 11 : 16}
               />
+              
+              {/* Account Number Validation Message */}
+              {accountNumber.length > 0 && (
+                <Text style={[
+                  styles.validationText,
+                  isAccountNumberValid() ? styles.validText : styles.invalidText
+                ]}>
+                  {getAccountNumberValidationMessage()}
+                </Text>
+              )}
 
               {disbursement === 'Bank' && (
                 <>
@@ -2473,6 +2545,19 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 15,
     backgroundColor: '#f9f9f9',
+  },
+  // Validation text styles
+  validationText: {
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 15,
+    paddingHorizontal: 5,
+  },
+  validText: {
+    color: '#059669',
+  },
+  invalidText: {
+    color: '#dc2626',
   },
   collateralIndicator: {
     flexDirection: 'row',
