@@ -1847,7 +1847,7 @@ const PayLoan = () => {
       style={styles.container}
     >
       <ScrollView 
-        contentContainerStyle={styles.container}
+        contentContainerStyle={styles.scrollContainer}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -1856,6 +1856,7 @@ const PayLoan = () => {
             tintColor="#3A7F0D"
           />
         }
+        showsVerticalScrollIndicator={true}
       >
         {/* Header with centered title and left back button using invisible spacers */}
         <View style={styles.headerRow}>
@@ -2284,8 +2285,11 @@ const PayLoan = () => {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     padding: 16,
     paddingBottom: 32,
   },
