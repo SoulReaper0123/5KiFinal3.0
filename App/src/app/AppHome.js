@@ -19,7 +19,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getDatabase, ref, onValue, off, query, orderByChild, equalTo } from 'firebase/database';
+import { getDatabase, ref, get } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -53,67 +53,30 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
 
-  // Real-time listener references
-  const userListenerRef = useRef(null);
-  const transactionsListenerRef = useRef(null);
-
-  // --- Real-time transaction checking ---
-  const setupRealTimeTransactionCheck = (userEmail) => {
-    if (!userEmail) return;
-
+  // Check for new transactions and show red dot on bell
+  const checkForNewTransactions = async () => {
     try {
-      const db = getDatabase();
-      
-      // Remove existing listeners
-      if (transactionsListenerRef.current) {
-        off(transactionsListenerRef.current);
-      }
-
-      // Listen to Transactions/Payments
-      const txRef = ref(db, 'Transactions/Payments');
-      transactionsListenerRef.current = onValue(txRef, (snapshot) => {
-        if (snapshot.exists()) {
-          checkForNewTransactions(userEmail);
-        }
-      });
-
-      // Also listen to Payments/ApprovedPayments
-      const approvedRef = ref(db, 'Payments/ApprovedPayments');
-      onValue(approvedRef, (snapshot) => {
-        if (snapshot.exists()) {
-          checkForNewTransactions(userEmail);
-        }
-      });
-
-    } catch (err) {
-      console.error('Error setting up real-time transaction check:', err);
-    }
-  };
-
-  const checkForNewTransactions = async (userEmail) => {
-    try {
-      if (!userEmail) return;
+      if (!email) return;
       const db = getDatabase();
       const txRef = ref(db, 'Transactions/Payments');
       const approvedRef = ref(db, 'Payments/ApprovedPayments');
-      
-      const [txSnap, approvedSnap] = await Promise.all([
-        new Promise(resolve => get(txRef).then(resolve)),
-        new Promise(resolve => get(approvedRef).then(resolve))
-      ]);
+      const [txSnap, approvedSnap] = await Promise.all([get(txRef), get(approvedRef)]);
 
       let count = 0;
       const countForEmail = (node) => {
         if (!node) return 0;
+        // node shape: { memberId: { txId: { ... } } } or { txId: { ... } }
         let c = 0;
         Object.values(node).forEach((memberGroup) => {
           if (!memberGroup) return;
+          // if memberGroup is a transaction object, check directly
           if (typeof memberGroup.email === 'string') {
-            if (memberGroup.email === userEmail) c++;
+            if (memberGroup.email === email) c++;
             return;
           }
+          // otherwise iterate inner transactions
           Object.values(memberGroup).forEach((tx) => {
-            if (tx?.email === userEmail) c++;
+            if (tx?.email === email) c++;
           });
         });
         return c;
@@ -126,13 +89,16 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         count += countForEmail(approvedSnap.val());
       }
 
+      // If we've seen more transactions than before, show dot
       if (previousInboxCount.current === 0) {
+        // first time: just initialize
         previousInboxCount.current = count;
         setHasNewInboxItems(false);
       } else if (count > previousInboxCount.current) {
         setHasNewInboxItems(true);
         previousInboxCount.current = count;
       } else {
+        // no increase
         previousInboxCount.current = count;
       }
       lastInboxCheckRef.current = Date.now();
@@ -140,6 +106,14 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
       console.error('Error checking transactions:', err);
     }
   };
+
+  useEffect(() => {
+    // run once when email becomes available, then poll every 30s
+    if (!email) return;
+    checkForNewTransactions();
+    const interval = setInterval(checkForNewTransactions, 30000);
+    return () => clearInterval(interval);
+  }, [email]);
 
   useEffect(() => {
     const textWidth = 600;
@@ -167,142 +141,108 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     })}`;
   };
 
-  // Real-time user data listener
-  const setupRealTimeUserData = (userEmail) => {
+  const fetchUserData = async (userEmail) => {
     if (!userEmail) {
-      console.log('No email provided for real-time setup');
-      setLoading(false);
+      console.log('No email provided to fetchUserData');
+      if (!refreshing) {
+        setLoading(false);
+      }
+      setRefreshing(false);
       return;
     }
 
     const db = getDatabase();
     const dbRef = ref(db, 'Members');
-    
-    // Remove existing listener
-    if (userListenerRef.current) {
-      off(userListenerRef.current);
-    }
-
-    console.log('Setting up real-time listener for:', userEmail);
-    
-    // Set up real-time listener
-    userListenerRef.current = onValue(dbRef, (snapshot) => {
+    try {
+      const snapshot = await get(dbRef);
       if (snapshot.exists()) {
         const members = snapshot.val();
         const foundUser = Object.values(members).find(
           (member) => member.email === userEmail
         );
         if (foundUser) {
-          console.log('Real-time update received:', {
-            firstName: foundUser.firstName,
-            balance: foundUser.balance,
-            investment: foundUser.investment || foundUser.investments,
-            email: foundUser.email
-          });
-          
           setFirstName(foundUser.firstName || 'Guest');
           setBalance(foundUser.balance || 0);
           setInvestment(foundUser.investment || foundUser.investments || 0);
-          setEmail(foundUser.email || userEmail);
+          setEmail(foundUser.email || 'No email provided');
           setSelfie(foundUser.selfie || null);
-          setMemberId(foundUser.memberId || null);
-          
-          // Only set loading to false on first data load
-          if (loading) {
-            setLoading(false);
-          }
-          if (refreshing) {
-            setRefreshing(false);
-          }
+          console.log('User data fetched successfully');
         } else {
-          console.log('User not found in real-time data:', userEmail);
-          setLoading(false);
-          setRefreshing(false);
+          console.log('User not found in database');
         }
       } else {
-        console.log('No members found in real-time data');
-        setLoading(false);
-        setRefreshing(false);
-      }
-    }, (error) => {
-      console.error('Error in real-time listener:', error);
-      setLoading(false);
-      setRefreshing(false);
-    });
-  };
-
-  // Enhanced user data loading with real-time listeners
-  const loadUserData = async (forceRefresh = false) => {
-    if (forceRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-
-    try {
-      const user = auth.currentUser;
-      const paramEmail = route.params?.user?.email;
-      const routeEmail = route.params?.email;
-      let storedEmail = null;
-      
-      // Try to get email from SecureStore (for biometric login)
-      try {
-        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-      } catch (error) {
-        console.error('Error getting email from SecureStore:', error);
-      }
-      
-      console.log('Setting up real-time data with:', { 
-        authEmail: user?.email, 
-        paramEmail, 
-        routeEmail,
-        storedEmail,
-        email
-      });
-      
-      // Priority order for email sources
-      let targetEmail = email || storedEmail || user?.email || paramEmail || routeEmail;
-      
-      if (targetEmail) {
-        console.log('Setting up real-time listeners for:', targetEmail);
-        setupRealTimeUserData(targetEmail);
-        setupRealTimeTransactionCheck(targetEmail);
-      } else {
-        console.log('No email found for real-time setup');
-        setLoading(false);
-        setRefreshing(false);
+        console.log('No members data available');
       }
     } catch (error) {
-      console.error('Error in loadUserData:', error);
-      setLoading(false);
+      console.error('Error fetching user data:', error);
+    } finally {
+      if (!refreshing) {
+        setLoading(false);
+      }
       setRefreshing(false);
     }
   };
 
-  // Initial load and real-time setup
   useEffect(() => {
-    loadUserData();
-
-    // Cleanup function to remove listeners
-    return () => {
-      console.log('Cleaning up real-time listeners');
-      if (userListenerRef.current) {
-        off(userListenerRef.current);
-      }
-      if (transactionsListenerRef.current) {
-        off(transactionsListenerRef.current);
+    const loadUserData = async () => {
+      try {
+        const user = auth.currentUser;
+        const paramEmail = route.params?.user?.email;
+        const routeEmail = route.params?.email;
+        let storedEmail = null;
+        
+        // Try to get email from SecureStore (for biometric login)
+        try {
+          storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+        } catch (error) {
+          console.error('Error getting email from SecureStore:', error);
+        }
+        
+        console.log('AppHome - Loading user data with:', { 
+          authEmail: user?.email, 
+          paramEmail, 
+          routeEmail,
+          storedEmail,
+          email
+        });
+        
+        // First try to use the email passed directly to this component
+        if (email) {
+          console.log('Using email prop:', email);
+          fetchUserData(email);
+        }
+        // Then try the email from SecureStore (for biometric login)
+        else if (storedEmail) {
+          console.log('Using email from SecureStore:', storedEmail);
+          fetchUserData(storedEmail);
+        }
+        // Then try the email from Firebase auth
+        else if (user?.email) {
+          console.log('Using Firebase auth email:', user.email);
+          fetchUserData(user.email);
+        }
+        // Then try the email from route params (user object)
+        else if (paramEmail) {
+          console.log('Using param email from user object:', paramEmail);
+          fetchUserData(paramEmail);
+        }
+        // Finally try the direct email from route params (used in biometric login)
+        else if (routeEmail) {
+          console.log('Using direct route email:', routeEmail);
+          fetchUserData(routeEmail);
+        }
+        else {
+          console.log('No email found, setting loading to false');
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Error in loadUserData:', error);
+        setLoading(false);
       }
     };
-  }, []);
-
-  // Reload when email changes
-  useEffect(() => {
-    if (email) {
-      console.log('Email changed, setting up new real-time listeners:', email);
-      setupRealTimeUserData(email);
-      setupRealTimeTransactionCheck(email);
-    }
-  }, [email]);
+    
+    loadUserData();
+  }, [route.params, email]);
 
   // Check if biometric setup should be prompted
   useEffect(() => {
@@ -373,13 +313,32 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   }, [navigation]);
 
   const onRefresh = async () => {
-    console.log('Manual refresh triggered');
     setRefreshing(true);
-    // Force re-check transactions
-    if (email) {
-      checkForNewTransactions(email);
+    try {
+      // Use the current email state directly instead of re-fetching from multiple sources
+      if (email) {
+        console.log('Refreshing with current email:', email);
+        await fetchUserData(email);
+      } else {
+        // Fallback: try to get email from SecureStore
+        try {
+          const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+          if (storedEmail) {
+            console.log('Refreshing with email from SecureStore:', storedEmail);
+            await fetchUserData(storedEmail);
+          } else {
+            console.log('No email found during refresh');
+          }
+        } catch (error) {
+          console.error('Error getting email from SecureStore during refresh:', error);
+        }
+      }
+    } catch (error) {
+      console.error('Error in onRefresh:', error);
+    } finally {
+      // Always stop refreshing, even if there's an error
+      setRefreshing(false);
     }
-    // The real-time listener will automatically update the data
   };
 
   // Fallback drawer state and handlers when Drawer navigator isn't available
@@ -409,15 +368,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   const handleLogoutFallback = async () => {
     try {
-      // Clean up real-time listeners
-      console.log('Cleaning up real-time listeners on logout');
-      if (userListenerRef.current) {
-        off(userListenerRef.current);
-      }
-      if (transactionsListenerRef.current) {
-        off(transactionsListenerRef.current);
-      }
-      
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
       await auth.signOut();
@@ -429,11 +379,10 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading ? (
+      {loading && !refreshing ? (
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#1E3A5F" />
-          <Text style={styles.loadingText}>Loading your data...</Text>
-          <Text style={styles.realtimeText}>Real-time updates enabled</Text>
+          <Text style={styles.loadingText}>Loading your account...</Text>
         </View>
       ) : (
         <ScrollView
@@ -441,12 +390,22 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             <RefreshControl 
               refreshing={refreshing} 
               onRefresh={onRefresh}
-              colors={['#1E3A5F']}
-              tintColor="#1E3A5F"
+              colors={['#1E3A5F']} // Android
+              tintColor="#1E3A5F" // iOS
+              progressBackgroundColor="#ffffff"
             />
           }
-          contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 40 }}
+          contentContainerStyle={{ 
+            flexGrow: 1, 
+            padding: 20, 
+            paddingBottom: 40,
+            minHeight: Dimensions.get('window').height + 100 
+          }}
+          style={styles.scrollView}
           keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={true}
+          overScrollMode="always" // Android
+          alwaysBounceVertical={true} // iOS
         >
           {/* Header Bar */}
           <View style={styles.headerBar}>
@@ -464,10 +423,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             <View style={styles.greetGroup}>
               <Text style={styles.greetSubtitle}>Welcome back,</Text>
               <Text style={styles.greetTitle}>{firstName}</Text>
-              <View style={styles.realtimeIndicator}>
-                <View style={styles.realtimeDot} />
-                <Text style={styles.realtimeText}>Live</Text>
-              </View>
             </View>
 
             <TouchableOpacity
@@ -908,26 +863,24 @@ const styles = StyleSheet.create({
   // Layout
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#fffff',
     marginTop: 30,
   },
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: '#f0f4f8',
   },
   loadingText: {
-    marginTop: 16,
-    fontSize: 16,
+    marginTop: 12,
     color: '#1E3A5F',
+    fontSize: 16,
     fontWeight: '500',
   },
-  realtimeText: {
-    fontSize: 12,
-    color: '#4ade80',
-    fontWeight: '500',
-    marginTop: 8,
+  scrollView: {
+    flex: 1,
+    width: '100%',
   },
 
   // New Header Bar
@@ -959,18 +912,6 @@ const styles = StyleSheet.create({
     color: '#1E3A5F',
     marginTop: 2,
   },
-  realtimeIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  realtimeDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#4ade80',
-    marginRight: 6,
-  },
   bellButton: {
     width: 40,
     height: 40,
@@ -993,11 +934,11 @@ const styles = StyleSheet.create({
 
   // Wallet Card
   walletCard: {
-    backgroundColor: '#f2f4f7',
+    backgroundColor: '#f2f4f7ff',
     marginTop: 12,
     borderRadius: 16,
     padding: 20,
-    shadowColor: '#000000',
+    shadowColor: '#00000091',
     shadowOpacity: 0.12,
     shadowRadius: 10,
     elevation: 3,
@@ -1008,20 +949,14 @@ const styles = StyleSheet.create({
     marginBottom: 6,
     letterSpacing: 0.5,
   },
-  balanceRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between' 
-  },
+  balanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   walletAmount: {
     fontSize: 32,
     color: '#1E3A5F',
     fontWeight: '700',
   },
-  eyeBtn: { 
-    marginLeft: 12, 
-    padding: 6 
-  },
+  eyeBtn: { marginLeft: 12, padding: 6 }
+  ,
   walletActionsRow: {
     flexDirection: 'row',
     marginTop: 14,
@@ -1129,7 +1064,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginTop: 12,
     borderRadius: 12,
-    backgroundColor: '#f2f4f7',
+    backgroundColor: '#f2f4f7ff',
     shadowColor: '#000',
     shadowOpacity: 0.08,
     shadowRadius: 8,
