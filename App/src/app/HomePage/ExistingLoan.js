@@ -278,7 +278,9 @@ const ExistingLoan = () => {
         dateApproved: null,
         interestRate: 0,
         interest: 0,
-        term: 0
+        term: 0,
+        remainingBalance: 0,
+        releaseAmount: 0
       };
 
       if (approvedSnapshot.exists()) {
@@ -293,7 +295,9 @@ const ExistingLoan = () => {
                 dateApproved: loan.dateApproved,
                 interestRate: parseFloat(loan.interestRate || 0),
                 interest: parseFloat(loan.interest || 0),
-                term: parseInt(loan.term || 0)
+                term: parseInt(loan.term || 0),
+                remainingBalance: parseFloat(loan.remainingBalance || loan.loanAmount || 0),
+                releaseAmount: parseFloat(loan.releaseAmount || loan.loanAmount || 0)
               };
               break;
             }
@@ -318,9 +322,10 @@ const ExistingLoan = () => {
                 ...approvedData,
                 _memberId: memberId,
                 _loanId: loanId,
-                outstandingBalance: currentLoan.loanAmount,
+                outstandingBalance: currentLoan.remainingBalance || approvedData.remainingBalance || currentLoan.loanAmount,
                 dateApplied: currentLoan.dateApplied,
                 dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
+                receivableAmount: currentLoan.releaseAmount || approvedData.releaseAmount || currentLoan.loanAmount
               };
               foundLoans.push(loanData);
             }
@@ -528,7 +533,6 @@ const ExistingLoan = () => {
     );
   }
 
-
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
@@ -551,8 +555,6 @@ const ExistingLoan = () => {
           />
         }
       >
-        {/* Loan Details summary moved to dedicated LoanDetails screen */}
-
         <Text style={styles.sectionTitle}>Active Loans</Text>
         {activeLoans && activeLoans.length > 0 ? (
           activeLoans.map((loan) => {
@@ -560,8 +562,9 @@ const ExistingLoan = () => {
             const detailRows = [
               { label: 'Loan Type:', value: loan.loanType || 'Loan' },
               { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
-              { label: 'ApprovedAmount:', value: formatCurrency(loan.loanAmount) },
-              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance ?? loan.loanAmount) },
+              { label: 'Approved Amount:', value: formatCurrency(loan.loanAmount) },
+              { label: 'Receivable Amount:', value: formatCurrency(loan.receivableAmount || loan.releaseAmount || loan.loanAmount) },
+              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance || loan.remainingBalance || loan.loanAmount) },
               { label: 'Date Applied:', value: formatDisplayDate(loan.dateApplied) },
               { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved) },
               { label: 'Term:', value: loan.term ? `${loan.term} months` : 'N/A' },
@@ -578,7 +581,8 @@ const ExistingLoan = () => {
                   navigation.navigate('LoanDetails', {
                     item: {
                       ...loan,
-                      outstandingBalance: parseFloat(loan.loanAmount || 0),
+                      outstandingBalance: loan.outstandingBalance || loan.remainingBalance || parseFloat(loan.loanAmount || 0),
+                      receivableAmount: loan.receivableAmount || loan.releaseAmount || parseFloat(loan.loanAmount || 0),
                       paymentHistory: transactionHistory.filter((payment) => {
                         const appliedToLoan = payment.appliedToLoan || payment.originalTransactionId;
                         const loanOriginalId = loan.originalTransactionId || loan.commonOriginalTransactionId;
