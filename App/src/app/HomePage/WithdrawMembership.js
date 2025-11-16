@@ -73,6 +73,62 @@ export default function WithdrawMembership() {
     { key: 'Others', label: 'Others' },
   ];
 
+  // Validate account number based on disbursement type
+  const validateAccountNumber = (value, disbursementType) => {
+    // Remove any non-digit characters
+    const cleanValue = value.replace(/\D/g, '');
+    
+    if (disbursementType === 'GCash') {
+      // GCash: exactly 11 digits
+      if (cleanValue.length > 11) {
+        return cleanValue.slice(0, 11);
+      }
+    } else if (disbursementType === 'Bank') {
+      // Bank: minimum 8 digits, maximum 16 digits
+      if (cleanValue.length > 16) {
+        return cleanValue.slice(0, 16);
+      }
+    }
+    
+    return cleanValue;
+  };
+
+  // Check if account number meets requirements
+  const isAccountNumberValid = () => {
+    if (!disbursementOption) return false;
+    
+    const cleanAccountNumber = form.disbursementAccountNumber.replace(/\D/g, '');
+    
+    if (disbursementOption === 'GCash') {
+      return cleanAccountNumber.length === 11;
+    } else if (disbursementOption === 'Bank') {
+      return cleanAccountNumber.length >= 8 && cleanAccountNumber.length <= 16;
+    }
+    
+    return false;
+  };
+
+  // Get account number validation message
+  const getAccountNumberValidationMessage = () => {
+    if (!disbursementOption) return '';
+    
+    const cleanAccountNumber = form.disbursementAccountNumber.replace(/\D/g, '');
+    
+    if (disbursementOption === 'GCash') {
+      if (cleanAccountNumber.length === 0) return '';
+      if (cleanAccountNumber.length < 11) return 'GCash number must be 11 digits';
+      if (cleanAccountNumber.length > 11) return 'GCash number cannot exceed 11 digits';
+      return 'Valid GCash number';
+    } else if (disbursementOption === 'Bank') {
+      if (cleanAccountNumber.length === 0) return '';
+      if (cleanAccountNumber.length < 8) return 'Bank account must be at least 8 digits';
+      if (cleanAccountNumber.length > 16) return 'Bank account cannot exceed 16 digits';
+      return 'Valid bank account number';
+    }
+    
+    return '';
+  };
+
   useEffect(() => {
     const handleBackPress = () => {
       navigation.navigate('AppHome');
@@ -290,6 +346,14 @@ export default function WithdrawMembership() {
     setCustomBankName('');
   };
 
+  const handleAccountNumberChange = (value) => {
+    const validatedValue = validateAccountNumber(value, disbursementOption);
+    setForm(prev => ({
+      ...prev,
+      disbursementAccountNumber: validatedValue
+    }));
+  };
+
   const handleSubmit = async () => {
     if (!memberId) {
       setAlertMessage('Please enter a valid member email first');
@@ -329,6 +393,18 @@ export default function WithdrawMembership() {
 
     if (!form.disbursementAccountName || !form.disbursementAccountNumber) {
       setAlertMessage('Please provide disbursement account name and number');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    // Check account number validation
+    if (!isAccountNumberValid()) {
+      if (disbursementOption === 'GCash') {
+        setAlertMessage('GCash account number must be exactly 11 digits');
+      } else if (disbursementOption === 'Bank') {
+        setAlertMessage('Bank account number must be between 8-16 digits');
+      }
       setAlertType('error');
       setAlertModalVisible(true);
       return;
@@ -445,6 +521,7 @@ export default function WithdrawMembership() {
                          !disbursementOption ||
                          !form.disbursementAccountName ||
                          !form.disbursementAccountNumber ||
+                         !isAccountNumberValid() ||
                          (disbursementOption === 'Bank' && !form.disbursementBankType && !customBankName);
 
   return (
@@ -595,11 +672,26 @@ export default function WithdrawMembership() {
                     <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
                     <TextInput
                       value={form.disbursementAccountNumber}
-                      onChangeText={(text) => setForm({...form, disbursementAccountNumber: text})}
+                      onChangeText={handleAccountNumberChange}
                       style={styles.input}
                       keyboardType="numeric"
-                      placeholder="Enter account number"
+                      placeholder={
+                        disbursementOption === 'GCash' 
+                          ? 'Enter 11-digit GCash number' 
+                          : 'Enter 8-16 digit bank account number'
+                      }
+                      maxLength={disbursementOption === 'GCash' ? 11 : 16}
                     />
+                    
+                    {/* Account Number Validation Message */}
+                    {form.disbursementAccountNumber.length > 0 && (
+                      <Text style={[
+                        styles.validationText,
+                        isAccountNumberValid() ? styles.validText : styles.invalidText
+                      ]}>
+                        {getAccountNumberValidationMessage()}
+                      </Text>
+                    )}
 
                     {disbursementOption === 'Bank' && (
                       <>
@@ -1005,7 +1097,7 @@ const styles = StyleSheet.create({
     marginTop: 10,
     fontSize: 16,
     fontWeight: '500',
-    color: '#2D5783',
+    color: '#2C5282',
   },
   required: {
     color: 'red',
@@ -1024,5 +1116,18 @@ const styles = StyleSheet.create({
   pickerText: {
     fontSize: 16,
     color: '#333',
+  },
+  // Validation text styles
+  validationText: {
+    fontSize: 12,
+    marginTop: -10,
+    marginBottom: 15,
+    paddingHorizontal: 5,
+  },
+  validText: {
+    color: '#059669',
+  },
+  invalidText: {
+    color: '#dc2626',
   },
 });
