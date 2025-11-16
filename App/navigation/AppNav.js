@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createDrawerNavigator, DrawerContentScrollView, DrawerItem } from '@react-navigation/drawer';
@@ -8,6 +8,9 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { auth } from '../src/firebaseConfig';
 import * as SecureStore from 'expo-secure-store';
 import CustomConfirmModal from '../src/components/CustomConfirmModal';
+
+// Import Auth Context
+import { AuthProvider, useAuth } from './Auth/AuthContext';
 
 // Import all your screens
 import Splashscreen from '../src/app/Splashscreen';
@@ -43,6 +46,7 @@ const Drawer = createDrawerNavigator();
 
 const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }) => {
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { logout } = useAuth();
 
   const handleLogout = () => {
     setShowLogoutModal(true);
@@ -53,9 +57,7 @@ const CustomDrawerContent = ({ user, loading, setGlobalLogoutLoading, ...props }
     setGlobalLogoutLoading(true);
     try {
       await new Promise(resolve => setTimeout(resolve, 800));
-      await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
-      await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
-      await auth.signOut();
+      await logout(); // Use auth context logout
       
       props.navigation.reset({
         index: 0,
@@ -303,48 +305,85 @@ const DrawerNavigator = ({ route }) => {
   );
 };
 
+// Main Navigator with Auth Protection
+const MainNavigator = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#2D5783" />
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+
+  return (
+    <NavigationContainer>
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {user ? (
+          // Authenticated Screens
+          <Stack.Group>
+            <Stack.Screen 
+              name="DrawerNav" 
+              component={DrawerNavigator} 
+              initialParams={{ email: user.email }}
+            />
+            <Stack.Screen name="AppHome" component={AppHome} />
+            <Stack.Screen name="ApplyLoan" component={ApplyLoan} />
+            <Stack.Screen name="PayLoan" component={PayLoan} />
+            <Stack.Screen name="PayLoanDetails" component={require('../src/app/HomePage/PayLoanDetails').default} />
+            <Stack.Screen name="ExistingLoan" component={ExistingLoan} />
+            <Stack.Screen name="LoanPaymentHistory" component={require('../src/app/HomePage/LoanPaymentHistory').default} />
+            <Stack.Screen name="LoanDetails" component={require('../src/app/HomePage/LoanDetails').default} />
+            <Stack.Screen name="Deposit" component={Deposit} />
+            <Stack.Screen name="Withdraw" component={Withdraw} />
+            <Stack.Screen name="Terms and Conditions" component={Terms} />
+            <Stack.Screen name="Privacy Policy" component={Privacy} />
+            <Stack.Screen name="TwoFactorEmail" component={TwoFactorEmail} />
+            <Stack.Screen name="VerifyCode" component={VerifyCode} />
+            <Stack.Screen name="Bot" component={Bot} />
+            <Stack.Screen name="Inbox" component={Inbox} />
+            <Stack.Screen name="InboxDetails" component={require('../src/app/HomePage/InboxDetails').default} />
+            <Stack.Screen name="Transactions" component={Transactions} />
+            <Stack.Screen name="TransactionDetails" component={require('../src/app/HomePage/TransactionDetails').default} />
+            <Stack.Screen name="WithdrawMembership" component={WithdrawMembership} />
+            <Stack.Screen name="ChangePassword" component={ChangePassword} />
+            <Stack.Screen name="AboutUs" component={AboutUs} />
+            <Stack.Screen name="ContactUs" component={ContactUs} />
+            <Stack.Screen name="Settings" component={Settings} />
+            <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
+            <Stack.Screen 
+              name="BiometricSetup" 
+              component={BiometricSetupScreen} 
+              options={{ gestureEnabled: false }} 
+            />
+          </Stack.Group>
+        ) : (
+          // Auth Screens
+          <Stack.Group>
+            <Stack.Screen name="Splash" component={Splashscreen} />
+            <Stack.Screen name="Login" component={AppLoginPage} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPassword} />
+            <Stack.Screen name="Register" component={RegisterPage} />
+            <Stack.Screen name="Register2" component={RegisterPage2} />
+            <Stack.Screen name="CreatePassword" component={CreatePasswordPage} />
+            <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} />
+            <Stack.Screen name="TwoFactorEmail" component={TwoFactorEmail} />
+            <Stack.Screen name="VerifyCode" component={VerifyCode} />
+          </Stack.Group>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+};
+
+// Wrap the main app with AuthProvider
 const AppNav = () => (
-  <NavigationContainer>
-    <Stack.Navigator initialRouteName="Splash">
-      <Stack.Screen name="Splash" component={Splashscreen} options={{ headerShown: false }} />
-      <Stack.Screen name="Login" component={AppLoginPage} options={{ headerShown: false }} />
-      <Stack.Screen name="ForgotPassword" component={ForgotPassword} options={{ headerShown: false }} />
-      <Stack.Screen name="Register" component={RegisterPage} options={{ headerShown: false }} />
-      <Stack.Screen name="Register2" component={RegisterPage2} options={{ headerShown: false }} />
-      <Stack.Screen name="CreatePassword" component={CreatePasswordPage} options={{ headerShown: false }} />
-      <Stack.Screen name="DrawerNav" component={AppHome} options={{ headerShown: false }} />
-      <Stack.Screen name="AppHome" component={AppHome} options={{ headerShown: false }} />
-      <Stack.Screen name="ApplyLoan" component={ApplyLoan} options={{ headerShown: false }} />
-      <Stack.Screen name="PayLoan" component={PayLoan} options={{ headerShown: false }} />
-      <Stack.Screen name="PayLoanDetails" component={require('../src/app/HomePage/PayLoanDetails').default} options={{ headerShown: false }} />
-      <Stack.Screen name="ExistingLoan" component={ExistingLoan} options={{ headerShown: false }} />
-      <Stack.Screen name="LoanPaymentHistory" component={require('../src/app/HomePage/LoanPaymentHistory').default} options={{ headerShown: false }} />
-      <Stack.Screen name="LoanDetails" component={require('../src/app/HomePage/LoanDetails').default} options={{ headerShown: false }} />
-      <Stack.Screen name="Deposit" component={Deposit} options={{ headerShown: false }} />
-      <Stack.Screen name="Withdraw" component={Withdraw} options={{ headerShown: false }} />
-      <Stack.Screen name="Terms and Conditions" component={Terms} options={{ headerShown: false }} />
-      <Stack.Screen name="Privacy Policy" component={Privacy} options={{ headerShown: false }} />
-      <Stack.Screen name="TwoFactorEmail" component={TwoFactorEmail} options={{ headerShown: false }} />
-      <Stack.Screen name="VerifyCode" component={VerifyCode} options={{ headerShown: false }} />
-      <Stack.Screen name="Bot" component={Bot} options={{ headerShown: false }} />
-      <Stack.Screen name="Inbox" component={Inbox} options={{ headerShown: false }} />
-      <Stack.Screen name="InboxDetails" component={require('../src/app/HomePage/InboxDetails').default} options={{ headerShown: false }} />
-      <Stack.Screen name="Transactions" component={Transactions} options={{ headerShown: false }} />
-      <Stack.Screen name="TransactionDetails" component={require('../src/app/HomePage/TransactionDetails').default} options={{ headerShown: false }} />
-      <Stack.Screen name="WithdrawMembership" component={WithdrawMembership} options={{ headerShown: false }} />
-      <Stack.Screen name="ChangePassword" component={ChangePassword} options={{ headerShown: false }} />
-      <Stack.Screen name="AboutUs" component={AboutUs} options={{ headerShown: false }} />
-      <Stack.Screen name="ContactUs" component={ContactUs} options={{ headerShown: false }} />
-      <Stack.Screen name="Settings" component={Settings} options={{ headerShown: false }} />
-      <Stack.Screen name="RegistrationFee" component={RegistrationFeePage} options={{ headerShown: false }} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{ headerShown: false }} />
-      <Stack.Screen 
-        name="BiometricSetup" 
-        component={BiometricSetupScreen} 
-        options={{ headerShown: false, gestureEnabled: false }} 
-      />
-    </Stack.Navigator>
-  </NavigationContainer>
+  <AuthProvider>
+    <MainNavigator />
+  </AuthProvider>
 );
 
 const styles = StyleSheet.create({
@@ -507,16 +546,18 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingVertical: 40,
+    backgroundColor: '#F8FAFC',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#2D5783',
   },
   loadingIndicator: {
     marginBottom: 10,
-  },
-  loadingText: {
-    fontSize: 14,
-    color: '#6b7280',
-    fontWeight: '500',
   },
   globalLoadingOverlay: {
     position: 'absolute',
@@ -547,89 +588,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     width: 220,
-  },
-  backArrow: {
-    position: 'absolute',
-    top: 50,
-    right: 20,
-    zIndex: 10,
-  },
-  modalOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    zIndex: 999,
-  },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 15,
-    padding: 30,
-    alignItems: 'center',
-    width: 320,
-    maxWidth: '90%',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  modalIcon: {
-    marginBottom: 15,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#2D5783',
-    marginBottom: 10,
-    textAlign: 'center',
-  },
-  modalMessage: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    marginBottom: 25,
-  },
-  modalButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    marginTop: 10,
-  },
-  modalButton: {
-    flex: 1,
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    alignItems: 'center',
-    marginHorizontal: 6,
-  },
-  cancelButton: {
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1.5,
-    borderColor: '#dee2e6',
-  },
-  confirmButton: {
-    backgroundColor: '#8E0B16',
-    shadowColor: '#8E0B16',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  cancelButtonText: {
-    color: '#495057',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  confirmButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 
