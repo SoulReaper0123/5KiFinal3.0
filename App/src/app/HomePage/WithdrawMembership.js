@@ -448,14 +448,13 @@ export default function WithdrawMembership() {
                          (disbursementOption === 'Bank' && !form.disbursementBankType && !customBankName);
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <SafeAreaView style={styles.container}>
-          {/* Header with centered title and left back button using invisible spacers */}
-          <View style={styles.headerRow}>
+    <SafeAreaView style={styles.safeArea}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}
+      >
+        {/* Header with centered title and left back button using invisible spacers */}
+        <View style={styles.headerRow}>
           <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
             <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
           </TouchableOpacity>
@@ -463,7 +462,12 @@ export default function WithdrawMembership() {
           <View style={styles.headerSide} />
         </View>
 
-        <View style={styles.content}>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContainer}
+          showsVerticalScrollIndicator={true}
+        >
+          <View style={styles.content}>
             <Text style={styles.label}>Email *</Text>
             <View style={styles.emailContainer}>
               <TextInput
@@ -683,93 +687,99 @@ export default function WithdrawMembership() {
               )}
             </TouchableOpacity>
           </View>
+        </ScrollView>
 
-          <Modal
-            visible={modalVisible}
-            animationType="fade"
-            transparent
-            onRequestClose={() => setModalVisible(false)}
-          >
-            <View style={styles.modalOverlay}>
-              <View style={styles.modalView}>
-                <MaterialIcons name="check-circle" size={50} color="#2D5783" />
-                <Text style={styles.modalTitle}>Request Submitted</Text>
-                <Text style={styles.modalText}>
-                  Your membership withdrawal request has been received and is under review.
-                </Text>
-                <Pressable 
-                  style={styles.okButton} 
-                  onPress={() => {
-                    setModalVisible(false);
-                    navigation.navigate('AppHome');
-                  }}
+        <Modal
+          visible={modalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.modalView}>
+              <MaterialIcons name="check-circle" size={50} color="#2D5783" />
+              <Text style={styles.modalTitle}>Request Submitted</Text>
+              <Text style={styles.modalText}>
+                Your membership withdrawal request has been received and is under review.
+              </Text>
+              <Pressable 
+                style={styles.okButton} 
+                onPress={() => {
+                  setModalVisible(false);
+                  navigation.navigate('AppHome');
+                }}
+              >
+                <Text style={styles.okButtonText}>OK</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Loading Overlay */}
+        {isSubmitting && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#4FE7AF" />
+              <Text style={styles.loadingText}>Processing...</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Custom Alert Modal */}
+        <CustomModal
+          visible={alertModalVisible}
+          onClose={() => setAlertModalVisible(false)}
+          message={alertMessage}
+          type={alertType}
+        />
+
+        {/* Confirmation Modal */}
+        <Modal visible={confirmModalVisible} transparent animationType="fade">
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalView, { width: '80%' }]}>
+              <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 15 }]}>
+                Confirm Membership Withdrawal
+              </Text>
+              <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+                You are about to submit a membership withdrawal request. This action cannot be undone. Are you sure you want to proceed?
+              </Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
+                <TouchableOpacity 
+                  style={[styles.submitButton, { backgroundColor: '#cccccc', width: '45%' }]} 
+                  onPress={() => setConfirmModalVisible(false)}
                 >
-                  <Text style={styles.okButtonText}>OK</Text>
-                </Pressable>
+                  <Text style={[styles.submitText, { color: 'black' }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.submitButton, { width: '45%' }]} 
+                  onPress={handleConfirmSubmit}
+                >
+                  <Text style={styles.submitText}>Confirm</Text>
+                </TouchableOpacity>
               </View>
             </View>
-          </Modal>
-
-          {/* Loading Overlay */}
-          {isSubmitting && (
-            <View style={styles.loadingOverlay}>
-              <View style={styles.loadingBox}>
-                <ActivityIndicator size="large" color="#4FE7AF" />
-                <Text style={styles.loadingText}>Processing...</Text>
-              </View>
-            </View>
-          )}
-
-          {/* Custom Alert Modal */}
-          <CustomModal
-            visible={alertModalVisible}
-            onClose={() => setAlertModalVisible(false)}
-            message={alertMessage}
-            type={alertType}
-          />
-
-          {/* Confirmation Modal */}
-          <Modal visible={confirmModalVisible} transparent animationType="fade">
-            <View style={styles.modalOverlay}>
-              <View style={[styles.modalView, { width: '80%' }]}>
-                <Text style={[styles.modalTitle, { textAlign: 'center', marginBottom: 15 }]}>
-                  Confirm Membership Withdrawal
-                </Text>
-                <Text style={{ fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
-                  You are about to submit a membership withdrawal request. This action cannot be undone. Are you sure you want to proceed?
-                </Text>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', width: '100%' }}>
-                  <TouchableOpacity 
-                    style={[styles.submitButton, { backgroundColor: '#cccccc', width: '45%' }]} 
-                    onPress={() => setConfirmModalVisible(false)}
-                  >
-                    <Text style={[styles.submitText, { color: 'black' }]}>Cancel</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={[styles.submitButton, { width: '45%' }]} 
-                    onPress={handleConfirmSubmit}
-                  >
-                    <Text style={styles.submitText}>Confirm</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </Modal>
-        </SafeAreaView>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          </View>
+        </Modal>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
+  safeArea: {
+    flex: 1,
     backgroundColor: '#F8FAFC',
-    padding: 16,
-    paddingBottom: 32,
+  },
+  container: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
   },
   scrollContainer: {
     flexGrow: 1,
+    padding: 16,
+    paddingBottom: 32,
   },
   // Header styles for centered title with left back button
   headerRow: {
@@ -778,6 +788,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    paddingHorizontal: 16,
   },
   headerSide: {
     width: 44,
@@ -995,5 +1006,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#2D5783',
+  },
+  required: {
+    color: 'red',
+  },
+  pickerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 5,
+    padding: 10,
+    marginBottom: 15,
+    backgroundColor: '#f9f9f9',
+  },
+  pickerText: {
+    fontSize: 16,
+    color: '#333',
   },
 });
