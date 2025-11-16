@@ -28,29 +28,18 @@ import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
 import PermanentWithdrawals from '../Withdraws/PermanentWithdraws';
 
-const genderOptions = [
-  { key: 'Male', label: 'Male' },
-  { key: 'Female', label: 'Female' }
-];
-
-const civilStatusOptions = [
-  { key: 'Single', label: 'Single' },
-  { key: 'Married', label: 'Married' },
-  { key: 'Widowed', label: 'Widowed' },
-  { key: 'Separated', label: 'Separated' }
-];
-
 const governmentIdOptions = [
   { key: 'national', label: 'National ID (PhilSys)' },
   { key: 'sss', label: 'SSS ID' },
   { key: 'philhealth', label: 'PhilHealth ID' },
-  { key: 'drivers_license', label: 'Drivers License' }
+  { key: 'drivers_license', label: 'Drivers License' },
+  { key: 'other', label: 'Others' }
 ];
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let pwd = '';
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < 8; i++) {
     pwd += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   if (!/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/\d/.test(pwd)) {
@@ -60,14 +49,23 @@ const generateRandomPassword = () => {
 };
 
 const formatDate = (date) => {
-  const options = { year: 'numeric', month: 'long', day: 'numeric' };
-  return date.toLocaleDateString('en-US', options);
+  return date.toLocaleDateString('en-US', { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  });
 };
 
 const formatTime = (date) => {
-  const hours = date.getHours().toString().padStart(2, '0');
+  let hours = date.getHours();
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  
+  return `${hours}:${minutes}:${seconds} ${ampm}`;
 };
 
 const styles = {
@@ -626,6 +624,8 @@ const Register = () => {
     registrationFee: ''
   });
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
+  const [selfieFile, setSelfieFile] = useState(null);
+  const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
   const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
   const [uploading, setUploading] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
@@ -682,7 +682,7 @@ const Register = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
       }
       @media print {
         body * {
@@ -819,255 +819,111 @@ const Register = () => {
     setFilteredData(filtered);
   };
 
-const handlePrint = (format = 'print') => {
-  setPrinting(true);
-  
-  try {
-    const sectionTitle = 
-      activeSection === 'registrations' ? 'Pending Registrations' :
-      activeSection === 'rejectedRegistrations' ? 'Rejected Registrations' :
-      activeSection === 'approvedRegistrations' ? 'Approved Registrations' :
-      activeSection === 'members' ? 'Members' : 'Permanent Withdrawals';
-
-    // Get the data that's currently displayed in the table (paginated)
-    const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
-
-    const printContent = document.createElement('div');
-    printContent.className = 'print-content';
-    printContent.style.padding = '20px';
-    printContent.style.fontFamily = 'Arial, sans-serif';
-
-    // Header
-    const header = document.createElement('div');
-    header.style.borderBottom = '2px solid #333';
-    header.style.paddingBottom = '10px';
-    header.style.marginBottom = '20px';
+  const handlePrint = (format = 'print') => {
+    setPrinting(true);
     
-    const title = document.createElement('h1');
-    title.textContent = `${sectionTitle} Report`;
-    title.style.margin = '0';
-    title.style.color = '#333';
-    
-    const date = document.createElement('p');
-    date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-    date.style.margin = '5px 0 0 0';
-    date.style.color = '#666';
-    
-    const count = document.createElement('p');
-    count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
-    count.style.margin = '5px 0 0 0';
-    count.style.color = '#666';
-    
-    header.appendChild(title);
-    header.appendChild(date);
-    header.appendChild(count);
-    printContent.appendChild(header);
+    try {
+      const sectionTitle = 
+        activeSection === 'registrations' ? 'Pending Registrations' :
+        activeSection === 'rejectedRegistrations' ? 'Rejected Registrations' :
+        activeSection === 'approvedRegistrations' ? 'Approved Registrations' :
+        activeSection === 'members' ? 'Members' : 'Permanent Withdrawals';
 
-    // Table
-    if (displayedData.length > 0) {
-      const table = document.createElement('table');
-      table.style.width = '100%';
-      table.style.borderCollapse = 'collapse';
-      table.style.marginTop = '20px';
+      // Get the data that's currently displayed in the table (paginated)
+      const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-      // Table Header - Define columns based on active section (excluding Action column)
-      const thead = document.createElement('thead');
-      const headerRow = document.createElement('tr');
-      headerRow.style.backgroundColor = '#f8f9fa';
+      const printContent = document.createElement('div');
+      printContent.className = 'print-content';
+      printContent.style.padding = '20px';
+      printContent.style.fontFamily = 'Arial, sans-serif';
+
+      // Header
+      const header = document.createElement('div');
+      header.style.borderBottom = '2px solid #333';
+      header.style.paddingBottom = '10px';
+      header.style.marginBottom = '20px';
       
-      // Define columns for each section (excluding the Action/View column)
-      let headers = [];
+      const title = document.createElement('h1');
+      title.textContent = `${sectionTitle} Report`;
+      title.style.margin = '0';
+      title.style.color = '#333';
       
-      switch(activeSection) {
-        case 'registrations':
-          headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
-          break;
-        case 'rejectedRegistrations':
-          headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
-          break;
-        case 'approvedRegistrations':
-          headers = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
-          break;
-        case 'members':
-          headers = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
-          break;
-        case 'permanentWithdrawals':
-          headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
-          break;
-        default:
-          headers = [];
-      }
-
-      // Create header cells
-      headers.forEach(headerText => {
-        const th = document.createElement('th');
-        th.textContent = headerText;
-        th.style.padding = '12px 8px';
-        th.style.border = '1px solid #ddd';
-        th.style.textAlign = 'left';
-        th.style.fontWeight = 'bold';
-        th.style.backgroundColor = '#e9ecef';
-        headerRow.appendChild(th);
-      });
+      const date = document.createElement('p');
+      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      date.style.margin = '5px 0 0 0';
+      date.style.color = '#666';
       
-      thead.appendChild(headerRow);
-      table.appendChild(thead);
-
-      // Table Body
-      const tbody = document.createElement('tbody');
-      displayedData.forEach((item, index) => {
-        const row = document.createElement('tr');
-        row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
-        
-        headers.forEach(header => {
-          const td = document.createElement('td');
-          let cellValue = '';
-          
-          // Handle data extraction based on header and active section
-          switch(header) {
-            case 'Full Name':
-              cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-              break;
-            case 'Name':
-              cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-              break;
-            case 'Email Address':
-            case 'Email':
-              cellValue = item.email || '';
-              break;
-            case 'Contact Number':
-            case 'Contact':
-              cellValue = item.phoneNumber || '';
-              break;
-            case 'Status':
-              cellValue = item.status || 'pending';
-              break;
-            case 'First Name':
-              cellValue = item.firstName || '';
-              break;
-            case 'Last Name':
-              cellValue = item.lastName || '';
-              break;
-            case 'Date Applied':
-              cellValue = item.dateCreated || item.dateApplied || '';
-              break;
-            case 'Date Approved':
-              cellValue = item.dateApproved || '';
-              break;
-            case 'Member ID':
-              cellValue = item.memberId || item.id || '';
-              break;
-            case 'Investment':
-              cellValue = `₱${(parseFloat(item.investment) || 0).toFixed(2)}`;
-              break;
-            case 'Savings':
-              cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
-              break;
-            case 'Loans':
-              // For members tab, you might need to calculate loans from your state
-              cellValue = `₱${(parseFloat(item.loans) || 0).toFixed(2)}`;
-              break;
-            case 'Balance':
-              cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
-              break;
-            case 'Reason':
-              cellValue = item.reason || '';
-              break;
-            default:
-              cellValue = item[header] || '';
-          }
-          
-          td.textContent = cellValue;
-          td.style.padding = '10px 8px';
-          td.style.border = '1px solid #ddd';
-          td.style.fontSize = '12px';
-          row.appendChild(td);
-        });
-        
-        tbody.appendChild(row);
-      });
+      const count = document.createElement('p');
+      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
+      count.style.margin = '5px 0 0 0';
+      count.style.color = '#666';
       
-      table.appendChild(tbody);
-      printContent.appendChild(table);
-    } else {
-      const noData = document.createElement('p');
-      noData.textContent = 'No data available';
-      noData.style.textAlign = 'center';
-      noData.style.color = '#666';
-      noData.style.fontStyle = 'italic';
-      printContent.appendChild(noData);
-    }
+      header.appendChild(title);
+      header.appendChild(date);
+      header.appendChild(count);
+      printContent.appendChild(header);
 
-    if (format === 'pdf') {
-      // For PDF, we'll use browser's print to PDF functionality
-      document.body.appendChild(printContent);
-      window.print();
-      document.body.removeChild(printContent);
-    } else if (format === 'word') {
-      // For Word, create a simple HTML file that can be opened in Word
-      const htmlContent = `
-        <html>
-          <head>
-            <title>${sectionTitle}</title>
-            <style>
-              body { font-family: Arial, sans-serif; margin: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-              th { background-color: #f2f2f2; font-weight: bold; }
-              h1 { color: #333; }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-        </html>
-      `;
-      
-      const blob = new Blob([htmlContent], { type: 'application/msword' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    } else if (format === 'excel') {
-      // Export to Excel
-      const workbook = new ExcelJS.Workbook();
-      const worksheet = workbook.addWorksheet(sectionTitle);
-
+      // Table
       if (displayedData.length > 0) {
-        // Define headers for Excel based on active section
-        let excelHeaders = [];
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginTop = '20px';
+
+        // Table Header - Define columns based on active section (excluding Action column)
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        headerRow.style.backgroundColor = '#f8f9fa';
+        
+        // Define columns for each section (excluding the Action/View column)
+        let headers = [];
         
         switch(activeSection) {
           case 'registrations':
-            excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
             break;
           case 'rejectedRegistrations':
-            excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
             break;
           case 'approvedRegistrations':
-            excelHeaders = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
+            headers = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
             break;
           case 'members':
-            excelHeaders = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
+            headers = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
             break;
           case 'permanentWithdrawals':
-            excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
+            headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
             break;
           default:
-            excelHeaders = [];
+            headers = [];
         }
 
-        worksheet.addRow(excelHeaders);
+        // Create header cells
+        headers.forEach(headerText => {
+          const th = document.createElement('th');
+          th.textContent = headerText;
+          th.style.padding = '12px 8px';
+          th.style.border = '1px solid #ddd';
+          th.style.textAlign = 'left';
+          th.style.fontWeight = 'bold';
+          th.style.backgroundColor = '#e9ecef';
+          headerRow.appendChild(th);
+        });
+        
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
 
-        displayedData.forEach(item => {
-          const row = [];
-          excelHeaders.forEach(header => {
+        // Table Body
+        const tbody = document.createElement('tbody');
+        displayedData.forEach((item, index) => {
+          const row = document.createElement('tr');
+          row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+          
+          headers.forEach(header => {
+            const td = document.createElement('td');
             let cellValue = '';
             
+            // Handle data extraction based on header and active section
             switch(header) {
               case 'Full Name':
                 cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
@@ -1102,16 +958,16 @@ const handlePrint = (format = 'print') => {
                 cellValue = item.memberId || item.id || '';
                 break;
               case 'Investment':
-                cellValue = parseFloat(item.investment) || 0;
+                cellValue = `₱${(parseFloat(item.investment) || 0).toFixed(2)}`;
                 break;
               case 'Savings':
-                cellValue = parseFloat(item.balance) || 0;
+                cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
                 break;
               case 'Loans':
-                cellValue = parseFloat(item.loans) || 0;
+                cellValue = `₱${(parseFloat(item.loans) || 0).toFixed(2)}`;
                 break;
               case 'Balance':
-                cellValue = parseFloat(item.balance) || 0;
+                cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
                 break;
               case 'Reason':
                 cellValue = item.reason || '';
@@ -1120,41 +976,184 @@ const handlePrint = (format = 'print') => {
                 cellValue = item[header] || '';
             }
             
-            row.push(cellValue);
+            td.textContent = cellValue;
+            td.style.padding = '10px 8px';
+            td.style.border = '1px solid #ddd';
+            td.style.fontSize = '12px';
+            row.appendChild(td);
           });
-          worksheet.addRow(row);
+          
+          tbody.appendChild(row);
         });
+        
+        table.appendChild(tbody);
+        printContent.appendChild(table);
+      } else {
+        const noData = document.createElement('p');
+        noData.textContent = 'No data available';
+        noData.style.textAlign = 'center';
+        noData.style.color = '#666';
+        noData.style.fontStyle = 'italic';
+        printContent.appendChild(noData);
       }
 
-      workbook.xlsx.writeBuffer().then(buffer => {
-        const blob = new Blob([buffer], { 
-          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-        });
-        const url = window.URL.createObjectURL(blob);
+      if (format === 'pdf') {
+        // For PDF, we'll use browser's print to PDF functionality
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      } else if (format === 'word') {
+        // For Word, create a simple HTML file that can be opened in Word
+        const htmlContent = `
+          <html>
+            <head>
+              <title>${sectionTitle}</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                h1 { color: #333; }
+              </style>
+            </head>
+            <body>
+              ${printContent.innerHTML}
+            </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        window.URL.revokeObjectURL(url);
-      });
-    } else {
-      // Direct print
-      document.body.appendChild(printContent);
-      window.print();
-      document.body.removeChild(printContent);
-    }
+        URL.revokeObjectURL(url);
+      } else if (format === 'excel') {
+        // Export to Excel
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(sectionTitle);
 
-    setPrintModalVisible(false);
-  } catch (error) {
-    console.error('Error printing data:', error);
-    setErrorMessage('Failed to print data');
-    setErrorModalVisible(true);
-  } finally {
-    setPrinting(false);
-  }
-};
+        if (displayedData.length > 0) {
+          // Define headers for Excel based on active section
+          let excelHeaders = [];
+          
+          switch(activeSection) {
+            case 'registrations':
+              excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+              break;
+            case 'rejectedRegistrations':
+              excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+              break;
+            case 'approvedRegistrations':
+              excelHeaders = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
+              break;
+            case 'members':
+              excelHeaders = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
+              break;
+            case 'permanentWithdrawals':
+              excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
+              break;
+            default:
+              excelHeaders = [];
+          }
+
+          worksheet.addRow(excelHeaders);
+
+          displayedData.forEach(item => {
+            const row = [];
+            excelHeaders.forEach(header => {
+              let cellValue = '';
+              
+              switch(header) {
+                case 'Full Name':
+                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                  break;
+                case 'Name':
+                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                  break;
+                case 'Email Address':
+                case 'Email':
+                  cellValue = item.email || '';
+                  break;
+                case 'Contact Number':
+                case 'Contact':
+                  cellValue = item.phoneNumber || '';
+                  break;
+                case 'Status':
+                  cellValue = item.status || 'pending';
+                  break;
+                case 'First Name':
+                  cellValue = item.firstName || '';
+                  break;
+                case 'Last Name':
+                  cellValue = item.lastName || '';
+                  break;
+                case 'Date Applied':
+                  cellValue = item.dateCreated || item.dateApplied || '';
+                  break;
+                case 'Date Approved':
+                  cellValue = item.dateApproved || '';
+                  break;
+                case 'Member ID':
+                  cellValue = item.memberId || item.id || '';
+                  break;
+                case 'Investment':
+                  cellValue = parseFloat(item.investment) || 0;
+                  break;
+                case 'Savings':
+                  cellValue = parseFloat(item.balance) || 0;
+                  break;
+                case 'Loans':
+                  cellValue = parseFloat(item.loans) || 0;
+                  break;
+                case 'Balance':
+                  cellValue = parseFloat(item.balance) || 0;
+                  break;
+                case 'Reason':
+                  cellValue = item.reason || '';
+                  break;
+                default:
+                  cellValue = item[header] || '';
+              }
+              
+              row.push(cellValue);
+            });
+            worksheet.addRow(row);
+          });
+        }
+
+        workbook.xlsx.writeBuffer().then(buffer => {
+          const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        });
+      } else {
+        // Direct print
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      }
+
+      setPrintModalVisible(false);
+    } catch (error) {
+      console.error('Error printing data:', error);
+      setErrorMessage('Failed to print data');
+      setErrorModalVisible(true);
+    } finally {
+      setPrinting(false);
+    }
+  };
 
   const handleTabSwitch = (section) => {
     setActiveSection(section);
@@ -1187,9 +1186,6 @@ const handlePrint = (format = 'print') => {
       firstName: '',
       middleName: '',
       lastName: '',
-      gender: '',
-      civilStatus: '',
-      age: '',
       dateOfBirth: '',
       placeOfBirth: '',
       address: '',
@@ -1197,9 +1193,7 @@ const handlePrint = (format = 'print') => {
       registrationFee: ''
     });
     setValidIdFrontFile(null);
-    setValidIdBackFile(null);
     setSelfieFile(null);
-    setSelfieWithIdFile(null);
     setProofOfPaymentFile(null);
   };
 
@@ -1238,16 +1232,6 @@ const handlePrint = (format = 'print') => {
       setErrorModalVisible(true);
       return false;
     }
-    if (!formData.gender) {
-      setErrorMessage('Gender is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.civilStatus) {
-      setErrorMessage('Civil status is required');
-      setErrorModalVisible(true);
-      return false;
-    }
     if (!formData.placeOfBirth) {
       setErrorMessage('Place of birth is required');
       setErrorModalVisible(true);
@@ -1263,8 +1247,8 @@ const handlePrint = (format = 'print') => {
       setErrorModalVisible(true);
       return false;
     }
-    if (!validIdFrontFile || !validIdBackFile || !selfieFile || !selfieWithIdFile) {
-      setErrorMessage('All image uploads are required');
+    if (!validIdFrontFile || !selfieFile) {
+      setErrorMessage('Valid ID Front and Selfie are required');
       setErrorModalVisible(true);
       return false;
     }
@@ -1300,8 +1284,6 @@ const handlePrint = (format = 'print') => {
       throw error;
     }
   };
-  
-  const toPeso = (n) => `₱${Number(n).toFixed(2)}`;
 
   const submitManualMember = async () => {
     setConfirmModalVisible(false);
@@ -1325,72 +1307,97 @@ const handlePrint = (format = 'print') => {
       }
 
       const now = new Date();
-      const dateAdded = now.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-      const timeAdded = now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      });
+      const dateApproved = formatDate(now);
+      const approvedTime = formatTime(now);
+      const dateCreated = formatDate(now);
+      const timeCreated = formatTime(now);
 
-      // Upload images
+      // Upload images - only the required ones from your app registration
       const validIdFrontUrl = await uploadImageToStorage(
         validIdFrontFile, 
-        `member_docs/${newId}/valid_id_front_${Date.now()}`
+        `users/${email.replace(/[.#$[\]]/g, '_')}/id_front`
       );
-      const validIdBackUrl = await uploadImageToStorage(
-        validIdBackFile, 
-        `member_docs/${newId}/valid_id_back_${Date.now()}`
-      );
+      
       const selfieUrl = await uploadImageToStorage(
         selfieFile, 
-        `member_docs/${newId}/selfie_${Date.now()}`
-      );
-      const selfieWithIdUrl = await uploadImageToStorage(
-        selfieWithIdFile, 
-        `member_docs/${newId}/selfie_with_id_${Date.now()}`
+        `users/${email.replace(/[.#$[\]]/g, '_')}/selfie`
       );
 
       // Upload proof of payment
-      const proofOfPaymentUrl = await uploadImageToStorage(
+      const paymentProofUrl = await uploadImageToStorage(
         proofOfPaymentFile,
-        `member_docs/${newId}/registration_payment_proof_${Date.now()}`
+        `users/${email.replace(/[.#$[\]]/g, '_')}/payment_proof`
       );
 
+      // Prepare member data following the same structure as your registration approval
       const memberData = {
         id: newId,
-        authUid: userId,
+        uid: userId,
         email,
         firstName,
         middleName: middleName || '',
         lastName,
-        ...rest,
-        dateAdded,
-        timeAdded,
-        status: 'active',
-        balance: 0.0,
-        loans: 0.0,
+        phoneNumber: formData.phoneNumber,
+        placeOfBirth: formData.placeOfBirth,
+        address: formData.address,
+        governmentId: formData.governmentId,
+        dateOfBirth: formData.dateOfBirth,
         validIdFront: validIdFrontUrl,
-        validIdBack: validIdBackUrl,
         selfie: selfieUrl,
-        selfieWithId: selfieWithIdUrl,
+        password: password,
+        hashedPassword: password, // In a real app, you'd hash this
+        dateCreated,
+        timeCreated,
+        dateApproved,
+        approvedTime,
+        status: 'active',
+        balance: parseFloat(registrationFee) || 0,
+        investment: parseFloat(registrationFee) || 0,
+        loans: 0.0,
         registrationFee: parseFloat(registrationFee),
-        registrationPaymentProof: proofOfPaymentUrl
+        paymentProof: paymentProofUrl,
+        paymentStatus: 'paid'
       };
 
+      // Save to Members (auto-approved)
       await database.ref(`Members/${newId}`).set(memberData);
 
-      setSuccessMessage('Member added successfully!');
+      // Also save to ApprovedRegistrations for consistency
+      await database.ref(`Registrations/ApprovedRegistrations/${email.replace(/[.#$[\]]/g, '_')}`).set({
+        ...memberData,
+        memberId: newId
+      });
+
+      // Update funds like in your approval process
+      await updateFunds(registrationFee);
+
+      // Create transaction record
+      const transactionData = {
+        type: 'registration',
+        amount: parseFloat(registrationFee),
+        dateApplied: dateCreated,
+        dateApproved: dateApproved,
+        approvedTime: approvedTime,
+        timestamp: now.getTime(),
+        status: 'approved',
+        memberId: newId,
+        firstName,
+        lastName,
+        email,
+        transactionId: `REG-${Date.now()}`,
+        description: 'Registration fee payment'
+      };
+
+      await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+
+      setSuccessMessage('Member added and approved successfully! Credentials have been sent to the member.');
       setSuccessModalVisible(true);
       closeAddModal();
 
       // Refresh data after successful addition
       await fetchAllData();
       
+      // Send credentials email
       await callApiAddMember(memberData, password);
     } catch (error) {
       console.error('Error adding member:', error);
@@ -1398,6 +1405,26 @@ const handlePrint = (format = 'print') => {
       setErrorModalVisible(true);
     } finally {
       setUploading(false);
+    }
+  };
+
+  const updateFunds = async (amount) => {
+    try {
+      const fundsRef = database.ref('Settings/Funds');
+      const snapshot = await fundsRef.once('value');
+      const currentFunds = snapshot.val() || 0;
+      const newFundsAmount = currentFunds + parseFloat(amount);
+      
+      await fundsRef.set(newFundsAmount);
+      
+      const now = new Date();
+      const dateKey = now.toISOString().split('T')[0];
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+      await fundsHistoryRef.set(newFundsAmount);
+      
+    } catch (error) {
+      console.error('Error updating funds:', error);
+      throw error;
     }
   };
 
@@ -1409,7 +1436,7 @@ const handlePrint = (format = 'print') => {
         email: memberData.email,
         password,
         memberId: memberData.id,
-        dateAdded: memberData.dateAdded
+        dateAdded: memberData.dateApproved
       });
 
       if (!response.ok) {
@@ -1501,20 +1528,20 @@ const handlePrint = (format = 'print') => {
     );
   };
 
-if (loading) {
-  return (
-    <div style={styles.safeAreaView}>
-      <div style={styles.mainContainer}>
-        <div style={styles.dashboardLoadingContainer}>
-          <div style={styles.loadingContainer}>
-            <div style={styles.spinner}></div>
-            <div style={styles.loadingText}>Loading membership data...</div>
+  if (loading) {
+    return (
+      <div style={styles.safeAreaView}>
+        <div style={styles.mainContainer}>
+          <div style={styles.dashboardLoadingContainer}>
+            <div style={styles.loadingContainer}>
+              <div style={styles.spinner}></div>
+              <div style={styles.loadingText}>Loading membership data...</div>
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
-}
+    );
+  }
 
   const paginatedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
   const totalPages = Math.ceil(filteredData.length / pageSize);
@@ -1587,7 +1614,6 @@ if (loading) {
                 title="Print/Export Options"
               >
                 <FaPrint />
-        
               </button>
             </div>
           </div>
@@ -1850,37 +1876,6 @@ if (loading) {
                         type="tel"
                       />
                     </div>
-
-
-
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Valid ID Front<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <div 
-                        style={{
-                          ...styles.fileUploadSection,
-                          ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {})
-                        }}
-                        onMouseEnter={() => handleMouseEnter('validIdFront')}
-                        onMouseLeave={() => handleMouseLeave('validIdFront')}
-                        onClick={() => document.getElementById('validIdFront').click()}
-                      >
-                        <input
-                          id="validIdFront"
-                          style={styles.fileInput}
-                          type="file"
-                          onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
-                          accept="image/*"
-                        />
-                        <p style={styles.fileUploadText}>
-                          {validIdFrontFile ? 'Change file' : 'Click to upload'}
-                        </p>
-                        {validIdFrontFile && (
-                          <p style={styles.fileName}>{validIdFrontFile.name}</p>
-                        )}
-                      </div>
-                    </div>
                   </div>
 
                   {/* Right Column */}
@@ -1900,20 +1895,14 @@ if (loading) {
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        Civil Status<span style={styles.requiredAsterisk}>*</span>
+                        Date of Birth<span style={styles.requiredAsterisk}>*</span>
                       </label>
-                      <select
-                        style={styles.formSelect}
-                        value={formData.civilStatus}
-                        onChange={(e) => handleInputChange('civilStatus', e.target.value)}
-                      >
-                        <option value="">Select Civil Status</option>
-                        {civilStatusOptions.map((option) => (
-                          <option key={option.key} value={option.key}>
-                            {option.label}
-                          </option>
-                        ))}
-                      </select>
+                      <input
+                        style={styles.formInput}
+                        value={formData.dateOfBirth}
+                        onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                        type="date"
+                      />
                     </div>
 
                     <div style={styles.formSection}>
@@ -1940,7 +1929,7 @@ if (loading) {
                       </label>
                       <input
                         style={styles.formInput}
-                        placeholder={`Minimum ${toPeso(minRegistrationFee)}`}
+                        placeholder={`Minimum ₱${minRegistrationFee.toFixed(2)}`}
                         value={formData.registrationFee}
                         onChange={(e) => handleInputChange('registrationFee', e.target.value)}
                         type="number"
@@ -1948,53 +1937,12 @@ if (loading) {
                         step="0.01"
                       />
                     </div>
-
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Valid ID Back<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <div 
-                        style={{
-                          ...styles.fileUploadSection,
-                          ...(isHovered.validIdBack ? styles.fileUploadSectionHover : {})
-                        }}
-                        onMouseEnter={() => handleMouseEnter('validIdBack')}
-                        onMouseLeave={() => handleMouseLeave('validIdBack')}
-                        onClick={() => document.getElementById('validIdBack').click()}
-                      >
-                        <input
-                          id="validIdBack"
-                          style={styles.fileInput}
-                          type="file"
-                          onChange={(e) => handleFileChange(e, setValidIdBackFile)}
-                          accept="image/*"
-                        />
-                        <p style={styles.fileUploadText}>
-                          {validIdBackFile ? 'Change file' : 'Click to upload'}
-                        </p>
-                        {validIdBackFile && (
-                          <p style={styles.fileName}>{validIdBackFile.name}</p>
-                        )}
-                      </div>
-                    </div>
                   </div>
                 </div>
 
                 {/* Additional Required Fields */}
                 <div style={styles.formGrid}>
                   <div>
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Date of Birth<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        value={formData.dateOfBirth}
-                        onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                        type="date"
-                      />
-                    </div>
-
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Place of Birth<span style={styles.requiredAsterisk}>*</span>
@@ -2012,19 +1960,6 @@ if (loading) {
                   <div>
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        Age<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Enter age"
-                        value={formData.age}
-                        onChange={(e) => handleInputChange('age', e.target.value)}
-                        type="number"
-                      />
-                    </div>
-
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
                         Address<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
@@ -2038,12 +1973,43 @@ if (loading) {
                   </div>
                 </div>
 
-                {/* Additional File Uploads */}
+                {/* File Uploads - Only required ones from your app */}
                 <div style={styles.formGrid}>
                   <div>
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
-                        Selfie Photo<span style={styles.requiredAsterisk}>*</span>
+                        Valid ID Front<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <div 
+                        style={{
+                          ...styles.fileUploadSection,
+                          ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {})
+                        }}
+                        onMouseEnter={() => handleMouseEnter('validIdFront')}
+                        onMouseLeave={() => handleMouseLeave('validIdFront')}
+                        onClick={() => document.getElementById('validIdFront').click()}
+                      >
+                        <input
+                          id="validIdFront"
+                          style={styles.fileInput}
+                          type="file"
+                          onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                          accept="image/*"
+                        />
+                        <p style={styles.fileUploadText}>
+                          {validIdFrontFile ? 'Change file' : 'Click to upload Valid ID Front'}
+                        </p>
+                        {validIdFrontFile && (
+                          <p style={styles.fileName}>{validIdFrontFile.name}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        Selfie<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <div 
                         style={{
@@ -2066,37 +2032,6 @@ if (loading) {
                         </p>
                         {selfieFile && (
                           <p style={styles.fileName}>{selfieFile.name}</p>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Selfie with ID<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <div 
-                        style={{
-                          ...styles.fileUploadSection,
-                          ...(isHovered.selfieWithId ? styles.fileUploadSectionHover : {})
-                        }}
-                        onMouseEnter={() => handleMouseEnter('selfieWithId')}
-                        onMouseLeave={() => handleMouseLeave('selfieWithId')}
-                        onClick={() => document.getElementById('selfieWithId').click()}
-                      >
-                        <input
-                          id="selfieWithId"
-                          style={styles.fileInput}
-                          type="file"
-                          onChange={(e) => handleFileChange(e, setSelfieWithIdFile)}
-                          accept="image/*"
-                        />
-                        <p style={styles.fileUploadText}>
-                          {selfieWithIdFile ? 'Change file' : 'Click to upload selfie with ID'}
-                        </p>
-                        {selfieWithIdFile && (
-                          <p style={styles.fileName}>{selfieWithIdFile.name}</p>
                         )}
                       </div>
                     </div>
