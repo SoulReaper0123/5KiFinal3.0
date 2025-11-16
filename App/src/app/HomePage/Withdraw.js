@@ -340,7 +340,10 @@ const submitWithdrawal = async () => {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        showsVerticalScrollIndicator={true}
+      >
         {/* Header with centered title and left back button using invisible spacers */}
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
@@ -349,8 +352,8 @@ const submitWithdrawal = async () => {
           <Text style={styles.headerTitle}>Withdraw</Text>
           <View style={styles.headerSide} />
         </View>
+        
         <View style={styles.content}>
-
           <Text style={styles.label}>Balance</Text>
           <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
@@ -573,8 +576,11 @@ const submitWithdrawal = async () => {
 
 const styles = StyleSheet.create({
   container: {
-    flexGrow: 1,
+    flex: 1,
     backgroundColor: '#F8FAFC',
+  },
+  scrollContainer: {
+    flexGrow: 1,
     padding: 16,
     paddingBottom: 32,
   },
