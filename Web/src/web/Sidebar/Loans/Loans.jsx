@@ -477,7 +477,7 @@ const styles = {
     padding: '20px'
   },
   modalCardSmall: {
-    width: '300px',
+    width: '400px',
     backgroundColor: 'white',
     borderRadius: '14px',
     padding: '20px',
@@ -643,6 +643,39 @@ const styles = {
     border: '1px solid #ddd',
     marginBottom: '12px',
     objectFit: 'cover'
+  },
+  // Confirmation modal styles matching ApplyLoan
+  modalButtonContainer: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: '20px',
+    gap: '10px'
+  },
+  modalButton: {
+    paddingVertical: '10px',
+    paddingHorizontal: '20px',
+    borderRadius: '5px',
+    minWidth: '45%',
+    alignItems: 'center',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600'
+  },
+  cancelButtonText: {
+    color: '#333',
+    fontSize: '14px',
+    fontWeight: 'bold'
+  },
+  confirmButton: {
+    backgroundColor: '#2C5282',
+    color: 'white'
+  },
+  confirmButtonText: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: 'bold'
   }
 };
 
@@ -666,6 +699,12 @@ const Loans = () => {
   const [actionInProgress, setActionInProgress] = useState(false);
   const [isHovered, setIsHovered] = useState({});
   
+  // NEW: States for the ApplyLoan-like flow
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+  const [confirmMessage, setConfirmMessage] = useState('');
+  const [confirmAction, setConfirmAction] = useState(null);
+  const [pendingApiData, setPendingApiData] = useState(null);
+  
   // Print Modal State
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
@@ -683,17 +722,19 @@ const Loans = () => {
     term: '',
     disbursement: 'GCash',
     accountName: '',
-    accountNumber: ''
+    accountNumber: '',
+    bankType: ''
   });
 
   const [loanTypes, setLoanTypes] = useState([]);
   const [interestByType, setInterestByType] = useState({});
+  const [processingFee, setProcessingFee] = useState(0);
 
   // Member validation states
   const [memberNotFound, setMemberNotFound] = useState(false);
   const [memberLoading, setMemberLoading] = useState(false);
 
-  // NEW: Collateral related states
+  // Collateral related states
   const [requiresCollateral, setRequiresCollateral] = useState(false);
   const [collateralType, setCollateralType] = useState('');
   const [collateralValue, setCollateralValue] = useState('');
@@ -736,7 +777,16 @@ const Loans = () => {
     { key: 'Other', label: 'Other' },
   ];
 
-  // Create style element and append to head - FIXED CSS with print header/footer removal
+  // Bank Type Options
+  const bankTypeOptions = [
+    { key: 'BDO', label: 'BDO' },
+    { key: 'Security Bank', label: 'Security Bank' },
+    { key: 'BPI', label: 'BPI' },
+    { key: 'ChinaBank', label: 'ChinaBank' },
+    { key: 'Others', label: 'Others' },
+  ];
+
+  // Create style element and append to head
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
@@ -749,12 +799,11 @@ const Loans = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        box-shadow: '0 10px 25px rgba(0,0,0,0.1)';
       }
       
       /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
-        /* Remove browser default headers and footers */
         @page {
           margin: 0.5in !important;
           size: auto;
@@ -762,28 +811,11 @@ const Loans = () => {
           margin-footer: 0 !important;
         }
         
-        /* Target Webkit browsers (Chrome, Safari) */
-        @page :first {
-          margin-top: 0;
-        }
-        
-        @page :left {
-          margin-left: 0.5in;
-          margin-right: 0.5in;
-        }
-        
-        @page :right {
-          margin-left: 0.5in;
-          margin-right: 0.5in;
-        }
-        
-        /* Hide URL, page numbers, and date in print */
         body::before,
         body::after {
           display: none !important;
         }
         
-        /* Hide any browser-generated content */
         .print-header:empty,
         .print-footer:empty {
           display: none;
@@ -862,7 +894,7 @@ const Loans = () => {
     fetchAdminData();
   }, []);
 
-  // Load Settings for LoanTypes and InterestRateByType
+  // Load Settings for LoanTypes, InterestRateByType, and ProcessingFee
   useEffect(() => {
     const settingsRef = database.ref('Settings');
     const cb = (snap) => {
@@ -872,6 +904,8 @@ const Loans = () => {
       const typesArr = isMap ? Object.keys(lt) : (lt || ['Regular Loan', 'Quick Cash']);
       setLoanTypes(typesArr);
       setInterestByType(isMap ? lt : (s.InterestRateByType || {}));
+      setProcessingFee(parseFloat(s.ProcessingFee) || 0);
+      
       if (!addForm.loanType && typesArr.length > 0) {
         const defaultType = typesArr[0];
         setAddForm(prev => ({ ...prev, loanType: defaultType }));
@@ -968,6 +1002,28 @@ const Loans = () => {
     return collateralType && collateralValue && collateralDescription && proofOfCollateral;
   };
 
+  // Check if form is valid
+  const isFormValid = () => {
+    const basicFieldsValid = 
+      addForm.memberId && 
+      addForm.firstName && 
+      addForm.lastName && 
+      addForm.email && 
+      addForm.loanAmount && 
+      addForm.term && 
+      addForm.disbursement;
+
+    const accountsOk = addForm.disbursement === 'Cash' || 
+      (addForm.accountName && addForm.accountNumber && 
+       (addForm.disbursement !== 'Bank' || addForm.bankType));
+
+    if (requiresCollateral) {
+      return basicFieldsValid && accountsOk && isCollateralValid();
+    }
+
+    return basicFieldsValid && accountsOk;
+  };
+
   const fetchLoansDataForSection = async (sectionKey = activeSection, options = {}) => {
     const { silent = false } = options;
     if (!silent) setLoading(true);
@@ -1059,7 +1115,7 @@ const Loans = () => {
     setFilteredData(filtered);
   };
 
-  // FIXED PRINT FUNCTION - Following PayLoans structure
+  // FIXED PRINT FUNCTION
   const handlePrint = (format = 'print') => {
     setPrinting(true);
     
@@ -1498,7 +1554,8 @@ const Loans = () => {
       term: '',
       disbursement: 'GCash',
       accountName: '',
-      accountNumber: ''
+      accountNumber: '',
+      bankType: ''
     });
     setMemberNotFound(false);
     setMemberLoading(false);
@@ -1531,182 +1588,217 @@ const Loans = () => {
     }
   };
 
-  const handleAddApprovedLoan = async () => {
+  // NEW: Generate transaction ID function
+  const generateTransactionId = () => Math.floor(100000 + Math.random() * 900000).toString();
+
+  // NEW: Store loan application in database (following ApplyLoan structure)
+  const storeLoanApplicationInDatabase = async (applicationData) => {
     try {
-      setIsProcessing(true);
+      const transactionId = generateTransactionId();
       const now = new Date();
-      const dateApproved = formatDate(now);
-      const timeApproved = formatTime(now);
+      
+      const dateApplied = formatDate(now);
+      const timeApplied = formatTime(now);
+      const timestamp = now.getTime();
 
-      const required = ['memberId','firstName','lastName','email','loanAmount','term','disbursement'];
-      for (const f of required) {
-        if (!addForm[f]) throw new Error('Please fill all required fields');
-      }
-
-      if (memberNotFound) {
-        throw new Error('Member not found. Please check the Member ID');
-      }
-
-      // Check if collateral is required but not provided
-      if (requiresCollateral && !isCollateralValid()) {
-        throw new Error('Collateral is required for this loan amount. Please complete all collateral details.');
-      }
-
-      const memberBalanceRef = database.ref(`Members/${addForm.memberId}/balance`);
-      const fundsRef = database.ref('Settings/Funds');
-      const interestRateRef = database.ref(`Settings/InterestRateByType/${encodeURIComponent(addForm.loanType || '')}/${addForm.term}`);
-      const processingFeeRef = database.ref('Settings/ProcessingFee');
-      const loanPercentageRef = database.ref('Settings/LoanPercentage');
-
-      const [balanceSnap, fundsSnap, irSnap, feeSnap, percSnap] = await Promise.all([
-        memberBalanceRef.once('value'),
-        fundsRef.once('value'),
-        interestRateRef.once('value'),
-        processingFeeRef.once('value'),
-        loanPercentageRef.once('value')
-      ]);
-
-      const memberBalance = parseFloat(balanceSnap.val()) || 0;
-      const currentFunds = parseFloat(fundsSnap.val()) || 0;
-      const interestRateVal = irSnap.val();
-      if (interestRateVal === null || interestRateVal === undefined || interestRateVal === '') {
-        throw new Error(`Missing interest rate for type "${addForm.loanType}" and term ${addForm.term} months. Set it in Settings > System Settings.`);
-      }
-      const interestRate = (parseFloat(interestRateVal) || 0) / 100;
-      const processingFee = parseFloat(feeSnap.val()) || 0;
-      const loanPercentage = parseFloat(percSnap.val());
-
-      const amount = parseFloat(addForm.loanAmount);
-      const termMonths = parseInt(addForm.term);
-
-      const maxLoanAmount = loanPercentage === 0 ? memberBalance : memberBalance * ((loanPercentage || 80) / 100);
-      if (amount > maxLoanAmount) {
-        const pct = loanPercentage === 0 ? 100 : (loanPercentage || 80);
-        throw new Error(`Loan amount exceeds ${pct}% of member's balance.`);
-      }
-
-      if (amount > currentFunds) {
-        throw new Error('Insufficient funds to approve this loan.');
-      }
-
-      const monthlyPayment = amount / termMonths;
-      const interest = amount * interestRate;
-      const totalMonthlyPayment = monthlyPayment + interest;
-      const totalTermPayment = totalMonthlyPayment * termMonths;
-      const releaseAmount = amount - processingFee;
-
-      const dueDate = new Date(now); dueDate.setDate(now.getDate() + 30);
-
-      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
-      const approvedRef = database.ref(`Loans/ApprovedLoans/${addForm.memberId}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Loans/${addForm.memberId}/${transactionId}`);
-      const currentLoanRef = database.ref(`Loans/CurrentLoans/${addForm.memberId}/${transactionId}`);
-      const memberLoanRef = database.ref(`Members/${addForm.memberId}/loans/${transactionId}`);
-
-      const approvedData = {
+      // Include ALL application data including collateral
+      const applicationDataWithMeta = {
+        ...applicationData,
         id: addForm.memberId,
         firstName: addForm.firstName,
         lastName: addForm.lastName,
         email: addForm.email,
         transactionId,
-        loanAmount: amount,
+        dateApplied,
+        timeApplied,
+        timestamp,
         loanType: addForm.loanType,
-        term: termMonths,
+        status: 'pending'
+      };
+
+      console.log('Storing loan application with data:', applicationDataWithMeta);
+
+      const applicationRefPath = `Loans/LoanApplications/${addForm.memberId}/${transactionId}`;
+      await database.ref(applicationRefPath).set(applicationDataWithMeta);
+
+      const txnRefPath = `Transactions/Loans/${addForm.memberId}/${transactionId}`;
+      await database.ref(txnRefPath).set({ 
+        ...applicationDataWithMeta, 
+        label: 'Loan', 
+        type: 'Loans' 
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to store loan application:', error);
+      setErrorMessage('Failed to submit loan application');
+      setErrorModalVisible(true);
+      return false;
+    }
+  };
+
+  // NEW: Submit loan application (following ApplyLoan process)
+  const submitLoanApplication = async () => {
+    if (!isFormValid()) {
+      setErrorMessage('All required fields must be filled');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+
+      const loanAmountNum = parseFloat(addForm.loanAmount);
+      
+      // Prepare application data with ALL fields
+      const applicationData = {
+        loanAmount: loanAmountNum,
+        term: addForm.term,
         disbursement: addForm.disbursement,
         accountName: addForm.accountName,
         accountNumber: addForm.accountNumber,
-        dateApproved,
-        timeApproved,
-        timestamp: now.getTime(),
-        status: 'approved',
-        interestRate: interestRate * 100,
-        interest,
-        monthlyPayment,
-        totalMonthlyPayment,
-        totalTermPayment,
-        processingFee,
-        releaseAmount,
-        dueDate: `${dueDate.getFullYear()}-${(dueDate.getMonth()+1).toString().padStart(2,'0')}-${dueDate.getDate().toString().padStart(2,'0')}`,
-        paymentsMade: 0,
+        bankType: addForm.disbursement === 'Bank' ? addForm.bankType : null,
+        interestRate: Number(interestByType?.[addForm.loanType]?.[addForm.term]) || 0,
+        firstName: addForm.firstName,
+        lastName: addForm.lastName,
+        email: addForm.email,
+        userId: addForm.memberId,
+        loanType: addForm.loanType,
         requiresCollateral,
+        processingFee: processingFee,
+        // Include collateral data if required
         ...(requiresCollateral && {
           collateralType,
           collateralValue,
           collateralDescription,
-          proofOfCollateral: proofOfCollateral ? URL.createObjectURL(proofOfCollateral) : null
+          proofOfCollateralUrl: proofOfCollateral ? URL.createObjectURL(proofOfCollateral) : null
         })
       };
 
-      await approvedRef.set(approvedData);
-      await transactionRef.set(approvedData);
-      await currentLoanRef.set(approvedData);
-      await memberLoanRef.set(approvedData);
-
-      const newFundsAmount = currentFunds - amount;
-      await fundsRef.set(newFundsAmount);
-      const timestampKey = now.toISOString().replace(/[.#$\[\]]/g, '_');
-      await database.ref(`Settings/FundsHistory/${timestampKey}`).set(newFundsAmount);
-
-      const dateKey = now.toISOString().split('T')[0];
-      const savingsRef = database.ref('Settings/Savings');
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-      const [savingsSnap, daySavingsSnap] = await Promise.all([
-        savingsRef.once('value'),
-        savingsHistoryRef.child(dateKey).once('value')
-      ]);
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
-      const newSavings = Math.ceil((currentSavings + processingFee) * 100) / 100;
-      await savingsRef.set(newSavings);
-      const currentDaySavings = parseFloat(daySavingsSnap.val()) || 0;
-      const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
-      await savingsHistoryRef.update({ [dateKey]: newDaySavings });
-
-      const updatedMemberBalance = Math.max(0, Math.ceil((memberBalance - amount) * 100) / 100);
-      await memberBalanceRef.set(updatedMemberBalance);
-
-      try {
-        const { ApproveLoans } = await import('../../../../../Server/api');
-        await ApproveLoans({
-          memberId: addForm.memberId,
-          transactionId,
-          amount: amount.toFixed(2),
-          term: termMonths,
-          dateApproved,
-          timeApproved,
-          email: addForm.email,
-          firstName: addForm.firstName,
-          lastName: addForm.lastName,
-          status: 'approved',
-          interestRate: (interestRate * 100).toFixed(2) + '%',
-          interest: interest.toFixed(2),
-          monthlyPayment: monthlyPayment.toFixed(2),
-          totalMonthlyPayment: totalMonthlyPayment.toFixed(2),
-          totalTermPayment: totalTermPayment.toFixed(2),
-          releaseAmount: releaseAmount.toFixed(2),
-          processingFee: processingFee.toFixed(2),
-          dueDate: approvedData.dueDate,
-          requiresCollateral,
-          ...(requiresCollateral && {
-            collateralType,
-            collateralValue,
-            collateralDescription
-          })
-        });
-      } catch (e) {
-        console.warn('ApproveLoans email send failed or not configured:', e?.message || e);
+      console.log('Starting database operation with complete data:', applicationData);
+      const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
+      
+      if (!storedSuccessfully) {
+        setIsProcessing(false);
+        return;
       }
 
-      setSuccessMessage('Approved loan added successfully!');
+      console.log('Database operation completed successfully');
+
+      const loanData = {
+        email: addForm.email,
+        firstName: addForm.firstName,
+        lastName: addForm.lastName,
+        amount: loanAmountNum,
+        term: addForm.term,
+        date: new Date().toISOString(),
+      };
+
+      setPendingApiData(loanData);
+      setSuccessMessage('Loan application submitted successfully! It will be reviewed by our team.');
       setSuccessModalVisible(true);
-      setAddModalVisible(false);
-      await fetchLoansDataForSection('approvedLoans');
-    } catch (err) {
-      console.error('Add approved loan error:', err);
-      setErrorMessage(err.message || 'Failed to add approved loan');
+      
+    } catch (error) {
+      console.error('Error during loan submission:', error);
+      setErrorMessage('An unexpected error occurred. Please try again later.');
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // NEW: Handle success OK (following ApplyLoan process)
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+    
+    // Close modal and refresh data
+    closeAddModal();
+    fetchLoansDataForSection('applyLoans');
+    
+    // Run API call in background after navigation
+    if (pendingApiData) {
+      // Use setTimeout to ensure navigation happens first
+      setTimeout(async () => {
+        try {
+          // Import and call the API
+          const { MemberLoan } = await import('../../../../../Server/api');
+          await MemberLoan(pendingApiData);
+          console.log('Loan API call completed successfully in background');
+        } catch (apiError) {
+          console.error('Background API call failed:', apiError);
+          // API failure doesn't affect user experience since data is already in database
+        }
+      }, 100);
+      
+      // Clear pending data
+      setPendingApiData(null);
+    }
+  };
+
+  // NEW: Show confirmation alert (following ApplyLoan design)
+  const showConfirmationAlert = () => {
+    const loanAmountNum = parseFloat(addForm.loanAmount) || 0;
+    const processingFeeNum = parseFloat(processingFee) || 0;
+    const releaseAmount = loanAmountNum - processingFeeNum;
+
+    let message = `Loan Type: ${addForm.loanType}\n` +
+      `Loan Amount: ${formatCurrency(loanAmountNum)}\n` +
+      `Processing Fee: ${formatCurrency(processingFeeNum)}\n` +
+      `Release Amount: ${formatCurrency(releaseAmount)}\n` +
+      `Term: ${addForm.term} ${addForm.term === '1' ? 'Month' : 'Months'}\n` +
+      `Disbursement: ${addForm.disbursement}`;
+
+    if (addForm.disbursement !== 'Cash') {
+      message += `\nAccount Name: ${addForm.accountName}\nAccount Number: ${addForm.accountNumber}`;
+      if (addForm.disbursement === 'Bank') {
+        message += `\nBank Type: ${addForm.bankType}`;
+      }
+    }
+
+    if (requiresCollateral) {
+      message += `\n\nCollateral Details\n` +
+        `Type: ${collateralType}\n` +
+        `Value: ${formatCurrency(collateralValue)}\n` +
+        `Description: ${collateralDescription}\n` +
+        `Proof: ${proofOfCollateral ? proofOfCollateral.name : 'Uploaded'}`;
+    }
+
+    setConfirmMessage(message);
+    setConfirmAction(() => () => {
+      submitLoanApplication();
+    });
+    setConfirmModalVisible(true);
+  };
+
+  // NEW: Handle submit (following ApplyLoan process)
+  const handleSubmit = async () => {
+    if (!isFormValid()) {
+      setErrorMessage('Please fill all required fields');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    if (memberNotFound) {
+      setErrorMessage('Member not found. Please check the Member ID');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    const loanAmountNum = Number(addForm.loanAmount) || 0;
+
+    if (loanAmountNum > memberBalance) {
+      if (!isCollateralValid()) {
+        setRequiresCollateral(true);
+        setErrorMessage('Loan amount exceeds member balance. Please add collateral or lower the amount.');
+        setErrorModalVisible(true);
+        return;
+      }
+      setRequiresCollateral(true);
+    } else {
+      setRequiresCollateral(false);
+    }
+
+    showConfirmationAlert();
   };
 
   const handleMouseEnter = (element) => {
@@ -1981,7 +2073,7 @@ const Loans = () => {
           <div style={styles.modalOverlay} onClick={closeAddModal}>
             <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Add Approved Loan</h2>
+                <h2 style={styles.modalTitle}>Add Loan Application</h2>
                 <button 
                   onClick={closeAddModal}
                   style={{
@@ -2072,6 +2164,7 @@ const Loans = () => {
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Account Name
+                        {addForm.disbursement !== 'Cash' && <span style={styles.requiredAsterisk}>*</span>}
                       </label>
                       <input
                         style={styles.formInput}
@@ -2145,12 +2238,14 @@ const Loans = () => {
                       >
                         <option value="GCash">GCash</option>
                         <option value="Bank">Bank</option>
+                        <option value="Cash">Cash</option>
                       </select>
                     </div>
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
                         Account Number
+                        {addForm.disbursement !== 'Cash' && <span style={styles.requiredAsterisk}>*</span>}
                       </label>
                       <input
                         style={styles.formInput}
@@ -2159,10 +2254,28 @@ const Loans = () => {
                         onChange={(e) => updateForm('accountNumber', e.target.value)}
                       />
                     </div>
+
+                    {addForm.disbursement === 'Bank' && (
+                      <div style={styles.formSection}>
+                        <label style={styles.formLabel}>
+                          Bank Type<span style={styles.requiredAsterisk}>*</span>
+                        </label>
+                        <select
+                          style={styles.formSelect}
+                          value={addForm.bankType}
+                          onChange={(e) => updateForm('bankType', e.target.value)}
+                        >
+                          <option value="">Select Bank Type</option>
+                          {bankTypeOptions.map((bank) => (
+                            <option key={bank.key} value={bank.key}>{bank.label}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {/* NEW: Collateral Section */}
+                {/* Collateral Section */}
                 {requiresCollateral && (
                   <div style={{ marginTop: '20px', padding: '15px', backgroundColor: '#f8f9fa', borderRadius: '10px', border: '1px solid #e9ecef' }}>
                     <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#2D5783', marginBottom: '10px', textAlign: 'center' }}>
@@ -2235,12 +2348,13 @@ const Loans = () => {
                 <button
                   style={{
                     ...styles.primaryButton,
-                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
+                    ...(isHovered.submitButton ? styles.primaryButtonHover : {}),
+                    ...(!isFormValid() && { backgroundColor: '#cccccc', cursor: 'not-allowed' })
                   }}
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
-                  onClick={() => setShowAddLoanConfirmation(true)}
-                  disabled={isProcessing || memberNotFound || memberLoading || (requiresCollateral && !isCollateralValid())}
+                  onClick={handleSubmit}
+                  disabled={!isFormValid() || isProcessing || memberNotFound || memberLoading}
                 >
                   {isProcessing ? (
                     <>
@@ -2250,7 +2364,7 @@ const Loans = () => {
                   ) : (
                     <>
                       <FaCheckCircle />
-                      <span>Add Approved Loan</span>
+                      <span>Submit Loan Application</span>
                     </>
                   )}
                 </button>
@@ -2259,7 +2373,7 @@ const Loans = () => {
           </div>
         )}
 
-        {/* NEW: Collateral Details Modal */}
+        {/* Collateral Details Modal */}
         {showCollateralModal && (
           <div style={styles.modalOverlay} onClick={() => setShowCollateralModal(false)}>
             <div style={{...styles.modalCard, ...styles.collateralModal}} onClick={(e) => e.stopPropagation()}>
@@ -2419,42 +2533,81 @@ const Loans = () => {
           </div>
         )}
 
-        {/* Confirmation Modal */}
-        {showAddLoanConfirmation && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-                <p style={styles.modalText}>
-                  {requiresCollateral 
-                    ? 'This loan requires collateral. Are you sure you want to proceed?' 
-                    : 'Are you sure you want to add this approved loan?'}
-                </p>
-                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                  <button 
-                    style={{
-                      ...styles.secondaryButton,
-                      flex: 1
-                    }} 
-                    onClick={() => setShowAddLoanConfirmation(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      flex: 1
-                    }}
-                    onClick={async () => { 
-                      setActionInProgress(true); 
-                      setShowAddLoanConfirmation(false); 
-                      await handleAddApprovedLoan(); 
-                      setActionInProgress(false); 
-                    }}
-                  >
-                    Confirm
-                  </button>
-                </div>
+        {/* Confirmation Modal (Following ApplyLoan Design) */}
+        {confirmModalVisible && (
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#2C5282' }} />
+              <h2 style={styles.modalTitle}>
+                {requiresCollateral ? 'Collateral Required' : 'Confirm Loan Application'}
+              </h2>
+              <div style={{ width: '100%', marginBottom: '20px' }}>
+                {requiresCollateral ? (
+                  <p style={styles.modalText}>
+                    Loan amount is more than the member's balance, this requires collateral, do you want to continue?
+                  </p>
+                ) : (
+                  <>
+                    <p style={styles.modalText}>Member Balance: {formatCurrency(memberBalance)}</p>
+                    <p style={styles.modalText}>Loan Type: {addForm.loanType}</p>
+                    <p style={styles.modalText}>Loan Amount: {formatCurrency(addForm.loanAmount || 0)}</p>
+                    <p style={styles.modalText}>Processing Fee: {formatCurrency(processingFee || 0)}</p>
+                    <p style={styles.modalText}>Release Amount: {formatCurrency((parseFloat(addForm.loanAmount || 0) - parseFloat(processingFee || 0)) || 0)}</p>
+                    <p style={styles.modalText}>Term: {addForm.term} {addForm.term === '1' ? 'Month' : 'Months'}</p>
+                    <p style={styles.modalText}>Interest Rate: {(Number(interestByType?.[addForm.loanType]?.[addForm.term]) || 0).toFixed(1)}%</p>
+                    <p style={styles.modalText}>Disbursement: {addForm.disbursement}</p>
+                    {addForm.disbursement !== 'Cash' && (
+                      <>
+                        <p style={styles.modalText}>Account Name: {addForm.accountName}</p>
+                        <p style={styles.modalText}>Account Number: {addForm.accountNumber}</p>
+                        {addForm.disbursement === 'Bank' && (
+                          <p style={styles.modalText}>Bank Type: {addForm.bankType}</p>
+                        )}
+                      </>
+                    )}
+                    {requiresCollateral && (
+                      <>
+                        <p style={{...styles.modalText, marginTop: '8px', fontWeight: '700', color: '#2C5282' }}>Collateral Details</p>
+                        <p style={styles.modalText}>Type: {collateralType}</p>
+                        <p style={styles.modalText}>Value: {formatCurrency(collateralValue || 0)}</p>
+                        <p style={styles.modalText}>Description: {collateralDescription}</p>
+                        <p style={styles.modalText}>Proof: {proofOfCollateral ? 'Uploaded' : 'Not provided'}</p>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+              <div style={styles.modalButtonContainer}>
+                <button 
+                  style={{
+                    ...styles.modalButton,
+                    backgroundColor: '#f5f5f5',
+                    border: '1px solid #ddd'
+                  }} 
+                  onClick={() => {
+                    setConfirmModalVisible(false);
+                    if (requiresCollateral) {
+                      setShowCollateralModal(true);
+                    }
+                  }}
+                >
+                  <span style={styles.cancelButtonText}>{requiresCollateral ? 'No' : 'Cancel'}</span>
+                </button>
+                <button 
+                  style={{
+                    ...styles.modalButton,
+                    ...styles.confirmButton
+                  }} 
+                  onClick={() => {
+                    setConfirmModalVisible(false);
+                    if (confirmAction) { 
+                      confirmAction(); 
+                      setConfirmAction(null); 
+                    }
+                  }}
+                >
+                  <span style={styles.confirmButtonText}>{requiresCollateral ? 'Yes' : 'Submit'}</span>
+                </button>
               </div>
             </div>
           </div>
@@ -2462,48 +2615,45 @@ const Loans = () => {
 
         {/* Success Modal */}
         {successModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
-                <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
-                <p style={styles.modalText}>
-                  {successMessage}
-                </p>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    width: '100%'
-                  }}
-                  onClick={() => setSuccessModalVisible(false)}
-                >
-                  OK
-                </button>
-              </div>
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
+              <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
+              <p style={styles.modalText}>
+                {successMessage}
+              </p>
+              <button
+                style={{
+                  ...styles.primaryButton,
+                  width: '100%',
+                  marginTop: '10px'
+                }}
+                onClick={handleSuccessOk}
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
 
         {/* Error Modal */}
         {errorModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
-                <h2 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: '0 0 10px 0'}}>Error</h2>
-                <p style={styles.modalText}>
-                  {errorMessage}
-                </p>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    width: '100%'
-                  }}
-                  onClick={() => setErrorModalVisible(false)}
-                >
-                  Try Again
-                </button>
-              </div>
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
+              <h2 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: '0 0 10px 0'}}>Error</h2>
+              <p style={styles.modalText}>
+                {errorMessage}
+              </p>
+              <button
+                style={{
+                  ...styles.primaryButton,
+                  width: '100%'
+                }}
+                onClick={() => setErrorModalVisible(false)}
+              >
+                Try Again
+              </button>
             </div>
           </div>
         )}
@@ -2513,7 +2663,7 @@ const Loans = () => {
           <div style={styles.loadingOverlay}>
             <div style={styles.loadingContent}>
               <div style={styles.spinner}></div>
-              <div style={styles.loadingTextOverlay}>Processing loan...</div>
+              <div style={styles.loadingTextOverlay}>Processing loan application...</div>
             </div>
           </div>
         )}
