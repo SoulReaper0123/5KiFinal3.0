@@ -12,7 +12,8 @@ import {
   FaUserTimes,
   FaFileAlt,
   FaPrint,
-  FaTimes
+  FaTimes,
+  FaSpinner
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -28,6 +29,7 @@ import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
 import PermanentWithdrawals from '../Withdraws/PermanentWithdrawals';
+import logoImage from '../../../../../assets/logo.png';
 
 const governmentIdOptions = [
   { key: 'national', label: 'National ID (PhilSys)' },
@@ -49,12 +51,17 @@ const generateRandomPassword = () => {
   return pwd;
 };
 
+const formatCurrency = (amount) => {
+  return new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+    minimumFractionDigits: 2,
+  }).format(amount);
+};
+
 const formatDate = (date) => {
-  return date.toLocaleDateString('en-US', { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
+  const options = { year: 'numeric', month: 'long', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
 };
 
 const formatTime = (date) => {
@@ -352,7 +359,9 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '20px'
+    padding: '20px',
+    overflowY: 'auto',
+    backdropFilter: 'blur(4px)'
   },
   modalCard: {
     backgroundColor: 'white',
@@ -363,7 +372,8 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    border: '1px solid #F1F5F9'
   },
   modalHeader: {
     padding: '24px',
@@ -489,40 +499,55 @@ const styles = {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '12px',
-    flexShrink: 0
+    flexShrink: 0,
+    background: '#f8fafc'
   },
-  primaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#1e40af',
-    color: '#fff',
-    border: 'none',
+  actionButton: {
+    padding: '0.75rem 2rem',
     borderRadius: '8px',
+    border: 'none',
     cursor: 'pointer',
-    fontSize: '14px',
     fontWeight: '600',
-    transition: 'background-color 0.2s ease',
+    fontSize: '0.875rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    whiteSpace: 'nowrap'
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
   },
-  primaryButtonHover: {
-    backgroundColor: '#1e3a8a'
+  primaryButton: {
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+    }
   },
   secondaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#6b7280',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-    transition: 'background-color 0.2s ease',
-    whiteSpace: 'nowrap'
+    background: '#6b7280',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+    }
   },
-  secondaryButtonHover: {
-    backgroundColor: '#4b5563'
+  approveButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
   },
   dashboardLoadingContainer: {
     display: 'flex',
@@ -542,7 +567,7 @@ const styles = {
   },
   spinner: {
     border: '4px solid #f3f4f6',
-    borderLeft: '4px solid #1e40af',
+    borderLeft: '4px solid #2563eb',
     borderRadius: '50%',
     width: '40px',
     height: '40px',
@@ -596,19 +621,26 @@ const styles = {
     color: '#64748b',
     margin: '4px 0 0 0'
   },
-  // New styles for validation and modals matching Registrations component
-  errorText: {
-    color: '#dc2626',
-    fontSize: '12px',
-    marginTop: '4px',
-    marginLeft: '2px'
+  // Confirmation modal styles
+  centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px',
+    backdropFilter: 'blur(4px)'
   },
   modalCardSmall: {
-    width: '340px',
+    width: '300px',
     backgroundColor: 'white',
     borderRadius: '14px',
     padding: '20px',
-    position: 'relative',
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
@@ -628,38 +660,58 @@ const styles = {
     lineHeight: '1.5',
     fontWeight: '500'
   },
-  actionButton: {
-    padding: '0.75rem 2rem',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: '0.875rem',
+  // Loading overlay
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.2s ease',
-    minWidth: '140px'
+    alignItems: 'center',
+    zIndex: 1500,
+    backdropFilter: 'blur(4px)',
   },
-  approveButton: {
-    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  loadingTextOverlay: {
     color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
-    }
+    fontSize: '14px',
+    fontWeight: '500'
   },
-  disabledButton: {
-    background: '#9ca3af',
-    cursor: 'not-allowed',
-    opacity: '0.7',
-    '&:hover': {
-      transform: 'none',
-      boxShadow: 'none'
-    }
+  // Error text styles
+  errorText: {
+    color: '#dc2626',
+    fontSize: '12px',
+    marginTop: '4px',
+    fontWeight: '500'
   }
 };
+
+// Add keyframes for spinner animation
+const spinKeyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the keyframes into the document head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = spinKeyframes;
+  if (!document.head.querySelector('style[data-spin-keyframes]')) {
+    styleSheet.setAttribute('data-spin-keyframes', 'true');
+    document.head.appendChild(styleSheet);
+  }
+}
 
 const Register = () => {
   const [activeSection, setActiveSection] = useState('registrations');
@@ -720,6 +772,9 @@ const Register = () => {
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
 
+  // Admin data for print report
+  const [adminData, setAdminData] = useState(null);
+
   const pageSize = 10;
 
   // Tab configuration
@@ -765,7 +820,26 @@ const Register = () => {
         transform: translateY(-2px);
         boxShadow: 0 10px 25px rgba(0,0,0,0.1);
       }
+      
+      /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
+        @page {
+          margin: 0.5in !important;
+          size: auto;
+          margin-header: 0 !important;
+          margin-footer: 0 !important;
+        }
+        
+        body::before,
+        body::after {
+          display: none !important;
+        }
+        
+        .print-header:empty,
+        .print-footer:empty {
+          display: none;
+        }
+        
         body * {
           visibility: hidden;
         }
@@ -777,17 +851,66 @@ const Register = () => {
           left: 0;
           top: 0;
           width: 100%;
+          padding: 20px;
+          background: white;
+          margin: 0 !important;
         }
         .no-print {
           display: none !important;
+        }
+        .print-header {
+          display: block !important;
+        }
+        .component-header {
+          display: none !important;
+        }
+        table {
+          width: 100%;
+          border-collapse: collapse;
+        }
+        th, td {
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
+        }
+        th {
+          background-color: #f2f2f2;
+          font-weight: bold;
         }
       }
     `;
     document.head.appendChild(styleElement);
 
     return () => {
-      document.head.removeChild(styleElement);
+      if (document.head.contains(styleElement)) {
+        document.head.removeChild(styleElement);
+      }
     };
+  }, []);
+
+  // Fetch admin data for print report
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        
+        const adminRef = database.ref(`${node}/${adminId}`);
+        const snapshot = await adminRef.once('value');
+        
+        if (snapshot.exists()) {
+          setAdminData(snapshot.val());
+        }
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      }
+    };
+
+    fetchAdminData();
   }, []);
 
   const fetchAllData = async () => {
@@ -1061,31 +1184,95 @@ const Register = () => {
       printContent.className = 'print-content';
       printContent.style.padding = '20px';
       printContent.style.fontFamily = 'Arial, sans-serif';
+      printContent.style.boxSizing = 'border-box';
+      printContent.style.margin = '0';
 
-      // Header
+      // Create your custom header
       const header = document.createElement('div');
+      header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '10px';
+      header.style.paddingBottom = '15px';
       header.style.marginBottom = '20px';
-      
-      const title = document.createElement('h1');
-      title.textContent = `${sectionTitle} Report`;
-      title.style.margin = '0';
-      title.style.color = '#333';
-      
-      const date = document.createElement('p');
-      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      date.style.margin = '5px 0 0 0';
-      date.style.color = '#666';
-      
-      const count = document.createElement('p');
-      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
-      count.style.margin = '5px 0 0 0';
-      count.style.color = '#666';
-      
-      header.appendChild(title);
-      header.appendChild(date);
-      header.appendChild(count);
+      header.style.boxSizing = 'border-box';
+
+      // Logo and Report Title (Centered)
+      const logoSection = document.createElement('div');
+      logoSection.style.textAlign = 'center';
+      logoSection.style.marginBottom = '15px';
+
+      // Add logo image
+      const logoImg = document.createElement('img');
+      logoImg.src = logoImage;
+      logoImg.style.width = '80px';
+      logoImg.style.height = '80px';
+      logoImg.style.marginBottom = '5px';
+      logoImg.style.display = 'block';
+      logoImg.style.marginLeft = 'auto';
+      logoImg.style.marginRight = 'auto';
+
+      const logo = document.createElement('div');
+      logo.textContent = '5Ki Financial Services';
+      logo.style.fontSize = '24px';
+      logo.style.fontWeight = 'bold';
+      logo.style.color = '#1e40af';
+      logo.style.marginBottom = '5px';
+
+      const reportTitle = document.createElement('div');
+      reportTitle.textContent = `${sectionTitle} Report`;
+      reportTitle.style.fontSize = '20px';
+      reportTitle.style.fontWeight = 'bold';
+      reportTitle.style.marginBottom = '15px';
+
+      logoSection.appendChild(logoImg);
+      logoSection.appendChild(logo);
+      logoSection.appendChild(reportTitle);
+
+      // Info Row (Generated Date on left, Prepared By on right)
+      const infoRow = document.createElement('div');
+      infoRow.style.display = 'flex';
+      infoRow.style.justifyContent = 'space-between';
+      infoRow.style.alignItems = 'flex-start';
+      infoRow.style.fontSize = '14px';
+      infoRow.style.marginBottom = '10px';
+      infoRow.style.boxSizing = 'border-box';
+
+      // Left side - Generated Date
+      const generatedDate = document.createElement('div');
+      generatedDate.style.textAlign = 'left';
+      generatedDate.style.flex = '1';
+      generatedDate.innerHTML = `
+        <strong>Generated as of:</strong><br>
+        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+      `;
+
+      // Right side - Prepared By
+      const preparedBy = document.createElement('div');
+      preparedBy.style.textAlign = 'right';
+      preparedBy.style.flex = '1';
+      const adminFirstName = adminData?.firstName || 'Admin';
+      const adminRole = localStorage.getItem('userRole') || 'Admin';
+      preparedBy.innerHTML = `
+        <strong>Prepared by:</strong><br>
+        <span style="font-weight: bold;">${adminFirstName}</span><br>
+        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
+      `;
+
+      infoRow.appendChild(generatedDate);
+      infoRow.appendChild(preparedBy);
+
+      // Report Details
+      const reportDetails = document.createElement('div');
+      reportDetails.style.textAlign = 'center';
+      reportDetails.style.marginBottom = '15px';
+      reportDetails.style.fontSize = '14px';
+      reportDetails.style.color = '#666';
+      reportDetails.innerHTML = `
+        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
+      `;
+
+      header.appendChild(logoSection);
+      header.appendChild(infoRow);
+      header.appendChild(reportDetails);
       printContent.appendChild(header);
 
       // Table
@@ -1094,30 +1281,31 @@ const Register = () => {
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
         table.style.marginTop = '20px';
+        table.style.boxSizing = 'border-box';
 
-        // Table Header - Define columns based on active section (excluding Action column)
+        // Table Header - Define columns based on active section
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.style.backgroundColor = '#f8f9fa';
         
-        // Define columns for each section (excluding the Action/View column)
+        // Define columns for each section
         let headers = [];
         
         switch(activeSection) {
           case 'registrations':
-            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Applied'];
             break;
           case 'rejectedRegistrations':
-            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Rejected'];
             break;
           case 'approvedRegistrations':
-            headers = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Date Approved', 'Member ID'];
             break;
           case 'members':
-            headers = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
+            headers = ['Member ID', 'Full Name', 'Email', 'Investment', 'Savings', 'Status'];
             break;
           case 'permanentWithdrawals':
-            headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
+            headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status', 'Date Withdrawn'];
             break;
           default:
             headers = [];
@@ -1132,6 +1320,7 @@ const Register = () => {
           th.style.textAlign = 'left';
           th.style.fontWeight = 'bold';
           th.style.backgroundColor = '#e9ecef';
+          th.style.boxSizing = 'border-box';
           headerRow.appendChild(th);
         });
         
@@ -1153,25 +1342,15 @@ const Register = () => {
               case 'Full Name':
                 cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
                 break;
-              case 'Name':
-                cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                break;
               case 'Email Address':
               case 'Email':
                 cellValue = item.email || '';
                 break;
               case 'Contact Number':
-              case 'Contact':
                 cellValue = item.phoneNumber || '';
                 break;
               case 'Status':
                 cellValue = item.status || 'pending';
-                break;
-              case 'First Name':
-                cellValue = item.firstName || '';
-                break;
-              case 'Last Name':
-                cellValue = item.lastName || '';
                 break;
               case 'Date Applied':
                 cellValue = item.dateCreated || item.dateApplied || '';
@@ -1179,23 +1358,26 @@ const Register = () => {
               case 'Date Approved':
                 cellValue = item.dateApproved || '';
                 break;
+              case 'Date Rejected':
+                cellValue = item.dateRejected || '';
+                break;
               case 'Member ID':
                 cellValue = item.memberId || item.id || '';
                 break;
               case 'Investment':
-                cellValue = `₱${(parseFloat(item.investment) || 0).toFixed(2)}`;
+                cellValue = formatCurrency(item.investment || 0);
                 break;
               case 'Savings':
-                cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
-                break;
-              case 'Loans':
-                cellValue = `₱${(parseFloat(item.loans) || 0).toFixed(2)}`;
+                cellValue = formatCurrency(item.balance || 0);
                 break;
               case 'Balance':
-                cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
+                cellValue = formatCurrency(item.balance || 0);
                 break;
               case 'Reason':
                 cellValue = item.reason || '';
+                break;
+              case 'Date Withdrawn':
+                cellValue = item.dateWithdrawn || '';
                 break;
               default:
                 cellValue = item[header] || '';
@@ -1205,6 +1387,7 @@ const Register = () => {
             td.style.padding = '10px 8px';
             td.style.border = '1px solid #ddd';
             td.style.fontSize = '12px';
+            td.style.boxSizing = 'border-box';
             row.appendChild(td);
           });
           
@@ -1222,160 +1405,208 @@ const Register = () => {
         printContent.appendChild(noData);
       }
 
-      if (format === 'pdf') {
-        // For PDF, we'll use browser's print to PDF functionality
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
-      } else if (format === 'word') {
-        // For Word, create a simple HTML file that can be opened in Word
-        const htmlContent = `
-          <html>
-            <head>
-              <title>${sectionTitle}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                h1 { color: #333; }
-              </style>
-            </head>
-            <body>
-              ${printContent.innerHTML}
-            </body>
-          </html>
-        `;
-        
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else if (format === 'excel') {
-        // Export to Excel
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet(sectionTitle);
-
-        if (displayedData.length > 0) {
-          // Define headers for Excel based on active section
-          let excelHeaders = [];
-          
-          switch(activeSection) {
-            case 'registrations':
-              excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
-              break;
-            case 'rejectedRegistrations':
-              excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
-              break;
-            case 'approvedRegistrations':
-              excelHeaders = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
-              break;
-            case 'members':
-              excelHeaders = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
-              break;
-            case 'permanentWithdrawals':
-              excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
-              break;
-            default:
-              excelHeaders = [];
-          }
-
-          worksheet.addRow(excelHeaders);
-
-          displayedData.forEach(item => {
-            const row = [];
-            excelHeaders.forEach(header => {
-              let cellValue = '';
-              
-              switch(header) {
-                case 'Full Name':
-                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                  break;
-                case 'Name':
-                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                  break;
-                case 'Email Address':
-                case 'Email':
-                  cellValue = item.email || '';
-                  break;
-                case 'Contact Number':
-                case 'Contact':
-                  cellValue = item.phoneNumber || '';
-                  break;
-                case 'Status':
-                  cellValue = item.status || 'pending';
-                  break;
-                case 'First Name':
-                  cellValue = item.firstName || '';
-                  break;
-                case 'Last Name':
-                  cellValue = item.lastName || '';
-                  break;
-                case 'Date Applied':
-                  cellValue = item.dateCreated || item.dateApplied || '';
-                  break;
-                case 'Date Approved':
-                  cellValue = item.dateApproved || '';
-                  break;
-                case 'Member ID':
-                  cellValue = item.memberId || item.id || '';
-                  break;
-                case 'Investment':
-                  cellValue = parseFloat(item.investment) || 0;
-                  break;
-                case 'Savings':
-                  cellValue = parseFloat(item.balance) || 0;
-                  break;
-                case 'Loans':
-                  cellValue = parseFloat(item.loans) || 0;
-                  break;
-                case 'Balance':
-                  cellValue = parseFloat(item.balance) || 0;
-                  break;
-                case 'Reason':
-                  cellValue = item.reason || '';
-                  break;
-                default:
-                  cellValue = item[header] || '';
-              }
-              
-              row.push(cellValue);
-            });
-            worksheet.addRow(row);
-          });
-        }
-
-        workbook.xlsx.writeBuffer().then(buffer => {
-          const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-          });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        });
-      } else {
-        // Direct print
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
+      // Create a hidden iframe for printing to avoid browser headers
+      const printFrame = document.createElement('iframe');
+      printFrame.style.position = 'fixed';
+      printFrame.style.right = '0';
+      printFrame.style.bottom = '0';
+      printFrame.style.width = '0';
+      printFrame.style.height = '0';
+      printFrame.style.border = '0';
+      printFrame.style.visibility = 'hidden';
+      
+      document.body.appendChild(printFrame);
+      
+      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+      if (printDocument.document) {
+        printDocument = printDocument.document;
       }
 
-      setPrintModalVisible(false);
+      // Write the print content to the iframe with CSS to remove headers/footers
+      printDocument.open();
+      printDocument.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>${sectionTitle} Report</title>
+            <style>
+              /* Reset all margins and remove browser headers/footers */
+              @page {
+                margin: 0.5in !important;
+                size: auto;
+                margin-header: 0 !important;
+                margin-footer: 0 !important;
+              }
+              
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+                font-family: Arial, sans-serif;
+                -webkit-print-color-adjust: exact;
+              }
+              
+              .print-content {
+                margin: 0 !important;
+                padding: 20px;
+              }
+              
+              /* Hide any potential browser elements */
+              header, footer, .header, .footer {
+                display: none !important;
+              }
+              
+              table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 20px;
+              }
+              
+              th, td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+              }
+              
+              th {
+                background-color: #f2f2f2;
+                font-weight: bold;
+              }
+            </style>
+          </head>
+          <body>
+            ${printContent.innerHTML}
+          </body>
+        </html>
+      `);
+      printDocument.close();
+
+      // Wait for content to load then print
+      printFrame.onload = function() {
+        try {
+          if (format === 'pdf') {
+            printFrame.contentWindow.print();
+
+            // Export to Excel
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet(sectionTitle);
+
+            if (displayedData.length > 0) {
+              // Define headers for Excel based on active section
+              let excelHeaders = [];
+              
+              switch(activeSection) {
+                case 'registrations':
+                  excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Applied'];
+                  break;
+                case 'rejectedRegistrations':
+                  excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Rejected'];
+                  break;
+                case 'approvedRegistrations':
+                  excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Date Approved', 'Member ID'];
+                  break;
+                case 'members':
+                  excelHeaders = ['Member ID', 'Full Name', 'Email', 'Investment', 'Savings', 'Status'];
+                  break;
+                case 'permanentWithdrawals':
+                  excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status', 'Date Withdrawn'];
+                  break;
+                default:
+                  excelHeaders = [];
+              }
+
+              worksheet.addRow(excelHeaders);
+
+              displayedData.forEach(item => {
+                const row = [];
+                excelHeaders.forEach(header => {
+                  let cellValue = '';
+                  
+                  switch(header) {
+                    case 'Full Name':
+                      cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                      break;
+                    case 'Email Address':
+                    case 'Email':
+                      cellValue = item.email || '';
+                      break;
+                    case 'Contact Number':
+                      cellValue = item.phoneNumber || '';
+                      break;
+                    case 'Status':
+                      cellValue = item.status || 'pending';
+                      break;
+                    case 'Date Applied':
+                      cellValue = item.dateCreated || item.dateApplied || '';
+                      break;
+                    case 'Date Approved':
+                      cellValue = item.dateApproved || '';
+                      break;
+                    case 'Date Rejected':
+                      cellValue = item.dateRejected || '';
+                      break;
+                    case 'Member ID':
+                      cellValue = item.memberId || item.id || '';
+                      break;
+                    case 'Investment':
+                      cellValue = parseFloat(item.investment) || 0;
+                      break;
+                    case 'Savings':
+                      cellValue = parseFloat(item.balance) || 0;
+                      break;
+                    case 'Balance':
+                      cellValue = parseFloat(item.balance) || 0;
+                      break;
+                    case 'Reason':
+                      cellValue = item.reason || '';
+                      break;
+                    case 'Date Withdrawn':
+                      cellValue = item.dateWithdrawn || '';
+                      break;
+                    default:
+                      cellValue = item[header] || '';
+                  }
+                  
+                  row.push(cellValue);
+                });
+                worksheet.addRow(row);
+              });
+            }
+
+            workbook.xlsx.writeBuffer().then(buffer => {
+              const blob = new Blob([buffer], { 
+                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+              });
+              const url = window.URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              window.URL.revokeObjectURL(url);
+            });
+          } else {
+            // Direct print
+            printFrame.contentWindow.print();
+          }
+          
+          // Clean up after printing
+          setTimeout(() => {
+            document.body.removeChild(printFrame);
+            setPrintModalVisible(false);
+            setPrinting(false);
+          }, 1000);
+        } catch (error) {
+          console.error('Print error:', error);
+          document.body.removeChild(printFrame);
+          setPrinting(false);
+        }
+      };
+
     } catch (error) {
       console.error('Error printing data:', error);
       setErrorMessage('Failed to print data');
       setErrorModalVisible(true);
-    } finally {
       setPrinting(false);
     }
   };
@@ -1733,7 +1964,7 @@ const Register = () => {
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
-    <div style={styles.safeAreaView}>
+    <div style={styles.safeAreaView} className="component-header">
       <div style={styles.mainContainer}>
         {/* Header Section */}
         <div style={styles.headerSection}>
@@ -1896,7 +2127,7 @@ const Register = () => {
 
         {/* Print Modal */}
         {printModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
+          <div style={styles.modalOverlay}>
             <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <h2 style={styles.modalTitle}>Print/Export Options</h2>
@@ -1948,22 +2179,6 @@ const Register = () => {
                   <p style={styles.printOptionText}>Save as PDF</p>
                   <p style={styles.printOptionDescription}>
                     Download as PDF file
-                  </p>
-                </button>
-
-                <button
-                  style={{
-                    ...styles.printOption,
-                    ...(isHovered.printWord ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printWord')}
-                  onMouseLeave={() => handleMouseLeave('printWord')}
-                  onClick={() => handlePrint('word')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Export to Word</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as Word document
                   </p>
                 </button>
 
@@ -2319,8 +2534,9 @@ const Register = () => {
               <div style={styles.modalActions}>
                 <button
                   style={{
+                    ...styles.actionButton,
                     ...styles.secondaryButton,
-                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
+                    ...(isHovered.cancelButton ? {} : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('cancelButton')}
                   onMouseLeave={() => handleMouseLeave('cancelButton')}
@@ -2331,8 +2547,10 @@ const Register = () => {
                 </button>
                 <button
                   style={{
-                    ...styles.primaryButton,
-                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
+                    ...styles.actionButton,
+                    ...styles.approveButton,
+                    ...(isHovered.submitButton ? {} : {}),
+                    ...(uploading ? styles.disabledButton : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
@@ -2341,7 +2559,7 @@ const Register = () => {
                 >
                   {uploading ? (
                     <>
-                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
+                      <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
                       <span>Adding Member...</span>
                     </>
                   ) : (
@@ -2356,19 +2574,19 @@ const Register = () => {
           </div>
         )}
 
-        {/* Confirmation Modal - Matching Registrations component design */}
+        {/* Confirmation Modal - Matching Deposits component design */}
         {confirmModalVisible && (
-          <div style={styles.modalOverlay}>
+          <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
               <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
               <p style={styles.modalText}>Are you sure you want to register this new member?</p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button 
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                <button
                   style={{
                     ...styles.actionButton,
-                    ...styles.approveButton,
-                    ...(uploading ? styles.disabledButton : {})
-                  }} 
+                    ...styles.primaryButton,
+                    flex: 1
+                  }}
                   onClick={submitManualMember}
                   disabled={uploading}
                 >
@@ -2377,29 +2595,31 @@ const Register = () => {
                 <button 
                   style={{
                     ...styles.actionButton,
-                    ...styles.secondaryButton
+                    ...styles.secondaryButton,
+                    flex: 1
                   }} 
                   onClick={() => setConfirmModalVisible(false)}
                   disabled={uploading}
                 >
-                  No
+                  {uploading ? 'Processing...' : 'No'}
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal - Matching Registrations component design */}
+        {/* Success Modal - Matching Deposits component design */}
         {successModalVisible && (
-          <div style={styles.modalOverlay}>
+          <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
               <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
               <p style={styles.modalText}>{successMessage}</p>
-              <button 
+              <button
                 style={{
                   ...styles.actionButton,
-                  ...styles.approveButton
-                }} 
+                  ...styles.primaryButton,
+                  width: '100%'
+                }}
                 onClick={handleSuccessOk}
               >
                 OK
@@ -2408,17 +2628,18 @@ const Register = () => {
           </div>
         )}
 
-        {/* Error Modal - Matching Registrations component design */}
+        {/* Error Modal - Matching Deposits component design */}
         {errorModalVisible && (
-          <div style={{ ...styles.modalOverlay, zIndex: 3000 }}>
+          <div style={styles.centeredModal}>
             <div style={styles.modalCardSmall}>
               <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
               <p style={styles.modalText}>{errorMessage}</p>
-              <button 
+              <button
                 style={{
                   ...styles.actionButton,
-                  ...styles.approveButton
-                }} 
+                  ...styles.primaryButton,
+                  width: '100%'
+                }}
                 onClick={() => setErrorModalVisible(false)}
               >
                 OK
@@ -2427,9 +2648,9 @@ const Register = () => {
           </div>
         )}
 
-        {/* Loading Spinner - Matching Registrations component */}
+        {/* Loading Spinner - Matching Deposits component */}
         {uploading && (
-          <div style={styles.modalOverlay}>
+          <div style={styles.centeredModal}>
             <div style={styles.spinner}></div>
           </div>
         )}
