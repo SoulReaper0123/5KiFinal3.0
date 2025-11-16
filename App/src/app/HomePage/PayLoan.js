@@ -111,6 +111,7 @@ const PayLoan = () => {
 
     initializeUserData();
     fetchPaymentSettings();
+    fetchSystemSettings();
     
     // Detect browser and platform information
     if (Platform.OS === 'web') {
@@ -192,9 +193,10 @@ const PayLoan = () => {
     try {
       // Refresh all data
       await fetchPaymentSettings();
+      await fetchSystemSettings();
       if (email) {
         await fetchUserData(email);
-        await fetchCurrentLoan(email);
+        await fetchCurrentLoans(email);
       }
     } catch (error) {
       console.error('Error refreshing data:', error);
@@ -648,8 +650,13 @@ const PayLoan = () => {
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
   useEffect(() => {
-    setIsSubmitDisabled(!paymentOption || !amountToBePaid || !proofOfPayment);
-  }, [paymentOption, amountToBePaid, proofOfPayment]);
+    // FIXED: Add check for active loans and selected loan
+    const hasActiveLoans = activeLoans.length > 0;
+    const hasSelectedLoan = selectedLoanId !== null;
+    const hasRequiredFields = paymentOption && amountToBePaid && proofOfPayment;
+    
+    setIsSubmitDisabled(!hasActiveLoans || !hasSelectedLoan || !hasRequiredFields);
+  }, [paymentOption, amountToBePaid, proofOfPayment, activeLoans, selectedLoanId]);
 
   // IMAGE HANDLING FUNCTIONS (same as RegisterPage2)
 
@@ -1738,6 +1745,21 @@ const PayLoan = () => {
   };
 
   const handleSubmit = async () => {
+    // FIXED: Check if there are active loans and a loan is selected
+    if (activeLoans.length === 0) {
+      setAlertMessage('You have no active loans to pay.');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    if (!selectedLoanId) {
+      setAlertMessage('Please select a loan to pay.');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
     if (!paymentOption || !amountToBePaid || !proofOfPayment) {
       setAlertMessage('All fields are required');
       setAlertType('error');
@@ -1751,11 +1773,6 @@ const PayLoan = () => {
       setAlertModalVisible(true);
       return;
     }
-
-    // Validate payment amount is a positive number; allow partial payments even when overdue
-    const paymentAmount = roundToCents(amountToBePaid);
-    const totalDueRounded = roundToCents(totalAmountDue);
-    // Note: We no longer block partial payments when overdue. Admin approval will allocate to penalty -> interest -> principal.
 
     // Show confirmation modal
     setConfirmModalVisible(true);
@@ -1841,22 +1858,23 @@ const PayLoan = () => {
         }
       >
         {/* Header with centered title and left back button using invisible spacers */}
-      <View style={styles.headerRow}>
-      <TouchableOpacity 
-        style={styles.headerSide} 
-        onPress={() => navigation.navigate('AppHome')}  
-      >
-        <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
-      </TouchableOpacity>
-        <Text style={styles.headerTitle}>Pay Loan</Text>
-        <View style={styles.headerSide} />
-      </View>
+        <View style={styles.headerRow}>
+          <TouchableOpacity 
+            style={styles.headerSide} 
+            onPress={() => navigation.navigate('AppHome')}  
+          >
+            <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Pay Loan</Text>
+          <View style={styles.headerSide} />
+        </View>
+        
         <View style={styles.content}>
           <Text style={styles.label}>Balance</Text>
           <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
           {/* Loans list and details */}
-          {activeLoans.length > 0 && (
+          {activeLoans.length > 0 ? (
             <View style={styles.loanInfoContainer}>
               <Text style={styles.sectionTitle}>Select Loan</Text>
               {activeLoans.map((ln) => (
@@ -1901,7 +1919,59 @@ const PayLoan = () => {
                 </View>
               ))}
 
-              {/* Current Loan Information moved to PayLoanDetails screen */}
+              {/* Show selected loan information */}
+              {currentLoan && (
+                <View style={styles.selectedLoanInfo}>
+                  <Text style={styles.sectionTitle}>Selected Loan Details</Text>
+                  <View style={styles.loanInfoRow}>
+                    <Text style={styles.loanInfoLabel}>Loan Type:</Text>
+                    <Text style={styles.loanInfoValue}>{currentLoan.loanType || 'N/A'}</Text>
+                  </View>
+                  <View style={styles.loanInfoRow}>
+                    <Text style={styles.loanInfoLabel}>Loan Amount:</Text>
+                    <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.loanAmount || currentLoan.outstandingBalance || 0)}</Text>
+                  </View>
+                  <View style={styles.loanInfoRow}>
+                    <Text style={styles.loanInfoLabel}>Monthly Payment:</Text>
+                    <Text style={styles.loanInfoValue}>{formatCurrency(currentLoan.totalMonthlyPayment || 0)}</Text>
+                  </View>
+                  <View style={styles.loanInfoRow}>
+                    <Text style={styles.loanInfoLabel}>Due Date:</Text>
+                    <Text style={styles.loanInfoValue}>{formatDisplayDate(currentLoan.dueDate || currentLoan.nextDueDate)}</Text>
+                  </View>
+                  {penaltyAmount > 0 && (
+                    <>
+                      <View style={styles.loanInfoRow}>
+                        <Text style={styles.loanInfoLabel}>Overdue Days:</Text>
+                        <Text style={[styles.loanInfoValue, styles.overdueText]}>{overdueDays} days</Text>
+                      </View>
+                      <View style={styles.loanInfoRow}>
+                        <Text style={styles.loanInfoLabel}>Penalty:</Text>
+                        <Text style={[styles.loanInfoValue, styles.overdueText]}>
+                          {formatCurrency(penaltyAmount)}
+                        </Text>
+                      </View>
+                    </>
+                  )}
+                  <View style={[styles.loanInfoRow, styles.totalRow]}>
+                    <Text style={styles.totalLabel}>Total Amount Due:</Text>
+                    <Text style={[
+                      styles.totalValue, 
+                      penaltyAmount > 0 ? styles.overdueText : styles.normalText
+                    ]}>
+                      {formatCurrency(totalAmountDue)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.noLoansContainer}>
+              <MaterialIcons name="money-off" size={50} color="#94A3B8" />
+              <Text style={styles.noLoansText}>No Active Loans</Text>
+              <Text style={styles.noLoansSubText}>
+                You don't have any active loans to pay at the moment.
+              </Text>
             </View>
           )}
 
@@ -1973,7 +2043,9 @@ const PayLoan = () => {
             onPress={handleSubmit}
             disabled={isSubmitDisabled}
           >
-            <Text style={styles.submitButtonText}>Submit</Text>
+            <Text style={styles.submitButtonText}>
+              {activeLoans.length === 0 ? 'No Active Loans' : 'Submit Payment'}
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -2600,6 +2672,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  selectedLoanInfo: {
+    marginTop: 15,
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
   loanInfoRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2694,6 +2774,31 @@ const styles = StyleSheet.create({
     color: '#FF0000',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  // No loans container
+  noLoansContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 10,
+    padding: 30,
+    marginVertical: 15,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noLoansText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#64748B',
+    marginTop: 10,
+    textAlign: 'center',
+  },
+  noLoansSubText: {
+    fontSize: 14,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 5,
+    lineHeight: 20,
   },
 });
 
