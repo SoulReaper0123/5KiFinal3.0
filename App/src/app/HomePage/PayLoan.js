@@ -17,7 +17,7 @@ import { storage, database, auth } from '../../firebaseConfig';
 import { MemberPayment } from '../../api';
 
 const PayLoan = () => {
-  const navigation = useRoute();
+  const navigation = useNavigation();
   const route = useRoute();
 
   // Loan payment states
