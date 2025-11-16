@@ -1842,9 +1842,12 @@ const PayLoan = () => {
       >
         {/* Header with centered title and left back button using invisible spacers */}
       <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
-          <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
-        </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.headerSide} 
+        onPress={() => navigation.navigate('AppHome')}  
+      >
+        <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+      </TouchableOpacity>
         <Text style={styles.headerTitle}>Pay Loan</Text>
         <View style={styles.headerSide} />
       </View>
