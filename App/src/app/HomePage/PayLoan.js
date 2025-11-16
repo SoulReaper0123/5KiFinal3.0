@@ -650,12 +650,13 @@ const PayLoan = () => {
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
   useEffect(() => {
-    // FIXED: Add check for active loans and selected loan
+    // FIXED: Cash-on-Hand doesn't require proof of payment
     const hasActiveLoans = activeLoans.length > 0;
     const hasSelectedLoan = selectedLoanId !== null;
-    const hasRequiredFields = paymentOption && amountToBePaid && proofOfPayment;
+    const hasRequiredFields = paymentOption && amountToBePaid;
+    const hasProofIfRequired = paymentOption === 'Cash-on-Hand' ? true : proofOfPayment;
     
-    setIsSubmitDisabled(!hasActiveLoans || !hasSelectedLoan || !hasRequiredFields);
+    setIsSubmitDisabled(!hasActiveLoans || !hasSelectedLoan || !hasRequiredFields || !hasProofIfRequired);
   }, [paymentOption, amountToBePaid, proofOfPayment, activeLoans, selectedLoanId]);
 
   // IMAGE HANDLING FUNCTIONS (same as RegisterPage2)
@@ -1760,8 +1761,16 @@ const PayLoan = () => {
       return;
     }
 
-    if (!paymentOption || !amountToBePaid || !proofOfPayment) {
+    // FIXED: Cash-on-Hand doesn't require proof of payment
+    if (!paymentOption || !amountToBePaid) {
       setAlertMessage('All fields are required');
+      setAlertType('error');
+      setAlertModalVisible(true);
+      return;
+    }
+
+    if (paymentOption !== 'Cash-on-Hand' && !proofOfPayment) {
+      setAlertMessage('Proof of payment is required for Bank and GCash payments');
       setAlertType('error');
       setAlertModalVisible(true);
       return;
@@ -1783,7 +1792,13 @@ const PayLoan = () => {
     setConfirmModalVisible(false);
     
     try {
-      const proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
+      let proofOfPaymentUrl = null;
+      
+      // Only upload proof of payment if it's not Cash-on-Hand
+      if (paymentOption !== 'Cash-on-Hand' && proofOfPayment) {
+        proofOfPaymentUrl = await uploadImageToFirebase(proofOfPayment, 'proofsOfPayment');
+      }
+      
       await storePaymentDataInDatabase(proofOfPaymentUrl);
 
       // Prepare payment data for API call to run when user clicks OK
@@ -1998,21 +2013,25 @@ const PayLoan = () => {
             </TouchableOpacity>
           </ModalSelector>
 
-          <Text style={styles.label}>Account Name</Text>
-          <TextInput 
-            value={accountName} 
-            placeholder={paymentOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
-            style={[styles.input, styles.fixedInput]} 
-            editable={false} 
-          />
+          {paymentOption !== 'Cash-on-Hand' && (
+            <>
+              <Text style={styles.label}>Account Name</Text>
+              <TextInput 
+                value={accountName} 
+                placeholder=""
+                style={[styles.input, styles.fixedInput]} 
+                editable={false} 
+              />
 
-          <Text style={styles.label}>Account Number</Text>
-          <TextInput 
-            value={accountNumber} 
-            placeholder={paymentOption === 'Cash-on-Hand' ? 'Not required for Cash-on-Hand' : ''}
-            style={[styles.input, styles.fixedInput]} 
-            editable={false} 
-          />
+              <Text style={styles.label}>Account Number</Text>
+              <TextInput 
+                value={accountNumber} 
+                placeholder=""
+                style={[styles.input, styles.fixedInput]} 
+                editable={false} 
+              />
+            </>
+          )}
 
           <Text style={styles.label}>Amount to be Paid<Text style={styles.required}>*</Text></Text>
           <TextInput
@@ -2023,21 +2042,25 @@ const PayLoan = () => {
             keyboardType="numeric"
           />
 
-          <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
-          <TouchableOpacity 
-            onPress={handleProofOfPaymentPress} 
-            style={styles.imagePreviewContainer}
-          >
-            {proofOfPayment ? (
-              <Image source={getImageSource(proofOfPayment)} style={styles.imagePreview} />
-            ) : (
-              <View style={styles.iconContainer}>
-                <Icon name="add" size={40} color="#1E3A5F" />
-                <Text style={styles.uploadText}>Tap to upload</Text>
-                <Text style={styles.uploadSubText}>Camera or Gallery</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          {paymentOption !== 'Cash-on-Hand' && (
+            <>
+              <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
+              <TouchableOpacity 
+                onPress={handleProofOfPaymentPress} 
+                style={styles.imagePreviewContainer}
+              >
+                {proofOfPayment ? (
+                  <Image source={getImageSource(proofOfPayment)} style={styles.imagePreview} />
+                ) : (
+                  <View style={styles.iconContainer}>
+                    <Icon name="add" size={40} color="#1E3A5F" />
+                    <Text style={styles.uploadText}>Tap to upload</Text>
+                    <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity 
             style={[styles.submitButton, isSubmitDisabled && styles.disabledButton]} 
@@ -2079,8 +2102,12 @@ const PayLoan = () => {
                 </>
               )}
               <Text style={styles.modalText}>Payment Option: {paymentOption}</Text>
-              <Text style={styles.modalText}>Account Name: {accountName}</Text>
-              <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+              {paymentOption !== 'Cash-on-Hand' && (
+                <>
+                  <Text style={styles.modalText}>Account Name: {accountName}</Text>
+                  <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
+                </>
+              )}
               <Text style={styles.modalText}>Amount to be Paid: {formatCurrency(amountToBePaid)}</Text>
             </View>
             <View style={styles.modalButtonContainer}>
