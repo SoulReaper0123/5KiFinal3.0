@@ -28,7 +28,7 @@ import Registrations from './Registrations';
 import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
-import PermanentWithdrawals from '../Withdraws/PermanentWithdrawals';
+import PermanentWithdrawals from '../Withdraws/PermanentWithdraws';
 import logoImage from '../../../../../assets/logo.png';
 
 const governmentIdOptions = [
