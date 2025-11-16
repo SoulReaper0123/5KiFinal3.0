@@ -19,7 +19,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getDatabase, ref, get } from 'firebase/database';
+import { getDatabase, ref, onValue, off, query, orderByChild, equalTo } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
@@ -53,33 +53,67 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
 
-  // Auto-refresh interval reference
-  const refreshIntervalRef = useRef(null);
+  // Real-time listener references
+  const userListenerRef = useRef(null);
+  const transactionsListenerRef = useRef(null);
 
-  // --- new code: check for new transactions and show red dot on bell ---
-  const checkForNewTransactions = async () => {
+  // --- Real-time transaction checking ---
+  const setupRealTimeTransactionCheck = (userEmail) => {
+    if (!userEmail) return;
+
     try {
-      if (!email) return;
+      const db = getDatabase();
+      
+      // Remove existing listeners
+      if (transactionsListenerRef.current) {
+        off(transactionsListenerRef.current);
+      }
+
+      // Listen to Transactions/Payments
+      const txRef = ref(db, 'Transactions/Payments');
+      transactionsListenerRef.current = onValue(txRef, (snapshot) => {
+        if (snapshot.exists()) {
+          checkForNewTransactions(userEmail);
+        }
+      });
+
+      // Also listen to Payments/ApprovedPayments
+      const approvedRef = ref(db, 'Payments/ApprovedPayments');
+      onValue(approvedRef, (snapshot) => {
+        if (snapshot.exists()) {
+          checkForNewTransactions(userEmail);
+        }
+      });
+
+    } catch (err) {
+      console.error('Error setting up real-time transaction check:', err);
+    }
+  };
+
+  const checkForNewTransactions = async (userEmail) => {
+    try {
+      if (!userEmail) return;
       const db = getDatabase();
       const txRef = ref(db, 'Transactions/Payments');
       const approvedRef = ref(db, 'Payments/ApprovedPayments');
-      const [txSnap, approvedSnap] = await Promise.all([get(txRef), get(approvedRef)]);
+      
+      const [txSnap, approvedSnap] = await Promise.all([
+        new Promise(resolve => get(txRef).then(resolve)),
+        new Promise(resolve => get(approvedRef).then(resolve))
+      ]);
 
       let count = 0;
       const countForEmail = (node) => {
         if (!node) return 0;
-        // node shape: { memberId: { txId: { ... } } } or { txId: { ... } }
         let c = 0;
         Object.values(node).forEach((memberGroup) => {
           if (!memberGroup) return;
-          // if memberGroup is a transaction object, check directly
           if (typeof memberGroup.email === 'string') {
-            if (memberGroup.email === email) c++;
+            if (memberGroup.email === userEmail) c++;
             return;
           }
-          // otherwise iterate inner transactions
           Object.values(memberGroup).forEach((tx) => {
-            if (tx?.email === email) c++;
+            if (tx?.email === userEmail) c++;
           });
         });
         return c;
@@ -92,16 +126,13 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         count += countForEmail(approvedSnap.val());
       }
 
-      // If we've seen more transactions than before, show dot
       if (previousInboxCount.current === 0) {
-        // first time: just initialize
         previousInboxCount.current = count;
         setHasNewInboxItems(false);
       } else if (count > previousInboxCount.current) {
         setHasNewInboxItems(true);
         previousInboxCount.current = count;
       } else {
-        // no increase
         previousInboxCount.current = count;
       }
       lastInboxCheckRef.current = Date.now();
@@ -109,15 +140,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
       console.error('Error checking transactions:', err);
     }
   };
-
-  useEffect(() => {
-    // run once when email becomes available, then poll every 30s
-    if (!email) return;
-    checkForNewTransactions();
-    const interval = setInterval(checkForNewTransactions, 30000);
-    return () => clearInterval(interval);
-  }, [email]);
-  // --- end new code ---
 
   useEffect(() => {
     const textWidth = 600;
@@ -145,45 +167,71 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     })}`;
   };
 
-  const fetchUserData = async (userEmail) => {
+  // Real-time user data listener
+  const setupRealTimeUserData = (userEmail) => {
     if (!userEmail) {
-      console.log('No email provided for fetchUserData');
+      console.log('No email provided for real-time setup');
       setLoading(false);
-      setRefreshing(false);
       return;
     }
 
     const db = getDatabase();
     const dbRef = ref(db, 'Members');
-    try {
-      const snapshot = await get(dbRef);
+    
+    // Remove existing listener
+    if (userListenerRef.current) {
+      off(userListenerRef.current);
+    }
+
+    console.log('Setting up real-time listener for:', userEmail);
+    
+    // Set up real-time listener
+    userListenerRef.current = onValue(dbRef, (snapshot) => {
       if (snapshot.exists()) {
         const members = snapshot.val();
         const foundUser = Object.values(members).find(
           (member) => member.email === userEmail
         );
         if (foundUser) {
+          console.log('Real-time update received:', {
+            firstName: foundUser.firstName,
+            balance: foundUser.balance,
+            investment: foundUser.investment || foundUser.investments,
+            email: foundUser.email
+          });
+          
           setFirstName(foundUser.firstName || 'Guest');
           setBalance(foundUser.balance || 0);
           setInvestment(foundUser.investment || foundUser.investments || 0);
-          setEmail(foundUser.email || 'No email provided');
+          setEmail(foundUser.email || userEmail);
           setSelfie(foundUser.selfie || null);
           setMemberId(foundUser.memberId || null);
+          
+          // Only set loading to false on first data load
+          if (loading) {
+            setLoading(false);
+          }
+          if (refreshing) {
+            setRefreshing(false);
+          }
         } else {
-          console.log('User not found in database:', userEmail);
+          console.log('User not found in real-time data:', userEmail);
+          setLoading(false);
+          setRefreshing(false);
         }
       } else {
-        console.log('No members found in database');
+        console.log('No members found in real-time data');
+        setLoading(false);
+        setRefreshing(false);
       }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-    } finally {
+    }, (error) => {
+      console.error('Error in real-time listener:', error);
       setLoading(false);
       setRefreshing(false);
-    }
+    });
   };
 
-  // Enhanced user data loading with auto-refresh
+  // Enhanced user data loading with real-time listeners
   const loadUserData = async (forceRefresh = false) => {
     if (forceRefresh) {
       setRefreshing(true);
@@ -204,7 +252,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         console.error('Error getting email from SecureStore:', error);
       }
       
-      console.log('AppHome - Loading user data with:', { 
+      console.log('Setting up real-time data with:', { 
         authEmail: user?.email, 
         paramEmail, 
         routeEmail,
@@ -216,10 +264,11 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
       let targetEmail = email || storedEmail || user?.email || paramEmail || routeEmail;
       
       if (targetEmail) {
-        console.log('Using email for data fetch:', targetEmail);
-        await fetchUserData(targetEmail);
+        console.log('Setting up real-time listeners for:', targetEmail);
+        setupRealTimeUserData(targetEmail);
+        setupRealTimeTransactionCheck(targetEmail);
       } else {
-        console.log('No email found for data fetch');
+        console.log('No email found for real-time setup');
         setLoading(false);
         setRefreshing(false);
       }
@@ -230,19 +279,18 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     }
   };
 
-  // Initial load and auto-refresh setup
+  // Initial load and real-time setup
   useEffect(() => {
     loadUserData();
 
-    // Set up auto-refresh every 2 minutes
-    refreshIntervalRef.current = setInterval(() => {
-      console.log('Auto-refreshing user data...');
-      loadUserData(true);
-    }, 120000); // 2 minutes
-
+    // Cleanup function to remove listeners
     return () => {
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
+      console.log('Cleaning up real-time listeners');
+      if (userListenerRef.current) {
+        off(userListenerRef.current);
+      }
+      if (transactionsListenerRef.current) {
+        off(transactionsListenerRef.current);
       }
     };
   }, []);
@@ -250,8 +298,9 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   // Reload when email changes
   useEffect(() => {
     if (email) {
-      console.log('Email changed, reloading data:', email);
-      loadUserData();
+      console.log('Email changed, setting up new real-time listeners:', email);
+      setupRealTimeUserData(email);
+      setupRealTimeTransactionCheck(email);
     }
   }, [email]);
 
@@ -325,11 +374,12 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   const onRefresh = async () => {
     console.log('Manual refresh triggered');
-    await loadUserData(true);
-    // Also check for new transactions immediately
+    setRefreshing(true);
+    // Force re-check transactions
     if (email) {
-      checkForNewTransactions();
+      checkForNewTransactions(email);
     }
+    // The real-time listener will automatically update the data
   };
 
   // Fallback drawer state and handlers when Drawer navigator isn't available
@@ -359,9 +409,13 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   const handleLogoutFallback = async () => {
     try {
-      // Clear auto-refresh interval
-      if (refreshIntervalRef.current) {
-        clearInterval(refreshIntervalRef.current);
+      // Clean up real-time listeners
+      console.log('Cleaning up real-time listeners on logout');
+      if (userListenerRef.current) {
+        off(userListenerRef.current);
+      }
+      if (transactionsListenerRef.current) {
+        off(transactionsListenerRef.current);
       }
       
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
@@ -379,6 +433,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         <View style={styles.loaderContainer}>
           <ActivityIndicator size="large" color="#1E3A5F" />
           <Text style={styles.loadingText}>Loading your data...</Text>
+          <Text style={styles.realtimeText}>Real-time updates enabled</Text>
         </View>
       ) : (
         <ScrollView
@@ -409,6 +464,10 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             <View style={styles.greetGroup}>
               <Text style={styles.greetSubtitle}>Welcome back,</Text>
               <Text style={styles.greetTitle}>{firstName}</Text>
+              <View style={styles.realtimeIndicator}>
+                <View style={styles.realtimeDot} />
+                <Text style={styles.realtimeText}>Live</Text>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -864,6 +923,12 @@ const styles = StyleSheet.create({
     color: '#1E3A5F',
     fontWeight: '500',
   },
+  realtimeText: {
+    fontSize: 12,
+    color: '#4ade80',
+    fontWeight: '500',
+    marginTop: 8,
+  },
 
   // New Header Bar
   headerBar: {
@@ -893,6 +958,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1E3A5F',
     marginTop: 2,
+  },
+  realtimeIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  realtimeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#4ade80',
+    marginRight: 6,
   },
   bellButton: {
     width: 40,
