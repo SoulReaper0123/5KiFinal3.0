@@ -53,7 +53,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
 
-  // Check for new transactions and show red dot on bell
+  // --- new code: check for new transactions and show red dot on bell ---
   const checkForNewTransactions = async () => {
     try {
       if (!email) return;
@@ -114,6 +114,7 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     const interval = setInterval(checkForNewTransactions, 30000);
     return () => clearInterval(interval);
   }, [email]);
+  // --- end new code ---
 
   useEffect(() => {
     const textWidth = 600;
@@ -129,9 +130,10 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   }, []);
 
   useEffect(() => {
-    const unsubscribe = MarqueeData(setMarqueeMessages);
-    return () => unsubscribe(); // Clean up when component unmounts
-  }, []);
+  const unsubscribe = MarqueeData(setMarqueeMessages);
+  return () => unsubscribe(); // Clean up when component unmounts
+}, []);
+
 
   const formatBalance = (amount) => {
     const validAmount = Number(amount) || 0;
@@ -142,15 +144,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   };
 
   const fetchUserData = async (userEmail) => {
-    if (!userEmail) {
-      console.log('No email provided to fetchUserData');
-      if (!refreshing) {
-        setLoading(false);
-      }
-      setRefreshing(false);
-      return;
-    }
-
     const db = getDatabase();
     const dbRef = ref(db, 'Members');
     try {
@@ -166,19 +159,12 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
           setInvestment(foundUser.investment || foundUser.investments || 0);
           setEmail(foundUser.email || 'No email provided');
           setSelfie(foundUser.selfie || null);
-          console.log('User data fetched successfully');
-        } else {
-          console.log('User not found in database');
         }
-      } else {
-        console.log('No members data available');
       }
     } catch (error) {
       console.error('Error fetching user data:', error);
     } finally {
-      if (!refreshing) {
-        setLoading(false);
-      }
+      setLoading(false);
       setRefreshing(false);
     }
   };
@@ -315,28 +301,53 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     try {
-      // Use the current email state directly instead of re-fetching from multiple sources
+      const user = auth.currentUser;
+      const paramEmail = route.params?.user?.email;
+      const routeEmail = route.params?.email;
+      let storedEmail = null;
+      
+      // Try to get email from SecureStore (for biometric login)
+      try {
+        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+      } catch (error) {
+        console.error('Error getting email from SecureStore during refresh:', error);
+      }
+      
+      console.log('AppHome - Refreshing user data with:', { 
+        authEmail: user?.email, 
+        paramEmail, 
+        routeEmail,
+        storedEmail,
+        email
+      });
+      
+      // Use the same priority order as initial load
       if (email) {
-        console.log('Refreshing with current email:', email);
-        await fetchUserData(email);
-      } else {
-        // Fallback: try to get email from SecureStore
-        try {
-          const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-          if (storedEmail) {
-            console.log('Refreshing with email from SecureStore:', storedEmail);
-            await fetchUserData(storedEmail);
-          } else {
-            console.log('No email found during refresh');
-          }
-        } catch (error) {
-          console.error('Error getting email from SecureStore during refresh:', error);
-        }
+        console.log('Refreshing with email prop:', email);
+        fetchUserData(email);
+      }
+      else if (storedEmail) {
+        console.log('Refreshing with email from SecureStore:', storedEmail);
+        fetchUserData(storedEmail);
+      }
+      else if (user?.email) {
+        console.log('Refreshing with Firebase auth email:', user.email);
+        fetchUserData(user.email);
+      }
+      else if (paramEmail) {
+        console.log('Refreshing with param email from user object:', paramEmail);
+        fetchUserData(paramEmail);
+      }
+      else if (routeEmail) {
+        console.log('Refreshing with direct route email:', routeEmail);
+        fetchUserData(routeEmail);
+      }
+      else {
+        console.log('No email found during refresh, stopping refresh');
+        setRefreshing(false);
       }
     } catch (error) {
       console.error('Error in onRefresh:', error);
-    } finally {
-      // Always stop refreshing, even if there's an error
       setRefreshing(false);
     }
   };
@@ -379,33 +390,15 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {loading && !refreshing ? (
+      {loading ? (
         <View style={styles.loaderContainer}>
-          <ActivityIndicator size="large" color="#1E3A5F" />
-          <Text style={styles.loadingText}>Loading your account...</Text>
+          <ActivityIndicator size="large" color="white" />
         </View>
       ) : (
         <ScrollView
-          refreshControl={
-            <RefreshControl 
-              refreshing={refreshing} 
-              onRefresh={onRefresh}
-              colors={['#1E3A5F']} // Android
-              tintColor="#1E3A5F" // iOS
-              progressBackgroundColor="#ffffff"
-            />
-          }
-          contentContainerStyle={{ 
-            flexGrow: 1, 
-            padding: 20, 
-            paddingBottom: 40,
-            minHeight: Dimensions.get('window').height + 100 
-          }}
-          style={styles.scrollView}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          contentContainerStyle={{ flexGrow: 1, padding: 20, paddingBottom: 40 }}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={true}
-          overScrollMode="always" // Android
-          alwaysBounceVertical={true} // iOS
         >
           {/* Header Bar */}
           <View style={styles.headerBar}>
@@ -624,6 +617,8 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               
               <Text style={styles.fallbackProfileName}>{firstName}</Text>
               <Text style={styles.fallbackProfileEmail}>{email}</Text>
+              
+
             </View>
 
             {/* Navigation Items */}
@@ -785,6 +780,8 @@ export default function AppHome() {
     }
   }, [route.params, email]);
 
+
+
   const navigation = useNavigation();
 
   const handleAIButtonPress = () => {
@@ -871,16 +868,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#f0f4f8',
-  },
-  loadingText: {
-    marginTop: 12,
-    color: '#1E3A5F',
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  scrollView: {
-    flex: 1,
-    width: '100%',
   },
 
   // New Header Bar
@@ -1451,6 +1438,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+
+
 
   // Floating AI Button styles
   floatingAIButton: {
