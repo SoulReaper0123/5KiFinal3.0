@@ -192,64 +192,6 @@ const ExistingLoan = () => {
     }
   };
 
-  // Alternative simpler overdue check for debugging
-  const isSimplyOverdue = (dueDate) => {
-    try {
-      if (!dueDate) return false;
-      
-      console.log('=== SIMPLE OVERDUE CHECK START ===');
-      console.log('Input due date:', dueDate, typeof dueDate);
-      
-      // Handle different date formats
-      let dueDateObj;
-      
-      if (typeof dueDate === 'string') {
-        // Try direct parsing first
-        dueDateObj = new Date(dueDate);
-        
-        // If that fails, try manual parsing for "August 20, 2025" format
-        if (isNaN(dueDateObj.getTime())) {
-          const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
-            'July', 'August', 'September', 'October', 'November', 'December'];
-          
-          const parts = dueDate.split(' ');
-          if (parts.length === 3) {
-            const monthName = parts[0];
-            const day = parseInt(parts[1].replace(',', ''));
-            const year = parseInt(parts[2]);
-            const monthIndex = monthNames.indexOf(monthName);
-            
-            if (monthIndex !== -1) {
-              dueDateObj = new Date(year, monthIndex, day);
-            }
-          }
-        }
-      } else {
-        dueDateObj = new Date(dueDate);
-      }
-      
-      const today = new Date();
-      
-      // Set both dates to start of day for accurate comparison
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const dueDateStart = new Date(dueDateObj.getFullYear(), dueDateObj.getMonth(), dueDateObj.getDate());
-      
-      const isOverdue = todayStart > dueDateStart;
-      
-      console.log('Due date string:', dueDate);
-      console.log('Parsed due date:', dueDateObj);
-      console.log('Due date (start of day):', dueDateStart);
-      console.log('Today (start of day):', todayStart);
-      console.log('Is overdue (simple):', isOverdue);
-      console.log('=== SIMPLE OVERDUE CHECK END ===');
-      
-      return isOverdue;
-    } catch (error) {
-      console.warn('Simple overdue check error:', error);
-      return false;
-    }
-  };
-
   useEffect(() => {
     loadUserData();
   }, [route.params]);
@@ -317,15 +259,26 @@ const ExistingLoan = () => {
           for (const loanId in loans) {
             const currentLoan = loans[loanId];
             if (currentLoan?.email === userEmail) {
+              // Use remainingBalance from database, fallback to approved data, then loanAmount
+              const outstandingBalance = currentLoan.remainingBalance !== undefined 
+                ? parseFloat(currentLoan.remainingBalance)
+                : (approvedData.remainingBalance || parseFloat(currentLoan.loanAmount || 0));
+              
+              // Use releaseAmount from database, fallback to approved data, then loanAmount
+              const receivableAmount = currentLoan.releaseAmount !== undefined
+                ? parseFloat(currentLoan.releaseAmount)
+                : (approvedData.releaseAmount || parseFloat(currentLoan.loanAmount || 0));
+
               const loanData = {
                 ...currentLoan,
                 ...approvedData,
                 _memberId: memberId,
                 _loanId: loanId,
-                outstandingBalance: currentLoan.remainingBalance || approvedData.remainingBalance || currentLoan.loanAmount,
+                // Use the calculated values
+                outstandingBalance: outstandingBalance,
+                receivableAmount: receivableAmount,
                 dateApplied: currentLoan.dateApplied,
-                dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
-                receivableAmount: currentLoan.releaseAmount || approvedData.releaseAmount || currentLoan.loanAmount
+                dateApproved: currentLoan.dateApproved || approvedData.dateApproved
               };
               foundLoans.push(loanData);
             }
@@ -563,8 +516,8 @@ const ExistingLoan = () => {
               { label: 'Loan Type:', value: loan.loanType || 'Loan' },
               { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
               { label: 'Approved Amount:', value: formatCurrency(loan.loanAmount) },
-              { label: 'Receivable Amount:', value: formatCurrency(loan.receivableAmount || loan.releaseAmount || loan.loanAmount) },
-              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance || loan.remainingBalance || loan.loanAmount) },
+              { label: 'Receivable Amount:', value: formatCurrency(loan.receivableAmount) },
+              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance) },
               { label: 'Date Applied:', value: formatDisplayDate(loan.dateApplied) },
               { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved) },
               { label: 'Term:', value: loan.term ? `${loan.term} months` : 'N/A' },
@@ -581,8 +534,8 @@ const ExistingLoan = () => {
                   navigation.navigate('LoanDetails', {
                     item: {
                       ...loan,
-                      outstandingBalance: loan.outstandingBalance || loan.remainingBalance || parseFloat(loan.loanAmount || 0),
-                      receivableAmount: loan.receivableAmount || loan.releaseAmount || parseFloat(loan.loanAmount || 0),
+                      outstandingBalance: loan.outstandingBalance,
+                      receivableAmount: loan.receivableAmount,
                       paymentHistory: transactionHistory.filter((payment) => {
                         const appliedToLoan = payment.appliedToLoan || payment.originalTransactionId;
                         const loanOriginalId = loan.originalTransactionId || loan.commonOriginalTransactionId;
