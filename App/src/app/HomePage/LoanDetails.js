@@ -35,7 +35,7 @@ const formatDate = (value) => {
   return `${datePart} • ${timePart}`;
 };
 
-export default function LoanDetails() {
+const LoanDetails = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { item } = route.params || {};
@@ -233,7 +233,7 @@ export default function LoanDetails() {
       </ScrollView>
     </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F8FAFC', paddingTop: 30 },
