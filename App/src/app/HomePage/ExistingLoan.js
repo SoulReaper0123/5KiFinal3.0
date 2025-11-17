@@ -397,81 +397,83 @@ const ExistingLoan = () => {
     }
   };
 
- const fetchTransactionHistory = async (memberId) => {
-  try {
-    // Read from both actual write paths and merge
-    const approvedRef = dbRef(database, `Payments/ApprovedPayments/${memberId}`);
-    const txRef = dbRef(database, `Transactions/Payments/${memberId}`);
+  const fetchTransactionHistory = async (memberId) => {
+    try {
+      // Read from both actual write paths and merge
+      const approvedRef = dbRef(database, `Payments/ApprovedPayments/${memberId}`);
+      const txRef = dbRef(database, `Transactions/Payments/${memberId}`);
 
-    const [approvedSnap, txSnap] = await Promise.all([get(approvedRef), get(txRef)]);
+      const [approvedSnap, txSnap] = await Promise.all([get(approvedRef), get(txRef)]);
 
-    const merged = [];
+      const merged = [];
 
-    if (approvedSnap.exists()) {
-      const data = approvedSnap.val();
-      Object.entries(data).forEach(([id, t]) => {
-        const ts = typeof t.timestamp === 'number'
-          ? t.timestamp
-          : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
-        merged.push({
-          transactionId: id,
-          type: t.type || 'Payment',
-          amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
-          dateApproved: t.dateApproved,
-          timestamp: ts,
-          description: t.description || '',
-          status: t.status || 'approved',
-          paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified',
-          appliedToLoan: t.appliedToLoan,
-          originalTransactionId: t.originalTransactionId
+      if (approvedSnap.exists()) {
+        const data = approvedSnap.val();
+        Object.entries(data).forEach(([id, t]) => {
+          const ts = typeof t.timestamp === 'number'
+            ? t.timestamp
+            : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+          merged.push({
+            transactionId: id,
+            originalTransactionId: t.originalTransactionId, // Add this
+            type: t.type || 'Payment',
+            amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
+            dateApproved: t.dateApproved,
+            timestamp: ts,
+            description: t.description || '',
+            status: t.status || 'approved',
+            paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified',
+            appliedToLoan: t.appliedToLoan,
+            // Keep originalTransactionId for matching
+          });
         });
-      });
-    }
+      }
 
-    if (txSnap.exists()) {
-      const data = txSnap.val();
-      Object.entries(data).forEach(([id, t]) => {
-        const ts = typeof t.timestamp === 'number'
-          ? t.timestamp
-          : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
-        merged.push({
-          transactionId: id,
-          type: t.type || 'Payment',
-          amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
-          dateApproved: t.dateApproved,
-          timestamp: ts,
-          description: t.description || '',
-          status: t.status || 'approved',
-          paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified',
-          appliedToLoan: t.appliedToLoan,
-          originalTransactionId: t.originalTransactionId
+      if (txSnap.exists()) {
+        const data = txSnap.val();
+        Object.entries(data).forEach(([id, t]) => {
+          const ts = typeof t.timestamp === 'number'
+            ? t.timestamp
+            : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
+          merged.push({
+            transactionId: id,
+            originalTransactionId: t.originalTransactionId, // Add this
+            type: t.type || 'Payment',
+            amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
+            dateApproved: t.dateApproved,
+            timestamp: ts,
+            description: t.description || '',
+            status: t.status || 'approved',
+            paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified',
+            appliedToLoan: t.appliedToLoan,
+            // Keep originalTransactionId for matching
+          });
         });
+      }
+
+      // Deduplicate by transactionId
+      const dedupedMap = new Map();
+      merged.forEach(item => {
+        dedupedMap.set(item.transactionId, item);
       });
+      const deduped = Array.from(dedupedMap.values())
+        .filter(t => {
+          const status = String(t.status || '').toLowerCase();
+          return status === 'approved' || status === 'paid' || status === 'completed';
+        });
+
+      deduped.sort((a, b) => {
+        const at = typeof a.timestamp === 'number' ? a.timestamp : parseDateTime(a.dateApproved).getTime();
+        const bt = typeof b.timestamp === 'number' ? b.timestamp : parseDateTime(b.dateApproved).getTime();
+        return bt - at;
+      });
+
+      setTransactionHistory(deduped);
+    } catch (error) {
+      console.error('Error fetching transactions:', error);
+      setTransactionHistory([]);
     }
-
-    // Deduplicate by transactionId
-    const dedupedMap = new Map();
-    merged.forEach(item => {
-      dedupedMap.set(item.transactionId, item);
-    });
-    const deduped = Array.from(dedupedMap.values())
-      .filter(t => {
-        const status = String(t.status || '').toLowerCase();
-        return status === 'approved' || status === 'paid' || status === 'completed';
-      });
-
-    deduped.sort((a, b) => {
-      const at = typeof a.timestamp === 'number' ? a.timestamp : parseDateTime(a.dateApproved).getTime();
-      const bt = typeof b.timestamp === 'number' ? b.timestamp : parseDateTime(b.dateApproved).getTime();
-      return bt - at;
-    });
-
-    setTransactionHistory(deduped);
-  } catch (error) {
-    console.error('Error fetching transactions:', error);
-    setTransactionHistory([]);
-  }
-};
+  };
 
   const getStatusColor = (status) => {
     switch(String(status).toLowerCase()) {
@@ -544,7 +546,13 @@ const ExistingLoan = () => {
                       outstandingBalance: loan.outstandingBalance,
                       receivableAmount: loan.receivableAmount,
                       processingFee: loan.processingFee,
+                      // Make sure these identifiers are passed
+                      originalTransactionId: loan.originalTransactionId,
+                      commonOriginalTransactionId: loan.commonOriginalTransactionId,
+                      _loanId: loan._loanId,
+                      transactionId: loan.transactionId,
                       paymentHistory: transactionHistory.filter((payment) => {
+                        // Use BOTH appliedToLoan AND originalTransactionId for matching
                         const appliedToLoan = payment.appliedToLoan || payment.originalTransactionId;
                         const loanOriginalId = loan.originalTransactionId || loan.commonOriginalTransactionId || loan._loanId;
                         return loanOriginalId && appliedToLoan && String(appliedToLoan) === String(loanOriginalId);
