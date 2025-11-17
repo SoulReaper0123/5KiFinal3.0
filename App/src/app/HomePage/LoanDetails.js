@@ -124,9 +124,38 @@ export default function LoanDetails() {
             <Text style={styles.summaryValue}>{Number(loan.interestRate || 0).toFixed(2)}%</Text>
           </View>
 
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Date Applied</Text>
+            <Text style={styles.summaryValue}>{formatDate(loan.dateApplied)}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Date Approved</Text>
+            <Text style={styles.summaryValue}>{formatDate(loan.dateApproved)}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Principal Amount</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(loan.monthlyPayment)}</Text>
+          </View>
+
           <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
             <Text style={styles.summaryLabel}>Total Amount</Text>
             <Text style={styles.summaryValue}>{formatCurrency(loan.totalMonthlyPayment ?? loan.totalTermPayment)}</Text>
+          </View>
+
+          <View style={[styles.summaryRow, { borderBottomWidth: 0, marginTop: 8 }]}>
+            <Text style={styles.summaryLabel}>Due Date</Text>
+            <View style={{ alignItems: 'flex-end' }}>
+              <Text style={[styles.summaryValue, dueOverdue && { color: '#D32F2F' }]}>
+                {formatDate(dueRaw)}
+              </Text>
+              {dueOverdue && (
+                <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
+                  Overdue
+                </Text>
+              )}
+            </View>
           </View>
         </View>
 
@@ -281,3 +310,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
 });
+
+export default LoanDetails;
