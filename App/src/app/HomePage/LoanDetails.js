@@ -39,6 +39,7 @@ const LoanDetails = () => {
   const [loading, setLoading] = useState(true);
   const [payments, setPayments] = useState([]);
   const [loanDetails, setLoanDetails] = useState(null);
+  const [debugInfo, setDebugInfo] = useState('');
 
   // Fetch payments for this specific loan
   const fetchPaymentsForLoan = async () => {
@@ -48,6 +49,7 @@ const LoanDetails = () => {
       const memberId = loan._memberId || loan.memberId || loan.id;
       if (!memberId) {
         console.log('❌ No member ID found for loan');
+        setDebugInfo('No member ID found');
         setPayments([]);
         return;
       }
@@ -56,16 +58,20 @@ const LoanDetails = () => {
         memberId,
         loanId: loan._loanId,
         transactionId: loan.transactionId,
-        originalTransactionId: loan.originalTransactionId
+        originalTransactionId: loan.originalTransactionId,
+        commonOriginalTransactionId: loan.commonOriginalTransactionId
       });
 
-      // Get the loan identifier - use originalTransactionId first, then fallback to _loanId
-      const loanIdentifier = 
-        loan.originalTransactionId || 
-        loan.commonOriginalTransactionId || 
-        loan._loanId;
+      // Try multiple possible loan identifiers
+      const possibleLoanIdentifiers = [
+        loan.originalTransactionId,
+        loan.commonOriginalTransactionId,
+        loan._loanId,
+        loan.transactionId,
+        loan.loanId
+      ].filter(Boolean); // Remove null/undefined values
 
-      console.log('📋 Looking for payments with appliedToLoan =', loanIdentifier);
+      console.log('📋 Possible loan identifiers:', possibleLoanIdentifiers);
 
       // Fetch from Payments/ApprovedPayments
       const paymentsRef = ref(database, `Payments/ApprovedPayments/${memberId}`);
@@ -76,22 +82,44 @@ const LoanDetails = () => {
       if (paymentsSnap?.exists()) {
         const paymentsData = paymentsSnap.val();
         console.log('✅ Found payments data, searching for loan matches...');
+        console.log('📊 Total payments found:', Object.keys(paymentsData).length);
 
-        // Find all payments where appliedToLoan matches the loan's identifier
+        // Find all payments where appliedToLoan matches any of the possible loan identifiers
         Object.entries(paymentsData).forEach(([paymentId, paymentData]) => {
           if (!paymentData || typeof paymentData !== 'object') return;
 
           const paymentAppliedToLoan = paymentData.appliedToLoan;
+          const paymentOriginalTransactionId = paymentData.originalTransactionId;
 
           console.log(`🔍 Checking payment ${paymentId}:`);
           console.log('  paymentAppliedToLoan:', paymentAppliedToLoan);
-          console.log('  loanIdentifier:', loanIdentifier);
+          console.log('  paymentOriginalTransactionId:', paymentOriginalTransactionId);
+          console.log('  possibleLoanIdentifiers:', possibleLoanIdentifiers);
 
-          // Check if this payment is for our loan
-          const matchesLoan = paymentAppliedToLoan &&
-            String(paymentAppliedToLoan) === String(loanIdentifier);
+          // Check if this payment is for our loan using multiple matching strategies
+          let matchesLoan = false;
+          let matchType = '';
 
-          console.log('  ✅ MATCHES:', matchesLoan);
+          // Strategy 1: Direct appliedToLoan match
+          if (paymentAppliedToLoan && possibleLoanIdentifiers.includes(paymentAppliedToLoan)) {
+            matchesLoan = true;
+            matchType = 'appliedToLoan direct match';
+          }
+          // Strategy 2: OriginalTransactionId match
+          else if (paymentOriginalTransactionId && possibleLoanIdentifiers.includes(paymentOriginalTransactionId)) {
+            matchesLoan = true;
+            matchType = 'originalTransactionId match';
+          }
+          // Strategy 3: String comparison (case insensitive)
+          else if (paymentAppliedToLoan) {
+            const appliedToLoanLower = String(paymentAppliedToLoan).toLowerCase();
+            matchesLoan = possibleLoanIdentifiers.some(id => 
+              String(id).toLowerCase() === appliedToLoanLower
+            );
+            if (matchesLoan) matchType = 'case-insensitive match';
+          }
+
+          console.log('  ✅ MATCHES:', matchesLoan, matchType);
 
           if (!matchesLoan) return;
 
@@ -126,18 +154,11 @@ const LoanDetails = () => {
               record.datePaid,
               record.paymentDate,
               record.paymentDateTime,
-              record.payment_date,
-              record.paymentDatetime,
-              record.paymentCreatedAt,
-              record.payment_created_at,
-              record.paymentCompletedAt,
-              record.paymentTimestamp,
               record.paidAt,
               record.date,
               record.completedAt,
               record.approvedAt,
               record.createdAt,
-              record.updatedAt,
             ];
 
             const timestampSources = [
@@ -146,13 +167,7 @@ const LoanDetails = () => {
               record.updatedAtTimestamp,
               record.approvedAtTimestamp,
               record.paymentTimestamp,
-              record.paymentCreatedAt,
-              record.paymentCompletedAt,
-              record.paymentDatetime,
               record.paidAtTimestamp,
-              record.processedAt,
-              record.timeApproved,
-              record.timeProcessed,
             ];
 
             let timestamp = null;
@@ -217,7 +232,7 @@ const LoanDetails = () => {
             ) ?? 0,
             displayDate,
             timestamp,
-            status: 'paid',
+            status: status || 'approved',
             paymentOption: paymentData.paymentOption || paymentData.modeOfPayment || paymentData.method,
             receiptNumber:
               paymentData.referenceNumber ||
@@ -235,21 +250,97 @@ const LoanDetails = () => {
             penaltyPaid: parseCurrencyValue(paymentData.penaltyPaid),
             principalPaid: parseCurrencyValue(paymentData.principalPaid),
             excessPayment: parseCurrencyValue(paymentData.excessPayment),
+            matchType: matchType,
           };
 
           collectedPayments.push(payment);
-          console.log('  ✅ Added payment to collection');
+          console.log('  ✅ Added payment to collection:', paymentId);
         });
       } else {
         console.log('❌ No payments found at Payments/ApprovedPayments/' + memberId);
+        setDebugInfo(`No payments found for member: ${memberId}`);
       }
 
       console.log('📊 Final payments collection:', collectedPayments);
       collectedPayments.sort((a, b) => b.timestamp - a.timestamp);
       setPayments(collectedPayments);
+      setDebugInfo(`Found ${collectedPayments.length} payments for ${possibleLoanIdentifiers.length} possible loan identifiers`);
     } catch (error) {
       console.error('❌ Error fetching payments for loan:', error);
       setPayments([]);
+      setDebugInfo(`Error: ${error.message}`);
+    }
+  };
+
+  // Also try to fetch from Transactions/Payments as fallback
+  const fetchPaymentsFromTransactions = async () => {
+    if (!loan || payments.length > 0) return;
+
+    try {
+      const memberId = loan._memberId || loan.memberId || loan.id;
+      if (!memberId) return;
+
+      console.log('🔄 Trying Transactions/Payments as fallback...');
+      const transactionsRef = ref(database, `Transactions/Payments/${memberId}`);
+      const transactionsSnap = await get(transactionsRef);
+
+      if (transactionsSnap?.exists()) {
+        const transactionsData = transactionsSnap.val();
+        console.log('✅ Found transactions data:', Object.keys(transactionsData).length);
+
+        const possibleLoanIdentifiers = [
+          loan.originalTransactionId,
+          loan.commonOriginalTransactionId,
+          loan._loanId,
+          loan.transactionId,
+          loan.loanId
+        ].filter(Boolean);
+
+        const collectedFromTransactions = [];
+
+        Object.entries(transactionsData).forEach(([paymentId, paymentData]) => {
+          if (!paymentData || typeof paymentData !== 'object') return;
+
+          const paymentAppliedToLoan = paymentData.appliedToLoan;
+          const status = String(paymentData.status || '').toLowerCase();
+
+          if (status !== 'approved' && status !== 'paid') return;
+
+          // Check for matches
+          const matchesLoan = paymentAppliedToLoan && 
+            possibleLoanIdentifiers.some(id => String(id) === String(paymentAppliedToLoan));
+
+          if (matchesLoan) {
+            const parseCurrencyValue = (value) => {
+              if (value === null || value === undefined) return null;
+              if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+              if (typeof value === 'string') {
+                const sanitized = value.replace(/[^0-9.-]/g, '');
+                if (!sanitized.trim()) return null;
+                const num = Number(sanitized);
+                return Number.isNaN(num) ? null : num;
+              }
+              return null;
+            };
+
+            collectedFromTransactions.push({
+              ...paymentData,
+              id: paymentId,
+              transactionId: paymentId,
+              amount: parseCurrencyValue(paymentData.amount) ?? 0,
+              source: 'transactions',
+            });
+          }
+        });
+
+        if (collectedFromTransactions.length > 0) {
+          console.log('✅ Found payments in transactions:', collectedFromTransactions.length);
+          setPayments(prev => [...prev, ...collectedFromTransactions]);
+          setDebugInfo(prev => prev + ` | Found ${collectedFromTransactions.length} in transactions`);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching from transactions:', error);
     }
   };
 
@@ -277,6 +368,10 @@ const LoanDetails = () => {
 
       // Fetch payments for this loan
       await fetchPaymentsForLoan();
+      
+      // Try transactions as fallback
+      await fetchPaymentsFromTransactions();
+      
       setLoading(false);
     };
 
@@ -297,6 +392,7 @@ const LoanDetails = () => {
           <View style={{ width: 22 }} />
         </View>
         <ActivityIndicator size="large" color="#234E70" style={{ marginTop: 20 }} />
+        <Text style={styles.debugText}>{debugInfo}</Text>
       </View>
     );
   }
@@ -312,6 +408,15 @@ const LoanDetails = () => {
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
+        {/* Debug Info */}
+        {__DEV__ && debugInfo ? (
+          <View style={styles.debugContainer}>
+            <Text style={styles.debugText}>Debug: {debugInfo}</Text>
+            <Text style={styles.debugText}>Loan ID: {loan._loanId}</Text>
+            <Text style={styles.debugText}>Original ID: {loan.originalTransactionId}</Text>
+          </View>
+        ) : null}
+
         <View style={styles.loanSummary}>
           <Text style={styles.summaryTitle}>{loanDetails?.loanType || loan?.loanType || 'Loan Type'}</Text>
           
@@ -367,12 +472,12 @@ const LoanDetails = () => {
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Monthly Amortization</Text>
+            <Text style={styles.summaryLabel}>Monthly Payment</Text>
             <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.monthlyPayment)}</Text>
           </View>
 
           <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.summaryLabel}>Total Monthly Amortization</Text>
+            <Text style={styles.summaryLabel}>Total Monthly Payment</Text>
             <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.totalMonthlyPayment)}</Text>
           </View>
 
@@ -398,7 +503,12 @@ const LoanDetails = () => {
         {payments.length > 0 ? (
           payments.map((payment, index) => (
             <View key={`${payment.id}-${index}`} style={styles.paymentCard}>
-              <Text style={styles.paymentTitle}>Payment ID: {payment.transactionId || 'N/A'}</Text>
+              <Text style={styles.paymentTitle}>
+                Payment ID: {payment.transactionId || 'N/A'}
+                {payment.matchType && (
+                  <Text style={styles.matchType}> ({payment.matchType})</Text>
+                )}
+              </Text>
               
               {payment.appliedToLoan && (
                 <View style={styles.paymentRow}>
@@ -492,6 +602,11 @@ const LoanDetails = () => {
             <Text style={styles.emptySubText}>
               Payment history will appear here once payments are approved
             </Text>
+            {__DEV__ && (
+              <Text style={styles.debugText}>
+                Check console for detailed debugging information
+              </Text>
+            )}
           </View>
         )}
       </ScrollView>
@@ -525,6 +640,20 @@ const styles = StyleSheet.create({
     fontSize: 18, 
     fontWeight: '700', 
     color: '#1E3A5F' 
+  },
+  debugContainer: {
+    backgroundColor: '#FFF3CD',
+    padding: 12,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#FFC107',
+  },
+  debugText: {
+    fontSize: 12,
+    color: '#856404',
+    fontFamily: 'monospace',
   },
   loanSummary: {
     backgroundColor: '#fff',
@@ -593,6 +722,11 @@ const styles = StyleSheet.create({
     fontWeight: '600', 
     color: '#1E3A5F', 
     marginBottom: 10 
+  },
+  matchType: {
+    fontSize: 12,
+    color: '#666',
+    fontStyle: 'italic',
   },
   paymentLabel: { 
     fontSize: 14, 
