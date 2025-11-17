@@ -220,10 +220,7 @@ const ExistingLoan = () => {
         dateApproved: null,
         interestRate: 0,
         interest: 0,
-        term: 0,
-        remainingBalance: 0,
-        releaseAmount: 0,
-        processingFee: 0
+        term: 0
       };
 
       if (approvedSnapshot.exists()) {
@@ -238,10 +235,7 @@ const ExistingLoan = () => {
                 dateApproved: loan.dateApproved,
                 interestRate: parseFloat(loan.interestRate || 0),
                 interest: parseFloat(loan.interest || 0),
-                term: parseInt(loan.term || 0),
-                remainingBalance: parseFloat(loan.remainingBalance || loan.loanAmount || 0),
-                releaseAmount: parseFloat(loan.releaseAmount || loan.loanAmount || 0),
-                processingFee: parseFloat(loan.processingFee || 0)
+                term: parseInt(loan.term || 0)
               };
               break;
             }
@@ -261,32 +255,14 @@ const ExistingLoan = () => {
           for (const loanId in loans) {
             const currentLoan = loans[loanId];
             if (currentLoan?.email === userEmail) {
-              // Use remainingBalance from database, fallback to approved data, then loanAmount
-              const outstandingBalance = currentLoan.remainingBalance !== undefined 
-                ? parseFloat(currentLoan.remainingBalance)
-                : (approvedData.remainingBalance || parseFloat(currentLoan.loanAmount || 0));
-              
-              // Use releaseAmount from database, fallback to approved data, then loanAmount
-              const receivableAmount = currentLoan.releaseAmount !== undefined
-                ? parseFloat(currentLoan.releaseAmount)
-                : (approvedData.releaseAmount || parseFloat(currentLoan.loanAmount || 0));
-
-              // Get processing fee from approved data or current loan
-              const processingFee = currentLoan.processingFee !== undefined
-                ? parseFloat(currentLoan.processingFee)
-                : (approvedData.processingFee || 0);
-
               const loanData = {
                 ...currentLoan,
                 ...approvedData,
                 _memberId: memberId,
                 _loanId: loanId,
-                // Use the calculated values
-                outstandingBalance: outstandingBalance,
-                receivableAmount: receivableAmount,
-                processingFee: processingFee,
+                outstandingBalance: currentLoan.loanAmount,
                 dateApplied: currentLoan.dateApplied,
-                dateApproved: currentLoan.dateApproved || approvedData.dateApproved
+                dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
               };
               foundLoans.push(loanData);
             }
@@ -415,7 +391,8 @@ const ExistingLoan = () => {
             : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
           merged.push({
             transactionId: id,
-            originalTransactionId: t.originalTransactionId, // Add this
+            originalTransactionId: t.originalTransactionId, // CRITICAL: Add this field
+            appliedToLoan: t.appliedToLoan, // CRITICAL: Add this field
             type: t.type || 'Payment',
             amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
             dateApproved: t.dateApproved,
@@ -423,8 +400,11 @@ const ExistingLoan = () => {
             description: t.description || '',
             status: t.status || 'approved',
             paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified',
-            appliedToLoan: t.appliedToLoan,
-            // Keep originalTransactionId for matching
+            // Additional payment fields for detailed view
+            interestPaid: parseFloat(t.interestPaid || 0),
+            principalPaid: parseFloat(t.principalPaid || 0),
+            penaltyPaid: parseFloat(t.penaltyPaid || 0),
+            excessPayment: parseFloat(t.excessPayment || 0),
           });
         });
       }
@@ -437,7 +417,8 @@ const ExistingLoan = () => {
             : (t.dateApproved ? new Date(t.dateApproved).getTime() : Date.now());
           merged.push({
             transactionId: id,
-            originalTransactionId: t.originalTransactionId, // Add this
+            originalTransactionId: t.originalTransactionId, // CRITICAL: Add this field
+            appliedToLoan: t.appliedToLoan, // CRITICAL: Add this field
             type: t.type || 'Payment',
             amountToBePaid: parseFloat(t.amountToBePaid || t.amount || t.amountPaid || 0),
             dateApproved: t.dateApproved,
@@ -445,8 +426,11 @@ const ExistingLoan = () => {
             description: t.description || '',
             status: t.status || 'approved',
             paymentOption: t.paymentOption || t.modeOfPayment || 'Not specified',
-            appliedToLoan: t.appliedToLoan,
-            // Keep originalTransactionId for matching
+            // Additional payment fields for detailed view
+            interestPaid: parseFloat(t.interestPaid || 0),
+            principalPaid: parseFloat(t.principalPaid || 0),
+            penaltyPaid: parseFloat(t.penaltyPaid || 0),
+            excessPayment: parseFloat(t.excessPayment || 0),
           });
         });
       }
@@ -526,37 +510,48 @@ const ExistingLoan = () => {
         {activeLoans && activeLoans.length > 0 ? (
           activeLoans.map((loan) => {
             const dueDateValue = loan.dueDate || loan.nextDueDate;
-            // Only show these specific fields in ExistingLoan
             const detailRows = [
               { label: 'Loan Type:', value: loan.loanType || 'Loan' },
               { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
               { label: 'Approved Amount:', value: formatCurrency(loan.loanAmount) },
-              { label: 'Processing Fee:', value: formatCurrency(loan.processingFee) },
-              { label: 'Receivable Amount:', value: formatCurrency(loan.receivableAmount) },
-              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance) },
+              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance ?? loan.loanAmount) },
+              { label: 'Date Applied:', value: formatDisplayDate(loan.dateApplied) },
+              { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved) },
+              { label: 'Term:', value: loan.term ? `${loan.term} months` : 'N/A' },
+              { label: 'Interest Rate:', value: formatPercentage(loan.interestRate) },
+              { label: 'Interest:', value: formatCurrency(loan.interest) },
+              { label: 'Principal Amount:', value: formatCurrency(loan.monthlyPayment) },
+              { label: 'Total Amount:', value: formatCurrency(loan.totalMonthlyPayment ?? loan.totalTermPayment) }
             ];
             return (
               <TouchableOpacity
                 key={loan.transactionId || loan._loanId}
                 style={styles.transactionCard}
                 onPress={() => {
+                  // Get payments that match this loan
+                  const loanPayments = transactionHistory.filter((payment) => {
+                    // Use BOTH appliedToLoan AND originalTransactionId for matching
+                    const appliedToLoan = payment.appliedToLoan || payment.originalTransactionId;
+                    const loanOriginalId = loan.originalTransactionId || loan.commonOriginalTransactionId || loan._loanId;
+                    
+                    console.log('🔍 Payment Matching:', {
+                      paymentId: payment.transactionId,
+                      appliedToLoan: payment.appliedToLoan,
+                      originalTransactionId: payment.originalTransactionId,
+                      loanOriginalId: loanOriginalId,
+                      matches: loanOriginalId && appliedToLoan && String(appliedToLoan) === String(loanOriginalId)
+                    });
+                    
+                    return loanOriginalId && appliedToLoan && String(appliedToLoan) === String(loanOriginalId);
+                  });
+
+                  console.log('📊 Found payments for loan:', loanPayments.length);
+
                   navigation.navigate('LoanDetails', {
                     item: {
                       ...loan,
-                      outstandingBalance: loan.outstandingBalance,
-                      receivableAmount: loan.receivableAmount,
-                      processingFee: loan.processingFee,
-                      // Make sure these identifiers are passed
-                      originalTransactionId: loan.originalTransactionId,
-                      commonOriginalTransactionId: loan.commonOriginalTransactionId,
-                      _loanId: loan._loanId,
-                      transactionId: loan.transactionId,
-                      paymentHistory: transactionHistory.filter((payment) => {
-                        // Use BOTH appliedToLoan AND originalTransactionId for matching
-                        const appliedToLoan = payment.appliedToLoan || payment.originalTransactionId;
-                        const loanOriginalId = loan.originalTransactionId || loan.commonOriginalTransactionId || loan._loanId;
-                        return loanOriginalId && appliedToLoan && String(appliedToLoan) === String(loanOriginalId);
-                      })
+                      outstandingBalance: parseFloat(loan.loanAmount || 0),
+                      paymentHistory: loanPayments
                     }
                   });
                 }}
