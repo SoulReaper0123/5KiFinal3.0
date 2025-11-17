@@ -1,7 +1,9 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ref, get } from 'firebase/database';
+import { database } from '../../firebaseConfig';
 
 const formatCurrency = (n) => `₱${(Number(n) || 0).toFixed(2)}`;
 
@@ -20,19 +22,12 @@ const formatDate = (value) => {
 
   if (Number.isNaN(baseDate.getTime())) return String(value);
 
-  const datePart = baseDate.toLocaleDateString('en-US', {
-    month: 'short',
+  // Remove time part, only show date
+  return baseDate.toLocaleDateString('en-US', {
+    month: 'long',
     day: 'numeric',
-    year: 'numeric',
+    year: 'numeric'
   });
-
-  const timePart = baseDate.toLocaleTimeString('en-US', {
-    hour: 'numeric',
-    minute: '2-digit',
-    hour12: true,
-  });
-
-  return `${datePart} • ${timePart}`;
 };
 
 const LoanDetails = () => {
@@ -40,6 +35,10 @@ const LoanDetails = () => {
   const route = useRoute();
   const { item } = route.params || {};
   const loan = item || {};
+
+  const [loading, setLoading] = useState(true);
+  const [payments, setPayments] = useState([]);
+  const [loanDetails, setLoanDetails] = useState(null);
 
   const parseDateTime = (dateInput) => {
     try {
@@ -85,8 +84,259 @@ const LoanDetails = () => {
     return startToday >= startDue;
   };
 
+  // Fetch payments for this specific loan
+  const fetchPaymentsForLoan = async () => {
+    if (!loan) return;
+
+    try {
+      const memberId = loan._memberId || loan.memberId;
+      if (!memberId) {
+        console.log('❌ No member ID found for loan');
+        setPayments([]);
+        return;
+      }
+
+      console.log('🔍 Fetching payments for loan:', {
+        memberId,
+        loanId: loan._loanId,
+        transactionId: loan.transactionId
+      });
+
+      // Get the originalTransactionId from the loan data
+      const loanOriginalTransactionId = 
+        loan.originalTransactionId || 
+        loan.commonOriginalTransactionId || 
+        loan._loanId;
+
+      console.log('📋 Looking for payments with appliedToLoan =', loanOriginalTransactionId);
+
+      // Fetch from Payments/ApprovedPayments
+      const paymentsRef = ref(database, `Payments/ApprovedPayments/${memberId}`);
+      const paymentsSnap = await get(paymentsRef);
+
+      const collectedPayments = [];
+
+      if (paymentsSnap?.exists()) {
+        const paymentsData = paymentsSnap.val();
+        console.log('✅ Found payments data, searching for loan matches...');
+
+        // Find all payments where appliedToLoan matches the loan's originalTransactionId
+        Object.entries(paymentsData).forEach(([paymentId, paymentData]) => {
+          if (!paymentData || typeof paymentData !== 'object') return;
+
+          const paymentAppliedToLoan = paymentData.appliedToLoan;
+
+          console.log(`🔍 Checking payment ${paymentId}:`);
+          console.log('  paymentAppliedToLoan:', paymentAppliedToLoan);
+          console.log('  loanOriginalTransactionId:', loanOriginalTransactionId);
+
+          // Check if this payment is for our loan
+          const matchesLoan = paymentAppliedToLoan &&
+            String(paymentAppliedToLoan) === String(loanOriginalTransactionId);
+
+          console.log('  ✅ MATCHES:', matchesLoan);
+
+          if (!matchesLoan) return;
+
+          const status = String(paymentData.status || paymentData.paymentStatus || '').toLowerCase();
+          if (status && status !== 'approved' && status !== 'paid') {
+            console.log('  ❌ Skipping - status not approved/paid:', status);
+            return;
+          }
+
+          // Parse currency values
+          const parseCurrencyValue = (value) => {
+            if (value === null || value === undefined) return null;
+            if (typeof value === 'number') return Number.isNaN(value) ? null : value;
+            if (typeof value === 'string') {
+              const sanitized = value.replace(/[^0-9.-]/g, '');
+              if (!sanitized.trim()) return null;
+              const num = Number(sanitized);
+              return Number.isNaN(num) ? null : num;
+            }
+            return null;
+          };
+
+          // Extract date info
+          const extractDateInfo = (record = {}) => {
+            if (!record || typeof record !== 'object') {
+              const now = Date.now();
+              return { displayDate: now, timestamp: now };
+            }
+
+            const dateCandidates = [
+              record.dateApproved,
+              record.datePaid,
+              record.paymentDate,
+              record.paymentDateTime,
+              record.payment_date,
+              record.paymentDatetime,
+              record.paymentCreatedAt,
+              record.payment_created_at,
+              record.paymentCompletedAt,
+              record.paymentTimestamp,
+              record.paidAt,
+              record.date,
+              record.completedAt,
+              record.approvedAt,
+              record.createdAt,
+              record.updatedAt,
+            ];
+
+            const timestampSources = [
+              record.timestamp,
+              record.createdAtTimestamp,
+              record.updatedAtTimestamp,
+              record.approvedAtTimestamp,
+              record.paymentTimestamp,
+              record.paymentCreatedAt,
+              record.paymentCompletedAt,
+              record.paymentDatetime,
+              record.paidAtTimestamp,
+              record.processedAt,
+              record.timeApproved,
+              record.timeProcessed,
+            ];
+
+            let timestamp = null;
+            for (const source of timestampSources) {
+              const normalized = normalizeEpochValue(source);
+              if (normalized !== null) {
+                timestamp = normalized;
+                break;
+              }
+            }
+
+            let displayDate = null;
+            for (const candidate of dateCandidates) {
+              if (candidate === null || candidate === undefined) continue;
+              if (typeof candidate === 'string' && !candidate.trim()) continue;
+              displayDate = candidate;
+              break;
+            }
+
+            if (timestamp === null && displayDate !== null) {
+              const normalizedDisplay = normalizeEpochValue(displayDate);
+              if (normalizedDisplay !== null) {
+                timestamp = normalizedDisplay;
+              } else {
+                const parsed = Date.parse(displayDate);
+                if (!Number.isNaN(parsed)) {
+                  timestamp = parsed;
+                }
+              }
+            }
+
+            if (timestamp === null) {
+              timestamp = Date.now();
+            }
+
+            if (!displayDate) {
+              displayDate = timestamp;
+            }
+
+            return { displayDate, timestamp };
+          };
+
+          const normalizeEpochValue = (value) => {
+            if (value === null || value === undefined || value === '') return null;
+            const num = Number(value);
+            if (Number.isNaN(num)) return null;
+            return num < 1e12 ? num * 1000 : num;
+          };
+
+          const { displayDate, timestamp } = extractDateInfo(paymentData);
+
+          const payment = {
+            source: 'payment',
+            id: paymentId,
+            transactionId: paymentId,
+            amount: parseCurrencyValue(
+              paymentData.amountPaid ||
+              paymentData.amountApproved ||
+              paymentData.approvedAmount ||
+              paymentData.amountToBePaid ||
+              paymentData.amount
+            ) ?? 0,
+            displayDate,
+            timestamp,
+            status: 'paid',
+            paymentOption: paymentData.paymentOption || paymentData.modeOfPayment || paymentData.method,
+            receiptNumber:
+              paymentData.referenceNumber ||
+              paymentData.paymentReference ||
+              paymentData.referenceId ||
+              paymentData.receiptNumber ||
+              paymentData.receipt,
+            appliedToLoan: paymentData.appliedToLoan,
+            amountToBePaid: parseCurrencyValue(paymentData.amountToBePaid),
+            dateApplied: paymentData.dateApplied,
+            dateApproved: paymentData.dateApproved,
+            interestPaid: parseCurrencyValue(paymentData.interestPaid),
+            originalTransactionId: paymentData.originalTransactionId,
+          };
+
+          collectedPayments.push(payment);
+          console.log('  ✅ Added payment to collection');
+        });
+      } else {
+        console.log('❌ No payments found at Payments/ApprovedPayments/' + memberId);
+      }
+
+      console.log('📊 Final payments collection:', collectedPayments);
+      collectedPayments.sort((a, b) => b.timestamp - a.timestamp);
+      setPayments(collectedPayments);
+    } catch (error) {
+      console.error('❌ Error fetching payments for loan:', error);
+      setPayments([]);
+    }
+  };
+
+  useEffect(() => {
+    const initializeData = async () => {
+      setLoading(true);
+      
+      // Set basic loan details
+      if (loan) {
+        setLoanDetails({
+          loanType: loan.loanType || 'Loan',
+          amount: parseFloat(loan.loanAmount) || 0,
+          term: loan.term,
+          interest: parseFloat(loan.interest) || 0,
+          interestRate: parseFloat(loan.interestRate) || 0,
+          dateApplied: loan.dateApplied,
+          dateApproved: loan.dateApproved,
+          monthlyPayment: parseFloat(loan.monthlyPayment) || 0,
+          totalMonthlyPayment: parseFloat(loan.totalMonthlyPayment) || 0,
+          outstandingBalance: parseFloat(loan.outstandingBalance) || 0,
+        });
+      }
+
+      // Fetch payments for this loan
+      await fetchPaymentsForLoan();
+      setLoading(false);
+    };
+
+    initializeData();
+  }, [loan]);
+
   const dueRaw = loan.dueDate || loan.nextDueDate;
   const dueOverdue = isOverdue(dueRaw);
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitleText}>{loan.loanType || 'Loan'}</Text>
+          <View style={{ width: 22 }} />
+        </View>
+        <ActivityIndicator size="large" color="#234E70" style={{ marginTop: 20 }} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -94,54 +344,59 @@ const LoanDetails = () => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
           <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
         </TouchableOpacity>
-        <Text style={styles.headerTitleText}>{loan.loanType || 'Loan'}</Text>
+        <Text style={styles.headerTitleText}>{loanDetails?.loanType || loan?.loanType || 'Loan'}</Text>
         <View style={{ width: 22 }} />
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 20 }}>
         <View style={styles.loanSummary}>
-          <Text style={styles.summaryTitle}>{loan.loanType || 'Loan Type'}</Text>
+          <Text style={styles.summaryTitle}>{loanDetails?.loanType || loan?.loanType || 'Loan Type'}</Text>
           
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Loan Amount</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(loan.loanAmount)}</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.amount)}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Outstanding Balance</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.outstandingBalance)}</Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Term</Text>
             <Text style={styles.summaryValue}>
-              {loan.term ? `${loan.term} ${loan.term === 1 ? 'month' : 'months'}` : 'N/A'}
+              {loanDetails?.term ? `${loanDetails.term} ${loanDetails.term === 1 ? 'month' : 'months'}` : 'N/A'}
             </Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Interest</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(loan.interest)}</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.interest)}</Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Interest Rate</Text>
-            <Text style={styles.summaryValue}>{Number(loan.interestRate || 0).toFixed(2)}%</Text>
+            <Text style={styles.summaryValue}>{Number(loanDetails?.interestRate || 0).toFixed(2)}%</Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Date Applied</Text>
-            <Text style={styles.summaryValue}>{formatDate(loan.dateApplied)}</Text>
+            <Text style={styles.summaryValue}>{formatDate(loanDetails?.dateApplied)}</Text>
           </View>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Date Approved</Text>
-            <Text style={styles.summaryValue}>{formatDate(loan.dateApproved)}</Text>
+            <Text style={styles.summaryValue}>{formatDate(loanDetails?.dateApproved)}</Text>
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Principal Amount</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(loan.monthlyPayment)}</Text>
+            <Text style={styles.summaryLabel}>Monthly Payment</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.monthlyPayment)}</Text>
           </View>
 
           <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.summaryLabel}>Total Amount</Text>
-            <Text style={styles.summaryValue}>{formatCurrency(loan.totalMonthlyPayment ?? loan.totalTermPayment)}</Text>
+            <Text style={styles.summaryLabel}>Total Monthly Payment</Text>
+            <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.totalMonthlyPayment)}</Text>
           </View>
 
           <View style={[styles.summaryRow, { borderBottomWidth: 0, marginTop: 8 }]}>
@@ -160,12 +415,12 @@ const LoanDetails = () => {
         </View>
 
         <Text style={styles.sectionTitle}>
-          Payments ({loan.paymentHistory?.length || 0})
+          Payment History ({payments.length})
         </Text>
 
-        {loan.paymentHistory && loan.paymentHistory.length > 0 ? (
-          loan.paymentHistory.map((payment, index) => (
-            <View key={index} style={styles.paymentCard}>
+        {payments.length > 0 ? (
+          payments.map((payment, index) => (
+            <View key={`${payment.id}-${index}`} style={styles.paymentCard}>
               <Text style={styles.paymentTitle}>Payment ID: {payment.transactionId || 'N/A'}</Text>
               
               {payment.appliedToLoan && (
@@ -206,7 +461,7 @@ const LoanDetails = () => {
               <View style={styles.paymentRow}>
                 <Text style={styles.paymentLabel}>Payment Amount</Text>
                 <Text style={[styles.paymentValue, { color: '#4CAF50' }]}>
-                  +{formatCurrency(payment.amountToBePaid || payment.amount || 0)}
+                  +{formatCurrency(payment.amount)}
                 </Text>
               </View>
 
@@ -227,7 +482,7 @@ const LoanDetails = () => {
           ))
         ) : (
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No payments made for this loan</Text>
+            <Text style={styles.emptyText}>No payments found for this loan</Text>
           </View>
         )}
       </ScrollView>
@@ -236,7 +491,11 @@ const LoanDetails = () => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC', paddingTop: 30 },
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F8FAFC', 
+    paddingTop: 30 
+  },
   headerBar: {
     marginHorizontal: 16,
     marginTop: 10,
@@ -249,56 +508,92 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  backBtn: { padding: 6, borderRadius: 8 },
-  headerTitleText: { fontSize: 18, fontWeight: '700', color: '#1E3A5F' },
+  backBtn: { 
+    padding: 6, 
+    borderRadius: 8 
+  },
+  headerTitleText: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1E3A5F' 
+  },
   loanSummary: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 12,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 2,
-    elevation: 1,
   },
-  summaryTitle: { fontSize: 18, fontWeight: '600', color: '#2D5783', marginBottom: 10 },
+  summaryTitle: { 
+    fontSize: 18, 
+    fontWeight: '600', 
+    color: '#1E3A5F', 
+    marginBottom: 10 
+  },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f5f9',
   },
-  summaryLabel: { fontSize: 14, color: '#666' },
-  summaryValue: { fontSize: 14, fontWeight: '500', color: '#2D5783' },
+  summaryLabel: { 
+    fontSize: 14, 
+    color: '#64748B' 
+  },
+  summaryValue: { 
+    fontSize: 14, 
+    fontWeight: '600', 
+    color: '#1E3A5F' 
+  },
   sectionTitle: {
     marginHorizontal: 16,
     marginBottom: 12,
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '600',
-    color: '#2D5783',
+    color: '#1E3A5F',
     marginTop: 8,
   },
   paymentCard: {
-    backgroundColor: '#F8FAFC',
-    borderRadius: 8,
+    backgroundColor: '#fff',
+    borderRadius: 10,
     padding: 16,
     marginHorizontal: 16,
     marginBottom: 12,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.08,
     shadowRadius: 2,
-    elevation: 1,
   },
   paymentRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 6,
   },
-  paymentTitle: { fontSize: 16, fontWeight: '600', color: '#2D5783', marginBottom: 10 },
-  paymentLabel: { fontSize: 14, color: '#666' },
-  paymentValue: { fontSize: 14, fontWeight: '500', color: '#2D5783' },
+  paymentTitle: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#1E3A5F', 
+    marginBottom: 10 
+  },
+  paymentLabel: { 
+    fontSize: 14, 
+    color: '#64748B' 
+  },
+  paymentValue: { 
+    fontSize: 14, 
+    fontWeight: '500', 
+    color: '#1E3A5F' 
+  },
   emptyContainer: {
     alignItems: 'center',
     paddingVertical: 20,
@@ -306,7 +601,7 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     textAlign: 'center',
-    color: '#888',
+    color: '#64748B',
     fontSize: 16,
   },
 });
