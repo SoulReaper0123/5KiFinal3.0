@@ -40,56 +40,12 @@ const LoanDetails = () => {
   const [payments, setPayments] = useState([]);
   const [loanDetails, setLoanDetails] = useState(null);
 
-  const parseDateTime = (dateInput) => {
-    try {
-      if (!dateInput) return null;
-      if (typeof dateInput === 'object' && dateInput.seconds !== undefined) {
-        return new Date(dateInput.seconds * 1000);
-      }
-      if (typeof dateInput === 'string') {
-        if (dateInput.includes(' at ')) {
-          const [datePart, timePart] = dateInput.split(' at ');
-          if (datePart.includes('/')) {
-            const [month, day, year] = datePart.split('/');
-            const [hours, minutes] = timePart.split(':');
-            return new Date(year, month - 1, day, hours, minutes);
-          } else {
-            const parsed = new Date(dateInput.replace(' at ', ' '));
-            if (!isNaN(parsed.getTime())) return parsed;
-          }
-        }
-        if (/^[A-Za-z]+ \d{1,2}, \d{4}$/.test(dateInput)) {
-          const parsed = new Date(dateInput + ' 00:00:00');
-          if (!isNaN(parsed.getTime())) return parsed;
-        }
-        if (/^\d{4}-\d{2}-\d{2}$/.test(dateInput)) {
-          return new Date(dateInput + 'T00:00:00');
-        }
-        const parsed = new Date(dateInput);
-        return isNaN(parsed.getTime()) ? null : parsed;
-      }
-      if (dateInput instanceof Date && !isNaN(dateInput.getTime())) return dateInput;
-      return null;
-    } catch {
-      return null;
-    }
-  };
-
-  const isOverdue = (raw) => {
-    const d = parseDateTime(raw);
-    if (!d) return false;
-    const today = new Date();
-    const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-    const startDue = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-    return startToday >= startDue;
-  };
-
   // Fetch payments for this specific loan
   const fetchPaymentsForLoan = async () => {
     if (!loan) return;
 
     try {
-      const memberId = loan._memberId || loan.memberId;
+      const memberId = loan._memberId || loan.memberId || loan.id;
       if (!memberId) {
         console.log('❌ No member ID found for loan');
         setPayments([]);
@@ -99,16 +55,17 @@ const LoanDetails = () => {
       console.log('🔍 Fetching payments for loan:', {
         memberId,
         loanId: loan._loanId,
-        transactionId: loan.transactionId
+        transactionId: loan.transactionId,
+        originalTransactionId: loan.originalTransactionId
       });
 
-      // Get the originalTransactionId from the loan data
-      const loanOriginalTransactionId = 
+      // Get the loan identifier - use originalTransactionId first, then fallback to _loanId
+      const loanIdentifier = 
         loan.originalTransactionId || 
         loan.commonOriginalTransactionId || 
         loan._loanId;
 
-      console.log('📋 Looking for payments with appliedToLoan =', loanOriginalTransactionId);
+      console.log('📋 Looking for payments with appliedToLoan =', loanIdentifier);
 
       // Fetch from Payments/ApprovedPayments
       const paymentsRef = ref(database, `Payments/ApprovedPayments/${memberId}`);
@@ -120,7 +77,7 @@ const LoanDetails = () => {
         const paymentsData = paymentsSnap.val();
         console.log('✅ Found payments data, searching for loan matches...');
 
-        // Find all payments where appliedToLoan matches the loan's originalTransactionId
+        // Find all payments where appliedToLoan matches the loan's identifier
         Object.entries(paymentsData).forEach(([paymentId, paymentData]) => {
           if (!paymentData || typeof paymentData !== 'object') return;
 
@@ -128,11 +85,11 @@ const LoanDetails = () => {
 
           console.log(`🔍 Checking payment ${paymentId}:`);
           console.log('  paymentAppliedToLoan:', paymentAppliedToLoan);
-          console.log('  loanOriginalTransactionId:', loanOriginalTransactionId);
+          console.log('  loanIdentifier:', loanIdentifier);
 
           // Check if this payment is for our loan
           const matchesLoan = paymentAppliedToLoan &&
-            String(paymentAppliedToLoan) === String(loanOriginalTransactionId);
+            String(paymentAppliedToLoan) === String(loanIdentifier);
 
           console.log('  ✅ MATCHES:', matchesLoan);
 
@@ -274,6 +231,10 @@ const LoanDetails = () => {
             dateApproved: paymentData.dateApproved,
             interestPaid: parseCurrencyValue(paymentData.interestPaid),
             originalTransactionId: paymentData.originalTransactionId,
+            // Additional fields from payment approval
+            penaltyPaid: parseCurrencyValue(paymentData.penaltyPaid),
+            principalPaid: parseCurrencyValue(paymentData.principalPaid),
+            excessPayment: parseCurrencyValue(paymentData.excessPayment),
           };
 
           collectedPayments.push(payment);
@@ -308,7 +269,9 @@ const LoanDetails = () => {
           dateApproved: loan.dateApproved,
           monthlyPayment: parseFloat(loan.monthlyPayment) || 0,
           totalMonthlyPayment: parseFloat(loan.totalMonthlyPayment) || 0,
-          outstandingBalance: parseFloat(loan.outstandingBalance) || 0,
+          outstandingBalance: parseFloat(loan.outstandingBalance) || parseFloat(loan.loanAmount) || 0,
+          processingFee: parseFloat(loan.processingFee) || 0,
+          receivableAmount: parseFloat(loan.receivableAmount) || 0,
         });
       }
 
@@ -320,8 +283,8 @@ const LoanDetails = () => {
     initializeData();
   }, [loan]);
 
-  const dueRaw = loan.dueDate || loan.nextDueDate;
-  const dueOverdue = isOverdue(dueRaw);
+  // Calculate total paid amount
+  const totalPaid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
 
   if (loading) {
     return (
@@ -357,6 +320,20 @@ const LoanDetails = () => {
             <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.amount)}</Text>
           </View>
 
+          {loanDetails?.processingFee > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Processing Fee</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.processingFee)}</Text>
+            </View>
+          )}
+
+          {loanDetails?.receivableAmount > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={styles.summaryLabel}>Receivable Amount</Text>
+              <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.receivableAmount)}</Text>
+            </View>
+          )}
+
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Outstanding Balance</Text>
             <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.outstandingBalance)}</Text>
@@ -390,28 +367,28 @@ const LoanDetails = () => {
           </View>
 
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Monthly Payment</Text>
+            <Text style={styles.summaryLabel}>Monthly Amortization</Text>
             <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.monthlyPayment)}</Text>
           </View>
 
           <View style={[styles.summaryRow, { borderBottomWidth: 0 }]}>
-            <Text style={styles.summaryLabel}>Total Monthly Payment</Text>
+            <Text style={styles.summaryLabel}>Total Monthly Amortization</Text>
             <Text style={styles.summaryValue}>{formatCurrency(loanDetails?.totalMonthlyPayment)}</Text>
           </View>
 
-          <View style={[styles.summaryRow, { borderBottomWidth: 0, marginTop: 8 }]}>
-            <Text style={styles.summaryLabel}>Due Date</Text>
-            <View style={{ alignItems: 'flex-end' }}>
-              <Text style={[styles.summaryValue, dueOverdue && { color: '#D32F2F' }]}>
-                {formatDate(dueRaw)}
-              </Text>
-              {dueOverdue && (
-                <Text style={{ color: '#D32F2F', fontSize: 12, fontWeight: '700', marginTop: 2 }}>
-                  Overdue
-                </Text>
-              )}
+          {loan.dueDate || loan.nextDueDate ? (
+            <View style={[styles.summaryRow, { borderBottomWidth: 0, marginTop: 8 }]}>
+              <Text style={styles.summaryLabel}>Due Date</Text>
+              <Text style={styles.summaryValue}>{formatDate(loan.dueDate || loan.nextDueDate)}</Text>
             </View>
-          </View>
+          ) : null}
+
+          {payments.length > 0 && (
+            <View style={[styles.summaryRow, { borderBottomWidth: 0, marginTop: 8 }]}>
+              <Text style={styles.summaryLabel}>Total Paid</Text>
+              <Text style={[styles.summaryValue, { color: '#4CAF50' }]}>{formatCurrency(totalPaid)}</Text>
+            </View>
+          )}
         </View>
 
         <Text style={styles.sectionTitle}>
@@ -451,10 +428,31 @@ const LoanDetails = () => {
                 </View>
               )}
 
-              {payment.interestPaid !== null && payment.interestPaid !== undefined && (
+              {payment.interestPaid !== null && payment.interestPaid !== undefined && payment.interestPaid > 0 && (
                 <View style={styles.paymentRow}>
                   <Text style={styles.paymentLabel}>Interest Paid</Text>
                   <Text style={styles.paymentValue}>{formatCurrency(payment.interestPaid)}</Text>
+                </View>
+              )}
+
+              {payment.penaltyPaid !== null && payment.penaltyPaid !== undefined && payment.penaltyPaid > 0 && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Penalty Paid</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(payment.penaltyPaid)}</Text>
+                </View>
+              )}
+
+              {payment.principalPaid !== null && payment.principalPaid !== undefined && payment.principalPaid > 0 && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Principal Paid</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(payment.principalPaid)}</Text>
+                </View>
+              )}
+
+              {payment.excessPayment !== null && payment.excessPayment !== undefined && payment.excessPayment > 0 && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Excess Payment</Text>
+                  <Text style={styles.paymentValue}>{formatCurrency(payment.excessPayment)}</Text>
                 </View>
               )}
 
@@ -478,11 +476,22 @@ const LoanDetails = () => {
                   <Text style={styles.paymentValue}>{payment.paymentOption}</Text>
                 </View>
               )}
+
+              {payment.receiptNumber && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Receipt Number</Text>
+                  <Text style={styles.paymentValue}>{payment.receiptNumber}</Text>
+                </View>
+              )}
             </View>
           ))
         ) : (
           <View style={styles.emptyContainer}>
+            <MaterialIcons name="receipt" size={50} color="#94A3B8" />
             <Text style={styles.emptyText}>No payments found for this loan</Text>
+            <Text style={styles.emptySubText}>
+              Payment history will appear here once payments are approved
+            </Text>
           </View>
         )}
       </ScrollView>
@@ -596,13 +605,21 @@ const styles = StyleSheet.create({
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 20,
+    paddingVertical: 40,
     marginHorizontal: 16,
   },
   emptyText: {
     textAlign: 'center',
     color: '#64748B',
     fontSize: 16,
+    marginTop: 12,
+    fontWeight: '500',
+  },
+  emptySubText: {
+    textAlign: 'center',
+    color: '#94A3B8',
+    fontSize: 14,
+    marginTop: 4,
   },
 });
 
