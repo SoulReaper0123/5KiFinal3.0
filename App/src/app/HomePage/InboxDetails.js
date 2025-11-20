@@ -20,7 +20,9 @@ const iconByType = (type) => {
       return { name: 'cash', lib: 'Ionicons', color: '#1E3A5F' };
     case 'registration':
       return { name: 'id-badge', lib: 'FontAwesome', color: '#1E3A5F' };
-    case 'membership withdrawal': // ADD THIS NEW CASE
+    case 'loan payment reminder':
+      return { name: 'alarm', lib: 'MaterialIcons', color: '#FF9800' };
+    case 'membership withdrawal':
       return { name: 'logout', lib: 'MaterialIcons', color: '#1E3A5F' };
     default:
       return { name: 'receipt', lib: 'MaterialIcons', color: '#1E3A5F' };
@@ -67,59 +69,63 @@ export default function InboxDetails() {
   }, []);
 
   // Compose sentence
-// In InboxDetails.js - Update the sentence useMemo
-const sentence = useMemo(() => {
-  const status = (item?.status || '').toLowerCase();
-  const originalRef = item?.originalTransactionId || item?.transactionId || 'N/A';
-  
-  const cleanDbId = (val) => {
-    if (!val) return '';
-    const s = String(val);
-    const withoutReminder = s.endsWith('-reminder') ? s.slice(0, -'-reminder'.length) : s;
-    const firstDash = withoutReminder.indexOf('-');
-    return firstDash >= 0 ? withoutReminder.slice(firstDash + 1) : withoutReminder;
-  };
-  
-  const newRef = item?.transactionId || item?.originalTransactionId || cleanDbId(item?.id) || originalRef;
+  const sentence = useMemo(() => {
+    const status = (item?.status || '').toLowerCase();
+    const originalRef = item?.originalTransactionId || item?.transactionId || 'N/A';
+    
+    const cleanDbId = (val) => {
+      if (!val) return '';
+      const s = String(val);
+      const withoutReminder = s.endsWith('-reminder') ? s.slice(0, -'-reminder'.length) : s;
+      const firstDash = withoutReminder.indexOf('-');
+      return firstDash >= 0 ? withoutReminder.slice(firstDash + 1) : withoutReminder;
+    };
+    
+    const newRef = item?.transactionId || item?.originalTransactionId || cleanDbId(item?.id) || originalRef;
 
-  const approvedDate = item?.dateApproved || item?.approvedAt || item?.dateApplied || '';
-  const dateStr = (() => {
-    try {
-      const d = new Date(approvedDate);
-      return isNaN(d.getTime()) ? String(approvedDate) : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-    } catch { return String(approvedDate); }
-  })();
+    const approvedDate = item?.dateApproved || item?.approvedAt || item?.dateApplied || '';
+    const dateStr = (() => {
+      try {
+        const d = new Date(approvedDate);
+        return isNaN(d.getTime()) ? String(approvedDate) : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+      } catch { return String(approvedDate); }
+    })();
 
-  const type = (item?.type || title || '').toLowerCase();
+    const type = (item?.type || title || '').toLowerCase();
 
-  const method = type.includes('deposit')
-    ? (item?.depositOption || item?.paymentOption || item?.withdrawOption)
-    : type.includes('payment')
-    ? (item?.paymentOption || item?.depositOption || item?.withdrawOption)
-    : type.includes('withdraw')
-    ? (item?.withdrawOption || item?.paymentOption || item?.depositOption)
-    : (item?.paymentOption || item?.depositOption || item?.withdrawOption);
+    const method = type.includes('deposit')
+      ? (item?.depositOption || item?.paymentOption || item?.withdrawOption)
+      : type.includes('payment')
+      ? (item?.paymentOption || item?.depositOption || item?.withdrawOption)
+      : type.includes('withdraw')
+      ? (item?.withdrawOption || item?.paymentOption || item?.depositOption)
+      : (item?.paymentOption || item?.depositOption || item?.withdrawOption);
 
-  const amount = item?.amount || 0;
+    const amount = item?.amount || 0;
 
-  // Handle Membership Withdrawal specific message
-  if (type.includes('membership withdrawal')) {
+    // Handle Loan Payment Reminder specific message
+    if (type.includes('loan payment reminder') || item?.isReminder) {
+      return `Reminder: ${item?.message || 'Your loan payment is due soon.'}\nRef No. ${newRef}`;
+    }
+
+    // Handle Membership Withdrawal specific message
+    if (type.includes('membership withdrawal')) {
+      const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
+      const base = `Your membership withdrawal application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}.`;
+      const ref2 = `\nRef No. ${newRef}`;
+      
+      // Add withdrawal reason if available
+      const reasonText = item?.reason ? `\nReason: ${item.reason}` : '';
+      
+      return `${base}${reasonText}${ref2}`;
+    }
+
+    // Original logic for other types
     const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
-    const base = `Your membership withdrawal application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}.`;
+    const base = `Your ${type} application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
     const ref2 = `\nRef No. ${newRef}`;
-    
-    // Add withdrawal reason if available
-    const reasonText = item?.reason ? `\nReason: ${item.reason}` : '';
-    
-    return `${base}${reasonText}${ref2}`;
-  }
-
-  // Original logic for other types
-  const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
-  const base = `Your ${type} application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
-  const ref2 = `\nRef No. ${newRef}`;
-  return `${base}${ref2}`;
-}, [item, title]);
+    return `${base}${ref2}`;
+  }, [item, title]);
 
   const icon = iconByType(title);
   const IconComp = icon.lib === 'Ionicons' ? Ionicons : (icon.lib === 'FontAwesome' ? FontAwesome : MaterialIcons);
