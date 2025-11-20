@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { getDatabase, ref, onValue, update } from 'firebase/database';
+import {
+  getDatabase, ref, onValue, update, push, set
+} from 'firebase/database';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle, FaPiggyBank, FaPercentage, FaCalendarAlt, FaFileContract, FaShieldAlt, FaInfoCircle, FaPhone, FaMoneyBillWave, FaBusinessTime } from 'react-icons/fa';
@@ -119,9 +121,30 @@ const SystemSettings = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
 
+  // New states for savings deposit with proof
+  const [savingsDepositModalVisible, setSavingsDepositModalVisible] = useState(false);
+  const [savingsDepositAmount, setSavingsDepositAmount] = useState('');
+  const [proofOfDepositFile, setProofOfDepositFile] = useState(null);
+  
+  // New states for savings withdrawal with proof
+  const [savingsWithdrawModalVisible, setSavingsWithdrawModalVisible] = useState(false);
+  const [savingsWithdrawAmount, setSavingsWithdrawAmount] = useState('');
+  const [proofOfWithdrawFile, setProofOfWithdrawFile] = useState(null);
+  
+  const [adminData, setAdminData] = useState(null);
+
   const db = getDatabase();
 
   // Helper function to format peso amounts with at least 2 decimal places
+  const formatCurrency = (amount) => {
+    return new Intl.NumberFormat('en-PH', {
+      style: 'currency',
+      currency: 'PHP',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
   const formatPesoAmount = (amount) => {
     const num = parseFloat(amount) || 0;
     return num.toLocaleString('en-PH', {
@@ -130,31 +153,72 @@ const SystemSettings = () => {
     });
   };
 
+  const formatDate = (date) => {
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  };
+
+  const formatTime = (date) => {
+    let hours = date.getHours();
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    const seconds = date.getSeconds().toString().padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    
+    return `${hours}:${minutes}:${seconds} ${ampm}`;
+  };
+
+  // Fetch admin data
+  useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        
+        const adminRef = ref(db, `${node}/${adminId}`);
+        const snapshot = await onValue(adminRef, (snap) => {
+          if (snap.exists()) {
+            setAdminData(snap.val());
+          }
+        }, { onlyOnce: true });
+        
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      }
+    };
+
+    fetchAdminData();
+  }, [db]);
+
   // Helper function to validate dividend percentages with better precision handling
-// Helper function to validate dividend percentages with better precision handling
-// Helper function to validate dividend percentages with better precision handling
-const validateDividendPercentages = () => {
-  const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
-  const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
-  const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
-  const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
-  const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
-  
-  // Use more precise rounding and handle floating point issues
-  const distTotal = Math.round((membersDividend + fiveKiEarnings) * 1000) / 1000;
-  const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 1000) / 1000;
-  
-  // Allow for very small rounding differences (0.001 tolerance)
-  const distributionValid = Math.abs(distTotal - 100) < 0.001;
-  const breakdownValid = Math.abs(breakdownTotal - 100) < 0.001;
-  
-  setDividendValidation({
-    distributionValid,
-    breakdownValid
-  });
-  
-  return distributionValid && breakdownValid;
-};
+  const validateDividendPercentages = () => {
+    const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
+    const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
+    const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
+    const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
+    const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
+    
+    // Use more precise rounding and handle floating point issues
+    const distTotal = Math.round((membersDividend + fiveKiEarnings) * 1000) / 1000;
+    const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 1000) / 1000;
+    
+    // Allow for very small rounding differences (0.001 tolerance)
+    const distributionValid = Math.abs(distTotal - 100) < 0.001;
+    const breakdownValid = Math.abs(breakdownTotal - 100) < 0.001;
+    
+    setDividendValidation({
+      distributionValid,
+      breakdownValid
+    });
+    
+    return distributionValid && breakdownValid;
+  };
 
   const showConfirmModal = (message, onConfirm, onCancel = () => {}) => {
     setConfirmModalConfig({
@@ -244,18 +308,17 @@ const validateDividendPercentages = () => {
   }, []);
 
   useEffect(() => {
-  if (editDividend) {
-    validateDividendPercentages();
-  }
-}, [
-  settings.MembersDividendPercentage, 
-  settings.FiveKiEarningsPercentage, 
-  settings.InvestmentSharePercentage, 
-  settings.PatronageSharePercentage, 
-  settings.ActiveMonthsPercentage, 
-  editDividend,
-  validateDividendPercentages // Add this dependency
-]);
+    if (editDividend) {
+      validateDividendPercentages();
+    }
+  }, [
+    settings.MembersDividendPercentage, 
+    settings.FiveKiEarningsPercentage, 
+    settings.InvestmentSharePercentage, 
+    settings.PatronageSharePercentage, 
+    settings.ActiveMonthsPercentage, 
+    editDividend
+  ]);
 
   const generateOrientationCode = () => {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -289,21 +352,21 @@ const validateDividendPercentages = () => {
     setTimeout(() => setMessageModal({ ...messageModal, visible: false }), 3000);
   };
 
-const handleInputChange = (key, value) => {
-  const clean = value.replace(/[^0-9.]/g, '');
-  if (clean.split('.').length > 2) return;
-  
-  const newSettings = { ...settings, [key]: clean };
-  setSettings(newSettings);
-  
-  // Immediately validate dividend percentages when relevant fields change
-  if (['MembersDividendPercentage', 'FiveKiEarningsPercentage', 'InvestmentSharePercentage', 'PatronageSharePercentage', 'ActiveMonthsPercentage'].includes(key)) {
-    // Use setTimeout to ensure validation runs after state update
-    setTimeout(() => {
-      validateDividendPercentages();
-    }, 0);
-  }
-};
+  const handleInputChange = (key, value) => {
+    const clean = value.replace(/[^0-9.]/g, '');
+    if (clean.split('.').length > 2) return;
+    
+    const newSettings = { ...settings, [key]: clean };
+    setSettings(newSettings);
+    
+    // Immediately validate dividend percentages when relevant fields change
+    if (['MembersDividendPercentage', 'FiveKiEarningsPercentage', 'InvestmentSharePercentage', 'PatronageSharePercentage', 'ActiveMonthsPercentage'].includes(key)) {
+      // Use setTimeout to ensure validation runs after state update
+      setTimeout(() => {
+        validateDividendPercentages();
+      }, 0);
+    }
+  };
 
   const handleInterestChange = (term, value) => {
     const clean = value.replace(/[^0-9.]/g, '');
@@ -634,34 +697,232 @@ const handleInputChange = (key, value) => {
   };
 
   const handleAddSavings = () => {
-    setSavingsModalVisible(true);
-    setActionAmount('');
+    setSavingsDepositModalVisible(true);
+    setSavingsDepositAmount('');
+    setProofOfDepositFile(null);
   };
 
-  const confirmAddSavings = () => {
-    const amount = parseFloat(actionAmount);
-    if (isNaN(amount) || amount <= 0) {
-      showMessage('Error', 'Please enter a valid positive amount', true);
+  const handleWithdrawSavings = () => {
+    setSavingsWithdrawModalVisible(true);
+    setSavingsWithdrawAmount('');
+    setProofOfWithdrawFile(null);
+  };
+
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
+  };
+
+  // New function to handle savings deposit with proof
+  const handleSavingsDeposit = async () => {
+    if (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0) {
+      showMessage('Error', 'Please enter a valid amount greater than 0', true);
       return;
     }
 
-    const newSavings = (parseFloat(settings.Savings) + amount).toFixed(2);
-    setSettings({
-      ...settings,
-      Savings: newSavings
-    });
+    if (!proofOfDepositFile) {
+      showMessage('Error', 'Please upload proof of deposit', true);
+      return;
+    }
 
-    setSavingsModalVisible(false);
-    setActionAmount('');
-    showSuccessMessage('Savings added successfully!');
+    try {
+      setActionInProgress(true);
+
+      // Generate transaction ID
+      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+      const now = new Date();
+      const depositDate = formatDate(now);
+      const depositTime = formatTime(now);
+      const amount = parseFloat(savingsDepositAmount);
+
+      // Get admin info
+      const adminId = localStorage.getItem('adminId');
+      const adminRole = localStorage.getItem('userRole') || 'admin';
+      const adminName = adminData?.firstName || 'Admin';
+
+      // Create deposit record
+      const depositData = {
+        transactionId,
+        amountToBeDeposited: amount,
+        proofOfDepositUrl: 'admin_deposit', // You can modify this to actually upload the file if needed
+        dateApplied: depositDate,
+        timeApplied: depositTime,
+        dateApproved: depositDate,
+        timeApproved: depositTime,
+        timestamp: now.getTime(),
+        status: 'approved',
+        depositOption: 'Bank', // Default for admin deposits
+        accountName: settings.Accounts.Bank.accountName || 'Admin Account',
+        accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
+        processedBy: adminName,
+        processedByRole: adminRole,
+        processedById: adminId,
+        type: 'savings_deposit',
+        note: 'Savings deposit added by admin'
+      };
+
+      // Save to approved deposits
+      const approvedRef = ref(db, `Deposits/ApprovedDeposits/admin/${transactionId}`);
+      await set(approvedRef, depositData);
+
+      // Update savings amount
+      const currentSavings = parseFloat(settings.Savings || 0);
+      const newSavingsTotal = currentSavings + amount;
+      
+      await update(ref(db, 'Settings'), {
+        Savings: parseFloat(newSavingsTotal.toFixed(2))
+      });
+
+      // Update local state
+      setSettings(prev => ({ 
+        ...prev, 
+        Savings: newSavingsTotal.toString() 
+      }));
+
+      setSavingsDepositModalVisible(false);
+      setSavingsDepositAmount('');
+      setProofOfDepositFile(null);
+      
+      showSuccessMessage(`₱${formatPesoAmount(amount)} added to savings successfully!`);
+    } catch (error) {
+      console.error('Error adding savings deposit:', error);
+      showMessage('Error', 'Failed to add savings deposit: ' + error.message, true);
+    } finally {
+      setActionInProgress(false);
+    }
+  };
+
+  // New function to handle savings withdrawal with proof
+  const handleSavingsWithdraw = async () => {
+    if (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0) {
+      showMessage('Error', 'Please enter a valid amount greater than 0', true);
+      return;
+    }
+
+    if (!proofOfWithdrawFile) {
+      showMessage('Error', 'Please upload proof of withdrawal', true);
+      return;
+    }
+
+    const amount = parseFloat(savingsWithdrawAmount);
+    const currentSavings = parseFloat(settings.Savings || 0);
+
+    if (amount > currentSavings) {
+      showMessage('Error', 'Insufficient savings balance', true);
+      return;
+    }
+
+    try {
+      setActionInProgress(true);
+
+      // Generate transaction ID
+      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+      const now = new Date();
+      const withdrawDate = formatDate(now);
+      const withdrawTime = formatTime(now);
+
+      // Get admin info
+      const adminId = localStorage.getItem('adminId');
+      const adminRole = localStorage.getItem('userRole') || 'admin';
+      const adminName = adminData?.firstName || 'Admin';
+
+      // Create withdrawal record
+      const withdrawData = {
+        transactionId,
+        amountToBeWithdrawn: amount,
+        proofOfWithdrawUrl: 'admin_withdrawal', // You can modify this to actually upload the file if needed
+        dateApplied: withdrawDate,
+        timeApplied: withdrawTime,
+        dateApproved: withdrawDate,
+        timeApproved: withdrawTime,
+        timestamp: now.getTime(),
+        status: 'approved',
+        withdrawOption: 'Bank', // Default for admin withdrawals
+        accountName: settings.Accounts.Bank.accountName || 'Admin Account',
+        accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
+        processedBy: adminName,
+        processedByRole: adminRole,
+        processedById: adminId,
+        type: 'savings_withdrawal',
+        note: 'Savings withdrawal processed by admin'
+      };
+
+      // Save to approved withdrawals
+      const approvedRef = ref(db, `Withdrawals/ApprovedWithdrawals/admin/${transactionId}`);
+      await set(approvedRef, withdrawData);
+
+      // Update savings amount
+      const newSavingsTotal = currentSavings - amount;
+      
+      await update(ref(db, 'Settings'), {
+        Savings: parseFloat(newSavingsTotal.toFixed(2))
+      });
+
+      // Update local state
+      setSettings(prev => ({ 
+        ...prev, 
+        Savings: newSavingsTotal.toString() 
+      }));
+
+      setSavingsWithdrawModalVisible(false);
+      setSavingsWithdrawAmount('');
+      setProofOfWithdrawFile(null);
+      
+      showSuccessMessage(`₱${formatPesoAmount(amount)} withdrawn from savings successfully!`);
+    } catch (error) {
+      console.error('Error processing savings withdrawal:', error);
+      showMessage('Error', 'Failed to process savings withdrawal: ' + error.message, true);
+    } finally {
+      setActionInProgress(false);
+    }
   };
 
   const handleAddSavingsWithConfirmation = () => {
+    if (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0) {
+      showMessage('Error', 'Please enter a valid amount greater than 0', true);
+      return;
+    }
+
+    if (!proofOfDepositFile) {
+      showMessage('Error', 'Please upload proof of deposit', true);
+      return;
+    }
+
     showConfirmModal(
-      'Are you sure you want to add to savings?',
-      confirmAddSavings,
+      `Are you sure you want to add ₱${formatPesoAmount(savingsDepositAmount)} to savings?`,
+      handleSavingsDeposit,
       () => {
-        setSavingsModalVisible(false);
+        // Cancel callback - do nothing
+      }
+    );
+  };
+
+  const handleWithdrawSavingsWithConfirmation = () => {
+    if (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0) {
+      showMessage('Error', 'Please enter a valid amount greater than 0', true);
+      return;
+    }
+
+    if (!proofOfWithdrawFile) {
+      showMessage('Error', 'Please upload proof of withdrawal', true);
+      return;
+    }
+
+    const amount = parseFloat(savingsWithdrawAmount);
+    const currentSavings = parseFloat(settings.Savings || 0);
+
+    if (amount > currentSavings) {
+      showMessage('Error', 'Insufficient savings balance', true);
+      return;
+    }
+
+    showConfirmModal(
+      `Are you sure you want to withdraw ₱${formatPesoAmount(amount)} from savings?`,
+      handleSavingsWithdraw,
+      () => {
+        // Cancel callback - do nothing
       }
     );
   };
@@ -840,19 +1101,25 @@ const handleInputChange = (key, value) => {
                   </div>
                 </div>
 
-                {/* Add to Savings Button */}
+                {/* Add to Savings and Withdraw from Savings Buttons */}
                 {editGeneralSettings && (
                   <div style={styles.actionButtonContainer}>
-                    <button
-                      style={styles.primaryButton}
-                      onClick={() => {
-                        setSavingsAddAmount('');
-                        setAddToSavingsModalVisible(true);
-                      }}
-                    >
-                      <FaPlus />
-                      Add to Savings
-                    </button>
+                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        style={styles.primaryButton}
+                        onClick={handleAddSavings}
+                      >
+                        <FaPlus />
+                        Add to Savings with Proof
+                      </button>
+                      <button
+                        style={{ ...styles.primaryButton, backgroundColor: '#ef4444' }}
+                        onClick={handleWithdrawSavings}
+                      >
+                        <FaExchangeAlt />
+                        Withdraw from Savings
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1705,6 +1972,214 @@ const handleInputChange = (key, value) => {
         )}
       </div>
 
+      {/* Savings Deposit Modal */}
+      {savingsDepositModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '500px'}}>
+            <h3 style={styles.enhancedModalTitle}>Add to Savings with Proof</h3>
+            
+            {/* Amount Input */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+                Deposit Amount
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#059669' }}>₱</span>
+                <input
+                  style={styles.enhancedModalInput}
+                  value={savingsDepositAmount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setSavingsDepositAmount(value);
+                    }
+                  }}
+                  type="text"
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              {savingsDepositAmount && parseFloat(savingsDepositAmount) > 0 && (
+                <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+                  Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) + parseFloat(savingsDepositAmount)).toFixed(2))}
+                </div>
+              )}
+            </div>
+
+            {/* Proof of Deposit Upload */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+                Proof of Deposit
+              </label>
+              <div 
+                style={{
+                  ...styles.fileUploadSection,
+                  border: proofOfDepositFile ? '2px solid #10b981' : '2px dashed #d1d5db',
+                  backgroundColor: proofOfDepositFile ? '#f0fdf4' : '#fafafa'
+                }}
+                onClick={() => document.getElementById('proofOfDeposit').click()}
+              >
+                <input
+                  id="proofOfDeposit"
+                  style={styles.fileInput}
+                  type="file"
+                  onChange={(e) => handleFileChange(e, setProofOfDepositFile)}
+                  accept="image/*"
+                />
+                {proofOfDepositFile ? (
+                  <>
+                    <FaCheckCircle style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
+                    <p style={styles.fileUploadText}>File selected: {proofOfDepositFile.name}</p>
+                    <p style={styles.fileName}>Click to change file</p>
+                  </>
+                ) : (
+                  <>
+                    <FaPlus style={{ fontSize: 24, color: '#6b7280', marginBottom: 8 }} />
+                    <p style={styles.fileUploadText}>Click to upload proof of deposit</p>
+                    <p style={styles.fileName}>Supported formats: JPG, PNG, PDF</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Admin Info */}
+            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', border: '1px solid #dbeafe' }}>
+              <p style={{ fontSize: 14, color: '#1e40af', margin: 0, fontWeight: '500' }}>
+                Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
+              </p>
+            </div>
+
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={{
+                  ...styles.enhancedModalBtnPrimary,
+                  backgroundColor: (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0 || !proofOfDepositFile) ? '#9ca3af' : '#10b981',
+                  cursor: (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0 || !proofOfDepositFile) ? 'not-allowed' : 'pointer'
+                }}
+                onClick={handleAddSavingsWithConfirmation}
+                disabled={!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0 || !proofOfDepositFile || actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Add to Savings'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => {
+                  setSavingsDepositAmount('');
+                  setProofOfDepositFile(null);
+                  setSavingsDepositModalVisible(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Savings Withdrawal Modal */}
+      {savingsWithdrawModalVisible && (
+        <div style={styles.centeredModal}>
+          <div style={{...styles.enhancedModal, maxWidth: '500px'}}>
+            <h3 style={styles.enhancedModalTitle}>Withdraw from Savings</h3>
+            
+            {/* Amount Input */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+                Withdrawal Amount
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#ef4444' }}>₱</span>
+                <input
+                  style={styles.enhancedModalInput}
+                  value={savingsWithdrawAmount}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                      setSavingsWithdrawAmount(value);
+                    }
+                  }}
+                  type="text"
+                  placeholder="0.00"
+                  autoFocus
+                />
+              </div>
+              {savingsWithdrawAmount && parseFloat(savingsWithdrawAmount) > 0 && (
+                <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
+                  Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) - parseFloat(savingsWithdrawAmount)).toFixed(2))}
+                </div>
+              )}
+            </div>
+
+            {/* Proof of Withdrawal Upload */}
+            <div style={{ marginBottom: 20 }}>
+              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+                Proof of Withdrawal
+              </label>
+              <div 
+                style={{
+                  ...styles.fileUploadSection,
+                  border: proofOfWithdrawFile ? '2px solid #10b981' : '2px dashed #d1d5db',
+                  backgroundColor: proofOfWithdrawFile ? '#f0fdf4' : '#fafafa'
+                }}
+                onClick={() => document.getElementById('proofOfWithdraw').click()}
+              >
+                <input
+                  id="proofOfWithdraw"
+                  style={styles.fileInput}
+                  type="file"
+                  onChange={(e) => handleFileChange(e, setProofOfWithdrawFile)}
+                  accept="image/*"
+                />
+                {proofOfWithdrawFile ? (
+                  <>
+                    <FaCheckCircle style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
+                    <p style={styles.fileUploadText}>File selected: {proofOfWithdrawFile.name}</p>
+                    <p style={styles.fileName}>Click to change file</p>
+                  </>
+                ) : (
+                  <>
+                    <FaPlus style={{ fontSize: 24, color: '#6b7280', marginBottom: 8 }} />
+                    <p style={styles.fileUploadText}>Click to upload proof of withdrawal</p>
+                    <p style={styles.fileName}>Supported formats: JPG, PNG, PDF</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Admin Info */}
+            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+              <p style={{ fontSize: 14, color: '#dc2626', margin: 0, fontWeight: '500' }}>
+                Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
+              </p>
+            </div>
+
+            <div style={styles.enhancedModalButtons}>
+              <button
+                style={{
+                  ...styles.enhancedModalBtnPrimary,
+                  backgroundColor: (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0 || !proofOfWithdrawFile) ? '#9ca3af' : '#ef4444',
+                  cursor: (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0 || !proofOfWithdrawFile) ? 'not-allowed' : 'pointer'
+                }}
+                onClick={handleWithdrawSavingsWithConfirmation}
+                disabled={!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0 || !proofOfWithdrawFile || actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Withdraw from Savings'}
+              </button>
+              <button
+                style={styles.enhancedModalBtnSecondary}
+                onClick={() => {
+                  setSavingsWithdrawAmount('');
+                  setProofOfWithdrawFile(null);
+                  setSavingsWithdrawModalVisible(false);
+                }}
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Confirmation Modal */}
       <ConfirmModal
         visible={confirmModalVisible}
@@ -1724,7 +2199,7 @@ const handleInputChange = (key, value) => {
         okLabel="Continue"
       />
 
-      {/* All other existing modals remain the same but use the new confirmation pattern */}
+      {/* All other existing modals remain the same */}
       {addModalVisible && (
         <ConfirmModal
           visible={addModalVisible}
@@ -1748,29 +2223,6 @@ const handleInputChange = (key, value) => {
           onConfirm={confirmDeleteTerm}
           onCancel={() => setDeleteModalVisible(false)}
         />
-      )}
-
-      {/* Add Savings Modal */}
-      {savingsModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={styles.smallModalCard}>
-            <FiAlertCircle style={styles.confirmIcon} />
-            <p style={styles.modalText}>Enter amount to add to savings:</p>
-            <input
-              style={styles.modalInput}
-              value={actionAmount}
-              onChange={(e) => setActionAmount(e.target.value)}
-              type="number"
-              placeholder="Amount"
-              min="0"
-              step="0.01"
-            />
-            <div style={styles.bottomButtons}>
-              <button style={styles.confirmBtn} onClick={handleAddSavingsWithConfirmation}>Add</button>
-              <button style={styles.cancelBtn} onClick={() => setSavingsModalVisible(false)}>Cancel</button>
-            </div>
-          </div>
-        </div>
       )}
 
       {/* Funds Action Modal */}
@@ -2185,90 +2637,6 @@ const handleInputChange = (key, value) => {
               <button
                 style={styles.enhancedModalBtnSecondary}
                 onClick={() => setEditContactModal(false)}
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Enhanced Add to Savings Modal */}
-      {addToSavingsModalVisible && (
-        <div style={styles.centeredModal}>
-          <div style={{...styles.enhancedModal, maxWidth: '400px' }}>
-            <h3 style={styles.enhancedModalTitle}>Add to Savings</h3>
-            <div style={{ marginBottom: 20 }}>
-              <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>Amount</label>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontSize: 16, fontWeight: 'bold', color: '#059669' }}>₱</span>
-                <input
-                  style={styles.enhancedModalInput}
-                  value={savingsAddAmount}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    if (value === '' || /^\d*\.?\d*$/.test(value)) {
-                      setSavingsAddAmount(value);
-                    }
-                  }}
-                  type="text"
-                  placeholder="0.00"
-                  autoFocus
-                />
-              </div>
-              {savingsAddAmount && parseFloat(savingsAddAmount) > 0 && (
-                <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
-                  Current: ₱{formatPesoAmount(settings.Savings)} → New total: ₱{formatPesoAmount((parseFloat(settings.Savings || 0) + parseFloat(savingsAddAmount)).toFixed(2))}
-                </div>
-              )}
-            </div>
-            <div style={styles.enhancedModalButtons}>
-              <button
-                style={styles.enhancedModalBtnPrimary}
-                onClick={async () => {
-                  try {
-                    const addAmount = parseFloat(savingsAddAmount || 0);
-                    if (addAmount <= 0) {
-                      showMessage('Error', 'Please enter a valid amount greater than 0', true);
-                      return;
-                    }
-
-                    setActionInProgress(true);
-                    
-                    const currentSavings = parseFloat(settings.Savings || 0);
-                    const newSavingsTotal = currentSavings + addAmount;
-                    
-                    const updateData = {
-                      Savings: parseFloat(newSavingsTotal.toFixed(2))
-                    };
-                    
-                    await update(ref(db, 'Settings'), updateData);
-                    
-                    setSettings(prev => ({ ...prev, Savings: newSavingsTotal.toString() }));
-                    setSavedSettingsSnapshot(prev => ({ 
-                      ...(prev || {}), 
-                      Savings: newSavingsTotal.toString()
-                    }));
-                    
-                    setSavingsAddAmount('');
-                    setAddToSavingsModalVisible(false);
-                    showSuccessMessage(`₱${formatPesoAmount(addAmount)} added to savings successfully!`);
-                  } catch (e) {
-                    showMessage('Error', e.message || 'Failed to add to savings', true);
-                  } finally {
-                    setActionInProgress(false);
-                  }
-                }}
-                disabled={actionInProgress || !savingsAddAmount || parseFloat(savingsAddAmount) <= 0}
-              >
-                {actionInProgress ? 'Adding...' : 'Add to Savings'}
-              </button>
-              <button
-                style={styles.enhancedModalBtnSecondary}
-                onClick={() => {
-                  setSavingsAddAmount('');
-                  setAddToSavingsModalVisible(false);
-                }}
               >
                 Cancel
               </button>
@@ -3131,6 +3499,38 @@ const styles = {
   removeButtonContainer: {
     display: 'flex',
     justifyContent: 'center'
+  },
+  // File upload styles
+  fileUploadSection: {
+    border: '2px dashed #d1d5db',
+    borderRadius: '12px',
+    padding: '32px',
+    textAlign: 'center',
+    transition: 'all 0.3s ease',
+    cursor: 'pointer',
+    backgroundColor: '#fafafa',
+    minHeight: '120px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '8px'
+  },
+  fileInput: {
+    display: 'none'
+  },
+  fileUploadText: {
+    fontSize: '16px',
+    color: '#374151',
+    fontWeight: '500',
+    textAlign: 'center',
+    margin: 0
+  },
+  fileName: {
+    fontSize: '14px',
+    color: '#6b7280',
+    textAlign: 'center',
+    margin: 0
   }
 };
 
@@ -3145,7 +3545,7 @@ styleElement.innerHTML = `
   .confirm-btn:hover {
     background: linear-gradient(135deg, #3730a3 0%, #1e3a8a 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(30, 58, 138, 0.4);
+    boxShadow: 0 6px 20px rgba(30, 58, 138, 0.4);
   }
 
   .cancel-btn:hover {
@@ -3157,7 +3557,7 @@ styleElement.innerHTML = `
   .enhanced-modal-btn-primary:hover:not(:disabled) {
     background: linear-gradient(135deg, #059669 0%, #10b981 100%);
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(16, 185, 129, 0.4);
+    boxShadow: 0 6px 20px rgba(16, 185, 129, 0.4);
   }
 
   .enhanced-modal-btn-secondary:hover:not(:disabled) {
@@ -3170,6 +3570,11 @@ styleElement.innerHTML = `
     opacity: 0.6;
     cursor: not-allowed;
     transform: none;
+  }
+
+  .file-upload-section:hover {
+    border-color: #3b82f6;
+    background-color: #f0f9ff;
   }
 `;
 document.head.appendChild(styleElement);
