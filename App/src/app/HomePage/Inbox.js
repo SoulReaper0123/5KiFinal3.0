@@ -28,15 +28,15 @@ export default function Inbox() {
   // State for email
   const [userEmail, setUserEmail] = useState(null);
 
-    useEffect(() => {
-      const handleBackPress = () => {
-        navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
-        return true; // prevent default pop
-      };
-  
-      const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
-      return () => subscription.remove();
-    }, [navigation]);
+  useEffect(() => {
+    const handleBackPress = () => {
+      navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
+      return true; // prevent default pop
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', handleBackPress);
+    return () => subscription.remove();
+  }, [navigation]);
   
   // Get email from all possible sources
   useEffect(() => {
@@ -196,22 +196,7 @@ export default function Inbox() {
                 label = 'Loan';
                 message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
                 
-                if (status === 'approved' && details.dueDate) {
-                  const dueDate = getRawDateFromFirebase(details.dueDate);
-                  parsed.push({
-                    id: `${type}-${transactionId}-reminder`,
-                    title: 'Loan Payment Reminder',
-                    label: 'Loan Payment Reminder',
-                    message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
-                    timestamp: getReliableTimestamp(details.dueDate, details), // Use due date timestamp for proper sorting
-                    displayDate: 'Reminder',
-                    email: details.email,
-                    icon: 'alarm',
-                    color: '#FF9800',
-                    status: 'reminder',
-                    transactionId,
-                  });
-                }
+                // REMOVED: Automatic loan reminder creation - only show actual reminders from LoanNotifications
                 break;
               case 'Withdrawals':
                 amount = Number(details.amountWithdrawn || 0);
@@ -273,6 +258,78 @@ export default function Inbox() {
     return parsed;
   };
 
+  // NEW FUNCTION: Fetch actual loan reminders from LoanNotifications
+  const fetchLoanReminders = async (userEmail) => {
+    try {
+      const loanNotificationsRef = ref(database, 'LoanNotifications');
+      const snapshot = await get(loanNotificationsRef);
+      
+      if (!snapshot.exists()) {
+        return [];
+      }
+
+      const notificationsData = snapshot.val();
+      const userReminders = [];
+      
+      // Also get member data to match by email
+      const membersRef = ref(database, 'Members');
+      const membersSnapshot = await get(membersRef);
+      const membersData = membersSnapshot.exists() ? membersSnapshot.val() : {};
+
+      // Find member ID for this user email
+      let userMemberId = null;
+      for (const [memberId, memberData] of Object.entries(membersData)) {
+        if (memberData.email?.toLowerCase() === userEmail?.toLowerCase()) {
+          userMemberId = memberId;
+          break;
+        }
+      }
+
+      if (!userMemberId) {
+        return [];
+      }
+
+      // Get loan data to populate reminder details
+      const currentLoansRef = ref(database, 'Loans/CurrentLoans');
+      const currentLoansSnapshot = await get(currentLoansRef);
+      const currentLoansData = currentLoansSnapshot.exists() ? currentLoansSnapshot.val() : {};
+
+      // Check for notifications for this user
+      for (const [notificationKey, notificationData] of Object.entries(notificationsData)) {
+        const [memberId, transactionId] = notificationKey.split('_');
+        
+        if (memberId === userMemberId) {
+          const loanData = currentLoansData[memberId]?.[transactionId];
+          if (loanData) {
+            const monthlyPayment = Number(loanData.monthlyPayment || 0).toFixed(2);
+            const dueDate = getRawDateFromFirebase(loanData.dueDate);
+            
+            userReminders.push({
+              id: `loan-reminder-${transactionId}`,
+              title: 'Loan Payment Reminder',
+              label: 'Loan Payment Reminder',
+              message: `Your monthly loan payment of ₱${monthlyPayment} is due on ${dueDate}.`,
+              timestamp: notificationData.sentAt ? new Date(notificationData.sentAt).getTime() : Date.now(),
+              displayDate: 'Reminder',
+              email: userEmail,
+              icon: 'alarm',
+              color: '#FF9800',
+              status: 'reminder',
+              transactionId,
+              isReminder: true,
+              originalTransactionId: transactionId
+            });
+          }
+        }
+      }
+
+      return userReminders;
+    } catch (error) {
+      console.error('Error fetching loan reminders:', error);
+      return [];
+    }
+  };
+
   const fetchMessages = async () => {
     if (!userEmail) {
       setMessages([]);
@@ -286,6 +343,8 @@ export default function Inbox() {
       const transactionsRef = ref(database, 'Transactions');
       const snapshot = await get(transactionsRef);
 
+      let allMessages = [];
+
       if (snapshot.exists()) {
         const data = snapshot.val();
         const parsedMessages = parseMessages(data);
@@ -294,12 +353,17 @@ export default function Inbox() {
           message => message.email?.toLowerCase() === userEmail?.toLowerCase()
         );
 
-        filteredMessages.sort((a, b) => b.timestamp - a.timestamp);
-        
-        setMessages(filteredMessages);
-      } else {
-        setMessages([]);
+        allMessages = [...filteredMessages];
       }
+
+      // Fetch actual loan reminders and add them to messages
+      const loanReminders = await fetchLoanReminders(userEmail);
+      allMessages = [...allMessages, ...loanReminders];
+
+      // Sort all messages by timestamp
+      allMessages.sort((a, b) => b.timestamp - a.timestamp);
+      
+      setMessages(allMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
       setMessages([]);
@@ -347,6 +411,7 @@ export default function Inbox() {
       paymentOption: message.paymentOption || null,
       depositOption: message.depositOption || null,
       withdrawOption: message.withdrawOption || null,
+      isReminder: message.isReminder || false,
     };
     navigation.navigate('InboxDetails', { item });
   };
@@ -585,7 +650,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     backgroundColor: 'white',
-    borderRadius: 12,
+    borderRadius: '12px',
     width: '90%',
     maxHeight: '80%',
   },
