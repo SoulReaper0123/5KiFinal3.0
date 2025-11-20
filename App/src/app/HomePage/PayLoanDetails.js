@@ -1,9 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
+import { ref, get } from 'firebase/database';
+import { database } from '../../firebaseConfig';
 
 const formatPeso = (n) => `₱${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
 const formatDate = (raw) => {
   if (!raw) return 'N/A';
   try {
@@ -80,30 +83,211 @@ const PayLoanDetails = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { item } = route.params || {};
-  const loan = item || {};
+  
+  const [loading, setLoading] = useState(true);
+  const [loanData, setLoanData] = useState({});
+  const [approvedLoanAmount, setApprovedLoanAmount] = useState(0);
+  const [currentLoanAmount, setCurrentLoanAmount] = useState(0);
+  const [payments, setPayments] = useState([]);
 
-  const dueRaw = loan.dueDate || loan.nextDueDate;
+  // Fetch loan details from both ApprovedLoans and CurrentLoans
+  useEffect(() => {
+    const fetchLoanDetails = async () => {
+      setLoading(true);
+      try {
+        const memberId = item?._memberId || item?.memberId;
+        const loanId = item?._loanId || item?.transactionId;
+
+        if (!memberId || !loanId) {
+          console.log('Missing memberId or loanId');
+          setLoading(false);
+          return;
+        }
+
+        // Fetch from ApprovedLoans for original loan details (Loan Amount)
+        const approvedLoanRef = ref(database, `Loans/ApprovedLoans/${memberId}/${loanId}`);
+        const approvedLoanSnap = await get(approvedLoanRef);
+
+        let approvedLoanAmountValue = 0;
+        let approvedLoanData = {};
+        if (approvedLoanSnap?.exists()) {
+          approvedLoanData = approvedLoanSnap.val();
+          approvedLoanAmountValue = parseFloat(approvedLoanData.loanAmount || 0);
+          setApprovedLoanAmount(approvedLoanAmountValue);
+        }
+
+        // Fetch from CurrentLoans for outstanding balance
+        const currentLoanRef = ref(database, `Loans/CurrentLoans/${memberId}/${loanId}`);
+        const currentLoanSnap = await get(currentLoanRef);
+
+        let currentLoanAmountValue = 0;
+        let currentLoanData = {};
+        if (currentLoanSnap?.exists()) {
+          currentLoanData = currentLoanSnap.val();
+          currentLoanAmountValue = parseFloat(currentLoanData.loanAmount || 0);
+          setCurrentLoanAmount(currentLoanAmountValue);
+        }
+
+        // Merge data exactly like in ExistingLoan component
+        const mergedLoanData = {
+          ...item,
+          ...approvedLoanData,
+          ...currentLoanData,
+          loanAmount: approvedLoanAmountValue, // From ApprovedLoans
+          outstandingBalance: currentLoanAmountValue, // From CurrentLoans
+          _memberId: memberId,
+          _loanId: loanId
+        };
+
+        setLoanData(mergedLoanData);
+
+        // Also fetch payment history
+        await fetchPaymentHistory(memberId, loanId);
+
+      } catch (error) {
+        console.error('Error fetching loan details:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const fetchPaymentHistory = async (memberId, loanId) => {
+      try {
+        const paymentsRef = ref(database, `Payments/ApprovedPayments/${memberId}`);
+        const paymentsSnap = await get(paymentsRef);
+
+        const collectedPayments = [];
+
+        if (paymentsSnap?.exists()) {
+          const paymentsData = paymentsSnap.val();
+          
+          // Get all possible loan identifiers from the original item
+          const possibleLoanIdentifiers = [
+            item?.originalTransactionId,
+            item?.commonOriginalTransactionId,
+            item?._loanId,
+            item?.transactionId,
+            loanId
+          ].filter(Boolean);
+
+          // Find payments that match this loan
+          Object.entries(paymentsData).forEach(([paymentId, paymentData]) => {
+            if (!paymentData || typeof paymentData !== 'object') return;
+
+            const paymentAppliedToLoan = paymentData.appliedToLoan;
+            const paymentOriginalTransactionId = paymentData.originalTransactionId;
+
+            // Check if this payment is for our loan
+            let matchesLoan = false;
+
+            // Strategy 1: Direct appliedToLoan match
+            if (paymentAppliedToLoan && possibleLoanIdentifiers.includes(paymentAppliedToLoan)) {
+              matchesLoan = true;
+            }
+            // Strategy 2: OriginalTransactionId match
+            else if (paymentOriginalTransactionId && possibleLoanIdentifiers.includes(paymentOriginalTransactionId)) {
+              matchesLoan = true;
+            }
+            // Strategy 3: String comparison (case insensitive)
+            else if (paymentAppliedToLoan) {
+              const appliedToLoanLower = String(paymentAppliedToLoan).toLowerCase();
+              matchesLoan = possibleLoanIdentifiers.some(id => 
+                String(id).toLowerCase() === appliedToLoanLower
+              );
+            }
+
+            if (matchesLoan) {
+              const status = String(paymentData.status || paymentData.paymentStatus || '').toLowerCase();
+              if (status && status !== 'approved' && status !== 'paid') return;
+
+              collectedPayments.push({
+                source: 'payment',
+                id: paymentId,
+                transactionId: paymentId,
+                originalTransactionId: paymentOriginalTransactionId,
+                amount: parseFloat(
+                  paymentData.amountPaid ||
+                  paymentData.amountApproved ||
+                  paymentData.approvedAmount ||
+                  paymentData.amountToBePaid ||
+                  paymentData.amount
+                ) || 0,
+                dateApproved: paymentData.dateApproved,
+                dateApplied: paymentData.dateApplied,
+                status: status || 'approved',
+                paymentOption: paymentData.paymentOption || paymentData.modeOfPayment || paymentData.method,
+                appliedToLoan: paymentData.appliedToLoan,
+                amountToBePaid: parseFloat(paymentData.amountToBePaid) || 0,
+                interestPaid: parseFloat(paymentData.interestPaid) || 0,
+                principalPaid: parseFloat(paymentData.principalPaid) || 0,
+                penaltyPaid: parseFloat(paymentData.penaltyPaid) || 0,
+                excessPayment: parseFloat(paymentData.excessPayment) || 0,
+              });
+            }
+          });
+
+          setPayments(collectedPayments);
+        }
+      } catch (error) {
+        console.error('Error fetching payments:', error);
+      }
+    };
+
+    // Fetch data when component mounts
+    if (item) {
+      fetchLoanDetails();
+    } else {
+      setLoading(false);
+    }
+  }, [item]);
+
+  const dueRaw = loanData.dueDate || loanData.nextDueDate;
   const dueOverdue = isOverdue(dueRaw);
 
-  // Calculate payment details (same as PayLoan screen)
+  // Calculate payment details
   const overdueDays = computeOverdueDays(dueRaw);
-  const loanInterest = parseFloat(loan.interest) || 0;
+  const loanInterest = parseFloat(loanData.interest) || 0;
   const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
-  const monthly = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
+  const monthly = parseFloat(loanData.totalMonthlyPayment || loanData.monthlyPayment || 0) || 0;
   const totalDue = monthly + penalty;
 
+  // Calculate total paid from payments
+  const totalPaid = payments.reduce((sum, payment) => sum + (payment.amount || 0), 0);
+
+  // Use loanAmount from ApprovedLoans and outstandingBalance from CurrentLoans
+  const loanAmount = approvedLoanAmount || loanData.loanAmount;
+  const outstandingBalance = currentLoanAmount || loanData.outstandingBalance;
+
   const details = [
-    { label: 'Loan ID', value: loan.transactionId || loan._loanId || 'N/A' },
-    { label: 'Loan Type', value: loan.loanType || 'N/A' },
-    { label: 'Approved Amount', value: formatPeso(loan.loanAmount) },
-    { label: 'Outstanding Balance', value: formatPeso(loan.outstandingBalance ?? loan.loanAmount) },
-    { label: 'Date Applied', value: formatDate(loan.dateApplied) },
-    { label: 'Date Approved', value: formatDate(loan.dateApproved) },
-    { label: 'Interest Rate', value: `${Number(loan.interestRate || 0).toFixed(2)}%` },
-    { label: 'Total Interest', value: formatPeso(loan.interest) },
-    { label: 'Terms', value: loan.term ? `${loan.term} months` : 'N/A' },
-    { label: 'Monthly Payment', value: formatPeso(loan.monthlyPayment) },
+    { label: 'Loan Type', value: loanData.loanType || 'N/A' },
+    { label: 'Loan ID', value: loanData.transactionId || loanData._loanId || 'N/A' },
+    { label: 'Loan Amount', value: formatPeso(loanAmount) },
+    { label: 'Processing Fee', value: formatPeso(loanData.processingFee) },
+    { label: 'Receivable Amount', value: formatPeso(loanData.releaseAmount) },
+    { label: 'Outstanding Balance', value: formatPeso(outstandingBalance) },
+    { label: 'Interest', value: formatPeso(loanData.interest) },
+    { label: 'Interest Rate', value: `${Number(loanData.interestRate || 0).toFixed(2)}%` },
+    { label: 'Total Interest', value: formatPeso(loanData.totalInterest) },
+    { label: 'Term', value: loanData.term ? `${loanData.term} ${loanData.term === 1 ? 'month' : 'months'}` : 'N/A' },
+    { label: 'Monthly Amortization', value: formatPeso(loanData.monthlyPayment) },
+    { label: 'Date Applied', value: formatDate(loanData.dateApplied) },
+    { label: 'Date Approved', value: formatDate(loanData.dateApproved) },
   ];
+
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.headerBar}>
+          <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.goBack()}>
+            <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitleText}>Pay Loan Details</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <ActivityIndicator size="large" color="#234E70" style={{ marginTop: 20 }} />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -146,7 +330,15 @@ const PayLoanDetails = () => {
             </View>
           </View>
 
-          {/* Total Payment Section - NEW ADDITION */}
+          {/* Total Paid Section */}
+          {payments.length > 0 && (
+            <View style={[styles.row, { borderBottomWidth: 0 }]}>
+              <Text style={styles.label}>Total Paid</Text>
+              <Text style={[styles.value, { color: '#4CAF50' }]}>{formatPeso(totalPaid)}</Text>
+            </View>
+          )}
+
+          {/* Total Payment Section */}
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Payment Summary</Text>
           </View>
@@ -192,13 +384,62 @@ const PayLoanDetails = () => {
             </View>
           )}
         </View>
+
+        {/* Payment History Section */}
+        {payments.length > 0 && (
+          <View style={styles.card}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Payment History ({payments.length})</Text>
+            </View>
+            {payments.map((payment, index) => (
+              <View key={`${payment.id}-${index}`} style={styles.paymentCard}>
+                <Text style={styles.paymentTitle}>
+                  Payment ID: {payment.transactionId || 'N/A'}
+                </Text>
+                
+                <View style={styles.paymentRow}>
+                  <Text style={styles.paymentLabel}>Amount Paid</Text>
+                  <Text style={styles.paymentValue}>{formatPeso(payment.amount)}</Text>
+                </View>
+
+                {payment.principalPaid > 0 && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Principal Paid</Text>
+                    <Text style={styles.paymentValue}>{formatPeso(payment.principalPaid)}</Text>
+                  </View>
+                )}
+
+                {payment.interestPaid > 0 && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Interest Paid</Text>
+                    <Text style={styles.paymentValue}>{formatPeso(payment.interestPaid)}</Text>
+                  </View>
+                )}
+
+                {payment.paymentOption && (
+                  <View style={styles.paymentRow}>
+                    <Text style={styles.paymentLabel}>Method</Text>
+                    <Text style={styles.paymentValue}>{payment.paymentOption}</Text>
+                  </View>
+                )}
+
+                {payment.dateApproved && (
+                  <View style={[styles.paymentRow, { borderBottomWidth: 0 }]}>
+                    <Text style={styles.paymentLabel}>Date Approved</Text>
+                    <Text style={styles.paymentValue}>{formatDate(payment.dateApproved)}</Text>
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Fixed Pay Now Button */}
       <View style={styles.footer}>
         <TouchableOpacity 
           style={styles.payNowButton}
-          onPress={() => navigation.navigate('PayLoan')}
+          onPress={() => navigation.navigate('PayLoan', { loan: loanData })}
         >
           <Text style={styles.payNowButtonText}>Pay Now</Text>
         </TouchableOpacity>
@@ -351,6 +592,39 @@ const styles = StyleSheet.create({
     color: 'black',
     fontWeight: 'bold',
     fontSize: 18,
+  },
+  // Payment history styles
+  paymentCard: {
+    backgroundColor: '#F8FAFC',
+    borderRadius: 8,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  paymentRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+    paddingBottom: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F1F5F9',
+  },
+  paymentTitle: { 
+    fontSize: 16, 
+    fontWeight: '600', 
+    color: '#2D5783', 
+    marginBottom: 10 
+  },
+  paymentLabel: { 
+    fontSize: 14, 
+    color: '#666' 
+  },
+  paymentValue: { 
+    fontSize: 14, 
+    fontWeight: '500', 
+    color: '#2D5783' 
   },
 });
 
