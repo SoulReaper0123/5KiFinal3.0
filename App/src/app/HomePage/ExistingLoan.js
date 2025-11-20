@@ -36,7 +36,7 @@ const ExistingLoan = () => {
     return `${percent.toFixed(2)}%`;
   };
 
-  // Robust date formatter
+  // Robust date formatter (date only)
   const formatDisplayDate = (dateInput) => {
     try {
       if (!dateInput) return 'N/A';
@@ -220,7 +220,9 @@ const ExistingLoan = () => {
         dateApproved: null,
         interestRate: 0,
         interest: 0,
-        term: 0
+        term: 0,
+        processingFee: 0,
+        releaseAmount: 0
       };
 
       if (approvedSnapshot.exists()) {
@@ -235,7 +237,9 @@ const ExistingLoan = () => {
                 dateApproved: loan.dateApproved,
                 interestRate: parseFloat(loan.interestRate || 0),
                 interest: parseFloat(loan.interest || 0),
-                term: parseInt(loan.term || 0)
+                term: parseInt(loan.term || 0),
+                processingFee: parseFloat(loan.processingFee || 0),
+                releaseAmount: parseFloat(loan.releaseAmount || 0)
               };
               break;
             }
@@ -263,6 +267,8 @@ const ExistingLoan = () => {
                 outstandingBalance: currentLoan.loanAmount,
                 dateApplied: currentLoan.dateApplied,
                 dateApproved: currentLoan.dateApproved || approvedData.dateApproved,
+                processingFee: currentLoan.processingFee || approvedData.processingFee,
+                releaseAmount: currentLoan.releaseAmount || approvedData.releaseAmount
               };
               foundLoans.push(loanData);
             }
@@ -510,18 +516,14 @@ const ExistingLoan = () => {
         {activeLoans && activeLoans.length > 0 ? (
           activeLoans.map((loan) => {
             const dueDateValue = loan.dueDate || loan.nextDueDate;
+            // Only display the requested fields in this order
             const detailRows = [
               { label: 'Loan Type:', value: loan.loanType || 'Loan' },
               { label: 'Loan ID:', value: loan.transactionId || loan._loanId || 'N/A' },
-              { label: 'Approved Amount:', value: formatCurrency(loan.loanAmount) },
-              { label: 'Outstanding Balance:', value: formatCurrency(loan.outstandingBalance ?? loan.loanAmount) },
-              { label: 'Date Applied:', value: formatDisplayDate(loan.dateApplied) },
-              { label: 'Date Approved:', value: formatDisplayDate(loan.dateApproved) },
-              { label: 'Term:', value: loan.term ? `${loan.term} months` : 'N/A' },
-              { label: 'Interest Rate:', value: formatPercentage(loan.interestRate) },
-              { label: 'Interest:', value: formatCurrency(loan.interest) },
-              { label: 'Principal Amount:', value: formatCurrency(loan.monthlyPayment) },
-              { label: 'Total Amount:', value: formatCurrency(loan.totalMonthlyPayment ?? loan.totalTermPayment) }
+              { label: 'Loan Amount:', value: formatCurrency(loan.loanAmount)|| 'N/A' },
+              { label: 'Processing Fee:', value: formatCurrency(loan.processingFee)|| 'N/A' },
+              { label: 'Receivable Amount:', value: formatCurrency(loan.releaseAmount)|| 'N/A' },
+              { label: 'Outstanding Balance:', value: formatCurrency(loan.remainingBalance)|| 'N/A' },
             ];
             return (
               <TouchableOpacity
