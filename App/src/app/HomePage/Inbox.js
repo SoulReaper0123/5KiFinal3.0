@@ -191,7 +191,7 @@ export default function Inbox() {
                 break;
               case 'Loans':
                 amount = Number(details.loanAmount || 0);
-                const monthlyPayment = Number(details.monthlyPayment || 0).toFixed(2);
+                const monthlyPayment = Number(details.totalMonthlyPayment || 0).toFixed(2);
                 title = 'Loan';
                 label = 'Loan';
                 message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
@@ -301,7 +301,7 @@ export default function Inbox() {
         if (memberId === userMemberId) {
           const loanData = currentLoansData[memberId]?.[transactionId];
           if (loanData) {
-            const monthlyPayment = Number(loanData.monthlyPayment || 0).toFixed(2);
+            const monthlyPayment = Number(loanData.totalMonthlyPayment || 0).toFixed(2);
             const dueDate = getRawDateFromFirebase(loanData.dueDate);
             
             userReminders.push({
