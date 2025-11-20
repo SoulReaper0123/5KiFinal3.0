@@ -196,21 +196,29 @@ const SystemSettings = () => {
     fetchAdminData();
   }, [db]);
 
-  // Helper function to validate dividend percentages with better precision handling
-  const validateDividendPercentages = () => {
-    const membersDividend = parseFloat(settings.MembersDividendPercentage || 0);
-    const fiveKiEarnings = parseFloat(settings.FiveKiEarningsPercentage || 0);
-    const investmentShare = parseFloat(settings.InvestmentSharePercentage || 0);
-    const patronageShare = parseFloat(settings.PatronageSharePercentage || 0);
-    const activeMonths = parseFloat(settings.ActiveMonthsPercentage || 0);
+  // Helper function to validate distribution allocation
+  const validateDistribution = (currentSettings) => {
+    const membersDividend = parseFloat(currentSettings.MembersDividendPercentage || 0);
+    const fiveKiEarnings = parseFloat(currentSettings.FiveKiEarningsPercentage || 0);
     
-    // Use more precise rounding and handle floating point issues
     const distTotal = Math.round((membersDividend + fiveKiEarnings) * 1000) / 1000;
-    const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 1000) / 1000;
+    return Math.abs(distTotal - 100) < 0.001;
+  };
+
+  // Helper function to validate breakdown allocation
+  const validateBreakdown = (currentSettings) => {
+    const investmentShare = parseFloat(currentSettings.InvestmentSharePercentage || 0);
+    const patronageShare = parseFloat(currentSettings.PatronageSharePercentage || 0);
+    const activeMonths = parseFloat(currentSettings.ActiveMonthsPercentage || 0);
     
-    // Allow for very small rounding differences (0.001 tolerance)
-    const distributionValid = Math.abs(distTotal - 100) < 0.001;
-    const breakdownValid = Math.abs(breakdownTotal - 100) < 0.001;
+    const breakdownTotal = Math.round((investmentShare + patronageShare + activeMonths) * 1000) / 1000;
+    return Math.abs(breakdownTotal - 100) < 0.001;
+  };
+
+  // Main validation function
+  const validateDividendPercentages = () => {
+    const distributionValid = validateDistribution(settings);
+    const breakdownValid = validateBreakdown(settings);
     
     setDividendValidation({
       distributionValid,
@@ -308,6 +316,8 @@ const SystemSettings = () => {
   }, []);
 
   useEffect(() => {
+    // Validate percentages whenever any dividend-related field changes
+    // This ensures real-time validation during editing
     if (editDividend) {
       validateDividendPercentages();
     }
@@ -316,8 +326,8 @@ const SystemSettings = () => {
     settings.FiveKiEarningsPercentage, 
     settings.InvestmentSharePercentage, 
     settings.PatronageSharePercentage, 
-    settings.ActiveMonthsPercentage, 
-    editDividend
+    settings.ActiveMonthsPercentage,
+    editDividend // Also validate when entering/exiting edit mode
   ]);
 
   const generateOrientationCode = () => {
@@ -361,10 +371,13 @@ const SystemSettings = () => {
     
     // Immediately validate dividend percentages when relevant fields change
     if (['MembersDividendPercentage', 'FiveKiEarningsPercentage', 'InvestmentSharePercentage', 'PatronageSharePercentage', 'ActiveMonthsPercentage'].includes(key)) {
-      // Use setTimeout to ensure validation runs after state update
-      setTimeout(() => {
-        validateDividendPercentages();
-      }, 0);
+      const distributionValid = validateDistribution(newSettings);
+      const breakdownValid = validateBreakdown(newSettings);
+      
+      setDividendValidation({
+        distributionValid,
+        breakdownValid
+      });
     }
   };
 
@@ -1695,7 +1708,10 @@ const SystemSettings = () => {
                     backgroundColor: dividendValidation.distributionValid ? '#f0fdf4' : '#fef2f2',
                     borderColor: dividendValidation.distributionValid ? '#bbf7d0' : '#fecaca'
                   }}>
-                    Total: {Math.round((parseFloat(settings.MembersDividendPercentage || 0) + parseFloat(settings.FiveKiEarningsPercentage || 0)) * 10) / 10}% 
+                    Total: {(
+                      parseFloat(settings.MembersDividendPercentage || 0) + 
+                      parseFloat(settings.FiveKiEarningsPercentage || 0)
+                    ).toFixed(1)}% 
                     {dividendValidation.distributionValid ? ' ✓ Balanced' : ' - Must equal exactly 100%'}
                   </div>
                 </div>
@@ -1787,7 +1803,11 @@ const SystemSettings = () => {
                     backgroundColor: dividendValidation.breakdownValid ? '#f0fdf4' : '#fef2f2',
                     borderColor: dividendValidation.breakdownValid ? '#bbf7d0' : '#fecaca'
                   }}>
-                    Total: {Math.round((parseFloat(settings.InvestmentSharePercentage || 0) + parseFloat(settings.PatronageSharePercentage || 0) + parseFloat(settings.ActiveMonthsPercentage || 0)) * 10) / 10}% 
+                    Total: {(
+                      parseFloat(settings.InvestmentSharePercentage || 0) + 
+                      parseFloat(settings.PatronageSharePercentage || 0) + 
+                      parseFloat(settings.ActiveMonthsPercentage || 0)
+                    ).toFixed(1)}% 
                     {dividendValidation.breakdownValid ? ' ✓ Balanced' : ' - Must equal exactly 100%'}
                   </div>
                 </div>
@@ -2043,7 +2063,7 @@ const SystemSettings = () => {
             </div>
 
             {/* Admin Info */}
-            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', border: '1px solid #dbeafe' }}>
+            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', border: '1px solid #dbeafe', border: '1px solid #fecaca' }}>
               <p style={{ fontSize: 14, color: '#1e40af', margin: 0, fontWeight: '500' }}>
                 Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
               </p>
@@ -2147,7 +2167,7 @@ const SystemSettings = () => {
             </div>
 
             {/* Admin Info */}
-            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px', border: '1px solid #fecaca' }}>
+            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px'}}>
               <p style={{ fontSize: 14, color: '#dc2626', margin: 0, fontWeight: '500' }}>
                 Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
               </p>
