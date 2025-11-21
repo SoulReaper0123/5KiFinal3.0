@@ -11,9 +11,7 @@ import {
   FaUserCheck,
   FaUserTimes,
   FaFileAlt,
-  FaPrint,
-  FaTimes,
-  FaSpinner
+  FaPrint
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -29,7 +27,18 @@ import RejectedRegistrations from './RejectedRegistrations';
 import ApprovedRegistrations from './ApprovedRegistrations';
 import AllMembers from '../Members/AllMembers';
 import PermanentWithdrawals from '../Withdraws/PermanentWithdraws';
-import logoImage from '../../../../../assets/logo.png';
+
+const genderOptions = [
+  { key: 'Male', label: 'Male' },
+  { key: 'Female', label: 'Female' }
+];
+
+const civilStatusOptions = [
+  { key: 'Single', label: 'Single' },
+  { key: 'Married', label: 'Married' },
+  { key: 'Widowed', label: 'Widowed' },
+  { key: 'Separated', label: 'Separated' }
+];
 
 const governmentIdOptions = [
   { key: 'national', label: 'National ID (PhilSys)' },
@@ -42,7 +51,7 @@ const governmentIdOptions = [
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
   let pwd = '';
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < 6; i++) {
     pwd += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   if (!/[A-Z]/.test(pwd) || !/[a-z]/.test(pwd) || !/\d/.test(pwd)) {
@@ -51,29 +60,15 @@ const generateRandomPassword = () => {
   return pwd;
 };
 
-const formatCurrency = (amount) => {
-  return new Intl.NumberFormat('en-PH', {
-    style: 'currency',
-    currency: 'PHP',
-    minimumFractionDigits: 2,
-  }).format(amount);
-};
-
 const formatDate = (date) => {
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return date.toLocaleDateString('en-US', options);
 };
 
 const formatTime = (date) => {
-  let hours = date.getHours();
+  const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  const seconds = date.getSeconds().toString().padStart(2, '0');
-  const ampm = hours >= 12 ? 'PM' : 'AM';
-  
-  hours = hours % 12;
-  hours = hours ? hours : 12;
-  
-  return `${hours}:${minutes}:${seconds} ${ampm}`;
+  return `${hours}:${minutes}`;
 };
 
 const styles = {
@@ -359,9 +354,7 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '20px',
-    overflowY: 'auto',
-    backdropFilter: 'blur(4px)'
+    padding: '20px'
   },
   modalCard: {
     backgroundColor: 'white',
@@ -372,8 +365,7 @@ const styles = {
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
-    flexDirection: 'column',
-    border: '1px solid #F1F5F9'
+    flexDirection: 'column'
   },
   modalHeader: {
     padding: '24px',
@@ -440,10 +432,6 @@ const styles = {
     backgroundColor: '#fff',
     boxSizing: 'border-box'
   },
-  formInputError: {
-    borderColor: '#dc2626',
-    boxShadow: '0 0 0 3px rgba(220, 38, 38, 0.1)'
-  },
   formInputFocus: {
     borderColor: '#3b82f6',
     boxShadow: '0 0 0 3px rgba(59, 130, 246, 0.1)'
@@ -499,55 +487,40 @@ const styles = {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '12px',
-    flexShrink: 0,
-    background: '#f8fafc'
-  },
-  actionButton: {
-    padding: '0.75rem 2rem',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: '0.875rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.2s ease',
-    minWidth: '140px'
+    flexShrink: 0
   },
   primaryButton: {
-    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
-    }
+    padding: '10px 20px',
+    backgroundColor: '#1e40af',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    whiteSpace: 'nowrap'
+  },
+  primaryButtonHover: {
+    backgroundColor: '#1e3a8a'
   },
   secondaryButton: {
-    background: '#6b7280',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
-    }
+    padding: '10px 20px',
+    backgroundColor: '#6b7280',
+    color: '#fff',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '600',
+    transition: 'background-color 0.2s ease',
+    whiteSpace: 'nowrap'
   },
-  approveButton: {
-    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
-    color: 'white',
-    '&:hover': {
-      transform: 'translateY(-1px)',
-      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
-    }
-  },
-  disabledButton: {
-    background: '#9ca3af',
-    cursor: 'not-allowed',
-    opacity: '0.7',
-    '&:hover': {
-      transform: 'none',
-      boxShadow: 'none'
-    }
+  secondaryButtonHover: {
+    backgroundColor: '#4b5563'
   },
   dashboardLoadingContainer: {
     display: 'flex',
@@ -567,7 +540,7 @@ const styles = {
   },
   spinner: {
     border: '4px solid #f3f4f6',
-    borderLeft: '4px solid #2563eb',
+    borderLeft: '4px solid #1e40af',
     borderRadius: '50%',
     width: '40px',
     height: '40px',
@@ -620,98 +593,8 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     margin: '4px 0 0 0'
-  },
-  // Confirmation modal styles
-  centeredModal: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-    padding: '20px',
-    backdropFilter: 'blur(4px)'
-  },
-  modalCardSmall: {
-    width: '300px',
-    backgroundColor: 'white',
-    borderRadius: '14px',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    textAlign: 'center',
-    border: '1px solid #F1F5F9'
-  },
-  confirmIcon: {
-    marginBottom: '14px',
-    fontSize: '28px'
-  },
-  modalText: {
-    fontSize: '14px',
-    marginBottom: '18px',
-    textAlign: 'center',
-    color: '#475569',
-    lineHeight: '1.5',
-    fontWeight: '500'
-  },
-  // Loading overlay
-  loadingOverlay: {
-    position: 'fixed',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(15, 23, 42, 0.8)',
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1500,
-    backdropFilter: 'blur(4px)',
-  },
-  loadingContent: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '14px',
-  },
-  loadingTextOverlay: {
-    color: 'white',
-    fontSize: '14px',
-    fontWeight: '500'
-  },
-  // Error text styles
-  errorText: {
-    color: '#dc2626',
-    fontSize: '12px',
-    marginTop: '4px',
-    fontWeight: '500'
   }
 };
-
-// Add keyframes for spinner animation
-const spinKeyframes = `
-  @keyframes spin {
-    0% { transform: rotate(0deg); }
-    100% { transform: rotate(360deg); }
-  }
-`;
-
-// Inject the keyframes into the document head
-if (typeof document !== 'undefined') {
-  const styleSheet = document.createElement('style');
-  styleSheet.type = 'text/css';
-  styleSheet.innerText = spinKeyframes;
-  if (!document.head.querySelector('style[data-spin-keyframes]')) {
-    styleSheet.setAttribute('data-spin-keyframes', 'true');
-    document.head.appendChild(styleSheet);
-  }
-}
 
 const Register = () => {
   const [activeSection, setActiveSection] = useState('registrations');
@@ -729,7 +612,7 @@ const Register = () => {
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isHovered, setIsHovered] = useState({});
 
-  // Add Member Modal State
+  // Add Member Modal State - ONLY FIELDS THAT MATCH YOUR APP
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
@@ -741,20 +624,9 @@ const Register = () => {
     placeOfBirth: '',
     address: '',
     governmentId: '',
-    registrationFee: ''
-  });
-  const [formErrors, setFormErrors] = useState({
-    email: '',
-    phoneNumber: '',
-    firstName: '',
-    lastName: '',
-    placeOfBirth: '',
-    address: '',
-    governmentId: '',
     registrationFee: '',
-    validIdFront: '',
-    selfie: '',
-    proofOfPayment: ''
+    attendedOrientation: true,
+    orientationCode: ''
   });
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
@@ -771,9 +643,6 @@ const Register = () => {
   // Print Modal State
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
-
-  // Admin data for print report
-  const [adminData, setAdminData] = useState(null);
 
   const pageSize = 10;
 
@@ -818,28 +687,9 @@ const Register = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
+        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
       }
-      
-      /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
-        @page {
-          margin: 0.5in !important;
-          size: auto;
-          margin-header: 0 !important;
-          margin-footer: 0 !important;
-        }
-        
-        body::before,
-        body::after {
-          display: none !important;
-        }
-        
-        .print-header:empty,
-        .print-footer:empty {
-          display: none;
-        }
-        
         body * {
           visibility: hidden;
         }
@@ -851,66 +701,17 @@ const Register = () => {
           left: 0;
           top: 0;
           width: 100%;
-          padding: 20px;
-          background: white;
-          margin: 0 !important;
         }
         .no-print {
           display: none !important;
-        }
-        .print-header {
-          display: block !important;
-        }
-        .component-header {
-          display: none !important;
-        }
-        table {
-          width: 100%;
-          border-collapse: collapse;
-        }
-        th, td {
-          border: 1px solid #ddd;
-          padding: 8px;
-          text-align: left;
-        }
-        th {
-          background-color: #f2f2f2;
-          font-weight: bold;
         }
       }
     `;
     document.head.appendChild(styleElement);
 
     return () => {
-      if (document.head.contains(styleElement)) {
-        document.head.removeChild(styleElement);
-      }
+      document.head.removeChild(styleElement);
     };
-  }, []);
-
-  // Fetch admin data for print report
-  useEffect(() => {
-    const fetchAdminData = async () => {
-      try {
-        const adminId = localStorage.getItem('adminId');
-        if (!adminId) return;
-
-        const role = localStorage.getItem('userRole') || 'admin';
-        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
-                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
-        
-        const adminRef = database.ref(`${node}/${adminId}`);
-        const snapshot = await adminRef.once('value');
-        
-        if (snapshot.exists()) {
-          setAdminData(snapshot.val());
-        }
-      } catch (error) {
-        console.error('Error fetching admin data:', error);
-      }
-    };
-
-    fetchAdminData();
   }, []);
 
   const fetchAllData = async () => {
@@ -979,150 +780,6 @@ const Register = () => {
     }
   }, [memberFilter, members, activeSection]);
 
-  // Validation functions matching RegisterPage
-  const validateEmail = (email) => {
-    const emailValue = (email || '').trim();
-    if (!emailValue) {
-      return 'Email is required';
-    }
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailValue)) {
-      return 'Please enter a valid email address (e.g., name@example.com)';
-    }
-    return '';
-  };
-
-  const validatePhoneNumber = (phoneNumber) => {
-    const digits = String(phoneNumber || '').replace(/\D/g, '');
-    if (!digits) {
-      return 'Phone number is required';
-    }
-    if (digits.length !== 11) {
-      return 'Phone number should be exactly 11 digits';
-    }
-    return '';
-  };
-
-  const validateFirstName = (firstName) => {
-    if (!firstName || !firstName.trim()) {
-      return 'First name is required';
-    }
-    return '';
-  };
-
-  const validateLastName = (lastName) => {
-    if (!lastName || !lastName.trim()) {
-      return 'Last name is required';
-    }
-    return '';
-  };
-
-  const validatePlaceOfBirth = (placeOfBirth) => {
-    if (!placeOfBirth || !placeOfBirth.trim()) {
-      return 'Place of birth is required';
-    }
-    return '';
-  };
-
-  const validateAddress = (address) => {
-    if (!address || !address.trim()) {
-      return 'Address is required';
-    }
-    return '';
-  };
-
-  const validateGovernmentId = (governmentId) => {
-    if (!governmentId) {
-      return 'Government ID is required';
-    }
-    return '';
-  };
-
-  const validateRegistrationFee = (fee) => {
-    const amt = parseFloat(fee);
-    if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
-      return `Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`;
-    }
-    return '';
-  };
-
-  const validateFile = (file, fieldName) => {
-    if (!file) {
-      return `${fieldName} is required`;
-    }
-    return '';
-  };
-
-  const validateField = (name, value) => {
-    switch (name) {
-      case 'email':
-        return validateEmail(value);
-      case 'phoneNumber':
-        return validatePhoneNumber(value);
-      case 'firstName':
-        return validateFirstName(value);
-      case 'lastName':
-        return validateLastName(value);
-      case 'placeOfBirth':
-        return validatePlaceOfBirth(value);
-      case 'address':
-        return validateAddress(value);
-      case 'governmentId':
-        return validateGovernmentId(value);
-      case 'registrationFee':
-        return validateRegistrationFee(value);
-      default:
-        return '';
-    }
-  };
-
-  const handleInputChange = (name, value) => {
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-
-    // Real-time validation
-    const error = validateField(name, value);
-    setFormErrors(prev => ({
-      ...prev,
-      [name]: error
-    }));
-  };
-
-  const handleFileChange = (e, setFileFunction, fieldName) => {
-    const file = e.target.files[0];
-    if (file) {
-      setFileFunction(file);
-      // Clear file error when file is selected
-      setFormErrors(prev => ({
-        ...prev,
-        [fieldName]: ''
-      }));
-    }
-  };
-
-  const validateAllFields = () => {
-    const errors = {
-      email: validateEmail(formData.email),
-      phoneNumber: validatePhoneNumber(formData.phoneNumber),
-      firstName: validateFirstName(formData.firstName),
-      lastName: validateLastName(formData.lastName),
-      placeOfBirth: validatePlaceOfBirth(formData.placeOfBirth),
-      address: validateAddress(formData.address),
-      governmentId: validateGovernmentId(formData.governmentId),
-      registrationFee: validateRegistrationFee(formData.registrationFee),
-      validIdFront: validateFile(validIdFrontFile, 'Valid ID Front'),
-      selfie: validateFile(selfieFile, 'Selfie'),
-      proofOfPayment: validateFile(proofOfPaymentFile, 'Proof of Payment')
-    };
-
-    setFormErrors(errors);
-
-    // Check if any errors exist
-    return !Object.values(errors).some(error => error !== '');
-  };
-
   const filterMembers = () => {
     let filtered = members;
     
@@ -1184,95 +841,31 @@ const Register = () => {
       printContent.className = 'print-content';
       printContent.style.padding = '20px';
       printContent.style.fontFamily = 'Arial, sans-serif';
-      printContent.style.boxSizing = 'border-box';
-      printContent.style.margin = '0';
 
-      // Create your custom header
+      // Header
       const header = document.createElement('div');
-      header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '15px';
+      header.style.paddingBottom = '10px';
       header.style.marginBottom = '20px';
-      header.style.boxSizing = 'border-box';
-
-      // Logo and Report Title (Centered)
-      const logoSection = document.createElement('div');
-      logoSection.style.textAlign = 'center';
-      logoSection.style.marginBottom = '15px';
-
-      // Add logo image
-      const logoImg = document.createElement('img');
-      logoImg.src = logoImage;
-      logoImg.style.width = '80px';
-      logoImg.style.height = '80px';
-      logoImg.style.marginBottom = '5px';
-      logoImg.style.display = 'block';
-      logoImg.style.marginLeft = 'auto';
-      logoImg.style.marginRight = 'auto';
-
-      const logo = document.createElement('div');
-      logo.textContent = '5Ki Financial Services';
-      logo.style.fontSize = '24px';
-      logo.style.fontWeight = 'bold';
-      logo.style.color = '#1e40af';
-      logo.style.marginBottom = '5px';
-
-      const reportTitle = document.createElement('div');
-      reportTitle.textContent = `${sectionTitle} Report`;
-      reportTitle.style.fontSize = '20px';
-      reportTitle.style.fontWeight = 'bold';
-      reportTitle.style.marginBottom = '15px';
-
-      logoSection.appendChild(logoImg);
-      logoSection.appendChild(logo);
-      logoSection.appendChild(reportTitle);
-
-      // Info Row (Generated Date on left, Prepared By on right)
-      const infoRow = document.createElement('div');
-      infoRow.style.display = 'flex';
-      infoRow.style.justifyContent = 'space-between';
-      infoRow.style.alignItems = 'flex-start';
-      infoRow.style.fontSize = '14px';
-      infoRow.style.marginBottom = '10px';
-      infoRow.style.boxSizing = 'border-box';
-
-      // Left side - Generated Date
-      const generatedDate = document.createElement('div');
-      generatedDate.style.textAlign = 'left';
-      generatedDate.style.flex = '1';
-      generatedDate.innerHTML = `
-        <strong>Generated as of:</strong><br>
-        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-      `;
-
-      // Right side - Prepared By
-      const preparedBy = document.createElement('div');
-      preparedBy.style.textAlign = 'right';
-      preparedBy.style.flex = '1';
-      const adminFirstName = adminData?.firstName || 'Admin';
-      const adminRole = localStorage.getItem('userRole') || 'Admin';
-      preparedBy.innerHTML = `
-        <strong>Prepared by:</strong><br>
-        <span style="font-weight: bold;">${adminFirstName}</span><br>
-        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
-      `;
-
-      infoRow.appendChild(generatedDate);
-      infoRow.appendChild(preparedBy);
-
-      // Report Details
-      const reportDetails = document.createElement('div');
-      reportDetails.style.textAlign = 'center';
-      reportDetails.style.marginBottom = '15px';
-      reportDetails.style.fontSize = '14px';
-      reportDetails.style.color = '#666';
-      reportDetails.innerHTML = `
-        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
-      `;
-
-      header.appendChild(logoSection);
-      header.appendChild(infoRow);
-      header.appendChild(reportDetails);
+      
+      const title = document.createElement('h1');
+      title.textContent = `${sectionTitle} Report`;
+      title.style.margin = '0';
+      title.style.color = '#333';
+      
+      const date = document.createElement('p');
+      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
+      date.style.margin = '5px 0 0 0';
+      date.style.color = '#666';
+      
+      const count = document.createElement('p');
+      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
+      count.style.margin = '5px 0 0 0';
+      count.style.color = '#666';
+      
+      header.appendChild(title);
+      header.appendChild(date);
+      header.appendChild(count);
       printContent.appendChild(header);
 
       // Table
@@ -1281,31 +874,30 @@ const Register = () => {
         table.style.width = '100%';
         table.style.borderCollapse = 'collapse';
         table.style.marginTop = '20px';
-        table.style.boxSizing = 'border-box';
 
-        // Table Header - Define columns based on active section
+        // Table Header - Define columns based on active section (excluding Action column)
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.style.backgroundColor = '#f8f9fa';
         
-        // Define columns for each section
+        // Define columns for each section (excluding the Action/View column)
         let headers = [];
         
         switch(activeSection) {
           case 'registrations':
-            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Applied'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
             break;
           case 'rejectedRegistrations':
-            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Rejected'];
+            headers = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
             break;
           case 'approvedRegistrations':
-            headers = ['Full Name', 'Email Address', 'Contact Number', 'Date Approved', 'Member ID'];
+            headers = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
             break;
           case 'members':
-            headers = ['Member ID', 'Full Name', 'Email', 'Investment', 'Savings', 'Status'];
+            headers = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
             break;
           case 'permanentWithdrawals':
-            headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status', 'Date Withdrawn'];
+            headers = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
             break;
           default:
             headers = [];
@@ -1320,7 +912,6 @@ const Register = () => {
           th.style.textAlign = 'left';
           th.style.fontWeight = 'bold';
           th.style.backgroundColor = '#e9ecef';
-          th.style.boxSizing = 'border-box';
           headerRow.appendChild(th);
         });
         
@@ -1342,15 +933,25 @@ const Register = () => {
               case 'Full Name':
                 cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
                 break;
+              case 'Name':
+                cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                break;
               case 'Email Address':
               case 'Email':
                 cellValue = item.email || '';
                 break;
               case 'Contact Number':
+              case 'Contact':
                 cellValue = item.phoneNumber || '';
                 break;
               case 'Status':
                 cellValue = item.status || 'pending';
+                break;
+              case 'First Name':
+                cellValue = item.firstName || '';
+                break;
+              case 'Last Name':
+                cellValue = item.lastName || '';
                 break;
               case 'Date Applied':
                 cellValue = item.dateCreated || item.dateApplied || '';
@@ -1358,26 +959,24 @@ const Register = () => {
               case 'Date Approved':
                 cellValue = item.dateApproved || '';
                 break;
-              case 'Date Rejected':
-                cellValue = item.dateRejected || '';
-                break;
               case 'Member ID':
                 cellValue = item.memberId || item.id || '';
                 break;
               case 'Investment':
-                cellValue = formatCurrency(item.investment || 0);
+                cellValue = `₱${(parseFloat(item.investment) || 0).toFixed(2)}`;
                 break;
               case 'Savings':
-                cellValue = formatCurrency(item.balance || 0);
+                cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
+                break;
+              case 'Loans':
+                // For members tab, you might need to calculate loans from your state
+                cellValue = `₱${(parseFloat(item.loans) || 0).toFixed(2)}`;
                 break;
               case 'Balance':
-                cellValue = formatCurrency(item.balance || 0);
+                cellValue = `₱${(parseFloat(item.balance) || 0).toFixed(2)}`;
                 break;
               case 'Reason':
                 cellValue = item.reason || '';
-                break;
-              case 'Date Withdrawn':
-                cellValue = item.dateWithdrawn || '';
                 break;
               default:
                 cellValue = item[header] || '';
@@ -1387,7 +986,6 @@ const Register = () => {
             td.style.padding = '10px 8px';
             td.style.border = '1px solid #ddd';
             td.style.fontSize = '12px';
-            td.style.boxSizing = 'border-box';
             row.appendChild(td);
           });
           
@@ -1405,208 +1003,160 @@ const Register = () => {
         printContent.appendChild(noData);
       }
 
-      // Create a hidden iframe for printing to avoid browser headers
-      const printFrame = document.createElement('iframe');
-      printFrame.style.position = 'fixed';
-      printFrame.style.right = '0';
-      printFrame.style.bottom = '0';
-      printFrame.style.width = '0';
-      printFrame.style.height = '0';
-      printFrame.style.border = '0';
-      printFrame.style.visibility = 'hidden';
-      
-      document.body.appendChild(printFrame);
-      
-      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
-      if (printDocument.document) {
-        printDocument = printDocument.document;
-      }
+      if (format === 'pdf') {
+        // For PDF, we'll use browser's print to PDF functionality
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      } else if (format === 'word') {
+        // For Word, create a simple HTML file that can be opened in Word
+        const htmlContent = `
+          <html>
+            <head>
+              <title>${sectionTitle}</title>
+              <style>
+                body { font-family: Arial, sans-serif; margin: 20px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+                th { background-color: #f2f2f2; font-weight: bold; }
+                h1 { color: #333; }
+              </style>
+            </head>
+            <body>
+              ${printContent.innerHTML}
+            </body>
+          </html>
+        `;
+        
+        const blob = new Blob([htmlContent], { type: 'application/msword' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      } else if (format === 'excel') {
+        // Export to Excel
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet(sectionTitle);
 
-      // Write the print content to the iframe with CSS to remove headers/footers
-      printDocument.open();
-      printDocument.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${sectionTitle} Report</title>
-            <style>
-              /* Reset all margins and remove browser headers/footers */
-              @page {
-                margin: 0.5in !important;
-                size: auto;
-                margin-header: 0 !important;
-                margin-footer: 0 !important;
-              }
-              
-              body {
-                margin: 0 !important;
-                padding: 0 !important;
-                font-family: Arial, sans-serif;
-                -webkit-print-color-adjust: exact;
-              }
-              
-              .print-content {
-                margin: 0 !important;
-                padding: 20px;
-              }
-              
-              /* Hide any potential browser elements */
-              header, footer, .header, .footer {
-                display: none !important;
-              }
-              
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-              }
-              
-              th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-              }
-              
-              th {
-                background-color: #f2f2f2;
-                font-weight: bold;
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-        </html>
-      `);
-      printDocument.close();
+        if (displayedData.length > 0) {
+          // Define headers for Excel based on active section
+          let excelHeaders = [];
+          
+          switch(activeSection) {
+            case 'registrations':
+              excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+              break;
+            case 'rejectedRegistrations':
+              excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status'];
+              break;
+            case 'approvedRegistrations':
+              excelHeaders = ['Email', 'Contact', 'First Name', 'Last Name', 'Date Applied', 'Date Approved'];
+              break;
+            case 'members':
+              excelHeaders = ['Member ID', 'Name', 'Investment', 'Savings', 'Loans'];
+              break;
+            case 'permanentWithdrawals':
+              excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status'];
+              break;
+            default:
+              excelHeaders = [];
+          }
 
-      // Wait for content to load then print
-      printFrame.onload = function() {
-        try {
-          if (format === 'pdf') {
-            printFrame.contentWindow.print();
+          worksheet.addRow(excelHeaders);
 
-            // Export to Excel
-            const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet(sectionTitle);
-
-            if (displayedData.length > 0) {
-              // Define headers for Excel based on active section
-              let excelHeaders = [];
+          displayedData.forEach(item => {
+            const row = [];
+            excelHeaders.forEach(header => {
+              let cellValue = '';
               
-              switch(activeSection) {
-                case 'registrations':
-                  excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Applied'];
+              switch(header) {
+                case 'Full Name':
+                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
                   break;
-                case 'rejectedRegistrations':
-                  excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Status', 'Date Rejected'];
+                case 'Name':
+                  cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
                   break;
-                case 'approvedRegistrations':
-                  excelHeaders = ['Full Name', 'Email Address', 'Contact Number', 'Date Approved', 'Member ID'];
+                case 'Email Address':
+                case 'Email':
+                  cellValue = item.email || '';
                   break;
-                case 'members':
-                  excelHeaders = ['Member ID', 'Full Name', 'Email', 'Investment', 'Savings', 'Status'];
+                case 'Contact Number':
+                case 'Contact':
+                  cellValue = item.phoneNumber || '';
                   break;
-                case 'permanentWithdrawals':
-                  excelHeaders = ['Member ID', 'Full Name', 'Balance', 'Reason', 'Status', 'Date Withdrawn'];
+                case 'Status':
+                  cellValue = item.status || 'pending';
+                  break;
+                case 'First Name':
+                  cellValue = item.firstName || '';
+                  break;
+                case 'Last Name':
+                  cellValue = item.lastName || '';
+                  break;
+                case 'Date Applied':
+                  cellValue = item.dateCreated || item.dateApplied || '';
+                  break;
+                case 'Date Approved':
+                  cellValue = item.dateApproved || '';
+                  break;
+                case 'Member ID':
+                  cellValue = item.memberId || item.id || '';
+                  break;
+                case 'Investment':
+                  cellValue = parseFloat(item.investment) || 0;
+                  break;
+                case 'Savings':
+                  cellValue = parseFloat(item.balance) || 0;
+                  break;
+                case 'Loans':
+                  cellValue = parseFloat(item.loans) || 0;
+                  break;
+                case 'Balance':
+                  cellValue = parseFloat(item.balance) || 0;
+                  break;
+                case 'Reason':
+                  cellValue = item.reason || '';
                   break;
                 default:
-                  excelHeaders = [];
+                  cellValue = item[header] || '';
               }
-
-              worksheet.addRow(excelHeaders);
-
-              displayedData.forEach(item => {
-                const row = [];
-                excelHeaders.forEach(header => {
-                  let cellValue = '';
-                  
-                  switch(header) {
-                    case 'Full Name':
-                      cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                      break;
-                    case 'Email Address':
-                    case 'Email':
-                      cellValue = item.email || '';
-                      break;
-                    case 'Contact Number':
-                      cellValue = item.phoneNumber || '';
-                      break;
-                    case 'Status':
-                      cellValue = item.status || 'pending';
-                      break;
-                    case 'Date Applied':
-                      cellValue = item.dateCreated || item.dateApplied || '';
-                      break;
-                    case 'Date Approved':
-                      cellValue = item.dateApproved || '';
-                      break;
-                    case 'Date Rejected':
-                      cellValue = item.dateRejected || '';
-                      break;
-                    case 'Member ID':
-                      cellValue = item.memberId || item.id || '';
-                      break;
-                    case 'Investment':
-                      cellValue = parseFloat(item.investment) || 0;
-                      break;
-                    case 'Savings':
-                      cellValue = parseFloat(item.balance) || 0;
-                      break;
-                    case 'Balance':
-                      cellValue = parseFloat(item.balance) || 0;
-                      break;
-                    case 'Reason':
-                      cellValue = item.reason || '';
-                      break;
-                    case 'Date Withdrawn':
-                      cellValue = item.dateWithdrawn || '';
-                      break;
-                    default:
-                      cellValue = item[header] || '';
-                  }
-                  
-                  row.push(cellValue);
-                });
-                worksheet.addRow(row);
-              });
-            }
-
-            workbook.xlsx.writeBuffer().then(buffer => {
-              const blob = new Blob([buffer], { 
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-              });
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
+              
+              row.push(cellValue);
             });
-          } else {
-            // Direct print
-            printFrame.contentWindow.print();
-          }
-          
-          // Clean up after printing
-          setTimeout(() => {
-            document.body.removeChild(printFrame);
-            setPrintModalVisible(false);
-            setPrinting(false);
-          }, 1000);
-        } catch (error) {
-          console.error('Print error:', error);
-          document.body.removeChild(printFrame);
-          setPrinting(false);
+            worksheet.addRow(row);
+          });
         }
-      };
 
+        workbook.xlsx.writeBuffer().then(buffer => {
+          const blob = new Blob([buffer], { 
+            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+          });
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(url);
+        });
+      } else {
+        // Direct print
+        document.body.appendChild(printContent);
+        window.print();
+        document.body.removeChild(printContent);
+      }
+
+      setPrintModalVisible(false);
     } catch (error) {
       console.error('Error printing data:', error);
       setErrorMessage('Failed to print data');
       setErrorModalVisible(true);
+    } finally {
       setPrinting(false);
     }
   };
@@ -1632,20 +1182,6 @@ const Register = () => {
 
   const openAddModal = () => {
     setAddModalVisible(true);
-    // Reset form errors when opening modal
-    setFormErrors({
-      email: '',
-      phoneNumber: '',
-      firstName: '',
-      lastName: '',
-      placeOfBirth: '',
-      address: '',
-      governmentId: '',
-      registrationFee: '',
-      validIdFront: '',
-      selfie: '',
-      proofOfPayment: ''
-    });
   };
 
   const closeAddModal = () => {
@@ -1660,32 +1196,87 @@ const Register = () => {
       placeOfBirth: '',
       address: '',
       governmentId: '',
-      registrationFee: ''
+      registrationFee: '',
+      attendedOrientation: true,
+      orientationCode: ''
     });
     setValidIdFrontFile(null);
     setSelfieFile(null);
     setProofOfPaymentFile(null);
-    setFormErrors({
-      email: '',
-      phoneNumber: '',
-      firstName: '',
-      lastName: '',
-      placeOfBirth: '',
-      address: '',
-      governmentId: '',
-      registrationFee: '',
-      validIdFront: '',
-      selfie: '',
-      proofOfPayment: ''
-    });
+  };
+
+  const handleInputChange = (name, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleFileChange = (e, setFileFunction) => {
+    const file = e.target.files[0];
+    if (file) {
+      setFileFunction(file);
+    }
+  };
+
+  const validateFields = () => {
+    if (!formData.email) {
+      setErrorMessage('Email is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.firstName) {
+      setErrorMessage('First name is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.lastName) {
+      setErrorMessage('Last name is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.phoneNumber) {
+      setErrorMessage('Phone number is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.placeOfBirth) {
+      setErrorMessage('Place of birth is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.address) {
+      setErrorMessage('Address is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!formData.governmentId) {
+      setErrorMessage('Government ID is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!validIdFrontFile || !selfieFile) {
+      setErrorMessage('Valid ID Front and Selfie are required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    // Amount and proof validation (like App RegistrationFeePage)
+    const amt = parseFloat(formData.registrationFee);
+    if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
+      setErrorMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
+      setErrorModalVisible(true);
+      return false;
+    }
+    if (!proofOfPaymentFile) {
+      setErrorMessage('Proof of payment is required');
+      setErrorModalVisible(true);
+      return false;
+    }
+    return true;
   };
 
   const handleSubmitConfirmation = () => {
-    if (!validateAllFields()) {
-      setErrorMessage('Please fix all validation errors before submitting.');
-      setErrorModalVisible(true);
-      return;
-    }
+    if (!validateFields()) return;
     setPendingAdd({ ...formData });
     setConfirmModalVisible(true);
   };
@@ -1701,6 +1292,8 @@ const Register = () => {
       throw error;
     }
   };
+  
+  const toPeso = (n) => `₱${Number(n).toFixed(2)}`;
 
   const submitManualMember = async () => {
     setConfirmModalVisible(false);
@@ -1724,97 +1317,69 @@ const Register = () => {
       }
 
       const now = new Date();
-      const dateApproved = formatDate(now);
-      const approvedTime = formatTime(now);
-      const dateCreated = formatDate(now);
-      const timeCreated = formatTime(now);
+      const dateAdded = now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      const timeAdded = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
 
-      // Upload images - only the required ones from your app registration
+      // Upload images - ONLY THE ONES THAT MATCH YOUR APP
       const validIdFrontUrl = await uploadImageToStorage(
         validIdFrontFile, 
-        `users/${email.replace(/[.#$[\]]/g, '_')}/id_front`
+        `member_docs/${newId}/valid_id_front_${Date.now()}`
       );
-      
       const selfieUrl = await uploadImageToStorage(
         selfieFile, 
-        `users/${email.replace(/[.#$[\]]/g, '_')}/selfie`
+        `member_docs/${newId}/selfie_${Date.now()}`
       );
 
       // Upload proof of payment
-      const paymentProofUrl = await uploadImageToStorage(
+      const proofOfPaymentUrl = await uploadImageToStorage(
         proofOfPaymentFile,
-        `users/${email.replace(/[.#$[\]]/g, '_')}/payment_proof`
+        `member_docs/${newId}/registration_payment_proof_${Date.now()}`
       );
 
-      // Prepare member data following the same structure as your registration approval
       const memberData = {
         id: newId,
-        uid: userId,
+        authUid: userId,
         email,
         firstName,
         middleName: middleName || '',
         lastName,
-        phoneNumber: formData.phoneNumber,
-        placeOfBirth: formData.placeOfBirth,
-        address: formData.address,
-        governmentId: formData.governmentId,
-        dateOfBirth: formData.dateOfBirth,
-        validIdFront: validIdFrontUrl,
-        selfie: selfieUrl,
-        password: password,
-        hashedPassword: password, // In a real app, you'd hash this
-        dateCreated,
-        timeCreated,
-        dateApproved,
-        approvedTime,
+        ...rest,
+        dateAdded,
+        timeAdded,
         status: 'active',
         balance: parseFloat(registrationFee) || 0,
         investment: parseFloat(registrationFee) || 0,
         loans: 0.0,
+        validIdFront: validIdFrontUrl,
+        selfie: selfieUrl,
         registrationFee: parseFloat(registrationFee),
-        paymentProof: paymentProofUrl,
-        paymentStatus: 'paid'
+        registrationPaymentProof: proofOfPaymentUrl,
+        // Add orientation fields to match your app
+        attendedOrientation: true,
+        orientationCode: 'ADMIN_ADDED' // Special code for admin-added members
       };
 
-      // Save to Members (auto-approved)
       await database.ref(`Members/${newId}`).set(memberData);
 
-      // Also save to ApprovedRegistrations for consistency
-      await database.ref(`Registrations/ApprovedRegistrations/${email.replace(/[.#$[\]]/g, '_')}`).set({
-        ...memberData,
-        memberId: newId
-      });
-
-      // Update funds like in your approval process
+      // Update funds with registration fee
       await updateFunds(registrationFee);
 
-      // Create transaction record
-      const transactionData = {
-        type: 'registration',
-        amount: parseFloat(registrationFee),
-        dateApplied: dateCreated,
-        dateApproved: dateApproved,
-        approvedTime: approvedTime,
-        timestamp: now.getTime(),
-        status: 'approved',
-        memberId: newId,
-        firstName,
-        lastName,
-        email,
-        transactionId: `REG-${Date.now()}`,
-        description: 'Registration fee payment'
-      };
-
-      await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
-
-      setSuccessMessage('Member added and approved successfully! Credentials have been sent to the member.');
+      setSuccessMessage('Member added successfully!');
       setSuccessModalVisible(true);
       closeAddModal();
 
       // Refresh data after successful addition
       await fetchAllData();
       
-      // Send credentials email
       await callApiAddMember(memberData, password);
     } catch (error) {
       console.error('Error adding member:', error);
@@ -1853,7 +1418,7 @@ const Register = () => {
         email: memberData.email,
         password,
         memberId: memberData.id,
-        dateAdded: memberData.dateApproved
+        dateAdded: memberData.dateAdded
       });
 
       if (!response.ok) {
@@ -1964,7 +1529,7 @@ const Register = () => {
   const totalPages = Math.ceil(filteredData.length / pageSize);
 
   return (
-    <div style={styles.safeAreaView} className="component-header">
+    <div style={styles.safeAreaView}>
       <div style={styles.mainContainer}>
         {/* Header Section */}
         <div style={styles.headerSection}>
@@ -2127,7 +1692,7 @@ const Register = () => {
 
         {/* Print Modal */}
         {printModalVisible && (
-          <div style={styles.modalOverlay}>
+          <div style={styles.modalOverlay} onClick={() => setPrintModalVisible(false)}>
             <div style={{...styles.modalCard, maxWidth: '500px'}} onClick={(e) => e.stopPropagation()}>
               <div style={styles.modalHeader}>
                 <h2 style={styles.modalTitle}>Print/Export Options</h2>
@@ -2185,6 +1750,22 @@ const Register = () => {
                 <button
                   style={{
                     ...styles.printOption,
+                    ...(isHovered.printWord ? styles.printOptionHover : {})
+                  }}
+                  onMouseEnter={() => handleMouseEnter('printWord')}
+                  onMouseLeave={() => handleMouseLeave('printWord')}
+                  onClick={() => handlePrint('word')}
+                  disabled={printing}
+                >
+                  <p style={styles.printOptionText}>Export to Word</p>
+                  <p style={styles.printOptionDescription}>
+                    Download as Word document
+                  </p>
+                </button>
+
+                <button
+                  style={{
+                    ...styles.printOption,
                     ...(isHovered.printExcel ? styles.printOptionHover : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('printExcel')}
@@ -2230,18 +1811,12 @@ const Register = () => {
                         First Name<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.firstName ? styles.formInputError : {})
-                        }}
+                        style={styles.formInput}
                         placeholder="Enter first name"
                         value={formData.firstName}
                         onChange={(e) => handleInputChange('firstName', e.target.value)}
                         autoCapitalize="words"
                       />
-                      {formErrors.firstName && (
-                        <div style={styles.errorText}>{formErrors.firstName}</div>
-                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -2249,18 +1824,12 @@ const Register = () => {
                         Last Name<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.lastName ? styles.formInputError : {})
-                        }}
+                        style={styles.formInput}
                         placeholder="Enter last name"
                         value={formData.lastName}
                         onChange={(e) => handleInputChange('lastName', e.target.value)}
                         autoCapitalize="words"
                       />
-                      {formErrors.lastName && (
-                        <div style={styles.errorText}>{formErrors.lastName}</div>
-                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -2268,19 +1837,13 @@ const Register = () => {
                         Email Address<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.email ? styles.formInputError : {})
-                        }}
+                        style={styles.formInput}
                         placeholder="Enter email address"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         type="email"
                         autoCapitalize="none"
                       />
-                      {formErrors.email && (
-                        <div style={styles.errorText}>{formErrors.email}</div>
-                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -2288,19 +1851,41 @@ const Register = () => {
                         Phone Number<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.phoneNumber ? styles.formInputError : {})
-                        }}
-                        placeholder="Enter 11-digit phone number"
+                        style={styles.formInput}
+                        placeholder="Enter phone number"
                         value={formData.phoneNumber}
                         onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
                         type="tel"
-                        maxLength={11}
                       />
-                      {formErrors.phoneNumber && (
-                        <div style={styles.errorText}>{formErrors.phoneNumber}</div>
-                      )}
+                    </div>
+
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        Valid ID Front<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <div 
+                        style={{
+                          ...styles.fileUploadSection,
+                          ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {})
+                        }}
+                        onMouseEnter={() => handleMouseEnter('validIdFront')}
+                        onMouseLeave={() => handleMouseLeave('validIdFront')}
+                        onClick={() => document.getElementById('validIdFront').click()}
+                      >
+                        <input
+                          id="validIdFront"
+                          style={styles.fileInput}
+                          type="file"
+                          onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                          accept="image/*"
+                        />
+                        <p style={styles.fileUploadText}>
+                          {validIdFrontFile ? 'Change file' : 'Click to upload'}
+                        </p>
+                        {validIdFrontFile && (
+                          <p style={styles.fileName}>{validIdFrontFile.name}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -2336,10 +1921,7 @@ const Register = () => {
                         Government ID<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <select
-                        style={{
-                          ...styles.formSelect,
-                          ...(formErrors.governmentId ? styles.formInputError : {})
-                        }}
+                        style={styles.formSelect}
                         value={formData.governmentId}
                         onChange={(e) => handleInputChange('governmentId', e.target.value)}
                       >
@@ -2350,9 +1932,6 @@ const Register = () => {
                           </option>
                         ))}
                       </select>
-                      {formErrors.governmentId && (
-                        <div style={styles.errorText}>{formErrors.governmentId}</div>
-                      )}
                     </div>
 
                     <div style={styles.formSection}>
@@ -2360,20 +1939,43 @@ const Register = () => {
                         Registration Fee<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.registrationFee ? styles.formInputError : {})
-                        }}
-                        placeholder={`Minimum ₱${minRegistrationFee.toFixed(2)}`}
+                        style={styles.formInput}
+                        placeholder={`Minimum ${toPeso(minRegistrationFee)}`}
                         value={formData.registrationFee}
                         onChange={(e) => handleInputChange('registrationFee', e.target.value)}
                         type="number"
                         min={minRegistrationFee}
                         step="0.01"
                       />
-                      {formErrors.registrationFee && (
-                        <div style={styles.errorText}>{formErrors.registrationFee}</div>
-                      )}
+                    </div>
+
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>
+                        Selfie<span style={styles.requiredAsterisk}>*</span>
+                      </label>
+                      <div 
+                        style={{
+                          ...styles.fileUploadSection,
+                          ...(isHovered.selfie ? styles.fileUploadSectionHover : {})
+                        }}
+                        onMouseEnter={() => handleMouseEnter('selfie')}
+                        onMouseLeave={() => handleMouseLeave('selfie')}
+                        onClick={() => document.getElementById('selfie').click()}
+                      >
+                        <input
+                          id="selfie"
+                          style={styles.fileInput}
+                          type="file"
+                          onChange={(e) => handleFileChange(e, setSelfieFile)}
+                          accept="image/*"
+                        />
+                        <p style={styles.fileUploadText}>
+                          {selfieFile ? 'Change file' : 'Click to upload selfie'}
+                        </p>
+                        {selfieFile && (
+                          <p style={styles.fileName}>{selfieFile.name}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -2386,18 +1988,12 @@ const Register = () => {
                         Place of Birth<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.placeOfBirth ? styles.formInputError : {})
-                        }}
+                        style={styles.formInput}
                         placeholder="Enter place of birth"
                         value={formData.placeOfBirth}
                         onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
                         autoCapitalize="words"
                       />
-                      {formErrors.placeOfBirth && (
-                        <div style={styles.errorText}>{formErrors.placeOfBirth}</div>
-                      )}
                     </div>
                   </div>
 
@@ -2407,91 +2003,12 @@ const Register = () => {
                         Address<span style={styles.requiredAsterisk}>*</span>
                       </label>
                       <input
-                        style={{
-                          ...styles.formInput,
-                          ...(formErrors.address ? styles.formInputError : {})
-                        }}
+                        style={styles.formInput}
                         placeholder="Enter complete address"
                         value={formData.address}
                         onChange={(e) => handleInputChange('address', e.target.value)}
                         autoCapitalize="words"
                       />
-                      {formErrors.address && (
-                        <div style={styles.errorText}>{formErrors.address}</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* File Uploads - Only required ones from your app */}
-                <div style={styles.formGrid}>
-                  <div>
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Valid ID Front<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <div 
-                        style={{
-                          ...styles.fileUploadSection,
-                          ...(isHovered.validIdFront ? styles.fileUploadSectionHover : {}),
-                          ...(formErrors.validIdFront ? { borderColor: '#dc2626' } : {})
-                        }}
-                        onMouseEnter={() => handleMouseEnter('validIdFront')}
-                        onMouseLeave={() => handleMouseLeave('validIdFront')}
-                        onClick={() => document.getElementById('validIdFront').click()}
-                      >
-                        <input
-                          id="validIdFront"
-                          style={styles.fileInput}
-                          type="file"
-                          onChange={(e) => handleFileChange(e, setValidIdFrontFile, 'validIdFront')}
-                          accept="image/*"
-                        />
-                        <p style={styles.fileUploadText}>
-                          {validIdFrontFile ? 'Change file' : 'Click to upload Valid ID Front'}
-                        </p>
-                        {validIdFrontFile && (
-                          <p style={styles.fileName}>{validIdFrontFile.name}</p>
-                        )}
-                      </div>
-                      {formErrors.validIdFront && (
-                        <div style={styles.errorText}>{formErrors.validIdFront}</div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div>
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Selfie<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <div 
-                        style={{
-                          ...styles.fileUploadSection,
-                          ...(isHovered.selfie ? styles.fileUploadSectionHover : {}),
-                          ...(formErrors.selfie ? { borderColor: '#dc2626' } : {})
-                        }}
-                        onMouseEnter={() => handleMouseEnter('selfie')}
-                        onMouseLeave={() => handleMouseLeave('selfie')}
-                        onClick={() => document.getElementById('selfie').click()}
-                      >
-                        <input
-                          id="selfie"
-                          style={styles.fileInput}
-                          type="file"
-                          onChange={(e) => handleFileChange(e, setSelfieFile, 'selfie')}
-                          accept="image/*"
-                        />
-                        <p style={styles.fileUploadText}>
-                          {selfieFile ? 'Change file' : 'Click to upload selfie'}
-                        </p>
-                        {selfieFile && (
-                          <p style={styles.fileName}>{selfieFile.name}</p>
-                        )}
-                      </div>
-                      {formErrors.selfie && (
-                        <div style={styles.errorText}>{formErrors.selfie}</div>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -2504,8 +2021,7 @@ const Register = () => {
                   <div 
                     style={{
                       ...styles.fileUploadSection,
-                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {}),
-                      ...(formErrors.proofOfPayment ? { borderColor: '#dc2626' } : {})
+                      ...(isHovered.proofOfPayment ? styles.fileUploadSectionHover : {})
                     }}
                     onMouseEnter={() => handleMouseEnter('proofOfPayment')}
                     onMouseLeave={() => handleMouseLeave('proofOfPayment')}
@@ -2515,7 +2031,7 @@ const Register = () => {
                       id="proofOfPayment"
                       style={styles.fileInput}
                       type="file"
-                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile, 'proofOfPayment')}
+                      onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
                       accept="image/*,application/pdf"
                     />
                     <p style={styles.fileUploadText}>
@@ -2525,18 +2041,14 @@ const Register = () => {
                       <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
                     )}
                   </div>
-                  {formErrors.proofOfPayment && (
-                    <div style={styles.errorText}>{formErrors.proofOfPayment}</div>
-                  )}
                 </div>
               </div>
 
               <div style={styles.modalActions}>
                 <button
                   style={{
-                    ...styles.actionButton,
                     ...styles.secondaryButton,
-                    ...(isHovered.cancelButton ? {} : {})
+                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('cancelButton')}
                   onMouseLeave={() => handleMouseLeave('cancelButton')}
@@ -2547,10 +2059,8 @@ const Register = () => {
                 </button>
                 <button
                   style={{
-                    ...styles.actionButton,
-                    ...styles.approveButton,
-                    ...(isHovered.submitButton ? {} : {}),
-                    ...(uploading ? styles.disabledButton : {})
+                    ...styles.primaryButton,
+                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
@@ -2559,7 +2069,7 @@ const Register = () => {
                 >
                   {uploading ? (
                     <>
-                      <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
                       <span>Adding Member...</span>
                     </>
                   ) : (
@@ -2574,84 +2084,76 @@ const Register = () => {
           </div>
         )}
 
-        {/* Confirmation Modal - Matching Deposits component design */}
+        {/* Confirmation Modal */}
         {confirmModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-              <p style={styles.modalText}>Are you sure you want to register this new member?</p>
-              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+          <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={styles.modalHeader}>
+                <h2 style={styles.modalTitle}>Confirm Registration</h2>
+              </div>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  Are you sure you want to register this new member? This action cannot be undone.
+                </p>
+              </div>
+              <div style={styles.modalActions}>
                 <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.primaryButton,
-                    flex: 1
-                  }}
-                  onClick={submitManualMember}
-                  disabled={uploading}
-                >
-                  {uploading ? 'Processing...' : 'Yes'}
-                </button>
-                <button 
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.secondaryButton,
-                    flex: 1
-                  }} 
+                  style={styles.secondaryButton}
                   onClick={() => setConfirmModalVisible(false)}
-                  disabled={uploading}
                 >
-                  {uploading ? 'Processing...' : 'No'}
+                  Cancel
+                </button>
+                <button
+                  style={styles.primaryButton}
+                  onClick={submitManualMember}
+                >
+                  Confirm Registration
                 </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal - Matching Deposits component design */}
+        {/* Success Modal */}
         {successModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
-              <p style={styles.modalText}>{successMessage}</p>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton,
-                  width: '100%'
-                }}
-                onClick={handleSuccessOk}
-              >
-                OK
-              </button>
+          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {successMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={handleSuccessOk}
+                >
+                  Continue
+                </button>
+              </div>
             </div>
           </div>
         )}
 
-        {/* Error Modal - Matching Deposits component design */}
+        {/* Error Modal */}
         {errorModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
-              <p style={styles.modalText}>{errorMessage}</p>
-              <button
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton,
-                  width: '100%'
-                }}
-                onClick={() => setErrorModalVisible(false)}
-              >
-                OK
-              </button>
+          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
+            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
+              <div style={{padding: '24px', textAlign: 'center'}}>
+                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
+                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
+                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
+                  {errorMessage}
+                </p>
+                <button
+                  style={styles.primaryButton}
+                  onClick={() => setErrorModalVisible(false)}
+                >
+                  Try Again
+                </button>
+              </div>
             </div>
-          </div>
-        )}
-
-        {/* Loading Spinner - Matching Deposits component */}
-        {uploading && (
-          <div style={styles.centeredModal}>
-            <div style={styles.spinner}></div>
           </div>
         )}
       </div>
