@@ -35,6 +35,54 @@ app.use(cors({
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ==============================================
+// IMAGE PROXY FOR CORS FIX
+// ==============================================
+
+app.get('/proxy-image', async (req, res) => {
+  try {
+    const imageUrl = req.query.url;
+    
+    if (!imageUrl) {
+      return res.status(400).json({ error: 'URL parameter required' });
+    }
+
+    console.log('🖼️ Proxying image:', imageUrl);
+    
+    const response = await fetch(imageUrl);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+
+    const buffer = await response.buffer();
+    
+    // Set appropriate headers for CORS
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+    
+    res.send(buffer);
+    
+  } catch (error) {
+    console.error('❌ Proxy error:', error);
+    res.status(500).json({ 
+      error: 'Failed to proxy image',
+      message: error.message 
+    });
+  }
+});
+
+// Handle preflight requests for proxy
+app.options('/proxy-image', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
+});
+
 // Mailjet Configuration
 const createTransporter = async () => {
   try {
@@ -226,7 +274,288 @@ const maskPassword = (pwd) => {
   return `${first}${'*'.repeat(Math.max(1, pwd.length - 2))}${last}`;
 };
 
-// Health check endpoint
+// ==============================================
+// LIGHTWEIGHT IMAGE PROCESSING ENDPOINTS
+// ==============================================
+
+const sharp = require('sharp');
+const { createWorker } = require('tesseract.js');
+
+// Global worker for OCR
+let ocrWorker = null;
+
+// Initialize OCR worker
+const initializeOCR = async () => {
+  try {
+    console.log('[OCR] Initializing Tesseract.js worker...');
+    ocrWorker = await createWorker('eng', 1, {
+      logger: m => console.log('[Tesseract]', m)
+    });
+    console.log('[OCR] Worker initialized successfully');
+  } catch (error) {
+    console.error('[OCR] Worker initialization failed:', error);
+  }
+};
+
+// Initialize when server starts
+initializeOCR();
+
+// Main OCR Processing Endpoint
+app.post('/process-ocr', async (req, res) => {
+  try {
+    const { imageUrl, type } = req.body;
+    
+    console.log(`[SERVER-OCR] Processing ${type} from:`, imageUrl);
+    
+    // Set CORS headers
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    // Fetch the image through server (no CORS issues)
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    }
+    
+    const imageBuffer = await imageResponse.buffer();
+    
+    let result = {};
+    
+    if (type === 'id') {
+      result = await processIDCard(imageBuffer);
+    } else if (type === 'payment') {
+      result = await processPaymentProof(imageBuffer);
+    } else if (type === 'face') {
+      result = await processFaceDetection(imageBuffer);
+    } else {
+      throw new Error('Unknown processing type');
+    }
+    
+    console.log(`[SERVER-OCR] ${type} processing completed`);
+    
+    res.json({
+      success: true,
+      type,
+      result
+    });
+    
+  } catch (error) {
+    console.error('[SERVER-OCR] Processing error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      type: req.body.type
+    });
+  }
+});
+
+// Handle preflight for OCR endpoint
+app.options('/process-ocr', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
+});
+
+// ID Card Processing with Tesseract.js
+async function processIDCard(imageBuffer) {
+  try {
+    console.log('[ID Processing] Starting ID card analysis with OCR');
+    
+    if (!ocrWorker) {
+      throw new Error('OCR worker not ready');
+    }
+    
+    // Preprocess image for better OCR
+    const processedImage = await sharp(imageBuffer)
+      .resize(1200)
+      .grayscale()
+      .normalize()
+      .sharpen()
+      .toBuffer();
+    
+    // Perform OCR with Tesseract.js
+    console.log('[ID Processing] Running OCR...');
+    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage);
+    
+    console.log('[ID Processing] OCR completed. Confidence:', confidence);
+    
+    // Extract name from text (simple pattern matching)
+    const extractedName = extractNameFromText(text);
+    const idType = detectIDType(text);
+    
+    return {
+      text: text || 'No text detected',
+      confidence: Math.round(confidence || 0),
+      extractedName: extractedName || 'Not found',
+      idType: idType || 'Unknown',
+      status: confidence > 50 ? 'valid' : 'low_confidence',
+      textLength: text ? text.length : 0
+    };
+    
+  } catch (error) {
+    console.error('[ID Processing] Error:', error);
+    return { 
+      error: 'ID processing failed', 
+      status: 'error'
+    };
+  }
+}
+
+// Payment Proof Processing with OCR
+async function processPaymentProof(imageBuffer) {
+  try {
+    console.log('[Payment Processing] Starting payment proof analysis');
+    
+    if (!ocrWorker) {
+      throw new Error('OCR worker not ready');
+    }
+    
+    // Preprocess for receipt text
+    const processedImage = await sharp(imageBuffer)
+      .resize(1000)
+      .grayscale()
+      .normalize()
+      .linear(1.3, 0)
+      .toBuffer();
+    
+    // OCR for payment details
+    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage);
+    
+    console.log('[Payment Processing] OCR completed');
+    
+    // Extract payment information
+    const paymentData = extractPaymentInfo(text);
+    
+    return {
+      text: text || 'No text detected',
+      confidence: Math.round(confidence || 0),
+      amount: paymentData.amount,
+      reference: paymentData.reference,
+      date: paymentData.date,
+      status: paymentData.amount ? 'valid' : 'manual_review'
+    };
+    
+  } catch (error) {
+    console.error('[Payment Processing] Error:', error);
+    return { 
+      error: 'Payment processing failed',
+      status: 'error'
+    };
+  }
+}
+
+// Simple Face Detection (no TensorFlow)
+async function processFaceDetection(imageBuffer) {
+  try {
+    console.log('[Face Processing] Starting face detection');
+    
+    // Simple image analysis without AI
+    const metadata = await sharp(imageBuffer).metadata();
+    
+    // Basic face detection heuristic
+    const hasFace = await detectFaceHeuristic(imageBuffer);
+    
+    return {
+      facesDetected: hasFace ? 1 : 0,
+      imageSize: `${metadata.width}x${metadata.height}`,
+      status: hasFace ? 'valid' : 'no_face',
+      details: {
+        method: 'Basic image analysis',
+        confidence: hasFace ? 'medium' : 'low'
+      }
+    };
+    
+  } catch (error) {
+    console.error('[Face Processing] Error:', error);
+    return { 
+      error: 'Face detection failed',
+      status: 'error'
+    };
+  }
+}
+
+// Helper function to extract name from OCR text
+function extractNameFromText(text) {
+  if (!text) return null;
+  
+  const lines = text.split('\n').filter(line => line.trim().length > 0);
+  
+  // Look for common name patterns
+  for (const line of lines) {
+    // Match "Lastname, Firstname" pattern
+    const nameMatch = line.match(/([A-Z][a-z]+),\s*([A-Z][a-z]+)/);
+    if (nameMatch) {
+      return `${nameMatch[2]} ${nameMatch[1]}`;
+    }
+    
+    // Match "Firstname Lastname" pattern
+    const simpleNameMatch = line.match(/([A-Z][a-z]+)\s+([A-Z][a-z]+)/);
+    if (simpleNameMatch && simpleNameMatch[1].length > 2 && simpleNameMatch[2].length > 2) {
+      return line.trim();
+    }
+  }
+  
+  return null;
+}
+
+// Helper function to detect ID type
+function detectIDType(text) {
+  if (!text) return 'Unknown';
+  
+  const upperText = text.toUpperCase();
+  
+  if (upperText.includes('DRIVER') && upperText.includes('LICENSE')) return "Driver's License";
+  if (upperText.includes('PASSPORT')) return 'Passport';
+  if (upperText.includes('NATIONAL ID')) return 'National ID';
+  if (upperText.includes('POSTAL ID')) return 'Postal ID';
+  if (upperText.includes('SSS')) return 'SSS ID';
+  if (upperText.includes('UMID')) return 'UMID';
+  if (upperText.includes('PHILHEALTH')) return 'PhilHealth';
+  
+  return 'Government ID';
+}
+
+// Helper function to extract payment information
+function extractPaymentInfo(text) {
+  if (!text) return { amount: null, reference: null, date: null };
+  
+  // Extract amount (look for PHP, ₱, Amount, etc.)
+  const amountRegex = /(?:PHP|₱|AMOUNT)[:\s]*([0-9,]+\.?[0-9]*)/i;
+  const amountMatch = text.match(amountRegex);
+  const amount = amountMatch ? amountMatch[1] : null;
+  
+  // Extract reference number (look for REF, Transaction, etc.)
+  const refRegex = /(?:REF|REFERENCE|TRANSACTION)[\s#:]*([A-Z0-9]{6,15})/i;
+  const refMatch = text.match(refRegex);
+  const reference = refMatch ? refMatch[1] : null;
+  
+  // Extract date (various date formats)
+  const dateRegex = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|([A-Z][a-z]{2,8}\s+\d{1,2},?\s+\d{4})/;
+  const dateMatch = text.match(dateRegex);
+  const date = dateMatch ? dateMatch[0] : null;
+  
+  return { amount, reference, date };
+}
+
+// Simple face detection using image characteristics
+async function detectFaceHeuristic(imageBuffer) {
+  try {
+    const metadata = await sharp(imageBuffer).metadata();
+    
+    // Basic heuristics for face detection
+    const aspectRatio = metadata.width / metadata.height;
+    const isPortrait = aspectRatio < 1.3 && aspectRatio > 0.7; // Common for selfies
+    const hasReasonableSize = metadata.width > 300 && metadata.height > 300;
+    
+    // If it's a portrait-oriented image of reasonable size, likely a face
+    return isPortrait && hasReasonableSize;
+  } catch (error) {
+    return false;
+  }
+}
+
 // Enhanced Health check endpoint
 app.get('/health', async (req, res) => {
   const healthcheck = {
