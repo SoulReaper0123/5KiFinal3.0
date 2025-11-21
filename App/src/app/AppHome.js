@@ -28,6 +28,7 @@ import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
 import LoanHistory from './HomePage/LoanHistory';
 import MarqueeData from './HomePage/MarqueeData';
+import CustomConfirmModal from '../components/CustomConfirmModal';
 
 const Tab = createBottomTabNavigator();
 
@@ -52,6 +53,10 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [hasNewInboxItems, setHasNewInboxItems] = useState(false);
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
+
+  // Logout states
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // --- new code: check for new transactions and show red dot on bell ---
   const checkForNewTransactions = async () => {
@@ -377,15 +382,29 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     navigation.navigate('InboxTab');
   };
 
-  const handleLogoutFallback = async () => {
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
+      // Clear SecureStore data
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
+      
+      // Sign out from Firebase
       await auth.signOut();
+      
+      // Navigate to login screen
       navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
     } catch (e) {
+      console.error('Logout error:', e);
       Alert.alert('Logout Error', 'There was an error during logout. Please try again.');
+    } finally {
+      setIsLoggingOut(false);
+      setLogoutModalVisible(false);
     }
+  };
+
+  const showLogoutConfirmation = () => {
+    setLogoutModalVisible(true);
   };
 
   return (
@@ -617,8 +636,6 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               
               <Text style={styles.fallbackProfileName}>{firstName}</Text>
               <Text style={styles.fallbackProfileEmail}>{email}</Text>
-              
-
             </View>
 
             {/* Navigation Items */}
@@ -700,11 +717,18 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             <View style={styles.fallbackLogoutContainer}>
               <TouchableOpacity 
                 style={styles.fallbackLogoutButton} 
-                onPress={handleLogoutFallback}
+                onPress={showLogoutConfirmation}
                 activeOpacity={0.8}
+                disabled={isLoggingOut}
               >
-                <MaterialIcons name="logout" size={20} color="white" />
-                <Text style={styles.fallbackLogoutText}>Logout</Text>
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color="white" />
+                ) : (
+                  <>
+                    <MaterialIcons name="logout" size={20} color="white" />
+                    <Text style={styles.fallbackLogoutText}>Logout</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -761,6 +785,28 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
           </View>
         </View>
       )}
+
+      {/* Logout Confirmation Modal */}
+      <CustomConfirmModal
+        visible={logoutModalVisible}
+        title="Confirm Logout"
+        message="Are you sure you want to logout?"
+        confirmText="Logout"
+        cancelText="Cancel"
+        onConfirm={handleLogout}
+        onCancel={() => setLogoutModalVisible(false)}
+        type="warning"
+      />
+
+      {/* Logout Loading Overlay */}
+      {isLoggingOut && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <ActivityIndicator size="large" color="#1E3A5F" />
+            <Text style={styles.loadingText}>Logging out...</Text>
+          </View>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -779,8 +825,6 @@ export default function AppHome() {
       setEmail(routeEmail);
     }
   }, [route.params, email]);
-
-
 
   const navigation = useNavigation();
 
@@ -1439,7 +1483,35 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-
+  // Loading Overlay for Logout
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1E3A5F',
+  },
 
   // Floating AI Button styles
   floatingAIButton: {
