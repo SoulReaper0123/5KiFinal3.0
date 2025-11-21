@@ -10,7 +10,8 @@ import {
   FaTimes,
   FaExclamationCircle,
   FaFileAlt,
-  FaPrint
+  FaPrint,
+  FaSpinner
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -44,9 +45,15 @@ const formatDate = (date) => {
 };
 
 const formatTime = (date) => {
-  const hours = date.getHours().toString().padStart(2, '0');
+  let hours = date.getHours();
   const minutes = date.getMinutes().toString().padStart(2, '0');
-  return `${hours}:${minutes}`;
+  const seconds = date.getSeconds().toString().padStart(2, '0');
+  const ampm = hours >= 12 ? 'PM' : 'AM';
+  
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  
+  return `${hours}:${minutes}:${seconds} ${ampm}`;
 };
 
 const styles = {
@@ -285,18 +292,20 @@ const styles = {
     alignItems: 'center',
     zIndex: 1000,
     padding: '20px',
-    overflowY: 'auto'
+    overflowY: 'auto',
+    backdropFilter: 'blur(4px)'
   },
   modalCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
     width: '90%',
-    maxWidth: '900px',
+    maxWidth: '500px',
     maxHeight: '90vh',
     overflow: 'hidden',
     boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
     display: 'flex',
-    flexDirection: 'column'
+    flexDirection: 'column',
+    border: '1px solid #F1F5F9'
   },
   modalHeader: {
     padding: '24px',
@@ -418,40 +427,55 @@ const styles = {
     display: 'flex',
     justifyContent: 'flex-end',
     gap: '12px',
-    flexShrink: 0
+    flexShrink: 0,
+    background: '#f8fafc'
   },
-  primaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#1e40af',
-    color: '#fff',
-    border: 'none',
+  actionButton: {
+    padding: '0.75rem 2rem',
     borderRadius: '8px',
+    border: 'none',
     cursor: 'pointer',
-    fontSize: '14px',
     fontWeight: '600',
-    transition: 'all 0.2s ease',
+    fontSize: '0.875rem',
     display: 'flex',
     alignItems: 'center',
-    gap: '8px',
-    whiteSpace: 'nowrap'
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
   },
-  primaryButtonHover: {
-    backgroundColor: '#1e3a8a'
+  primaryButton: {
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
+    }
   },
   secondaryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#6b7280',
-    color: '#fff',
-    border: 'none',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    fontSize: '14px',
-    fontWeight: '600',
-    transition: 'all 0.2s ease',
-    whiteSpace: 'nowrap'
+    background: '#6b7280',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+    }
   },
-  secondaryButtonHover: {
-    backgroundColor: '#4b5563'
+  approveButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
   },
   dashboardLoadingContainer: {
     display: 'flex',
@@ -471,7 +495,7 @@ const styles = {
   },
   spinner: {
     border: '4px solid #f3f4f6',
-    borderLeft: '4px solid #1e40af',
+    borderLeft: '4px solid #2563eb',
     borderRadius: '50%',
     width: '40px',
     height: '40px',
@@ -537,7 +561,8 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '20px'
+    padding: '20px',
+    backdropFilter: 'blur(4px)'
   },
   modalCardSmall: {
     width: '300px',
@@ -597,6 +622,25 @@ const styles = {
   }
 };
 
+// Add keyframes for spinner animation
+const spinKeyframes = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject the keyframes into the document head
+if (typeof document !== 'undefined') {
+  const styleSheet = document.createElement('style');
+  styleSheet.type = 'text/css';
+  styleSheet.innerText = spinKeyframes;
+  if (!document.head.querySelector('style[data-spin-keyframes]')) {
+    styleSheet.setAttribute('data-spin-keyframes', 'true');
+    document.head.appendChild(styleSheet);
+  }
+}
+
 const Withdraws = () => {
   const [activeSection, setActiveSection] = useState('withdrawApplications');
   const [withdrawApplications, setWithdrawApplications] = useState([]);
@@ -623,7 +667,6 @@ const Withdraws = () => {
     amountWithdrawn: '',
   });
   const [proofOfWithdrawFile, setProofOfWithdrawFile] = useState(null);
-  const [uploading, setUploading] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
   const [withdrawAccounts, setWithdrawAccounts] = useState({
     Bank: { accountName: '', accountNumber: '' },
@@ -642,6 +685,10 @@ const Withdraws = () => {
 
   // Admin data for print report
   const [adminData, setAdminData] = useState(null);
+
+  // New states for the process flow - SAME AS WithdrawApplications
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
   const pageSize = 10;
 
@@ -667,7 +714,7 @@ const Withdraws = () => {
     }
   ];
 
-  // Create style element and append to head - FIXED CSS with print header/footer removal
+  // Create style element and append to head
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
@@ -680,12 +727,11 @@ const Withdraws = () => {
       }
       .hover-lift:hover {
         transform: translateY(-2px);
-        box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+        boxShadow: 0 10px 25px rgba(0,0,0,0.1);
       }
       
       /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
-        /* Remove browser default headers and footers */
         @page {
           margin: 0.5in !important;
           size: auto;
@@ -693,28 +739,11 @@ const Withdraws = () => {
           margin-footer: 0 !important;
         }
         
-        /* Target Webkit browsers (Chrome, Safari) */
-        @page :first {
-          margin-top: 0;
-        }
-        
-        @page :left {
-          margin-left: 0.5in;
-          margin-right: 0.5in;
-        }
-        
-        @page :right {
-          margin-left: 0.5in;
-          margin-right: 0.5in;
-        }
-        
-        /* Hide URL, page numbers, and date in print */
         body::before,
         body::after {
           display: none !important;
         }
         
-        /* Hide any browser-generated content */
         .print-header:empty,
         .print-footer:empty {
           display: none;
@@ -745,17 +774,17 @@ const Withdraws = () => {
           display: none !important;
         }
         table {
-          width: '100%';
-          border-collapse: 'collapse';
+          width: 100%;
+          border-collapse: collapse;
         }
         th, td {
-          border: '1px solid #ddd';
-          padding: '8px';
-          text-align: 'left';
+          border: 1px solid #ddd;
+          padding: 8px;
+          text-align: left;
         }
         th {
-          background-color: '#f2f2f2';
-          font-weight: 'bold';
+          background-color: #f2f2f2;
+          font-weight: bold;
         }
       }
     `;
@@ -936,7 +965,6 @@ const Withdraws = () => {
     }
   };
 
-  // FIXED PRINT FUNCTION - Removed browser headers and footers
   const handlePrint = (format = 'print') => {
     setPrinting(true);
     
@@ -1389,18 +1417,23 @@ const Withdraws = () => {
       [name]: value
     }));
 
-    if (name === 'withdrawOption' && value) {
-      // FIX: Safely access withdrawAccounts with fallback
-      const selectedAccount = withdrawAccounts[value] || { accountName: '', accountNumber: '' };
-      setFormData(prev => ({
-        ...prev,
-        accountName: selectedAccount.accountName || '',
-        accountNumber: selectedAccount.accountNumber || ''
-      }));
-
-      // Clear proof of withdraw for Cash
+    if (name === 'withdrawOption') {
       if (value === 'Cash') {
+        // For Cash, clear account details and proof file
+        setFormData(prev => ({
+          ...prev,
+          accountName: '',
+          accountNumber: ''
+        }));
         setProofOfWithdrawFile(null);
+      } else if (value) {
+        // For Bank/GCash, use the predefined account details
+        const selectedAccount = withdrawAccounts[value] || { accountName: '', accountNumber: '' };
+        setFormData(prev => ({
+          ...prev,
+          accountName: selectedAccount.accountName || '',
+          accountNumber: selectedAccount.accountNumber || ''
+        }));
       }
     }
 
@@ -1453,6 +1486,26 @@ const Withdraws = () => {
       setErrorModalVisible(true);
       return false;
     }
+    
+    // For Bank/GCash, validate account details
+    if (formData.withdrawOption !== 'Cash') {
+      if (!formData.accountName) {
+        setErrorMessage('Account name is required for Bank/GCash withdrawals');
+        setErrorModalVisible(true);
+        return false;
+      }
+      if (!formData.accountNumber) {
+        setErrorMessage('Account number is required for Bank/GCash withdrawals');
+        setErrorModalVisible(true);
+        return false;
+      }
+      if (!proofOfWithdrawFile) {
+        setErrorMessage('Proof of withdrawal is required for Bank/GCash withdrawals');
+        setErrorModalVisible(true);
+        return false;
+      }
+    }
+    
     return true;
   };
 
@@ -1473,110 +1526,127 @@ const Withdraws = () => {
     }
   };
 
-  const submitWithdraw = async () => {
-    setConfirmModalVisible(false);
-    setUploading(true);
-    setIsProcessing(true);
-
-    try {
-      let proofOfWithdrawUrl = '';
-      
-      // Only upload proof of withdraw for non-Cash withdrawals
-      if (formData.withdrawOption !== 'Cash' && proofOfWithdrawFile) {
-        proofOfWithdrawUrl = await uploadImageToStorage(
-          proofOfWithdrawFile, 
-          `proofsOfWithdraw/${formData.memberId}_${Date.now()}`
-        );
-      }
-
-      const transactionId = generateTransactionId();
-      const now = new Date();
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const amount = parseFloat(formData.amountWithdrawn);
-
-      const withdrawData = {
-        transactionId,
-        id: formData.memberId,
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        withdrawOption: formData.withdrawOption,
-        accountName: formData.accountName,
-        accountNumber: formData.accountNumber,
-        amountWithdrawn: amount,
-        dateApplied: approvalDate,
-        timeApplied: approvalTime,
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        status: 'approved'
-      };
-
-      if (proofOfWithdrawUrl) {
-        withdrawData.proofOfWithdrawUrl = proofOfWithdrawUrl;
-      }
-
-      const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${formData.memberId}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Withdrawals/${formData.memberId}/${transactionId}`);
-      const memberRef = database.ref(`Members/${formData.memberId}`);
-      const fundsRef = database.ref('Settings/Funds');
-
-      const memberSnap = await memberRef.once('value');
-
-      if (memberSnap.exists()) {
-        const member = memberSnap.val();
-        const currentBalance = parseFloat(member.balance || 0);
-        const fundsSnap = await fundsRef.once('value');
-        const currentFunds = parseFloat(fundsSnap.val()) || 0;
-
-        // Check if member has sufficient balance
-        if (amount > currentBalance) {
-          throw new Error('Insufficient member balance');
-        }
-
-        // Check if there are sufficient funds
-        if (amount > currentFunds) {
-          throw new Error('Insufficient funds available');
-        }
-
-        await approvedRef.set(withdrawData);
-        await transactionRef.set(withdrawData);
-
-        const newBalance = currentBalance - amount;
-        const newFunds = currentFunds - amount;
-        await memberRef.update({ balance: newBalance });
-        await fundsRef.set(newFunds);
-
-        // Log to FundsHistory
-        const dateKey = now.toISOString().split('T')[0];
-        await database.ref(`Settings/FundsHistory/${dateKey}`).set(newFunds);
-
-        await callApiApprove(withdrawData);
-
-        setSuccessMessage('Withdrawal added and approved successfully!');
-        setSuccessModalVisible(true);
-        closeAddModal();
-
-        await fetchAllData();
-      } else {
-        throw new Error('Member not found');
-      }
-    } catch (error) {
-      console.error('Error adding withdrawal:', error);
-      setErrorMessage(error.message || 'Failed to add withdrawal');
-      setErrorModalVisible(true);
-    } finally {
-      setUploading(false);
-      setIsProcessing(false);
-    }
-  };
-
   const generateTransactionId = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
 
+  // FIXED: Process database addition with proper data structure
+  const processDatabaseAddition = async (withdrawData) => {
+    try {
+      const { memberId, amountWithdrawn } = withdrawData;
+      
+      // 1. Verify member details
+      const memberRef = database.ref(`Members/${memberId}`);
+      const memberSnap = await memberRef.once('value');
+      const memberData = memberSnap.val();
+
+      if (!memberData || 
+          memberData.email !== withdrawData.email ||
+          memberData.firstName !== withdrawData.firstName || 
+          memberData.lastName !== withdrawData.lastName) {
+        throw new Error('Member details do not match our records');
+      }
+
+      // Check if member has sufficient balance AND investment
+      const currentBalance = parseFloat(memberData.balance || 0);
+      const currentInvestment = parseFloat(memberData.investment || 0);
+      const withdrawAmount = parseFloat(amountWithdrawn);
+      
+      // Check if both balance and investment are sufficient
+      if (currentBalance < withdrawAmount) {
+        throw new Error('Member has insufficient balance for this withdrawal');
+      }
+      
+      if (currentInvestment < withdrawAmount) {
+        throw new Error('Member has insufficient investment for this withdrawal');
+      }
+
+      // Calculate new balances (deduct same amount from both)
+      const newBalance = currentBalance - withdrawAmount;
+      const newInvestment = currentInvestment - withdrawAmount;
+
+      // Generate a new transaction ID for approved/transactions records
+      const transactionId = generateTransactionId();
+
+      // Database references
+      const approvedRef = database.ref(`Withdrawals/ApprovedWithdrawals/${memberId}/${transactionId}`);
+      const transactionRef = database.ref(`Transactions/Withdrawals/${memberId}/${transactionId}`);
+      const fundsRef = database.ref('Settings/Funds');
+      
+      // Fetch funds data
+      const fundsSnap = await fundsRef.once('value');
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+
+      // Check if there are sufficient funds
+      if (withdrawAmount > currentFunds) {
+        throw new Error('Insufficient funds available for withdrawal');
+      }
+
+      // Update all databases
+      const now = new Date();
+      
+      // Update funds and member balances
+      const newFunds = currentFunds - withdrawAmount;
+      
+      await fundsRef.set(newFunds);
+      
+      // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
+      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+      await fundsHistoryRef.set(newFunds);
+      
+      // Update member's balance AND investment (both reduced by same amount)
+      await memberRef.update({ 
+        balance: newBalance,
+        investment: newInvestment 
+      });
+
+      // Create clean withdrawal data without undefined values
+      const cleanWithdrawData = {
+        id: memberId,
+        firstName: withdrawData.firstName || '',
+        lastName: withdrawData.lastName || '',
+        email: withdrawData.email || '',
+        withdrawOption: withdrawData.withdrawOption || '',
+        accountName: withdrawData.accountName || '',
+        accountNumber: withdrawData.accountNumber || '',
+        amountWithdrawn: withdrawAmount,
+        transactionId: transactionId,
+        dateApplied: formatDate(now),
+        timeApplied: formatTime(now),
+        dateApproved: formatDate(now),
+        timeApproved: formatTime(now),
+        timestamp: now.getTime(),
+        status: 'approved',
+        deductionBreakdown: {
+          fromBalance: withdrawAmount,
+          fromInvestment: withdrawAmount,
+          totalWithdrawn: withdrawAmount
+        }
+      };
+
+      // Only add proofOfWithdrawUrl if it exists and is not empty
+      if (withdrawData.proofOfWithdrawUrl) {
+        cleanWithdrawData.proofOfWithdrawUrl = withdrawData.proofOfWithdrawUrl;
+      }
+
+      // Finalize operations
+      await approvedRef.set(cleanWithdrawData);
+      await transactionRef.set(cleanWithdrawData);
+
+      return { transactionId, fullWithdrawData: cleanWithdrawData };
+
+    } catch (err) {
+      console.error('Database addition error:', err);
+      throw new Error(err.message || 'Failed to add withdrawal');
+    }
+  };
+
+  // FIXED: Call API approve with proper data structure
   const callApiApprove = async (withdrawData) => {
     try {
+      console.log('Sending approval email for withdrawal:', withdrawData);
+      
       const response = await ApproveWithdraws({
         memberId: withdrawData.id,
         transactionId: withdrawData.transactionId,
@@ -1586,20 +1656,107 @@ const Withdraws = () => {
         email: withdrawData.email,
         firstName: withdrawData.firstName,
         lastName: withdrawData.lastName,
-        status: 'approved'
+        status: 'approved',
+        withdrawOption: withdrawData.withdrawOption
       });
       
-      if (!response.ok) {
-        throw new Error('Failed to send approval email');
+      if (response.ok) {
+        console.log('Approval email sent successfully');
+      } else {
+        console.error('Failed to send approval email:', response.statusText);
       }
-    } catch (error) {
-      console.error('API error:', error);
-      throw error;
+    } catch (err) {
+      console.error('API approve error:', err);
+      // Don't throw error - this runs in background
     }
   };
 
-  const handleSuccessOk = () => {
+  // FIXED: Confirm add withdraw with proper file handling
+  const confirmAddWithdraw = async () => {
+    setConfirmModalVisible(false);
+    setActionInProgress(true);
+
+    try {
+      let proofOfWithdrawUrl = '';
+      
+      // Only upload proof of withdraw for non-Cash withdrawals
+      if (formData.withdrawOption !== 'Cash' && proofOfWithdrawFile) {
+        console.log('Uploading proof of withdrawal file...');
+        proofOfWithdrawUrl = await uploadImageToStorage(
+          proofOfWithdrawFile, 
+          `proofsOfWithdraw/${formData.memberId}_${Date.now()}`
+        );
+        console.log('Proof uploaded successfully:', proofOfWithdrawUrl);
+      }
+
+      const withdrawData = {
+        ...formData,
+        amountWithdrawn: parseFloat(formData.amountWithdrawn),
+        proofOfWithdrawUrl: proofOfWithdrawUrl || null // Use null instead of undefined
+      };
+
+      console.log('Prepared withdrawal data:', withdrawData);
+
+      // Store pending API call for background processing
+      setPendingApiCall({
+        type: 'add',
+        data: withdrawData
+      });
+
+      setSuccessMessage('Withdrawal added and approved successfully!');
+      setSuccessModalVisible(true);
+    } catch (error) {
+      console.error('Error preparing withdrawal:', error);
+      setErrorMessage(error.message || 'An error occurred. Please try again.');
+      setErrorModalVisible(true);
+      setActionInProgress(false);
+    }
+  };
+
+  // FIXED: Handle success with proper error handling
+  const handleSuccessOk = async () => {
+    // Show loading spinner and hide success modal
+    setIsProcessing(true);
     setSuccessModalVisible(false);
+
+    let transactionResult = null;
+
+    try {
+      // Finalize DB changes
+      if (pendingApiCall && pendingApiCall.type === 'add') {
+        console.log('Processing database addition...');
+        transactionResult = await processDatabaseAddition(pendingApiCall.data);
+        console.log('Database addition successful:', transactionResult);
+      }
+    } catch (err) {
+      console.error('Finalize DB on OK error:', err);
+      setErrorMessage('Failed to add withdrawal to database: ' + err.message);
+      setErrorModalVisible(true);
+      setIsProcessing(false);
+      return;
+    }
+
+    // Trigger background email after DB success; do not block UI
+    try {
+      if (transactionResult && transactionResult.fullWithdrawData) {
+        console.log('Sending approval email...');
+        await callApiApprove(transactionResult.fullWithdrawData);
+      }
+    } catch (error) {
+      console.error('Error calling API:', error);
+    } finally {
+      setPendingApiCall(null);
+    }
+
+    // Close modal and clean state
+    closeAddModal();
+    setActionInProgress(false);
+
+    // Finally refresh
+    await fetchAllData();
+
+    // Hide loading spinner
+    setIsProcessing(false);
   };
 
   const handleMouseEnter = (element) => {
@@ -1695,7 +1852,6 @@ const Withdraws = () => {
               >
                 <FaPrint />
               </button>
-
             </div>
           </div>
         </div>
@@ -1706,7 +1862,7 @@ const Withdraws = () => {
           {!noMatch && filteredData.length > 0 && (
             <div style={styles.paginationContainer}>
               <span style={styles.paginationInfo}>
-                {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length}
+                {currentPage * pageSize + 1} - {Math.min((currentPage + 1) * pageSize, filteredData.length)} of {filteredData.length} 
               </span>
               <div style={styles.paginationControls}>
                 <button
@@ -1718,7 +1874,8 @@ const Withdraws = () => {
                   }}
                 >
                   <FaChevronLeft />
-                </button> 
+                </button>
+
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
                   disabled={currentPage === totalPages - 1}
@@ -1948,18 +2105,21 @@ const Withdraws = () => {
                       </select>
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Account Name
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Account name"
-                        value={formData.accountName}
-                        onChange={(e) => handleInputChange('accountName', e.target.value)}
-                        readOnly
-                      />
-                    </div>
+                    {/* Only show Account Name for Bank/GCash */}
+                    {formData.withdrawOption !== 'Cash' && (
+                      <div style={styles.formSection}>
+                        <label style={styles.formLabel}>
+                          Account Name
+                        </label>
+                        <input
+                          style={styles.formInput}
+                          placeholder="Account name"
+                          value={formData.accountName}
+                          onChange={(e) => handleInputChange('accountName', e.target.value)}
+                          readOnly
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column */}
@@ -1993,18 +2153,21 @@ const Withdraws = () => {
                       />
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Account Number
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Account number"
-                        value={formData.accountNumber}
-                        onChange={(e) => handleInputChange('accountNumber', e.target.value)}
-                        readOnly
-                      />
-                    </div>
+                    {/* Only show Account Number for Bank/GCash */}
+                    {formData.withdrawOption !== 'Cash' && (
+                      <div style={styles.formSection}>
+                        <label style={styles.formLabel}>
+                          Account Number
+                        </label>
+                        <input
+                          style={styles.formInput}
+                          placeholder="Account number"
+                          value={formData.accountNumber}
+                          onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                          readOnly
+                        />
+                      </div>
+                    )}
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
@@ -2027,7 +2190,7 @@ const Withdraws = () => {
                 {formData.withdrawOption && formData.withdrawOption !== 'Cash' && (
                   <div style={styles.formSection}>
                     <label style={styles.formLabel}>
-                      Proof of Withdrawal
+                      Proof of Withdrawal<span style={styles.requiredAsterisk}>*</span>
                     </label>
                     <div 
                       style={{
@@ -2067,7 +2230,7 @@ const Withdraws = () => {
                     }}>
                       <FaCheckCircle style={{color: '#059669', marginRight: '8px'}} />
                       <span style={{color: '#0369a1', fontWeight: '500'}}>
-                        Proof of withdrawal not required for Cash withdrawals
+                        Cash withdrawal - No proof or account details required
                       </span>
                     </div>
                   </div>
@@ -2077,30 +2240,33 @@ const Withdraws = () => {
               <div style={styles.modalActions}>
                 <button
                   style={{
+                    ...styles.actionButton,
                     ...styles.secondaryButton,
-                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
+                    ...(isHovered.cancelButton ? {} : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('cancelButton')}
                   onMouseLeave={() => handleMouseLeave('cancelButton')}
                   onClick={closeAddModal}
-                  disabled={uploading}
+                  disabled={actionInProgress}
                 >
                   Cancel
                 </button>
                 <button
                   style={{
-                    ...styles.primaryButton,
-                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
+                    ...styles.actionButton,
+                    ...styles.approveButton,
+                    ...(isHovered.submitButton ? {} : {}),
+                    ...(actionInProgress ? styles.disabledButton : {})
                   }}
                   onMouseEnter={() => handleMouseEnter('submitButton')}
                   onMouseLeave={() => handleMouseLeave('submitButton')}
                   onClick={handleSubmitConfirmation}
-                  disabled={uploading || memberNotFound || memberLoading}
+                  disabled={actionInProgress || memberNotFound || memberLoading}
                 >
-                  {uploading ? (
+                  {actionInProgress ? (
                     <>
-                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
-                      <span>Adding Withdrawal...</span>
+                      <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+                      <span>Processing...</span>
                     </>
                   ) : (
                     <>
@@ -2114,93 +2280,84 @@ const Withdraws = () => {
           </div>
         )}
 
-        {/* Confirmation Modal - Fixed centering */}
+        {/* Confirmation Modal */}
         {confirmModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-                <p style={styles.modalText}>Are you sure you want to add this withdrawal?</p>
-                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                  <button 
-                    style={{
-                      ...styles.secondaryButton,
-                      flex: 1
-                    }} 
-                    onClick={() => setConfirmModalVisible(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      flex: 1
-                    }}
-                    onClick={submitWithdraw}
-                  >
-                    Confirm
-                  </button>
-                </div>
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+              <p style={styles.modalText}>Are you sure you want to add this withdrawal?</p>
+              <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.primaryButton,
+                    flex: 1
+                  }}
+                  onClick={confirmAddWithdraw}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Processing...' : 'Yes'}
+                </button>
+                <button 
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.secondaryButton,
+                    flex: 1
+                  }} 
+                  onClick={() => setConfirmModalVisible(false)}
+                  disabled={actionInProgress}
+                >
+                  {actionInProgress ? 'Processing...' : 'No'}
+                </button>
               </div>
             </div>
           </div>
         )}
 
-        {/* Success Modal - Fixed centering */}
+        {/* Success Modal */}
         {successModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
-                <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
-                <p style={styles.modalText}>
-                  {successMessage}
-                </p>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    width: '100%'
-                  }}
-                  onClick={handleSuccessOk}
-                >
-                  OK
-                </button>
-              </div>
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+              <p style={styles.modalText}>{successMessage}</p>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton,
+                  width: '100%'
+                }}
+                onClick={handleSuccessOk}
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
 
-        {/* Error Modal - Fixed centering and styling issues */}
+        {/* Error Modal */}
         {errorModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
-                <h2 style={{fontSize: '18px', fontWeight: '700', color: '#1e293b', margin: '0 0 10px 0'}}>Error</h2>
-                <p style={styles.modalText}>
-                  {errorMessage}
-                </p>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    width: '100%'
-                  }}
-                  onClick={() => setErrorModalVisible(false)}
-                >
-                  Try Again
-                </button>
-              </div>
+          <div style={styles.centeredModal}>
+            <div style={styles.modalCardSmall}>
+              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
+              <p style={styles.modalText}>{errorMessage}</p>
+              <button
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton,
+                  width: '100%'
+                }}
+                onClick={() => setErrorModalVisible(false)}
+              >
+                OK
+              </button>
             </div>
           </div>
         )}
 
-        {/* Processing Overlay */}
+        {/* Loading Spinner */}
         {isProcessing && (
-          <div style={styles.loadingOverlay}>
-            <div style={styles.loadingContent}>
-              <div style={styles.spinner}></div>
-              <div style={styles.loadingTextOverlay}>Processing withdrawal...</div>
-            </div>
+          <div style={styles.centeredModal}>
+            <div style={styles.spinner}></div>
           </div>
         )}
       </div>
