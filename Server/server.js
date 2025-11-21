@@ -75,10 +75,10 @@ app.get('/proxy-image', async (req, res) => {
   }
 });
 
-// Handle preflight requests for proxy
-app.options('/proxy-image', (req, res) => {
+// Handle preflight for OCR endpoint
+app.options('/process-ocr', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.status(200).end();
 });
@@ -275,22 +275,35 @@ const maskPassword = (pwd) => {
 };
 
 // ==============================================
-// LIGHTWEIGHT IMAGE PROCESSING ENDPOINTS
+// IMPROVED IMAGE PROCESSING ENDPOINTS
 // ==============================================
 
 const sharp = require('sharp');
 const { createWorker } = require('tesseract.js');
 
-// Global worker for OCR
+// Global worker for OCR with better configuration
 let ocrWorker = null;
 
-// Initialize OCR worker
+// Initialize OCR worker with better settings
 const initializeOCR = async () => {
   try {
     console.log('[OCR] Initializing Tesseract.js worker...');
     ocrWorker = await createWorker('eng', 1, {
-      logger: m => console.log('[Tesseract]', m)
+      logger: m => {
+        if (m.status === 'recognizing text' && m.progress === 1) {
+          console.log('[Tesseract] OCR completed');
+        }
+      },
+      errorHandler: err => console.error('[Tesseract Error]', err)
     });
+    
+    // Configure worker for better performance
+    await ocrWorker.setParameters({
+      tessedit_pageseg_mode: '6', // Uniform block of text
+      tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 .,-/$₱:',
+      preserve_interword_spaces: '1',
+    });
+    
     console.log('[OCR] Worker initialized successfully');
   } catch (error) {
     console.error('[OCR] Worker initialization failed:', error);
@@ -300,52 +313,387 @@ const initializeOCR = async () => {
 // Initialize when server starts
 initializeOCR();
 
-// Main OCR Processing Endpoint
+// Improved image fetching with better error handling
+const fetchImageWithRetry = async (imageUrl, maxRetries = 3) => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[IMAGE FETCH] Attempt ${attempt} for: ${imageUrl}`);
+      
+      const response = await fetch(imageUrl, {
+        timeout: 10000,
+        headers: {
+          'User-Agent': '5KI-Financial-Services/1.0'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const buffer = await response.buffer();
+      
+      // Validate image buffer
+      if (!buffer || buffer.length === 0) {
+        throw new Error('Empty image buffer received');
+      }
+      
+      console.log(`[IMAGE FETCH] Success - Size: ${buffer.length} bytes`);
+      return buffer;
+      
+    } catch (error) {
+      console.warn(`[IMAGE FETCH] Attempt ${attempt} failed:`, error.message);
+      
+      if (attempt === maxRetries) {
+        throw new Error(`Failed to fetch image after ${maxRetries} attempts: ${error.message}`);
+      }
+      
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+    }
+  }
+};
+
+// Improved image preprocessing for OCR
+const preprocessImageForOCR = async (imageBuffer, type) => {
+  try {
+    let processedBuffer = imageBuffer;
+    
+    // Handle corrupt JPEG images
+    try {
+      await sharp(imageBuffer).metadata();
+    } catch (jpegError) {
+      console.warn('[IMAGE PREPROCESS] JPEG error, attempting repair...');
+      // Try to process anyway with error tolerance
+      processedBuffer = await sharp(imageBuffer, { failOnError: false })
+        .jpeg({ quality: 80, force: false })
+        .toBuffer();
+    }
+    
+    const processor = sharp(processedBuffer, { failOnError: false });
+    
+    // Different preprocessing based on type
+    switch (type) {
+      case 'id':
+        return await processor
+          .resize(1200, null, { withoutEnlargement: true })
+          .grayscale()
+          .normalise()
+          .sharpen()
+          .linear(1.1, 0) // Increase contrast
+          .png({ quality: 90 })
+          .toBuffer();
+        
+      case 'payment':
+        return await processor
+          .resize(1000, null, { withoutEnlargement: true })
+          .grayscale()
+          .normalise()
+          .linear(1.3, 0) // Higher contrast for receipts
+          .png({ quality: 85 })
+          .toBuffer();
+        
+      case 'face':
+        return await processor
+          .resize(800, 600, { fit: 'inside' })
+          .png({ quality: 90 })
+          .toBuffer();
+        
+      default:
+        return await processor
+          .resize(800, null, { withoutEnlargement: true })
+          .png({ quality: 85 })
+          .toBuffer();
+    }
+  } catch (error) {
+    console.error('[IMAGE PREPROCESS] Error:', error);
+    // Return original buffer if preprocessing fails
+    return imageBuffer;
+  }
+};
+
+// Improved ID Card Processing
+async function processIDCard(imageBuffer) {
+  try {
+    console.log('[ID Processing] Starting ID card analysis');
+    
+    if (!ocrWorker) {
+      throw new Error('OCR worker not ready');
+    }
+    
+    // Preprocess image
+    const processedImage = await preprocessImageForOCR(imageBuffer, 'id');
+    
+    // Perform OCR with timeout
+    const ocrPromise = ocrWorker.recognize(processedImage);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('OCR timeout')), 30000)
+    );
+    
+    const { data: { text, confidence } } = await Promise.race([ocrPromise, timeoutPromise]);
+    
+    console.log(`[ID Processing] OCR completed. Confidence: ${Math.round(confidence)}`);
+    
+    // Extract information with improved patterns
+    const extractedName = extractNameFromText(text);
+    const idType = detectIDType(text);
+    
+    return {
+      text: text || 'No text detected',
+      confidence: Math.round(confidence || 0),
+      extractedName: extractedName || 'Not found',
+      idType: idType || 'Unknown',
+      status: confidence > 40 ? 'valid' : 'low_confidence',
+      textLength: text ? text.length : 0
+    };
+    
+  } catch (error) {
+    console.error('[ID Processing] Error:', error);
+    return { 
+      error: 'ID processing failed', 
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+// Improved Payment Proof Processing
+async function processPaymentProof(imageBuffer) {
+  try {
+    console.log('[Payment Processing] Starting payment proof analysis');
+    
+    if (!ocrWorker) {
+      throw new Error('OCR worker not ready');
+    }
+    
+    // Preprocess with error handling for corrupt images
+    let processedImage;
+    try {
+      processedImage = await preprocessImageForOCR(imageBuffer, 'payment');
+    } catch (preprocessError) {
+      console.warn('[Payment Processing] Preprocessing failed, using original image');
+      processedImage = imageBuffer;
+    }
+    
+    // OCR for payment details with timeout
+    const ocrPromise = ocrWorker.recognize(processedImage);
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('OCR timeout')), 25000)
+    );
+    
+    const { data: { text, confidence } } = await Promise.race([ocrPromise, timeoutPromise]);
+    
+    console.log('[Payment Processing] OCR completed');
+    
+    // Extract payment information
+    const paymentData = extractPaymentInfo(text);
+    
+    return {
+      text: text || 'No text detected',
+      confidence: Math.round(confidence || 0),
+      amount: paymentData.amount,
+      reference: paymentData.reference,
+      date: paymentData.date,
+      status: paymentData.amount ? 'valid' : 'manual_review'
+    };
+    
+  } catch (error) {
+    console.error('[Payment Processing] Error:', error);
+    return { 
+      error: 'Payment processing failed',
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+// Improved Face Detection
+async function processFaceDetection(imageBuffer) {
+  try {
+    console.log('[Face Processing] Starting face detection');
+    
+    // Simple image analysis without heavy AI
+    const metadata = await sharp(imageBuffer, { failOnError: false }).metadata();
+    
+    // Basic face detection using image characteristics
+    const hasFace = await detectFaceHeuristic(imageBuffer);
+    
+    return {
+      facesDetected: hasFace ? 1 : 0,
+      imageSize: `${metadata.width}x${metadata.height}`,
+      status: hasFace ? 'valid' : 'no_face',
+      details: {
+        method: 'Basic image analysis',
+        confidence: hasFace ? 'medium' : 'low'
+      }
+    };
+    
+  } catch (error) {
+    console.error('[Face Processing] Error:', error);
+    return { 
+      error: 'Face detection failed',
+      status: 'error',
+      message: error.message
+    };
+  }
+}
+
+// Improved helper function to extract name from OCR text
+function extractNameFromText(text) {
+  if (!text) return null;
+  
+  const lines = text.split('\n')
+    .map(line => line.trim())
+    .filter(line => line.length > 0);
+  
+  // Look for common name patterns in Philippine IDs
+  for (const line of lines) {
+    // Match "Lastname, Firstname Middleinitial" pattern (common in Philippine IDs)
+    const nameMatch = line.match(/([A-Z][A-Za-z\s]+),\s*([A-Z][A-Za-z]+(?:\s+[A-Z][a-z]*)*)/);
+    if (nameMatch) {
+      return `${nameMatch[2]} ${nameMatch[1]}`;
+    }
+    
+    // Match full name pattern (2-4 words, all starting with capital)
+    const simpleNameMatch = line.match(/([A-Z][a-z]+)\s+([A-Z][a-z]+)(?:\s+([A-Z][a-z]+))?(?:\s+([A-Z][a-z]+))?/);
+    if (simpleNameMatch) {
+      const nameParts = [simpleNameMatch[1], simpleNameMatch[2], simpleNameMatch[3], simpleNameMatch[4]]
+        .filter(Boolean)
+        .filter(part => part.length > 1);
+      
+      if (nameParts.length >= 2 && nameParts.length <= 4) {
+        // Check if it doesn't contain common non-name words
+        const nonNameWords = ['REPUBLIC', 'PHILIPPINE', 'IDENTIFICATION', 'DRIVER', 'LICENSE', 'POSTAL', 'SSS', 'UMID'];
+        const isLikelyName = !nameParts.some(part => nonNameWords.includes(part.toUpperCase()));
+        
+        if (isLikelyName) {
+          return nameParts.join(' ');
+        }
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Improved payment info extraction
+function extractPaymentInfo(text) {
+  if (!text) return { amount: null, reference: null, date: null };
+  
+  const normalized = text.replace(/\s+/g, ' ').toUpperCase();
+  
+  // Extract amount (look for PHP, ₱, Amount, etc.)
+  const amountRegex = /(?:AMOUNT|TOTAL|SEND|SENT|PAID|PHP|₱|PESOS?)[\s:\-]*([0-9,]+\.?[0-9]{0,2})/gi;
+  const amountMatches = [...normalized.matchAll(amountRegex)];
+  const amount = amountMatches.length > 0 ? amountMatches[0][1].replace(/,/g, '') : null;
+  
+  // Extract reference number (various formats)
+  const refRegex = /(?:REF(?:ERENCE)?|TRX|TXN|TRANSACTION)[\s#:\-]*([A-Z0-9]{4,20})/gi;
+  const refMatches = [...normalized.matchAll(refRegex)];
+  const reference = refMatches.length > 0 ? refMatches[0][1] : null;
+  
+  // Extract date (various date formats)
+  const dateRegex = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|([A-Z][a-z]{2,8}\s+\d{1,2},?\s+\d{4})/gi;
+  const dateMatch = normalized.match(dateRegex);
+  const date = dateMatch ? dateMatch[0] : null;
+  
+  return { amount, reference, date };
+}
+
+// Improved face detection heuristic
+async function detectFaceHeuristic(imageBuffer) {
+  try {
+    const metadata = await sharp(imageBuffer, { failOnError: false }).metadata();
+    
+    // Basic heuristics for face detection
+    const aspectRatio = metadata.width / metadata.height;
+    const isPortrait = aspectRatio < 1.3 && aspectRatio > 0.7; // Common for selfies
+    const hasReasonableSize = metadata.width > 200 && metadata.height > 200;
+    const isColorImage = metadata.channels >= 3;
+    
+    // If it's a portrait-oriented color image of reasonable size, likely a face
+    return isPortrait && hasReasonableSize && isColorImage;
+  } catch (error) {
+    console.warn('[Face Heuristic] Error:', error);
+    return false;
+  }
+}
+
+// Main OCR Processing Endpoint - IMPROVED VERSION
 app.post('/process-ocr', async (req, res) => {
+  let startTime = Date.now();
+  
   try {
     const { imageUrl, type } = req.body;
     
     console.log(`[SERVER-OCR] Processing ${type} from:`, imageUrl);
+    
+    // Validate input
+    if (!imageUrl || !type) {
+      return res.status(400).json({
+        success: false,
+        error: 'Missing required fields: imageUrl and type are required'
+      });
+    }
+    
+    // Validate type
+    const validTypes = ['id', 'payment', 'face'];
+    if (!validTypes.includes(type)) {
+      return res.status(400).json({
+        success: false,
+        error: `Invalid type. Must be one of: ${validTypes.join(', ')}`
+      });
+    }
     
     // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
-    // Fetch the image through server (no CORS issues)
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-    }
-    
-    const imageBuffer = await imageResponse.buffer();
+    // Fetch the image with retry logic
+    const imageBuffer = await fetchImageWithRetry(imageUrl);
     
     let result = {};
     
-    if (type === 'id') {
-      result = await processIDCard(imageBuffer);
-    } else if (type === 'payment') {
-      result = await processPaymentProof(imageBuffer);
-    } else if (type === 'face') {
-      result = await processFaceDetection(imageBuffer);
-    } else {
-      throw new Error('Unknown processing type');
-    }
+    // Process based on type with timeout
+    const processingPromise = (async () => {
+      switch (type) {
+        case 'id':
+          return await processIDCard(imageBuffer);
+        case 'payment':
+          return await processPaymentProof(imageBuffer);
+        case 'face':
+          return await processFaceDetection(imageBuffer);
+        default:
+          throw new Error('Unknown processing type');
+      }
+    })();
     
-    console.log(`[SERVER-OCR] ${type} processing completed`);
+    // Add overall timeout for processing
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('Processing timeout')), 45000)
+    );
+    
+    result = await Promise.race([processingPromise, timeoutPromise]);
+    
+    const processingTime = Date.now() - startTime;
+    console.log(`[SERVER-OCR] ${type} processing completed in ${processingTime}ms`);
     
     res.json({
       success: true,
       type,
+      processingTime: `${processingTime}ms`,
       result
     });
     
   } catch (error) {
-    console.error('[SERVER-OCR] Processing error:', error);
+    const processingTime = Date.now() - startTime;
+    console.error(`[SERVER-OCR] Processing error after ${processingTime}ms:`, error);
+    
     res.status(500).json({
       success: false,
       error: error.message,
-      type: req.body.type
+      type: req.body.type,
+      processingTime: `${processingTime}ms`
     });
   }
 });
