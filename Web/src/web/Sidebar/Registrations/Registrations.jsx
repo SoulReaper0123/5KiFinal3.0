@@ -21,10 +21,8 @@ import {
   FaHeart,
   FaBirthdayCake
 } from 'react-icons/fa';
-import * as tf from '@tensorflow/tfjs';
-import * as mobilenet from '@tensorflow-models/mobilenet';
-import * as blazeface from '@tensorflow-models/blazeface';
-import Tesseract from 'tesseract.js';
+
+const API_URL = 'https://five5ki.onrender.com'; 
 
 const styles = {
   container: {
@@ -314,27 +312,27 @@ const styles = {
       boxShadow: 'none'
     }
   },
-viewButton: {
-  background: 'transparent',
-  color: '#2563eb',
-  border: '1px solid #2563eb',
-  borderRadius: '6px',
-  padding: '0.375rem 0.75rem',
-  fontSize: '0.75rem',
-  fontWeight: '500',
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center', // Add this
-  gap: '0.25rem',
-  transition: 'all 0.2s ease',
-  width: '40%', // Add this to take full cell width
-  margin: '0 auto', // Add this for extra centering
-  '&:hover': {
-    background: '#2563eb',
-    color: 'white'
-  }
-},
+  viewButton: {
+    background: 'transparent',
+    color: '#2563eb',
+    border: '1px solid #2563eb',
+    borderRadius: '6px',
+    padding: '0.375rem 0.75rem',
+    fontSize: '0.75rem',
+    fontWeight: '500',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.25rem',
+    transition: 'all 0.2s ease',
+    width: '40%',
+    margin: '0 auto',
+    '&:hover': {
+      background: '#2563eb',
+      color: 'white'
+    }
+  },
   modalCardSmall: {
     width: '300px',
     backgroundColor: 'white',
@@ -706,569 +704,127 @@ const Registrations = ({
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [validationStatus, setValidationStatus] = useState({});
-  const [modelsLoaded, setModelsLoaded] = useState(false);
-  const [validationResults, setValidationResults] = useState(null);
   const [isVerifying, setIsVerifying] = useState({});
-  const [tfModels, setTfModels] = useState({
-    mobilenet: null,
-    blazeface: null
-  });
   const [pendingApiCall, setPendingApiCall] = useState(null);
   const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
 
-  useEffect(() => {
-    const loadModels = async () => {
-      try {
-        console.log('Loading TensorFlow.js models...');
-        
-        await tf.setBackend('webgl');
-        await tf.ready();
-        console.log('TensorFlow.js backend ready');
-        
-        let mobilenetModel = null;
-        let blazefaceModel = null;
-        
-        try {
-          console.log('Loading MobileNet...');
-          mobilenetModel = await mobilenet.load();
-          console.log('MobileNet loaded successfully');
-        } catch (mobilenetError) {
-          console.warn('MobileNet failed to load:', mobilenetError);
-        }
-        
-        try {
-          console.log('Loading BlazeFace...');
-          blazefaceModel = await blazeface.load();
-          console.log('BlazeFace loaded successfully');
-        } catch (blazefaceError) {
-          console.warn('BlazeFace failed to load:', blazefaceError);
-        }
-        
-        setTfModels({
-          mobilenet: mobilenetModel,
-          blazeface: blazefaceModel
-        });
-        
-        console.log('Skipping face-api.js models to avoid conflicts with TensorFlow.js');
-        
-        const hasModels = mobilenetModel || blazefaceModel;
-        setModelsLoaded(hasModels);
-        
-        if (hasModels) {
-          console.log('TensorFlow models loaded successfully');
-        } else {
-          console.warn('No models loaded successfully, using manual validation mode');
-        }
-        
-      } catch (err) {
-        console.error('Failed to load models:', err);
-        console.error('Error details:', err.message);
-        
-        try {
-          console.log('Trying CPU backend as fallback...');
-          await tf.setBackend('cpu');
-          await tf.ready();
-          
-          const mobilenetModel = await mobilenet.load();
-          setTfModels({
-            mobilenet: mobilenetModel,
-            blazeface: null
-          });
-          setModelsLoaded(true);
-          console.log('CPU backend loaded successfully with MobileNet');
-        } catch (fallbackError) {
-          console.error('CPU backend also failed:', fallbackError);
-          setModelsLoaded(false);
-          setTfModels({ mobilenet: null, blazeface: null });
-          console.warn('All model loading failed, using manual validation mode');
-        }
-      }
-    };
-
-    loadModels();
-  }, []);
-
-  const loadImageForTensorFlow = async (imageUrl) => {
-    return new Promise((resolve, reject) => {
-      const tryLoad = (mode, attempt) => {
-        const img = new Image();
-        if (mode) img.crossOrigin = mode;
-        img.onload = () => {
-          console.log(`TF image loaded with mode: ${mode || 'none'} (attempt ${attempt})`);
-          resolve(img);
-        };
-        img.onerror = () => {
-          console.warn(`TF image failed with mode: ${mode || 'none'} (attempt ${attempt})`);
-          if (attempt === 1) {
-            tryLoad('use-credentials', 2);
-          } else if (attempt === 2) {
-            tryLoad(null, 3);
-          } else if (attempt === 3) {
-            try {
-              const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
-              const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
-              const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-              const proxied = new Image();
-              proxied.crossOrigin = 'anonymous';
-              proxied.onload = () => resolve(proxied);
-              proxied.onerror = () => reject(new Error('Failed to load image via proxy for TF'));
-              proxied.src = proxyUrl;
-            } catch (e) {
-              reject(e);
-            }
-          }
-        };
-        img.src = imageUrl;
-      };
-      tryLoad('anonymous', 1);
-    });
-  };
-
-  const loadImageWithCORS = async (imageUrl) => {
-    return new Promise((resolve, reject) => {
-      const createCanvasFromImage = (img) => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        canvas.width = img.width || img.naturalWidth;
-        canvas.height = img.height || img.naturalHeight;
-        
-        try {
-          ctx.drawImage(img, 0, 0);
-          return canvas;
-        } catch (error) {
-          console.warn('Canvas drawing failed:', error);
-          return img;
-        }
-      };
-
-      const tryLoadImage = (corsMode, attempt = 1) => {
-        const newImg = new Image();
-        
-        if (corsMode) {
-          newImg.crossOrigin = corsMode;
-        }
-        
-        newImg.onload = () => {
-          console.log(`Image loaded successfully with CORS mode: ${corsMode || 'none'} (attempt ${attempt})`);
-          
-          if (imageUrl.includes('firebasestorage.googleapis.com')) {
-            try {
-              const canvas = createCanvasFromImage(newImg);
-              resolve(canvas);
-            } catch (error) {
-              console.warn('Canvas creation failed, using original image:', error);
-              resolve(newImg);
-            }
-          } else {
-            resolve(newImg);
-          }
-        };
-        
-        newImg.onerror = (error) => {
-          console.warn(`Failed to load image with CORS mode: ${corsMode || 'none'} (attempt ${attempt})`, error);
-          
-          if (attempt === 1) {
-            tryLoadImage('use-credentials', 2);
-          } else if (attempt === 2) {
-            tryLoadImage(null, 3);
-          } else if (attempt === 3) {
-            const apiHost = (typeof window !== 'undefined' && window.location && window.location.origin) || '';
-            const proxyBase = (import.meta?.env?.VITE_SERVER_URL) || apiHost;
-            const proxyUrl = `${proxyBase}/proxy-image?url=${encodeURIComponent(imageUrl)}`;
-            const proxied = new Image();
-            proxied.crossOrigin = 'anonymous';
-            proxied.onload = () => resolve(proxied);
-            proxied.onerror = () => {
-              console.warn('Proxy also failed, using fallback canvas');
-              const canvas = document.createElement('canvas');
-              canvas.width = 300;
-              canvas.height = 200;
-              const ctx = canvas.getContext('2d');
-              ctx.fillStyle = '#f0f0f0';
-              ctx.fillRect(0, 0, 300, 200);
-              ctx.fillStyle = '#666';
-              ctx.font = '16px Arial';
-              ctx.textAlign = 'center';
-              ctx.fillText('Image Load Failed', 150, 100);
-              resolve(canvas);
-            };
-            proxied.src = proxyUrl;
-          }
-        };
-        
-        newImg.src = imageUrl;
-      };
-      
-      tryLoadImage('anonymous', 1);
-    });
-  };
-
-  const preprocessForOCR = (img, scale = 2, binary = false) => {
-    try {
-      const srcW = img.width || img.naturalWidth || 0;
-      const srcH = img.height || img.naturalHeight || 0;
-      if (!srcW || !srcH) return img;
-
-      const minTargetW = Math.max(800, Math.floor(srcW * scale));
-      const factor = minTargetW / srcW;
-      const targetW = Math.floor(srcW * factor);
-      const targetH = Math.floor(srcH * factor);
-
-      const canvas = document.createElement('canvas');
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext('2d');
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-
-      const imageData = ctx.getImageData(0, 0, targetW, targetH);
-      const d = imageData.data;
-
-      const contrast = binary ? 80 : 50;
-      const c = (259 * (contrast + 255)) / (255 * (259 - contrast));
-      const thresh = 180;
-
-      for (let i = 0; i < d.length; i += 4) {
-        const r = d[i], g = d[i + 1], b = d[i + 2];
-        let y = 0.299 * r + 0.587 * g + 0.114 * b;
-        y = c * (y - 128) + 128;
-        if (binary) {
-          y = y >= thresh ? 255 : 0;
-        }
-        d[i] = d[i + 1] = d[i + 2] = Math.max(0, Math.min(255, y));
-      }
-      ctx.putImageData(imageData, 0, 0);
-      return canvas;
-    } catch (e) {
-      console.warn('preprocessForOCR failed, using original image', e);
-      return img;
-    }
-  };
-
-  const cropPercent = (canvasOrImg, xPct, yPct, wPct, hPct) => {
-    try {
-      const baseW = canvasOrImg.width || canvasOrImg.naturalWidth;
-      const baseH = canvasOrImg.height || canvasOrImg.naturalHeight;
-      const x = Math.max(0, Math.floor(baseW * xPct));
-      const y = Math.max(0, Math.floor(baseH * yPct));
-      const w = Math.min(baseW - x, Math.floor(baseW * wPct));
-      const h = Math.min(baseH - y, Math.floor(baseH * hPct));
-      const c = document.createElement('canvas');
-      c.width = w; c.height = h;
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(canvasOrImg, x, y, w, h, 0, 0, w, h);
-      return c;
-    } catch (e) {
-      console.warn('cropPercent failed', e);
-      return canvasOrImg;
-    }
-  };
-
-  const upsampleIfSmall = (imgOrCanvas, minW = 600) => {
-    try {
-      const w = imgOrCanvas.width || imgOrCanvas.naturalWidth;
-      const h = imgOrCanvas.height || imgOrCanvas.naturalHeight;
-      if (!w || !h) return imgOrCanvas;
-      if (w >= minW) return imgOrCanvas;
-      const scale = minW / w;
-      const c = document.createElement('canvas');
-      c.width = Math.floor(w * scale);
-      c.height = Math.floor(h * scale);
-      const ctx = c.getContext('2d');
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(imgOrCanvas, 0, 0, c.width, c.height);
-      return c;
-    } catch {
-      return imgOrCanvas;
-    }
-  };
-
-  const recognizeText = async (imgOrCanvas, options = {}) => {
-    const defaultOpts = {
-      tessedit_char_whitelist: "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,-'",
-      tessedit_pageseg_mode: 6,
-      preserve_interword_spaces: '1'
-    };
-    const opts = { ...defaultOpts, ...options };
-    const big = upsampleIfSmall(imgOrCanvas, 800);
-    const { data: { text, confidence } } = await Tesseract.recognize(big, 'eng', opts);
-    return { text: (text || '').trim(), confidence: confidence ?? 0 };
-  };
-
-  const extractNameFromIDText = (rawText) => {
-    if (!rawText) return null;
-
-    const text = rawText.replace(/[|]/g, 'I');
-    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    const upperLines = lines.map(l => l.toUpperCase());
-
-    const clean = (s) => (s || '')
-      .toUpperCase()
-      .replace(/[^A-Z,'\-\s]/g, ' ')
-      .replace(/\s{2,}/g, ' ')
-      .trim();
-
-    for (const line of upperLines) {
-      const L = clean(line);
-      const m = L.match(/^([A-Z][A-Z'\-\s]{1,30}),\s*([A-Z][A-Z'\-]{1,20})(?:\s+([A-Z][A-Z'\-]{1,20}))?(?:\s+([A-Z][A-Z'\-]{1,10}))?$/);
-      if (m) {
-        const last = m[1].replace(/\s{2,}/g, ' ').trim();
-        const first = m[2];
-        const middle = [m[3], m[4]].filter(Boolean).join(' ');
-        const candidate = middle ? `${first} ${middle} ${last}` : `${first} ${last}`;
-        if (plausible(candidate)) return toTitleCase(candidate);
-      }
-    }
-
-    const toTitleCase = (name) => {
-      const keepUpper = new Set(['MC', 'MAC']);
-      const minor = new Set(['DE', 'DEL', 'DA', 'DI', 'LA', 'LE', 'VON', 'VAN', 'DY', 'DU']);
-      return name.split(/\s+/).map(w => {
-        if (keepUpper.has(w)) return w;
-        if (minor.has(w)) return w.charAt(0) + w.slice(1).toLowerCase();
-        return w.charAt(0) + w.slice(1).toLowerCase();
-      }).join(' ');
-    };
-
-    const plausible = (s) => {
-      const t = (s || '').split(/\s+/).filter(Boolean);
-      if (t.length < 2) return false;
-      if ((s || '').length < 8) return false;
-      if (t.some(w => /\d/.test(w))) return false;
-      return true;
-    };
-
-    let philIdx = upperLines.findIndex(l => /(APELYIDO|LAST\s*NAME)/.test(l));
-    if (philIdx !== -1) {
-      const collected = [];
-      for (let j = philIdx + 1; j < Math.min(philIdx + 8, upperLines.length); j++) {
-        const raw = upperLines[j];
-        if (/(APELYIDO|LAST\s*NAME|MGA\s*PANGALAN|GIVEN\s*NAMES|GITNANG\s*APELYIDO|MIDDLE\s*NAME|DATE\s*OF\s*BIRTH|ADDRESS|TIRAHAN)/.test(raw)) continue;
-        let cand = clean(raw);
-        if (!cand) continue;
-        if (/(PHILIPPINES|REPUBLIC|DRIVER|LICENSE|NUMBER|SEX|WEIGHT|HEIGHT|EYES|CODE|EXPIRATION|AGENCY|BIRTH)/.test(cand)) break;
-        if (/^[A-Z' \-]+$/.test(cand)) collected.push(cand);
-        if (collected.length >= 3) break;
-      }
-      if (collected.length >= 1) {
-        const last = collected[0];
-        const given = collected[1] || '';
-        const middle = collected[2] || '';
-        const result = `${given} ${middle} ${last}`.replace(/\s+/g, ' ').trim();
-        if (plausible(result)) return toTitleCase(result);
-      }
-    }
-
-    let idx = upperLines.findIndex(l => /LAST\s*NAME.*FIRST\s*NAME/.test(l));
-    if (idx !== -1) {
-      for (let j = idx + 1; j < Math.min(idx + 4, upperLines.length); j++) {
-        let cand = clean(upperLines[j]);
-        if (!cand) continue;
-        if (/,$/.test(cand) && upperLines[j + 1]) {
-          cand = `${cand.replace(/,+$/, '')}, ${clean(upperLines[j + 1])}`;
-        }
-        if (cand.includes(',')) {
-          const [last, rest] = cand.split(',').map(s => clean(s));
-          const result = `${rest} ${last}`.replace(/\s+/g, ' ').trim();
-          if (plausible(result)) return toTitleCase(result);
-        } else if (plausible(cand)) {
-          return toTitleCase(cand);
-        }
-      }
-    }
-
-    for (const l of upperLines) {
-      const candLine = clean(l);
-      if (/(APELYIDO|LAST\s*NAME|GIVEN\s*NAMES|MIDDLE\s*NAME|ADDRESS|TIRAHAN|DATE\s*OF\s*BIRTH|DRIVER|LICENSE)/.test(candLine)) continue;
-      if (candLine.includes(',')) {
-        const parts = candLine.split(',');
-        const last = clean(parts.shift());
-        const rest = clean(parts.join(' '));
-        const result = `${rest} ${last}`.replace(/\s+/g, ' ').trim();
-        if (plausible(result)) return toTitleCase(result);
-      }
-    }
-
-    for (let i = 0; i < upperLines.length - 1; i++) {
-      const a = clean(upperLines[i]);
-      const b = clean(upperLines[i + 1]);
-      if (/(APELYIDO|LAST\s*NAME|ADDRESS|TIRAHAN|DRIVER|LICENSE)/.test(a)) continue;
-      if (a.endsWith(',') && b) {
-        const cand = `${a.replace(/,+$/, '')}, ${b}`;
-        const [last, rest] = cand.split(',').map(s => clean(s));
-        const result = `${rest} ${last}`.trim();
-        if (plausible(result)) return toTitleCase(result);
-      }
-    }
-
-    const blacklist = /(REPUBLIC|PHILIPPINES|DEPARTMENT|TRANSPORTATION|OFFICE|DRIVER|LICENSE|DL|CONDITIONS|NATIONALITY|SEX|WEIGHT|HEIGHT|EYES|ADDRESS|TIRAHAN|DATE|BIRTH|LICENSEE|SIGNATURE|ASSISTANT|SECRETARY|AGENCY|CODE|EXPIRATION|NUMBER|AGENCY|G06|OO\+|BLACK)/;
-    const candidates = upperLines
-      .map(clean)
-      .filter(l => l && /^[A-Z\s'\-]+$/.test(l) && !blacklist.test(l))
-      .filter(l => {
-        const words = l.split(/\s+/).filter(Boolean);
-        const minorSet = new Set(['DE','DEL','DA','DI','LA','LE','VON','VAN','DY','DU']);
-        const longWords = words.filter(w => w.length >= 3 || minorSet.has(w));
-        const singleLetters = words.filter(w => w.length === 1).length;
-        if (singleLetters / Math.max(words.length, 1) > 0.4) return false;
-        return words.length >= 2 && words.length <= 6 && longWords.length >= 2;
-      })
-      .sort((a, b) => (b.split(' ').length - a.split(' ').length) || (b.length - a.length));
-
-    if (candidates.length) {
-      const best = candidates[0];
-      if (plausible(best)) return toTitleCase(best);
-    }
-
-    return null;
-  };
-
-  const __nameOcrCache = new Map();
-
-  const recognizeNameFromIDFrontFast = async (img, keyUrl = '') => {
-    if (keyUrl && __nameOcrCache.has(keyUrl)) return { name: __nameOcrCache.get(keyUrl), mode: 'cache' };
-
-    const tryAngles = [0, -2, 2, -3, 3];
-    const tryRegions = (base) => [
-      cropPercent(base, 0.15, 0.18, 0.78, 0.40),
-      cropPercent(base, 0.18, 0.22, 0.75, 0.35),
-      cropPercent(base, 0.22, 0.26, 0.70, 0.30)
-    ];
-    const rotateSmall = (imgIn, deg) => {
-      if (!deg) return imgIn;
-      try {
-        const w = imgIn.width || imgIn.naturalWidth;
-        const h = imgIn.height || imgIn.naturalHeight;
-        const rad = (deg * Math.PI) / 180;
-        const c = document.createElement('canvas');
-        c.width = w; c.height = h;
-        const ctx = c.getContext('2d');
-        ctx.translate(w/2, h/2); ctx.rotate(rad);
-        ctx.drawImage(imgIn, -w/2, -h/2);
-        return c;
-      } catch { return imgIn; }
-    };
-
-    for (const ang of tryAngles) {
-      const rotated = rotateSmall(img, ang);
-      const base = preprocessForOCR(rotated, 1.6, false);
-      for (const region of tryRegions(base)) {
-        try {
-          let { text } = await recognizeText(region, { tessedit_pageseg_mode: 6 });
-          let name = extractNameFromIDText(text);
-          if (name) { if (keyUrl) __nameOcrCache.set(keyUrl, name); return { name, mode: 'fast-psm6' }; }
-          const bin = preprocessForOCR(region, 1.0, true);
-          ({ text } = await recognizeText(bin, { tessedit_pageseg_mode: 7 }));
-          name = extractNameFromIDText(text);
-          if (name) { if (keyUrl) __nameOcrCache.set(keyUrl, name); return { name, mode: 'fast-psm7-binary' }; }
-        } catch {}
-      }
-    }
-
-    return { name: null, mode: 'none' };
-  };
-
-  const manualVerifyID = async (imageUrl, label) => {
+  // Server-based verification functions
+  const verifyID = async (imageUrl, label) => {
+    setIsVerifying(prev => ({ ...prev, [label]: true }));
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Verifying...' }
+      [label]: { status: 'verifying', message: 'Analyzing ID with AI...' }
     }));
 
     try {
-      const loadedImg = await loadImageWithCORS(imageUrl);
+      const response = await fetch(`${API_URL}/process-ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          type: 'id'
+        })
+      });
 
-      if (label && label.toLowerCase().includes('front')) {
-        try {
-          const pre1 = preprocessForOCR(loadedImg, 2.2, false);
-          let { data: { text: ocrText1 } } = await Tesseract.recognize(pre1, 'eng', {
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,-'
-          });
-          let text = (ocrText1 || '').trim();
+      const data = await response.json();
 
-          if (!text || text.length < 8) {
-            const pre2 = preprocessForOCR(loadedImg, 2.4, true);
-            const { data: { text: ocrText2 } } = await Tesseract.recognize(pre2, 'eng', {
-              tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz ,-'
-            });
-            text = (ocrText2 || '').trim();
+      if (data.success) {
+        const result = data.result;
+        
+        let message = `Confidence: ${result.confidence}%`;
+        if (result.extractedName && result.extractedName !== 'Not found') {
+          message += ` | Name: ${result.extractedName}`;
+        }
+        if (result.idType && result.idType !== 'Unknown') {
+          message += ` | Type: ${result.idType}`;
+        }
+
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: {
+            status: result.status === 'valid' ? 'valid' : 'manual',
+            message: message
           }
-          
-          let extractedName = null;
-          try {
-            const fast = await recognizeNameFromIDFrontFast(loadedImg, imageUrl);
-            extractedName = fast?.name || null;
-          } catch {}
+        }));
 
-          if (!extractedName) {
-            const up = (text || '').toUpperCase();
-            const sanitized = up
-              .replace(/NATIONALITY[^\n]*\n?/g, ' ')
-              .replace(/SEX[^\n]*\n?/g, ' ')
-              .replace(/BIRTH[^\n]*\n?/g, ' ')
-              .replace(/ADDRESS[^\n]*\n?/g, ' ');
-            extractedName = extractNameFromIDText(sanitized);
-          }
+        // Show detailed results in modal
+        if (result.extractedName && result.extractedName !== 'Not found') {
+          showInfoModal('ID Verification Results', [
+            { label: 'Detected Name', value: result.extractedName },
+            { label: 'ID Type', value: result.idType },
+            { label: 'Confidence', value: `${result.confidence}%` }
+          ]);
+        }
+      } else {
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: { status: 'error', message: 'Server processing failed' }
+        }));
+      }
+    } catch (error) {
+      console.error('ID verification error:', error);
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'error', message: 'Network error' }
+      }));
+    } finally {
+      setIsVerifying(prev => ({ ...prev, [label]: false }));
+    }
+  };
 
-          const detectIdType = (raw) => {
-            const t = (raw || '').toUpperCase();
-            if (/PHILIPPINE\s*IDENTIFICATION\s*CARD|PAMBANSANG\s*PAGKAKAKILANLAN|PHILSYS|PSN\s*ID|REPUBLIC\s*OF\s*THE\s*PHILIPPINES/.test(t)) return 'Philippine Identification Card';
-            if (/DRIVER'?S\s*LICENSE|LAND\s*TRANSPORTATION\s*OFFICE|\bLTO\b/.test(t)) return 'Driver\'s License';
-            if (/POSTAL\s*ID/.test(t)) return 'Postal ID';
-            if (/SSS|UMID/.test(t)) return 'SSS/UMID';
-            return 'Unknown';
-          };
-          const idType = detectIdType(text);
-          
-          if (extractedName) {
-            try {
-              const tokens = extractedName.split(/\s+/).filter(Boolean);
-              let firstName = tokens[0] || '';
-              let lastName = tokens[tokens.length - 1] || '';
-              let middleName = tokens.slice(1, -1).join(' ') || '';
-              const particles = new Set(['De','Del','Dei','Da','Di','La','Le','Von','Van','Dy','Du','Mac','Mc','San','Santa','Santo']);
-              if (tokens.length >= 3) {
-                const secondLast = tokens[tokens.length - 2];
-                if (particles.has(secondLast)) {
-                  lastName = tokens.slice(tokens.length - 2).join(' ');
-                  middleName = tokens.slice(1, -2).join(' ') || '';
-                }
-              }
- 
-              setSelectedRegistration(prev => {
-                if (!prev) return prev;
-                const updated = { ...prev };
-                if (!updated.firstName && firstName) updated.firstName = firstName;
-                if (!updated.lastName && lastName) updated.lastName = lastName;
-                if (!updated.middleName && middleName) updated.middleName = middleName;
-                return updated;
-              });
-            } catch {}
-          }
- 
-          setValidationStatus(prev => ({
-            ...prev,
-            [label]: {
-              status: (text && text.trim()) ? 'valid' : 'invalid',
-              message: extractedName ? `Name: ${extractedName}` : (text && text.trim()) ? 'Text detected' : 'No text detected',
-              details: `Type of ID: ${idType}`
-            }
-          }));
+  const verifyPaymentProof = async (imageUrl, label) => {
+    setIsVerifying(prev => ({ ...prev, [label]: true }));
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'verifying', message: 'Extracting payment details...' }
+    }));
 
-          if (extractedName) {
-            showInfoModal('Verification Success', [
-              { label: 'Type of ID', value: idType },
-              { label: 'Name', value: extractedName }
-            ]);
+    try {
+      const response = await fetch(`${API_URL}/process-ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          type: 'payment'
+        })
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        const result = data.result;
+        
+        let message = 'Payment details extracted';
+        if (result.amount) {
+          message = `Amount: ${result.amount}`;
+        }
+        if (result.reference) {
+          message += ` | Ref: ${result.reference}`;
+        }
+        if (result.date) {
+          message += ` | Date: ${result.date}`;
+        }
+
+        setValidationStatus(prev => ({
+          ...prev,
+          [label]: {
+            status: result.status === 'valid' ? 'valid' : 'manual',
+            message: message
           }
-        } catch (ocrErr) {
-          setValidationStatus(prev => ({
-            ...prev,
-            [label]: { status: 'manual', message: 'Text extraction failed. Try a clearer, closer photo of the name line.' }
-          }));
+        }));
+
+        // Show detailed results
+        if (result.amount || result.reference) {
+          showInfoModal('Payment Verification Results', [
+            { label: 'Amount', value: result.amount || 'Not found' },
+            { label: 'Reference', value: result.reference || 'Not found' },
+            { label: 'Date', value: result.date || 'Not found' },
+            { label: 'Confidence', value: `${result.confidence}%` }
+          ]);
         }
       } else {
         setValidationStatus(prev => ({
@@ -1277,230 +833,74 @@ const Registrations = ({
         }));
       }
     } catch (error) {
+      console.error('Payment verification error:', error);
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { status: 'error', message: 'Verification failed' }
+        [label]: { status: 'error', message: 'Payment verification failed' }
       }));
     } finally {
-      setIsValidating(false);
-    }
-  };
-
-  const verifyID = async (imageUrl, label) => {
-    console.log('Using manual ID verification due to CORS restrictions');
-    return manualVerifyID(imageUrl, label);
-  };
-
-  const manualVerifyFace = async (imageUrl, label) => {
-    setValidationStatus(prev => ({
-      ...prev,
-      [label]: { status: 'verifying', message: 'Verifying...' }
-    }));
-
-    try {
-      const loadedImg = await loadImageForTensorFlow(imageUrl);
-      if (tfModels.blazeface) {
-        try {
-          const faces = await tfModels.blazeface.estimateFaces(loadedImg, false);
-          const faceCount = faces.length;
-          setValidationStatus(prev => ({
-            ...prev,
-            [label]: {
-              status: faceCount > 0 ? 'valid' : 'invalid',
-              message: faceCount > 0 ? 'Face detected' : 'No face detected'
-            }
-          }));
-        } catch (err) {
-          setValidationStatus(prev => ({
-            ...prev,
-            [label]: { status: 'manual', message: 'Automatic face detection failed' }
-          }));
-        }
-      } else {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'manual', message: 'Face model not loaded' }
-        }));
-      }
-    } catch (error) {
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Automatic face detection failed' }
-      }));
-    }
-  };
-
-  const verifyPaymentProof = async (imageUrl, label) => {
-    setValidationStatus(prev => ({
-      ...prev,
-      [label]: { status: 'verifying', message: 'Extracting payment details...' }
-    }));
-
-    try {
-      const loadedImg = await loadImageWithCORS(imageUrl);
-      const { data: { text, confidence } } = await Tesseract.recognize(loadedImg, 'eng');
-
-      const parsePaymentText = (raw) => {
-        const normalized = raw.replace(/\s+/g, ' ').replace(/[|]/g, ' ').trim();
-
-        const amountPatterns = [
-          /(?:amount|amt|paid)\s*[:\-]?\s*(?:php|₱)?\s*([\d.,]+)\b/i,
-          /(?:php|₱)\s*([\d.,]+)\b/i
-        ];
-        const refPatterns = [
-          /(ref(?:erence)?\s*(?:no\.?|#)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
-          /(ref(?:erence)?\s*(?:no\.?|#)?|gcash\s*ref(?:erence)?|txn\s*id|transaction\s*(?:id|no\.?))\s*[:\-]?\s*([A-Z0-9\-]{6,})/i,
-          /\b(?:ref(?:erence)?\s*(?:no\.?|#)?)\s*([A-Z0-9\-]{6,})\b/i,
-          /\b([A-Z0-9]{10,})\b/
-        ];
-        const datePatterns = [
-          /\b(?:jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\s+\d{1,2},\s+\d{4}\b\s*(?:\d{1,2}:\d{2}\s*(?:am|pm))?/i,
-          /\b\d{4}-\d{2}-\d{2}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i,
-          /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b\s*(?:\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm)?)?/i
-        ];
-
-        let amount = null;
-        for (const re of amountPatterns) {
-          const m = normalized.match(re);
-          if (m && m[1]) {
-            amount = m[1].replace(/[\s,]/g, '');
-            break;
-          }
-        }
-
-        let refNo = null;
-        for (const re of refPatterns) {
-          const m = normalized.match(re);
-          if (m) {
-            refNo = (m[2] || m[1] || '').toString().trim();
-            refNo = refNo.replace(/\s{2,}/g, ' ').trim();
-            break;
-          }
-        }
-        if (!refNo) {
-          const fallback = normalized.match(/ref(?:erence)?\s*(?:no\.?|#)?\s*[:\-]?\s*([A-Z0-9\s\-]{8,30})/i);
-          if (fallback && fallback[1]) {
-            refNo = fallback[1].replace(/[^A-Z0-9\s\-]/gi, '').replace(/\s{2,}/g, ' ').trim();
-          }
-        }
-        if (!refNo) {
-          const spacedDigits = normalized.match(/\b\d{3,6}(?:\s+\d{3,6}){1,5}\b/);
-          if (spacedDigits) {
-            refNo = spacedDigits[0].replace(/\s{2,}/g, ' ').trim();
-          }
-        }
-
-        let dateTime = null;
-        for (const re of datePatterns) {
-          const m = normalized.match(re);
-          if (m) { dateTime = m[0]; break; }
-        }
-
-        return { amount, refNo, dateTime };
-      };
-
-      const parsed = parsePaymentText(text || '');
-      const foundAll = Boolean(parsed.amount && parsed.refNo && parsed.dateTime);
-      const foundAny = parsed.amount || parsed.refNo || parsed.dateTime;
-
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: {
-          status: foundAny ? 'valid' : (confidence > 30 ? 'partial' : 'manual'),
-          message: foundAny
-            ? `Amount: ${parsed.amount || 'N/A'}, Ref No: ${parsed.refNo || 'N/A'}${parsed.dateTime ? `, Date: ${parsed.dateTime}` : ''}`
-            : 'Text detected but could not find Amount/Ref No'
-        }
-      }));
-
-      if (foundAll) {
-        showInfoModal('Verification Success', [
-          { label: 'Amount', value: parsed.amount },
-          { label: 'Ref No.', value: parsed.refNo },
-          { label: 'Date', value: parsed.dateTime }
-        ]);
-      } else if (!parsed.amount && !parsed.refNo) {
-        showInfoModal('Verification Failed', [
-          { label: 'Reason', value: 'Could not detect Amount and Reference No.' }
-        ]);
-      }
-    } catch (error) {
-      console.error('Payment proof OCR failed:', error);
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Payment OCR failed' }
-      }));
+      setIsVerifying(prev => ({ ...prev, [label]: false }));
     }
   };
 
   const verifyFace = async (imageUrl, label) => {
+    setIsVerifying(prev => ({ ...prev, [label]: true }));
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Verifying face' }
+      [label]: { status: 'verifying', message: 'Detecting face...' }
     }));
 
     try {
-      const loadedImg = await loadImageForTensorFlow(imageUrl);
-      const width = loadedImg.width || 300;
-      const height = loadedImg.height || 200;
+      const response = await fetch(`${API_URL}/process-ocr`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          imageUrl: imageUrl,
+          type: 'face'
+        })
+      });
 
-      if (width < 64 || height < 64) {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'manual', message: 'Image too small for detection' }
-        }));
-        return;
-      }
+      const data = await response.json();
 
-      let faceCount = 0;
-      let confidence = 0;
-      let detectionMethod = 'none';
-
-      if (tfModels.blazeface) {
-        try {
-          const predictions = await tfModels.blazeface.estimateFaces(loadedImg, false);
-          faceCount = predictions.length;
-          detectionMethod = 'BlazeFace';
-          confidence = predictions[0]?.probability?.[0] ?? (faceCount > 0 ? 0.8 : 0);
-        } catch (e) {
+      if (data.success) {
+        const result = data.result;
+        
+        if (result.facesDetected > 0) {
           setValidationStatus(prev => ({
             ...prev,
-            [label]: { status: 'manual', message: 'Automatic face detection failed' }
+            [label]: {
+              status: 'valid',
+              message: `Face detected (${result.facesDetected})`
+            }
           }));
-          return;
+
+          showInfoModal('Face Detection Results', [
+            { label: 'Faces Detected', value: result.facesDetected },
+            { label: 'Image Size', value: result.imageSize },
+            { label: 'Status', value: '✅ Valid' }
+          ]);
+        } else {
+          setValidationStatus(prev => ({
+            ...prev,
+            [label]: { status: 'invalid', message: 'No face detected' }
+          }));
         }
       } else {
         setValidationStatus(prev => ({
           ...prev,
-          [label]: { status: 'manual', message: 'Face model not loaded' }
+          [label]: { status: 'error', message: 'Face detection failed' }
         }));
-        return;
-      }
-
-      if (faceCount > 0) {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'valid', message: 'Face detected'}
-        }));
-        showInfoModal('Verification Success', [
-          { label: 'Face', value: 'Detected' }
-        ]);
-      } else {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'invalid', message: 'No face detected' }
-        }));
-        showInfoModal('Verification Result', [
-          { label: 'Face', value: 'No face detected' }
-        ]);
       }
     } catch (error) {
+      console.error('Face verification error:', error);
       setValidationStatus(prev => ({
         ...prev,
-        [label]: { status: 'error', message: 'Face verification error' }
+        [label]: { status: 'error', message: 'Face verification failed' }
       }));
     } finally {
-      setIsValidating(false);
+      setIsVerifying(prev => ({ ...prev, [label]: false }));
     }
   };
 
@@ -1515,35 +915,23 @@ const Registrations = ({
     setIsVerifying(prev => ({ ...prev, [label]: true }));
     
     console.log('Manual verification triggered for:', label);
-    console.log('Image URL:', url);
 
-    const labelLower = (label || '').toLowerCase();
+    const labelLower = label.toLowerCase();
 
-    const finish = () => setIsVerifying(prev => ({ ...prev, [label]: false }));
-
-    const run = async () => {
-      try {
-        if (labelLower.includes('payment') || labelLower.includes('proof') || labelLower.includes('receipt')) {
-          await verifyPaymentProof(url, label);
-        } else if (labelLower.includes('id') && !labelLower.includes('back')) {
-          await verifyID(url, label);
-        } else if (labelLower.includes('selfie')) {
-          if (!modelsLoaded) {
-            console.warn('AI models not loaded yet');
-            setValidationStatus(prev => ({
-              ...prev,
-              [label]: { status: 'error', message: 'AI models not loaded yet' }
-            }));
-            return;
-          }
-          await verifyFace(url, label);
-        }
-      } finally {
-        finish();
-      }
-    };
-
-    run();
+    if (labelLower.includes('payment') || labelLower.includes('proof') || labelLower.includes('receipt')) {
+      verifyPaymentProof(url, label);
+    } else if (labelLower.includes('id') && !labelLower.includes('back')) {
+      verifyID(url, label);
+    } else if (labelLower.includes('selfie')) {
+      verifyFace(url, label);
+    } else {
+      // For other images, just mark as manually reviewed
+      setValidationStatus(prev => ({
+        ...prev,
+        [label]: { status: 'manual', message: 'Manual review completed' }
+      }));
+      setIsVerifying(prev => ({ ...prev, [label]: false }));
+    }
   };
 
   const showInfoModal = (title, fields) => {
@@ -1639,7 +1027,6 @@ const Registrations = ({
   };
 
   const processAction = async (registration, action, rejectionReason = '') => {
-    // Defer DB writes and refresh to success modal OK
     setActionInProgress(true);
     setIsProcessing(true);
     setCurrentAction(action);
@@ -1655,7 +1042,6 @@ const Registrations = ({
           amount: registration.registrationFee || 0 
         };
 
-        // Local preview only; do not touch DB yet
         setSelectedRegistration(prev => ({
           ...prev,
           dateApproved: approveData.dateApproved,
@@ -1677,7 +1063,6 @@ const Registrations = ({
           rejectionReason
         };
 
-        // Local preview only; do not touch DB yet
         setSelectedRegistration(prev => ({
           ...prev,
           dateRejected: rejectData.dateRejected,
@@ -1697,7 +1082,6 @@ const Registrations = ({
       console.error('Error preparing action:', error);
       setErrorMessage(error.message || 'An error occurred. Please try again.');
       setErrorModalVisible(true);
-      // Hide loading on error
       setIsProcessing(false);
       setActionInProgress(false);
     }
@@ -1712,73 +1096,69 @@ const Registrations = ({
     }
   };
 
-const checkIfEmailExistsInDatabase = async (email, firstName, lastName) => {
-  try {
-    const membersSnap = await database.ref('Members').once('value');
-    const membersData = membersSnap.val() || {};
-    
-    // Check if email exists with DIFFERENT name (this should block approval)
-    const emailExistsWithDifferentName = Object.values(membersData).some(u => 
-      u.email?.toLowerCase() === email.toLowerCase() &&
-      (u.firstName?.toLowerCase() !== firstName.toLowerCase() || 
-       u.lastName?.toLowerCase() !== lastName.toLowerCase())
-    );
-    
-    if (emailExistsWithDifferentName) return true;
+  const checkIfEmailExistsInDatabase = async (email, firstName, lastName) => {
+    try {
+      const membersSnap = await database.ref('Members').once('value');
+      const membersData = membersSnap.val() || {};
+      
+      const emailExistsWithDifferentName = Object.values(membersData).some(u => 
+        u.email?.toLowerCase() === email.toLowerCase() &&
+        (u.firstName?.toLowerCase() !== firstName.toLowerCase() || 
+         u.lastName?.toLowerCase() !== lastName.toLowerCase())
+      );
+      
+      if (emailExistsWithDifferentName) return true;
 
-    const adminsSnap = await database.ref('Users/Admin').once('value');
-    const adminsData = adminsSnap.val() || {};
-    
-    // Check if email exists with DIFFERENT name in Admins
-    const adminEmailExistsWithDifferentName = Object.values(adminsData).some(u => 
-      u.email?.toLowerCase() === email.toLowerCase() &&
-      (u.firstName?.toLowerCase() !== firstName.toLowerCase() || 
-       u.lastName?.toLowerCase() !== lastName.toLowerCase())
-    );
-    
-    return adminEmailExistsWithDifferentName;
-  } catch (err) {
-    console.error('DB email check error:', err);
-    return false;
-  }
-};
-
-const checkIfSamePersonExists = async (email, firstName, lastName) => {
-  try {
-    const membersSnap = await database.ref('Members').once('value');
-    const membersData = membersSnap.val() || {};
-    
-    // Check if same person exists in Members (all three fields must match)
-    const memberEntry = Object.entries(membersData).find(([_, member]) => 
-      member.email?.toLowerCase() === email.toLowerCase() &&
-      member.firstName?.toLowerCase() === firstName.toLowerCase() &&
-      member.lastName?.toLowerCase() === lastName.toLowerCase()
-    );
-
-    if (memberEntry) {
-      return { exists: true, source: 'member', id: memberEntry[0], data: memberEntry[1] };
+      const adminsSnap = await database.ref('Users/Admin').once('value');
+      const adminsData = adminsSnap.val() || {};
+      
+      const adminEmailExistsWithDifferentName = Object.values(adminsData).some(u => 
+        u.email?.toLowerCase() === email.toLowerCase() &&
+        (u.firstName?.toLowerCase() !== firstName.toLowerCase() || 
+         u.lastName?.toLowerCase() !== lastName.toLowerCase())
+      );
+      
+      return adminEmailExistsWithDifferentName;
+    } catch (err) {
+      console.error('DB email check error:', err);
+      return false;
     }
+  };
 
-    const adminsSnap = await database.ref('Users/Admin').once('value');
-    const adminsData = adminsSnap.val() || {};
-    
-    // Check if same person exists in Admins (all three fields must match)
-    const adminEntry = Object.entries(adminsData).find(([_, admin]) => 
-      admin.email?.toLowerCase() === email.toLowerCase() &&
-      admin.firstName?.toLowerCase() === firstName.toLowerCase() &&
-      admin.lastName?.toLowerCase() === lastName.toLowerCase()
-    );
+  const checkIfSamePersonExists = async (email, firstName, lastName) => {
+    try {
+      const membersSnap = await database.ref('Members').once('value');
+      const membersData = membersSnap.val() || {};
+      
+      const memberEntry = Object.entries(membersData).find(([_, member]) => 
+        member.email?.toLowerCase() === email.toLowerCase() &&
+        member.firstName?.toLowerCase() === firstName.toLowerCase() &&
+        member.lastName?.toLowerCase() === lastName.toLowerCase()
+      );
 
-    if (adminEntry) {
-      return { exists: true, source: 'admin', id: adminEntry[0], data: adminEntry[1] };
+      if (memberEntry) {
+        return { exists: true, source: 'member', id: memberEntry[0], data: memberEntry[1] };
+      }
+
+      const adminsSnap = await database.ref('Users/Admin').once('value');
+      const adminsData = adminsSnap.val() || {};
+      
+      const adminEntry = Object.entries(adminsData).find(([_, admin]) => 
+        admin.email?.toLowerCase() === email.toLowerCase() &&
+        admin.firstName?.toLowerCase() === firstName.toLowerCase() &&
+        admin.lastName?.toLowerCase() === lastName.toLowerCase()
+      );
+
+      if (adminEntry) {
+        return { exists: true, source: 'admin', id: adminEntry[0], data: adminEntry[1] };
+      }
+
+      return { exists: false };
+    } catch (err) {
+      console.error('DB same person check error:', err);
+      return { exists: false };
     }
-
-    return { exists: false };
-  } catch (err) {
-    console.error('DB same person check error:', err);
-    return { exists: false };
-  }
-};
+  };
 
   const updateFunds = async (amount) => {
     try {
@@ -1800,52 +1180,155 @@ const checkIfSamePersonExists = async (email, firstName, lastName) => {
     }
   };
 
-const processDatabaseApprove = async (reg) => {
-  try {
-    const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
-    let userId = null;
+  const processDatabaseApprove = async (reg) => {
+    try {
+      const { id, email, password, firstName, lastName, registrationFee = 0, ...rest } = reg;
+      let userId = null;
 
-    const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
+      const samePersonCheck = await checkIfSamePersonExists(email, firstName, lastName);
 
-    if (!samePersonCheck.exists) {
-      // Only block if email exists with DIFFERENT name
+      if (!samePersonCheck.exists) {
+        const emailWithDifferentName = await checkIfEmailExistsInDatabase(email, firstName, lastName);
+
+        if (emailWithDifferentName) {
+          throw new Error('This email is already registered to a different member.');
+        }
+      }
+      
+      if (samePersonCheck.exists) {
+        const now = new Date();
+        const approvedDate = formatDate(now);
+        const approvedTime = formatTime(now);
+
+        const updateData = {};
+
+        Object.keys(rest).forEach(key => {
+          if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
+            updateData[key] = rest[key];
+          }
+        });
+
+        const currentBalance = samePersonCheck.data.balance || 0;
+        updateData.balance = currentBalance + parseFloat(registrationFee);
+
+        updateData.dateApproved = approvedDate;
+        updateData.approvedTime = approvedTime;
+
+        const existingRole = samePersonCheck.data.role;
+        const existingStatus = samePersonCheck.data.status;
+        const isAdminLike = samePersonCheck.source === 'admin' || existingRole === 'admin' || existingRole === 'coadmin';
+        if (isAdminLike) {
+          updateData.role = existingRole || 'admin';
+          updateData.status = existingStatus || 'active';
+        } else {
+          updateData.status = 'active';
+        }
+
+        const transactionData = {
+          type: 'registration',
+          amount: parseFloat(registrationFee),
+          dateApplied: rest?.dateCreated || rest?.dateApplied || '',
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          timestamp: now.getTime(),
+          status: 'approved',
+          memberId: parseInt(samePersonCheck.id),
+          firstName,
+          lastName,
+          email,
+          transactionId: `REG-${Date.now()}`,
+          description: 'Registration fee payment'
+        };
+
+        await database.ref(`Transactions/Registrations/${samePersonCheck.id}/${transactionData.transactionId}`).set(transactionData);
+
+        if (isAdminLike) {
+          const adminTxnRef = database.ref(`Transactions/Admins/${samePersonCheck.id}`).push();
+          await adminTxnRef.set({
+            transactionId: adminTxnRef.key,
+            type: 'AdminRegistrationApproval',
+            dateApproved: approvedDate,
+            approvedTime: approvedTime,
+            firstName,
+            lastName,
+            email,
+            memberId: parseInt(samePersonCheck.id),
+            status: 'approved',
+            description: 'Registration approved for existing Admin',
+            amount: registrationFee || 0 
+          });
+        }
+
+        const memberRef = database.ref(`Members/${samePersonCheck.id}`);
+        const memberSnap = await memberRef.once('value');
+        if (!memberSnap.exists()) {
+          await memberRef.set({
+            id: parseInt(samePersonCheck.id),
+            firstName,
+            lastName,
+            email,
+            ...rest,
+            dateApproved: approvedDate,
+            approvedTime: approvedTime,
+            investment: updateData.balance || parseFloat(registrationFee) || 0,
+            balance: updateData.balance || parseFloat(registrationFee) || 0,
+            status: isAdminLike ? (existingStatus || 'active') : 'active',
+            role: isAdminLike ? (existingRole || 'admin') : (rest?.role || 'member')
+          });
+        } else {
+          await memberRef.update(updateData);
+        }
+        await updateFunds(registrationFee);
+
+        await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
+          firstName,
+          lastName,
+          ...rest,
+          email,
+          dateCreated: rest?.dateCreated || rest?.dateApplied || '',
+          dateApproved: approvedDate,
+          approvedTime: approvedTime,
+          memberId: parseInt(samePersonCheck.id),
+          status: 'approved'
+        });
+
+        return parseInt(samePersonCheck.id);
+      }
+
       const emailWithDifferentName = await checkIfEmailExistsInDatabase(email, firstName, lastName);
-
       if (emailWithDifferentName) {
         throw new Error('This email is already registered to a different member.');
       }
-    }
-    
-    if (samePersonCheck.exists) {
-      // Update existing member/admin record
+
+      try {
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        userId = userCredential.user.uid;
+      } catch (authError) {
+        if (authError.code === 'auth/email-already-in-use') {
+          console.log('Email exists in Firebase Auth but not in database, proceeding...');
+          userId = `auth-${Date.now()}`;
+        } else {
+          throw authError;
+        }
+      }
+
+      const membersSnap = await database.ref('Members').once('value');
+      const members = membersSnap.val() || {};
+      
+      let newId = 5001;
+      const existingIds = Object.keys(members).map(Number).sort((a, b) => a - b);
+      
+      for (const id of existingIds) {
+        if (id === newId) newId++;
+        else if (id > newId) break;
+      }
+      
       const now = new Date();
       const approvedDate = formatDate(now);
       const approvedTime = formatTime(now);
-
-      const updateData = {};
-
-      Object.keys(rest).forEach(key => {
-        if (samePersonCheck.data[key] === undefined || samePersonCheck.data[key] !== rest[key]) {
-          updateData[key] = rest[key];
-        }
-      });
-
-      const currentBalance = samePersonCheck.data.balance || 0;
-      updateData.balance = currentBalance + parseFloat(registrationFee);
-
-      updateData.dateApproved = approvedDate;
-      updateData.approvedTime = approvedTime;
-
-      const existingRole = samePersonCheck.data.role;
-      const existingStatus = samePersonCheck.data.status;
-      const isAdminLike = samePersonCheck.source === 'admin' || existingRole === 'admin' || existingRole === 'coadmin';
-      if (isAdminLike) {
-        updateData.role = existingRole || 'admin';
-        updateData.status = existingStatus || 'active';
-      } else {
-        updateData.status = 'active';
-      }
-
+      
+      const initialBalance = parseFloat(registrationFee) || 0;
+      
       const transactionData = {
         type: 'registration',
         amount: parseFloat(registrationFee),
@@ -1854,18 +1337,35 @@ const processDatabaseApprove = async (reg) => {
         approvedTime: approvedTime,
         timestamp: now.getTime(),
         status: 'approved',
-        memberId: parseInt(samePersonCheck.id),
+        memberId: newId,
         firstName,
         lastName,
         email,
         transactionId: `REG-${Date.now()}`,
-        description: 'Registration fee payment'
+        description: 'Registration fee payment',
       };
 
-      await database.ref(`Transactions/Registrations/${samePersonCheck.id}/${transactionData.transactionId}`).set(transactionData);
+      await database.ref(`Members/${newId}`).set({
+        id: newId,
+        uid: userId,
+        firstName,
+        lastName,
+        ...rest,
+        email,
+        dateApproved: approvedDate,
+        approvedTime: approvedTime,
+        balance: initialBalance,
+        investment: initialBalance,
+        loans: 0.0,
+        status: 'active',
+        amount: registrationFee || 0 
+      });
 
-      if (isAdminLike) {
-        const adminTxnRef = database.ref(`Transactions/Admins/${samePersonCheck.id}`).push();
+      await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+
+      const roleFromReg = (rest && rest.role) || (reg && reg.role);
+      if (roleFromReg === 'admin' || roleFromReg === 'coadmin') {
+        const adminTxnRef = database.ref(`Transactions/Admins/${newId}`).push();
         await adminTxnRef.set({
           transactionId: adminTxnRef.key,
           type: 'AdminRegistrationApproval',
@@ -1874,34 +1374,15 @@ const processDatabaseApprove = async (reg) => {
           firstName,
           lastName,
           email,
-          memberId: parseInt(samePersonCheck.id),
+          memberId: newId,
           status: 'approved',
-          description: 'Registration approved for existing Admin',
+          description: 'Registration approved for Admin',
           amount: registrationFee || 0 
         });
       }
 
-      const memberRef = database.ref(`Members/${samePersonCheck.id}`);
-      const memberSnap = await memberRef.once('value');
-      if (!memberSnap.exists()) {
-        await memberRef.set({
-          id: parseInt(samePersonCheck.id),
-          firstName,
-          lastName,
-          email,
-          ...rest,
-          dateApproved: approvedDate,
-          approvedTime: approvedTime,
-          investment: updateData.balance || parseFloat(registrationFee) || 0,
-          balance: updateData.balance || parseFloat(registrationFee) || 0,
-          status: isAdminLike ? (existingStatus || 'active') : 'active',
-          role: isAdminLike ? (existingRole || 'admin') : (rest?.role || 'member')
-        });
-      } else {
-        await memberRef.update(updateData);
-      }
       await updateFunds(registrationFee);
-
+      
       await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
         firstName,
         lastName,
@@ -1910,125 +1391,18 @@ const processDatabaseApprove = async (reg) => {
         dateCreated: rest?.dateCreated || rest?.dateApplied || '',
         dateApproved: approvedDate,
         approvedTime: approvedTime,
-        memberId: parseInt(samePersonCheck.id),
+        memberId: newId,
         status: 'approved'
       });
 
-      return parseInt(samePersonCheck.id);
+      await removeFromPendingRegistrations(id);
+
+      return newId;
+    } catch (err) {
+      console.error('Approval DB error:', err);
+      throw new Error(err.message || 'Failed to approve registration');
     }
-
-    // Check if email exists with different name (should have been caught earlier, but double-check)
-    const emailWithDifferentName = await checkIfEmailExistsInDatabase(email, firstName, lastName);
-    if (emailWithDifferentName) {
-      throw new Error('This email is already registered to a different member.');
-    }
-
-    // Try to create Firebase Auth account, but handle "email already in use" gracefully
-    try {
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      userId = userCredential.user.uid;
-    } catch (authError) {
-      if (authError.code === 'auth/email-already-in-use') {
-        // Email exists in Firebase Auth but not in our database - this is OK
-        // We'll proceed without creating a new auth account
-        console.log('Email exists in Firebase Auth but not in database, proceeding...');
-        userId = `auth-${Date.now()}`; // Create a placeholder ID
-      } else {
-        throw authError;
-      }
-    }
-
-    const membersSnap = await database.ref('Members').once('value');
-    const members = membersSnap.val() || {};
-    
-    let newId = 5001;
-    const existingIds = Object.keys(members).map(Number).sort((a, b) => a - b);
-    
-    for (const id of existingIds) {
-      if (id === newId) newId++;
-      else if (id > newId) break;
-    }
-    
-    const now = new Date();
-    const approvedDate = formatDate(now);
-    const approvedTime = formatTime(now);
-    
-    const initialBalance = parseFloat(registrationFee) || 0;
-    
-    const transactionData = {
-      type: 'registration',
-      amount: parseFloat(registrationFee),
-      dateApplied: rest?.dateCreated || rest?.dateApplied || '',
-      dateApproved: approvedDate,
-      approvedTime: approvedTime,
-      timestamp: now.getTime(),
-      status: 'approved',
-      memberId: newId,
-      firstName,
-      lastName,
-      email,
-      transactionId: `REG-${Date.now()}`,
-      description: 'Registration fee payment',
-    };
-
-    await database.ref(`Members/${newId}`).set({
-      id: newId,
-      uid: userId,
-      firstName,
-      lastName,
-      ...rest,
-      email,
-      dateApproved: approvedDate,
-      approvedTime: approvedTime,
-      balance: initialBalance,
-      investment: initialBalance,
-      loans: 0.0,
-      status: 'active',
-      amount: registrationFee || 0 
-    });
-
-    await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
-
-    const roleFromReg = (rest && rest.role) || (reg && reg.role);
-    if (roleFromReg === 'admin' || roleFromReg === 'coadmin') {
-      const adminTxnRef = database.ref(`Transactions/Admins/${newId}`).push();
-      await adminTxnRef.set({
-        transactionId: adminTxnRef.key,
-        type: 'AdminRegistrationApproval',
-        dateApproved: approvedDate,
-        approvedTime: approvedTime,
-        firstName,
-        lastName,
-        email,
-        memberId: newId,
-        status: 'approved',
-        description: 'Registration approved for Admin',
-        amount: registrationFee || 0 
-      });
-    }
-
-    await updateFunds(registrationFee);
-    
-    await database.ref(`Registrations/ApprovedRegistrations/${id}`).set({
-      firstName,
-      lastName,
-      ...rest,
-      email,
-      dateCreated: rest?.dateCreated || rest?.dateApplied || '',
-      dateApproved: approvedDate,
-      approvedTime: approvedTime,
-      memberId: newId,
-      status: 'approved'
-    });
-
-    await removeFromPendingRegistrations(id);
-
-    return newId;
-  } catch (err) {
-    console.error('Approval DB error:', err);
-    throw new Error(err.message || 'Failed to approve registration');
-  }
-};
+  };
   
   const processDatabaseReject = async (reg, rejectionReason) => {
     try {
@@ -2052,61 +1426,57 @@ const processDatabaseApprove = async (reg) => {
     }
   };
 
-const callApiApprove = async (reg) => {
-  try {
-    console.log('Sending approval email in background...');
-const response = await ApproveRegistration({
-  email: reg.email,
-  firstName: reg.firstName,
-  lastName: reg.lastName,
-  amount: reg.registrationFee || 0, 
-  dateApproved: reg.dateApproved,
-  approvedTime: reg.approvedTime,
-  memberId: reg.memberId,
-   password: reg.password 
-});
-    
-    if (!response.ok) {
-      console.warn('Background: Failed to send approval email');
-    } else {
-      console.log('Background: Approval email sent successfully');
+  const callApiApprove = async (reg) => {
+    try {
+      console.log('Sending approval email in background...');
+      const response = await ApproveRegistration({
+        email: reg.email,
+        firstName: reg.firstName,
+        lastName: reg.lastName,
+        amount: reg.registrationFee || 0, 
+        dateApproved: reg.dateApproved,
+        approvedTime: reg.approvedTime,
+        memberId: reg.memberId,
+        password: reg.password 
+      });
+      
+      if (!response.ok) {
+        console.warn('Background: Failed to send approval email');
+      } else {
+        console.log('Background: Approval email sent successfully');
+      }
+    } catch (err) {
+      console.error('Background API approve error:', err);
     }
-  } catch (err) {
-    console.error('Background API approve error:', err);
-    // Don't throw error - this runs in background
-  }
-};
+  };
 
-const callApiReject = async (reg) => {
-  try {
-    console.log('Sending rejection email in background...');
-    const response = await RejectRegistration({
-      firstName: reg.firstName,
-      lastName: reg.lastName,
-      email: reg.email,
-      dateRejected: reg.dateRejected,
-      rejectedTime: reg.rejectedTime,
-      rejectionReason: reg.rejectionReason || 'Rejected by admin'
-    });
-    
-    if (!response.ok) {
-      console.warn('Background: Failed to send rejection email');
-    } else {
-      console.log('Background: Rejection email sent successfully');
+  const callApiReject = async (reg) => {
+    try {
+      console.log('Sending rejection email in background...');
+      const response = await RejectRegistration({
+        firstName: reg.firstName,
+        lastName: reg.lastName,
+        email: reg.email,
+        dateRejected: reg.dateRejected,
+        rejectedTime: reg.rejectedTime,
+        rejectionReason: reg.rejectionReason || 'Rejected by admin'
+      });
+      
+      if (!response.ok) {
+        console.warn('Background: Failed to send rejection email');
+      } else {
+        console.log('Background: Rejection email sent successfully');
+      }
+    } catch (err) {
+      console.error('Background API reject error:', err);
     }
-  } catch (err) {
-    console.error('Background API reject error:', err);
-    // Don't throw error - this runs in background
-  }
-};
+  };
 
   const handleSuccessOk = async () => {
-    // Show loading spinner and hide success modal
     setIsProcessing(true);
     setSuccessMessageModalVisible(false);
 
     try {
-      // Finalize DB changes
       if (pendingApiCall) {
         if (pendingApiCall.type === 'approve') {
           const memberId = await processDatabaseApprove(pendingApiCall.data);
@@ -2117,10 +1487,8 @@ const callApiReject = async (reg) => {
       }
     } catch (err) {
       console.error('Finalize DB on OK error:', err);
-      // Optionally show error modal here if needed
     }
 
-    // Trigger background email after DB success; do not block UI
     try {
       if (pendingApiCall) {
         if (pendingApiCall.type === 'approve') {
@@ -2135,15 +1503,10 @@ const callApiReject = async (reg) => {
       setPendingApiCall(null);
     }
 
-    // Close modal and clean state
     closeModal();
     setSelectedRegistration(null);
     setCurrentAction(null);
-
-    // Finally refresh
     refreshData();
-
-    // Hide loading spinner
     setIsProcessing(false);
   };
 
@@ -2228,36 +1591,36 @@ const callApiReject = async (reg) => {
             </tr>
           </thead>
           <tbody>
-  {registrations.map((item, index) => (
-    <tr key={index} style={styles.tableRow}>
-      <td style={styles.tableCell}>
-        <div style={{ fontWeight: '500' }}>
-          {item.firstName} {item.lastName}
-        </div>
-      </td>
-      <td style={styles.tableCell}>{item.email}</td>
-      <td style={styles.tableCell}>{item.phoneNumber}</td>
-      <td style={styles.tableCell}>
-        <span style={{
-          ...styles.statusBadge,
-          ...(item.status === 'approved' ? styles.statusApproved : 
-               item.status === 'rejected' ? styles.statusRejected : styles.statusPending)
-        }}>
-          {item.status || 'pending'}
-        </span>
-      </td>
-      <td style={styles.tableCell}>
-        <button 
-          style={styles.viewButton}
-          onClick={() => openModal(item)}
-        >
-          <FaEye />
-          View
-        </button>
-      </td>
-    </tr>
-  ))}
-</tbody>
+            {registrations.map((item, index) => (
+              <tr key={index} style={styles.tableRow}>
+                <td style={styles.tableCell}>
+                  <div style={{ fontWeight: '500' }}>
+                    {item.firstName} {item.lastName}
+                  </div>
+                </td>
+                <td style={styles.tableCell}>{item.email}</td>
+                <td style={styles.tableCell}>{item.phoneNumber}</td>
+                <td style={styles.tableCell}>
+                  <span style={{
+                    ...styles.statusBadge,
+                    ...(item.status === 'approved' ? styles.statusApproved : 
+                         item.status === 'rejected' ? styles.statusRejected : styles.statusPending)
+                  }}>
+                    {item.status || 'pending'}
+                  </span>
+                </td>
+                <td style={styles.tableCell}>
+                  <button 
+                    style={styles.viewButton}
+                    onClick={() => openModal(item)}
+                  >
+                    <FaEye />
+                    View
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
         </table>
       </div>
 
@@ -2356,40 +1719,40 @@ const callApiReject = async (reg) => {
                     </div>
                   </div>
 
-                 <div style={styles.section}>
-  <h3 style={styles.sectionTitle}>
-    <FaIdCard />
-    Application Details
-  </h3>
-  <div style={styles.fieldGroup}>
-    <span style={styles.fieldLabel}>Date Applied:</span>
-    <span style={styles.fieldValue}>
-      {selectedRegistration.dateApplied || selectedRegistration.dateCreated || 'N/A'}
-    </span>
-  </div>
-  <div style={styles.fieldGroup}>
-    <span style={styles.fieldLabel}>Status:</span>
-    <span style={{
-      ...styles.statusBadge,
-      ...(selectedRegistration.status === 'approved' ? styles.statusApproved : 
-           selectedRegistration.status === 'rejected' ? styles.statusRejected : styles.statusPending)
-    }}>
-      {selectedRegistration.status || 'pending'}
-    </span>
-  </div>
-  {selectedRegistration.dateApproved && (
-    <div style={styles.fieldGroup}>
-      <span style={styles.fieldLabel}>Date Approved:</span>
-      <span style={styles.fieldValue}>{selectedRegistration.dateApproved}</span>
-    </div>
-  )}
-  {selectedRegistration.dateRejected && (
-    <div style={styles.fieldGroup}>
-      <span style={styles.fieldLabel}>Date Rejected:</span>
-      <span style={styles.fieldValue}>{selectedRegistration.dateRejected}</span>
-    </div>
-  )}
-</div>
+                  <div style={styles.section}>
+                    <h3 style={styles.sectionTitle}>
+                      <FaIdCard />
+                      Application Details
+                    </h3>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Date Applied:</span>
+                      <span style={styles.fieldValue}>
+                        {selectedRegistration.dateApplied || selectedRegistration.dateCreated || 'N/A'}
+                      </span>
+                    </div>
+                    <div style={styles.fieldGroup}>
+                      <span style={styles.fieldLabel}>Status:</span>
+                      <span style={{
+                        ...styles.statusBadge,
+                        ...(selectedRegistration.status === 'approved' ? styles.statusApproved : 
+                             selectedRegistration.status === 'rejected' ? styles.statusRejected : styles.statusPending)
+                      }}>
+                        {selectedRegistration.status || 'pending'}
+                      </span>
+                    </div>
+                    {selectedRegistration.dateApproved && (
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Date Approved:</span>
+                        <span style={styles.fieldValue}>{selectedRegistration.dateApproved}</span>
+                      </div>
+                    )}
+                    {selectedRegistration.dateRejected && (
+                      <div style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>Date Rejected:</span>
+                        <span style={styles.fieldValue}>{selectedRegistration.dateRejected}</span>
+                      </div>
+                    )}
+                  </div>
 
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>
@@ -2455,101 +1818,101 @@ const callApiReject = async (reg) => {
               </div>
             </div>
 
-{selectedRegistration.status !== 'approved' && selectedRegistration.status !== 'rejected' && (
-  <div style={styles.modalActions}>
-    <button
-      style={{
-        ...styles.actionButton,
-        ...styles.approveButton,
-        ...(isProcessing ? styles.disabledButton : {})
-      }}
-      onClick={handleApproveClick}
-      disabled={isProcessing}
-    >
-      Approve
-    </button>
-    <button
-      style={{
-        ...styles.actionButton,
-        ...styles.rejectButton,
-        ...(isProcessing ? styles.disabledButton : {})
-      }}
-      onClick={handleRejectClick}
-      disabled={isProcessing}
-    >
-      Reject
-    </button>
-  </div>
-)}
+            {selectedRegistration.status !== 'approved' && selectedRegistration.status !== 'rejected' && (
+              <div style={styles.modalActions}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.approveButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={handleApproveClick}
+                  disabled={isProcessing}
+                >
+                  Approve
+                </button>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    ...styles.rejectButton,
+                    ...(isProcessing ? styles.disabledButton : {})
+                  }}
+                  onClick={handleRejectClick}
+                  disabled={isProcessing}
+                >
+                  Reject
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-{/* Approve Confirmation Modal */}
-{showApproveConfirmation && (
-  <div style={styles.modalOverlay}>
-    <div style={styles.modalCardSmall}>
-      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-      <p style={styles.modalText}>Are you sure you want to approve this registration?</p>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button 
-          style={{
-            ...styles.actionButton,
-            ...styles.primaryButton,
-            ...(actionInProgress ? styles.disabledButton : {})
-          }} 
-          onClick={confirmApprove}
-          disabled={actionInProgress}
-        >
-          {actionInProgress ? 'Processing...' : 'Yes'}
-        </button>
-        <button 
-          style={{
-            ...styles.actionButton,
-            ...styles.secondaryButton
-          }} 
-          onClick={() => setShowApproveConfirmation(false)}
-          disabled={actionInProgress}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {/* Approve Confirmation Modal */}
+      {showApproveConfirmation && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+            <p style={styles.modalText}>Are you sure you want to approve this registration?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton,
+                  ...(actionInProgress ? styles.disabledButton : {})
+                }} 
+                onClick={confirmApprove}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  ...styles.secondaryButton
+                }} 
+                onClick={() => setShowApproveConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
-{/* Reject Confirmation Modal */}
-{showRejectConfirmation && (
-  <div style={styles.modalOverlay}>
-    <div style={styles.modalCardSmall}>
-      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-      <p style={styles.modalText}>Are you sure you want to reject this registration?</p>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button 
-          style={{
-            ...styles.actionButton,
-            ...styles.primaryButton,
-            ...(actionInProgress ? styles.disabledButton : {})
-          }} 
-          onClick={confirmRejectFinal}
-          disabled={actionInProgress}
-        >
-          {actionInProgress ? 'Processing...' : 'Yes'}
-        </button>
-        <button 
-          style={{
-            ...styles.actionButton,
-            ...styles.secondaryButton
-          }} 
-          onClick={() => setShowRejectConfirmation(false)}
-          disabled={actionInProgress}
-        >
-          No
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+      {/* Reject Confirmation Modal */}
+      {showRejectConfirmation && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCardSmall}>
+            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+            <p style={styles.modalText}>Are you sure you want to reject this registration?</p>
+            <div style={{ display: 'flex', gap: '10px' }}>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  ...styles.primaryButton,
+                  ...(actionInProgress ? styles.disabledButton : {})
+                }} 
+                onClick={confirmRejectFinal}
+                disabled={actionInProgress}
+              >
+                {actionInProgress ? 'Processing...' : 'Yes'}
+              </button>
+              <button 
+                style={{
+                  ...styles.actionButton,
+                  ...styles.secondaryButton
+                }} 
+                onClick={() => setShowRejectConfirmation(false)}
+                disabled={actionInProgress}
+              >
+                No
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Rejection Reason Modal */}
       {showRejectionModal && (
@@ -2620,35 +1983,35 @@ const callApiReject = async (reg) => {
         </div>
       )}
 
-{/* Loading Spinner */}
-{isProcessing && (
-  <div style={styles.modalOverlay}>
-    <div style={styles.spinner}></div>
-  </div>
-)}
-
-{/* Success Modal */}
-{successMessageModalVisible && (
-  <div style={styles.modalOverlay}>
-    <div style={styles.modalCardSmall}>
-      {currentAction === 'approve' ? (
-        <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
-      ) : (
-        <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
+      {/* Loading Spinner */}
+      {isProcessing && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.spinner}></div>
+        </div>
       )}
-      <p style={styles.modalText}>{successMessage}</p>
-      <button 
-        style={{
-          ...styles.actionButton,
-          ...styles.primaryButton
-        }} 
-        onClick={handleSuccessOk}
-      >
-        OK
-      </button>
-    </div>
-  </div>
-)}
+
+      {/* Success Modal */}
+      {successMessageModalVisible && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalCardSmall}>
+            {currentAction === 'approve' ? (
+              <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+            ) : (
+              <FaTimes style={{ ...styles.confirmIcon, color: '#ef4444' }} />
+            )}
+            <p style={styles.modalText}>{successMessage}</p>
+            <button 
+              style={{
+                ...styles.actionButton,
+                ...styles.primaryButton
+              }} 
+              onClick={handleSuccessOk}
+            >
+              OK
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Image Viewer */}
       {imageViewerVisible && (
