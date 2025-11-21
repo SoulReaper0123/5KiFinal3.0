@@ -1418,17 +1418,22 @@ const Deposits = () => {
     }));
 
     if (name === 'depositOption' && value) {
-      // FIX: Safely access depositAccounts with fallback
-      const selectedAccount = depositAccounts[value] || { accountName: '', accountNumber: '' };
-      setFormData(prev => ({
-        ...prev,
-        accountName: selectedAccount.accountName || '',
-        accountNumber: selectedAccount.accountNumber || ''
-      }));
-
-      // Clear proof of deposit for Cash
+      // For Cash deposits, clear account details
       if (value === 'Cash') {
+        setFormData(prev => ({
+          ...prev,
+          accountName: '',
+          accountNumber: ''
+        }));
         setProofOfDepositFile(null);
+      } else {
+        // For Bank/GCash, set account details from depositAccounts
+        const selectedAccount = depositAccounts[value] || { accountName: '', accountNumber: '' };
+        setFormData(prev => ({
+          ...prev,
+          accountName: selectedAccount.accountName || '',
+          accountNumber: selectedAccount.accountNumber || ''
+        }));
       }
     }
 
@@ -1546,8 +1551,8 @@ const Deposits = () => {
           lastName: depositData.lastName,
           email: depositData.email,
           depositOption: depositData.depositOption,
-          accountName: depositData.accountName,
-          accountNumber: depositData.accountNumber,
+          accountName: depositData.depositOption === 'Cash' ? 'Cash on Hand' : depositData.accountName,
+          accountNumber: depositData.depositOption === 'Cash' ? 'N/A' : depositData.accountNumber,
           proofOfDepositUrl: depositData.proofOfDepositUrl || null
         };
 
@@ -1566,16 +1571,14 @@ const Deposits = () => {
           investment: newInvestment
         });
 
-        // Update funds for non-cash deposits only
-        if (depositData.depositOption !== 'Cash') {
-          const fundSnap = await fundsRef.once('value');
-          const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
-          await fundsRef.set(updatedFund);
-          
-          const dateKey = now.toISOString().split('T')[0];
-          const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
-          await fundsHistoryRef.set(updatedFund);
-        }
+        // UPDATE FUNDS FOR ALL DEPOSIT TYPES (including Cash)
+        const fundSnap = await fundsRef.once('value');
+        const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
+        await fundsRef.set(updatedFund);
+        
+        const dateKey = now.toISOString().split('T')[0];
+        const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+        await fundsHistoryRef.set(updatedFund);
 
         return { transactionId, fullDepositData };
       } else {
@@ -2036,18 +2039,21 @@ const Deposits = () => {
                       </select>
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Account Name
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Account name"
-                        value={formData.accountName}
-                        onChange={(e) => handleInputChange('accountName', e.target.value)}
-                        readOnly
-                      />
-                    </div>
+                    {/* Only show Account Name for non-Cash deposits */}
+                    {formData.depositOption && formData.depositOption !== 'Cash' && (
+                      <div style={styles.formSection}>
+                        <label style={styles.formLabel}>
+                          Account Name
+                        </label>
+                        <input
+                          style={styles.formInput}
+                          placeholder="Account name"
+                          value={formData.accountName}
+                          onChange={(e) => handleInputChange('accountName', e.target.value)}
+                          readOnly
+                        />
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column */}
@@ -2081,18 +2087,21 @@ const Deposits = () => {
                       />
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Account Number
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Account number"
-                        value={formData.accountNumber}
-                        onChange={(e) => handleInputChange('accountNumber', e.target.value)}
-                        readOnly
-                      />
-                    </div>
+                    {/* Only show Account Number for non-Cash deposits */}
+                    {formData.depositOption && formData.depositOption !== 'Cash' && (
+                      <div style={styles.formSection}>
+                        <label style={styles.formLabel}>
+                          Account Number
+                        </label>
+                        <input
+                          style={styles.formInput}
+                          placeholder="Account number"
+                          value={formData.accountNumber}
+                          onChange={(e) => handleInputChange('accountNumber', e.target.value)}
+                          readOnly
+                        />
+                      </div>
+                    )}
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
@@ -2155,7 +2164,7 @@ const Deposits = () => {
                     }}>
                       <FaCheckCircle style={{color: '#059669', marginRight: '8px'}} />
                       <span style={{color: '#0369a1', fontWeight: '500'}}>
-                        Proof of deposit not required for Cash deposits
+                        Cash on Hand - No proof of deposit or account details required
                       </span>
                     </div>
                   </div>
