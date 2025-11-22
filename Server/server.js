@@ -557,19 +557,25 @@ async function detectFaceHeuristic(imageBuffer) {
 }
 
 // Enhanced Health check endpoint
+// Enhanced Health check with activity tracking
 app.get('/health', async (req, res) => {
   const healthcheck = {
     status: 'OK',
     timestamp: new Date().toISOString(),
-    service: '5KI Email API',
+    service: '5KI Email API - ALWAYS RUNNING',
     uptime: process.uptime(),
     memory: process.memoryUsage(),
     email: transporter ? 'Connected' : 'Not Connected',
-    provider: 'Mailjet'
+    provider: 'Mailjet',
+    serverTime: new Date().toLocaleString(),
+    nodeVersion: process.version,
+    environment: process.env.NODE_ENV || 'development'
   };
   
+  // Log activity
+  console.log(`❤️  Health check called - ${new Date().toISOString()}`);
+  
   try {
-    // Test email connectivity
     if (transporter) {
       await transporter.verify();
       healthcheck.email = 'Connected and Verified';
@@ -581,6 +587,50 @@ app.get('/health', async (req, res) => {
     healthcheck.error = error.message;
     res.status(503).json(healthcheck);
   }
+});
+
+// Additional activity endpoint
+// ==============================================
+// ADDITIONAL HEALTH & PING ENDPOINTS
+// ==============================================
+
+// Basic ping endpoint (very lightweight)
+app.get('/ping', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.json({ 
+    status: 'alive', 
+    timestamp: new Date().toISOString(),
+    service: '5KI Email API'
+  });
+});
+
+// Lightweight status endpoint
+app.get('/status', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.json({ 
+    status: 'OK',
+    uptime: process.uptime(),
+    memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024) + 'MB'
+  });
+});
+
+// Quick health check (faster than /health)
+app.get('/live', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.send('OK');
+});
+
+// Activity endpoint for cron jobs
+app.get('/cron', (req, res) => {
+  console.log(`⏰ Cron activity - ${new Date().toISOString()}`);
+  res.json({ 
+    active: true, 
+    serverTime: new Date().toISOString(),
+    status: 'Server is running and active'
+  });
 });
 
 
@@ -881,45 +931,6 @@ app.post('/test-mailjet', async (req, res) => {
           
           <p>You can now use all the email endpoints in your application with Mailjet!</p>
           
-          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
-            5KI Financial Services &copy; ${new Date().getFullYear()}
-          </p>
-        </div>
-      `
-    };
-
-    const result = await sendEmailWithRetry(mailOptions);
-
-    res.status(200).json({ 
-      success: true,
-      message: 'Test email sent successfully via Mailjet',
-      result: result 
-    });
-  } catch (error) {
-    console.error('[TEST ERROR] Failed to send test email:', error);
-    res.status(500).json({ 
-      success: false,
-      message: 'Failed to send test email',
-      error: error.message 
-    });
-  }
-});
-// Test endpoint for Mailjet
-app.post('/test-mailjet', async (req, res) => {
-  try {
-    const { to = process.env.MAILJET_FROM_EMAIL } = req.body;
-    
-    const mailOptions = {
-      to: to,
-      subject: 'Test Email from Mailjet - 5KI Financial Services',
-      html: `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
-          <h2 style="color: #2c3e50; border-bottom: 2px solid #3498db; padding-bottom: 10px;">
-            Mailjet Test Successful!
-          </h2>
-          <p>This is a test email from your 5KI Financial Services application.</p>
-          <p>If you're receiving this, your Mailjet integration is working correctly! 🎉</p>
-          <p><strong>Timestamp:</strong> ${new Date().toISOString()}</p>
           <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
             5KI Financial Services &copy; ${new Date().getFullYear()}
           </p>
@@ -3750,26 +3761,71 @@ app.post('/send-member-delete-data', async (req, res) => {
 // ==============================================
 
 // Continuous self-ping to prevent shutdown
-const startSelfPing = () => {
-  const PING_INTERVAL = 5 * 60 * 1000; // 5 minutes (more frequent)
-  const PING_URL = `https://fivekiapp.onrender.com/health`;
+// ==============================================
+// ENHANCED KEEP-ALIVE SYSTEM FOR RENDER.COM
+// ==============================================
+
+// ==============================================
+// ENHANCED KEEP-ALIVE SYSTEM FOR RENDER.COM
+// ==============================================
+
+// Enhanced keep-alive with multiple endpoints and better timing
+const startEnhancedKeepAlive = () => {
+  const PING_INTERVAL = 8 * 60 * 1000; // 8 minutes - critical for Render
+  const PING_URLS = [
+    `https://five5ki.onrender.com/health`,
+    `https://five5ki.onrender.com/ping`,
+    `https://five5ki.onrender.com/status`,
+    `https://five5ki.onrender.com/live`
+  ];
   
-  console.log(`🔄 Starting continuous self-ping to: ${PING_URL}`);
+  console.log(`🔄 Starting Render.com keep-alive system`);
+  console.log(`⏰ Pinging ${PING_URLS.length} endpoints every 8 minutes`);
   
-  setInterval(async () => {
-    try {
-      const response = await fetch(PING_URL, { 
-        timeout: 10000,
-        headers: {
-          'User-Agent': '5KI-KeepAlive/1.0'
-        }
-      });
-      console.log(`✅ Keep-alive ping: ${response.status} - ${new Date().toISOString()}`);
-    } catch (error) {
-      console.log(`⚠️ Ping failed (but continuing): ${error.message}`);
-      // NEVER shutdown on ping failures
+  let pingCount = 0;
+  
+  const performPing = async () => {
+    pingCount++;
+    const pingStart = Date.now();
+    
+    for (let i = 0; i < PING_URLS.length; i++) {
+      const pingUrl = PING_URLS[i];
+      
+      try {
+        console.log(`📡 Keep-alive [${pingCount}.${i+1}] to: ${pingUrl.replace('https://five5ki.onrender.com', '')}`);
+        
+        const response = await fetch(pingUrl, { 
+          method: 'GET',
+          headers: {
+            'User-Agent': '5KI-Render-KeepAlive/1.0',
+            'Cache-Control': 'no-cache'
+          },
+          timeout: 15000
+        });
+        
+        const responseTime = Date.now() - pingStart;
+        console.log(`✅ Ping [${pingCount}.${i+1}] successful: ${response.status} (${responseTime}ms)`);
+        
+      } catch (error) {
+        console.log(`⚠️ Ping [${pingCount}.${i+1}] failed: ${error.message}`);
+      }
+      
+      // Stagger pings by 2 seconds
+      if (i < PING_URLS.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 2000));
+      }
     }
-  }, PING_INTERVAL);
+    
+    const totalTime = Date.now() - pingStart;
+    console.log(`🎯 Ping cycle ${pingCount} completed in ${totalTime}ms`);
+    console.log(`⏰ Next ping in ${PING_INTERVAL/60000} minutes`);
+  };
+  
+  // Start immediate ping cycle
+  setTimeout(performPing, 10000);
+  
+  // Regular interval pings
+  setInterval(performPing, PING_INTERVAL);
 };
 
 // Continuous activity to prevent idle shutdown
@@ -3820,13 +3876,32 @@ const setupErrorProtection = () => {
   });
 };
 
-// Main server startup - ALWAYS RUNNING
+// SIMPLE QUICK FIX - Add this right after your imports
+// Change from 4 minutes to 8 minutes
+const quickKeepAlive = () => {
+  setInterval(async () => {
+    try {
+      await fetch(`https://five5ki.onrender.com/health`);
+      console.log(`🔁 Quick ping - ${new Date().toLocaleTimeString()}`);
+    } catch (e) {
+      console.log(`⚠️ Quick ping failed`);
+    }
+  }, 8 * 60 * 1000); // ✅ 8 minutes (was 4)
+};
+
+// Call this immediately
+quickKeepAlive();
+
 const startServer = async () => {
   try {
-    console.log('🚀 Starting 5KI Email Server - ALWAYS RUNNING MODE');
+    console.log('🚀 Starting 5KI Email Server - RENDER.COM OPTIMIZED');
+    console.log('📋 Strategy: Multi-endpoint pings every 8 minutes');
     
-    // Initialize email service
+    // Initialize email service first
     await initializeTransporter();
+    
+    // Start enhanced keep-alive system
+    startEnhancedKeepAlive();
     
     // Start continuous protection
     ignoreShutdownSignals();
@@ -3835,45 +3910,85 @@ const startServer = async () => {
     
     // Start server
     const server = app.listen(PORT, '0.0.0.0', () => {
-      console.log(`✅ Server PERMANENTLY running on port ${PORT}`);
+      console.log(`✅ Server running on port ${PORT}`);
       console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`📧 Email service: ${transporter ? 'Mailjet Ready' : 'Console Fallback'}`);
-      console.log(`📍 Health: https://fivekiapp.onrender.com/health`);
+      console.log(`📍 Public URLs:`);
+      console.log(`   - Main: https://five5ki.onrender.com`);
+      console.log(`   - Health: https://five5ki.onrender.com/health`);
+      console.log(`   - Ping: https://five5ki.onrender.com/ping`);
+      console.log(`   - Status: https://five5ki.onrender.com/status`);
       console.log(`⏰ Started: ${new Date().toISOString()}`);
-      console.log('🛡️  SERVER WILL NEVER SHUTDOWN AUTOMATICALLY');
+      console.log('🛡️  Enhanced keep-alive system activated');
       
-      // Start keep-alive pings
-      startSelfPing();
+      // Immediate startup ping
+      setTimeout(() => {
+        fetch('https://five5ki.onrender.com/ping')
+          .then(() => console.log('🎯 Startup ping sent'))
+          .catch(() => {});
+      }, 3000);
     });
 
-    // Enhanced server settings for continuous operation
+    // Enhanced server settings for better performance
     server.keepAliveTimeout = 120000;
     server.headersTimeout = 130000;
     
-    // Handle server errors without crashing
+    // Handle server errors gracefully
     server.on('error', (error) => {
-      console.error('❌ Server error (BUT CONTINUING):', error);
-      
+      console.error('❌ Server error:', error);
       if (error.code === 'EADDRINUSE') {
-        console.log('🔄 Port busy, but server continues other operations');
+        console.log('🔄 Port busy - retrying...');
+        setTimeout(() => {
+          server.close();
+          startServer();
+        }, 5000);
       }
     });
 
-    // Monitor server health continuously
+    // Monitor server health
     setInterval(() => {
       const uptime = process.uptime();
       const memory = process.memoryUsage();
-      console.log(`❤️  Heartbeat - Uptime: ${Math.round(uptime)}s, Memory: ${Math.round(memory.heapUsed / 1024 / 1024)}MB`);
-    }, 60000); // Every minute
+      const hours = Math.floor(uptime / 3600);
+      const minutes = Math.floor((uptime % 3600) / 60);
+      
+      console.log(`❤️  Server Status - Uptime: ${hours}h ${minutes}m, Memory: ${Math.round(memory.heapUsed / 1024 / 1024)}MB`);
+    }, 60000);
 
   } catch (error) {
-    console.error('❌ Startup error (BUT RETRYING):', error);
-    console.log('🔄 Retrying startup in 10 seconds...');
-    
-    // Always retry on failure
-    setTimeout(startServer, 10000);
+    console.error('❌ Startup error:', error);
+    console.log('🔄 Retrying startup in 15 seconds...');
+    setTimeout(startServer, 15000);
   }
 };
+
+// Setup instructions for external monitoring
+const setupExternalMonitoring = () => {
+  console.log(`
+🎯 EXTERNAL MONITORING SETUP INSTRUCTIONS:
+  
+1. UPTIMEROBOT.COM (Free):
+   - Create account at https://uptimerobot.com/
+   - Add monitor for: https://five5ki.onrender.com/ping
+   - Set interval: 5 minutes
+   - This will ping your server every 5 minutes
+
+2. CRON-JOB.ORG (Free):
+   - Create account at https://cron-job.org/
+   - Add cron job for: https://five5ki.onrender.com/cron  
+   - Set to run every 5 minutes
+
+3. HEALTHCHECKS.IO (Free):
+   - Create account at https://healthchecks.io/
+   - Add check for: https://five5ki.onrender.com/health
+   - Set period: 5 minutes
+
+Using these services will ensure your server gets external pings even if internal pings fail!
+  `);
+};
+
+// Call this in your startup
+setupExternalMonitoring();
 
 // Start server with infinite persistence
 console.log('🎯 Starting 5KI Server - INFINITE RUN MODE');
