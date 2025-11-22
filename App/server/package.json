@@ -19,8 +19,10 @@
     "googleapis": "^164.1.0",
     "node-mailjet": "^6.0.11",
     "nodemailer": "^6.10.1",
-    "nodemon": "^3.1.7",
     "path": "^0.12.7",
     "resend": "^6.2.2"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.11"
   }
 }
