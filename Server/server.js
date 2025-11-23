@@ -1461,7 +1461,7 @@ app.post('/rejectRegistrations', async (req, res) => {
           
           <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
             <p style="font-weight: bold; color: #e74c3c; margin: 0;">
-              We regret to inform you that your registration application has not been approved at this time.
+              Registration application has not been approved.
             </p>
           </div>
           
@@ -1870,7 +1870,7 @@ app.post('/rejectDeposits', async (req, res) => {
           
           <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
             <p style="font-weight: bold; color: #e74c3c; margin: 0;">
-              We regret to inform you that your deposit application has not been approved.
+              Deposit application has not been approved.
             </p>
           </div>
           
@@ -2171,7 +2171,7 @@ app.post('/rejectWithdraws', async (req, res) => {
           
           <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
             <p style="font-weight: bold; color: #e74c3c; margin: 0;">
-              We regret to inform you that your withdrawal application has not been approved.
+              Withdrawal application has not been approved.
             </p>
           </div>
           
@@ -2493,7 +2493,7 @@ app.post('/rejectLoans', async (req, res) => {
           ` : `
           <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
             <p style="font-weight: bold; color: #e74c3c; margin: 0;">
-              We regret to inform you that your loan application has been rejected.
+              Loan application has been rejected.
             </p>
           </div>
           `}
@@ -3004,7 +3004,7 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
           
           <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
             <p style="font-weight: bold; color: #e74c3c; margin: 0;">
-              We regret to inform you that your membership withdrawal request has not been approved.
+              Membership withdrawal request has not been approved.
             </p>
           </div>
           
@@ -3512,7 +3512,7 @@ app.post('/send-member-credentials', async (req, res) => {
                 <td style="padding: 8px; border: 1px solid #ddd;">${email}</td>
               </tr>
               <tr>
-                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Password</td>
+                <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Temporary Password</td>
                 <td style="padding: 8px; border: 1px solid #ddd;">${password}</td>
               </tr>
               <tr>
