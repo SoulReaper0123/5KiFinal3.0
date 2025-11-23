@@ -1,5 +1,30 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { FaSearch, FaDownload, FaFilter, FaChevronLeft, FaChevronRight, FaPlus, FaSave, FaTimes, FaCheckCircle, FaUser, FaUserCheck, FaUserTimes, FaEye, FaEdit, FaTrash, FaPhone, FaEnvelope, FaCalendarAlt, FaIdCard, FaMapMarkerAlt, FaMoneyBillWave, FaSpinner } from 'react-icons/fa';
+import { 
+  FaSearch, 
+  FaDownload, 
+  FaFilter, 
+  FaChevronLeft, 
+  FaChevronRight, 
+  FaPlus, 
+  FaSave, 
+  FaTimes, 
+  FaCheckCircle, 
+  FaUser, 
+  FaUserCheck, 
+  FaUserTimes, 
+  FaEye, 
+  FaEdit, 
+  FaTrash, 
+  FaPhone, 
+  FaEnvelope, 
+  FaCalendarAlt, 
+  FaIdCard, 
+  FaMapMarkerAlt, 
+  FaMoneyBillWave, 
+  FaSpinner, 
+  FaHandHoldingUsd,
+  FaReceipt  
+} from 'react-icons/fa';
 import { AiOutlineClose } from 'react-icons/ai';
 import { FiAlertCircle } from 'react-icons/fi';
 import { database, auth, storage } from '../../../../Database/firebaseConfig';
@@ -8,7 +33,7 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage
 import { sendMemberCredentialsEmail, sendMemberDeleteData } from '../../../../Server/api';
 import ExcelJS from 'exceljs';
 
-// Options (simplified as requested)
+// Options
 const governmentIdOptions = [
   { key: 'national', label: 'National ID (PhilSys)' },
   { key: 'sss', label: 'SSS ID' },
@@ -37,6 +62,13 @@ const formatTime = (date) => {
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
   return `${hours}:${minutes}`;
+};
+
+const formatCurrency = (amount) => {
+  return `₱${Number(amount || 0).toLocaleString(undefined, { 
+    minimumFractionDigits: 2, 
+    maximumFractionDigits: 2 
+  })}`;
 };
 
 const styles = {
@@ -706,6 +738,90 @@ const styles = {
   financialValue: {
     fontSize: '1rem',
     fontWeight: '600'
+  },
+  loanSection: {
+    background: '#fff9f0',
+    border: '1px solid #fed7aa',
+    borderRadius: '8px',
+    padding: '1rem',
+    marginTop: '1rem'
+  },
+  loanCheckbox: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '8px',
+    marginBottom: '12px',
+    cursor: 'pointer'
+  },
+  loanFields: {
+    display: 'grid',
+    gridTemplateColumns: '1fr 1fr',
+    gap: '12px',
+    marginTop: '12px'
+  },
+  infoBox: {
+    backgroundColor: '#fff3cd',
+    border: '1px solid #ffeaa7',
+    borderRadius: '8px',
+    padding: '12px',
+    marginTop: '12px'
+  },
+  infoText: {
+    fontSize: '12px',
+    color: '#856404',
+    lineHeight: '1.5'
+  },
+  loansContainer: {
+    marginTop: '16px',
+    border: '1px solid #e2e8f0',
+    borderRadius: '8px',
+    padding: '16px',
+    backgroundColor: '#f8fafc'
+  },
+  loanCard: {
+    border: '1px solid #d1d5db',
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '16px',
+    backgroundColor: 'white'
+  },
+  loanHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: '12px',
+    paddingBottom: '8px',
+    borderBottom: '1px solid #e5e7eb'
+  },
+  loanTitle: {
+    fontSize: '16px',
+    fontWeight: '600',
+    color: '#1e3a8a',
+    margin: 0
+  },
+  removeLoanButton: {
+    background: '#ef4444',
+    color: 'white',
+    border: 'none',
+    borderRadius: '4px',
+    padding: '4px 8px',
+    cursor: 'pointer',
+    fontSize: '12px'
+  },
+  addAnotherLoanButton: {
+    background: '#1e40af',
+    color: 'white',
+    border: 'none',
+    borderRadius: '6px',
+    padding: '10px 16px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: '500',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    marginTop: '8px'
   }
 };
 
@@ -722,15 +838,19 @@ const emptyForm = {
   governmentId: '',
   balance: '',
   investment: '',
-  loans: ''
+  currentSavings: '',
+  hasExistingLoan: false,
+  loanAmount: '',
+  loanTerm: ''
 };
+
 
 const DataMigration = () => {
   // Data
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
+
 
   // Pagination
   const pageSize = 10;
@@ -747,7 +867,6 @@ const DataMigration = () => {
   // Files
   const [validIdFrontFile, setValidIdFrontFile] = useState(null);
   const [selfieFile, setSelfieFile] = useState(null);
-  const [proofOfPaymentFile, setProofOfPaymentFile] = useState(null);
 
   // UX
   const [uploading, setUploading] = useState(false);
@@ -772,6 +891,85 @@ const DataMigration = () => {
   const [lastNameError, setLastNameError] = useState('');
   const [phoneNumberError, setPhoneNumberError] = useState('');
   const [memberIdError, setMemberIdError] = useState('');
+  
+  // Loan and penalty states
+const [currentLoan, setCurrentLoan] = useState(null);
+const [activeLoans, setActiveLoans] = useState([]); // list of active loans for member
+const [selectedLoanId, setSelectedLoanId] = useState(null); // which loan is selected for payment
+const [penaltyAmount, setPenaltyAmount] = useState(0);
+const [penaltyPerDay, setPenaltyPerDay] = useState(100); // Default penalty
+const [totalAmountDue, setTotalAmountDue] = useState(0);
+const [overdueDays, setOverdueDays] = useState(0);
+const [refreshing, setRefreshing] = useState(false);
+
+// Add these state variables to your existing DataMigration component
+const [existingLoans, setExistingLoans] = useState([]);
+const [paymentTransactions, setPaymentTransactions] = useState([]);
+const [interestRatesByType, setInterestRatesByType] = useState({});
+const [loanTypeOptions, setLoanTypeOptions] = useState([]);
+const [availableTerms, setAvailableTerms] = useState([]);
+const [processingFee, setProcessingFee] = useState(0);
+
+
+// Empty loan template
+const emptyLoan = {
+  id: Date.now().toString(),
+  loanType: '',
+  loanAmount: '',
+  term: '',
+  outstandingBalance: '',
+  monthsRemaining: '',
+  paymentsMade: 0,
+  status: 'active',
+  dateApproved: new Date().toISOString().split('T')[0],
+  interestRate: 0,
+  interestRateDecimal: 0,
+  interestPerTerm: 0,
+  totalInterest: 0,
+  totalTermPayment: 0,
+  totalMonthlyPayment: 0,
+  monthlyPrincipal: 0,
+  disbursement: 'Cash',
+  accountName: '',
+  accountNumber: '',
+  bankType: '',
+  transactionId: '' // Will be generated when saved
+};
+
+// ADD DISBURSEMENT OPTIONS CONSTANT (add this near the top with other options)
+const disbursementOptions = [
+  { key: 'Cash', label: 'Cash' },
+  { key: 'Bank', label: 'Bank' },
+  { key: 'GCash', label: 'GCash' },
+];
+
+// ADD BANK TYPE OPTIONS
+const bankTypeOptions = [
+  { key: 'BDO', label: 'BDO' },
+  { key: 'Security Bank', label: 'Security Bank' },
+  { key: 'BPI', label: 'BPI' },
+  { key: 'ChinaBank', label: 'ChinaBank' },
+  { key: 'Others', label: 'Others' },
+];
+
+// Empty payment transaction template
+const emptyPaymentTransaction = {
+  id: Date.now().toString(),
+  loanTransactionId: '',
+  paymentDate: new Date().toISOString().split('T')[0],
+  paymentTime: formatTime(new Date()),
+  paymentAmount: '',
+  paymentMethod: 'Cash',
+  accountName: '',
+  accountNumber: '',
+  bankType: '',
+  proofOfPaymentUrl: null,
+  status: 'approved',
+  penaltyPaid: 0,
+  interestPaid: 0,
+  principalPaid: 0,
+  excessPayment: 0
+};
 
   // Create style element and append to head
   useEffect(() => {
@@ -790,52 +988,353 @@ const DataMigration = () => {
       }
     `;
     document.head.appendChild(styleElement);
-
     return () => {
       document.head.removeChild(styleElement);
     };
   }, []);
 
-  const fetchMembers = async () => {
-    setLoading(true);
-    try {
-      const snap = await database.ref('Members').once('value');
-      const data = snap.val() || {};
-      const list = Object.values(data).sort((a, b) => Number(a.id) - Number(b.id));
-      setMembers(list);
-    } catch (e) {
-      console.error(e);
-      setErrorMessage('Failed to load members');
-      setErrorModalVisible(true);
-    } finally {
-      setLoading(false);
-    }
+  
+
+  // Add this function after the existing formatDate and formatTime functions
+const deductOneYear = (dateString) => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    date.setFullYear(date.getFullYear() - 1);
+    
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('en-US', options);
+  } catch (error) {
+    console.error('Error deducting year from date:', error);
+    return dateString; // Return original if there's an error
+  }
+};
+
+
+const fetchMembers = async () => {
+  setLoading(true);
+  try {
+    const snap = await database.ref('Members').once('value');
+    const data = snap.val() || {};
+    const list = Object.values(data).sort((a, b) => Number(a.id) - Number(b.id));
+    
+    // Deduct 1 year from dateAdded for each member
+    const membersWithAdjustedDates = list.map(member => ({
+      ...member,
+      dateAdded: deductOneYear(member.dateAdded)
+    }));
+    
+    setMembers(membersWithAdjustedDates);
+  } catch (e) {
+    console.error(e);
+    setErrorMessage('Failed to load members');
+    setErrorModalVisible(true);
+  } finally {
+    setLoading(false);
+  }
+};
+
+// Function to update available terms based on selected loan type
+const updateAvailableTerms = (loanType, interestRatesMap = null) => {
+  const rates = interestRatesMap || interestRatesByType;
+  const termsForType = rates[loanType] || {};
+  
+  const terms = Object.keys(termsForType)
+    .sort((a, b) => Number(a) - Number(b))
+    .map(term => ({
+      key: term,
+      label: `${term} ${term === '1' ? 'Month' : 'Months'}`,
+      interestRate: (Number(termsForType[term]) || 0) / 100
+    }));
+  
+  setAvailableTerms(terms);
+  return terms;
+};
+
+// Function to fetch loan types and interest rates from settings
+const fetchLoanSettings = async () => {
+  try {
+    const settingsSnap = await database.ref('Settings').once('value');
+    const settings = settingsSnap.val() || {};
+    
+    // Get loan types from Settings/LoanTypes
+    const loanTypes = settings.LoanTypes || {};
+    const types = Object.keys(loanTypes).map(type => ({
+      key: type,
+      label: type
+    }));
+    
+    // Get processing fee
+    const processingFeeValue = settings.ProcessingFee || 0;
+    
+    setLoanTypeOptions(types);
+    setInterestRatesByType(loanTypes);
+    setProcessingFee(parseFloat(processingFeeValue));
+    
+    return { loanTypes, processingFee: processingFeeValue };
+  } catch (error) {
+    console.error('Error fetching loan settings:', error);
+    // Set default values
+    setLoanTypeOptions([
+      { key: 'Regular Loan', label: 'Regular Loan' },
+      { key: 'Quick Cash', label: 'Quick Cash' }
+    ]);
+    setProcessingFee(0);
+    return { loanTypes: {}, processingFee: 0 };
+  }
+};
+
+// Function to add a new loan
+const addNewLoan = () => {
+  const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+  const newLoan = {
+    ...emptyLoan,
+    id: Date.now().toString(), // Unique ID for React key and internal management
+    transactionId: transactionId, // Unique transaction ID for database and linking
+    loanType: '',
+    loanAmount: '',
+    term: '',
+    outstandingBalance: '',
+    monthsRemaining: '',
+    paymentsMade: 0,
+    status: 'active',
+    dateApproved: new Date().toISOString().split('T')[0],
+    interestRate: 0,
+    interestRateDecimal: 0,
+    interestPerTerm: 0,
+    totalInterest: 0,
+    totalTermPayment: 0,
+    totalMonthlyPayment: 0,
+    monthlyPrincipal: 0,
+    disbursement: 'Cash',
+    accountName: '',
+    accountNumber: '',
+    bankType: ''
   };
+  setExistingLoans(prev => [...prev, newLoan]);
+};
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const feeSnap = await database.ref('Settings/RegistrationMinimumFee').once('value');
-        const val = feeSnap.val();
-        const num = parseFloat(val);
-        if (!isNaN(num)) setMinRegistrationFee(num);
-      } catch (_) {}
+// Function to remove a loan
+const removeLoan = (loanId) => {
+  setExistingLoans(prev => prev.filter(loan => loan.id !== loanId));
+  
+  // Also remove any payment transactions linked to this loan
+  const loanToRemove = existingLoans.find(loan => loan.id === loanId);
+  if (loanToRemove) {
+    setPaymentTransactions(prev => 
+      prev.filter(payment => payment.loanTransactionId !== loanToRemove.transactionId)
+    );
+  }
+};
 
-      await fetchMembers();
-    })();
-  }, []);
+// FIXED: Update loan field function
+const updateLoanField = (loanId, field, value) => {
+  setExistingLoans(prev => prev.map(loan => {
+    if (loan.id === loanId) {
+      const updatedLoan = { ...loan, [field]: value };
+      
+      // Handle loan type change - update available terms
+      if (field === 'loanType' && value) {
+        const terms = updateAvailableTerms(value);
+        if (terms.length > 0 && !updatedLoan.term) {
+          updatedLoan.term = terms[0].key;
+          updatedLoan.interestRateDecimal = terms[0].interestRate;
+        }
+      }
+      
+      // Handle disbursement change - reset account fields if changing to Cash
+      if (field === 'disbursement') {
+        if (value === 'Cash') {
+          updatedLoan.accountName = '';
+          updatedLoan.accountNumber = '';
+          updatedLoan.bankType = '';
+        } else if (value === 'GCash') {
+          updatedLoan.bankType = ''; // GCash doesn't need bank type
+        }
+      }
+      
+      // Handle account number validation
+      if (field === 'accountNumber') {
+        const validatedValue = validateAccountNumber(value, updatedLoan.disbursement);
+        updatedLoan.accountNumber = validatedValue;
+      }
+      
+      // Auto-calculate interest rate when loan type or term changes
+      if ((field === 'loanType' || field === 'term') && updatedLoan.loanType && updatedLoan.term) {
+        const interestRatePercentage = interestRatesByType[updatedLoan.loanType]?.[updatedLoan.term] || 0;
+        updatedLoan.interestRate = parseFloat(interestRatePercentage) || 0;
+        updatedLoan.interestRateDecimal = (parseFloat(interestRatePercentage) || 0) / 100;
+      }
+      
+      // FIX: Only auto-calculate if NOT the outstandingBalance field
+      if (field !== 'outstandingBalance') {
+        const calculatedLoan = calculateLoanDetails(updatedLoan);
+        return calculatedLoan;
+      }
+      
+      // For outstandingBalance field, just return the updated value without recalculation
+      return updatedLoan;
+    }
+    return loan;
+  }));
+};
+
+// Enhanced calculateLoanDetails function
+const calculateLoanDetails = (loan) => {
+  const amount = parseFloat(loan.loanAmount) || 0;
+  const termMonths = parseInt(loan.term) || 0;
+  const interestRate = loan.interestRateDecimal || 0;
+  const paymentsMade = parseInt(loan.paymentsMade) || 0;
+  
+  if (amount > 0 && termMonths > 0 && interestRate > 0) {
+    const interestPerTerm = amount * interestRate;
+    const totalInterest = interestPerTerm * termMonths;
+    const totalTermPayment = amount + totalInterest;
+    const totalMonthlyPayment = totalTermPayment / termMonths;
+    const monthlyPrincipal = amount / termMonths;
+    
+    // Calculate interest paid based on payments made
+    const interestPaidSoFar = Math.min(totalInterest, (paymentsMade * interestPerTerm));
+    
+    // FIX: NEVER auto-calculate outstanding balance for migration
+    // Always preserve the manually entered value
+    const outstandingBalance = parseFloat(loan.outstandingBalance) || totalTermPayment;
+    
+    return {
+      ...loan,
+      interestPerTerm: Math.round(interestPerTerm * 100) / 100,
+      totalInterest: Math.round(totalInterest * 100) / 100,
+      totalTermPayment: Math.round(totalTermPayment * 100) / 100,
+      totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100,
+      monthlyPrincipal: Math.round(monthlyPrincipal * 100) / 100,
+      interestPaid: Math.round(interestPaidSoFar * 100) / 100,
+      // CRITICAL FIX: Always use manual outstanding balance without recalculation
+      outstandingBalance: outstandingBalance,
+      // Auto-calculate months remaining only
+      monthsRemaining: Math.max(0, termMonths - paymentsMade)
+    };
+  }
+  
+  return loan;
+};
+// Function to add a new payment transaction
+const addPaymentTransaction = () => {
+  const newPayment = {
+    ...emptyPaymentTransaction,
+    id: Date.now().toString()
+  };
+  setPaymentTransactions(prev => [...prev, newPayment]);
+};
+
+// Function to remove a payment transaction
+const removePaymentTransaction = (paymentId) => {
+  setPaymentTransactions(prev => prev.filter(payment => payment.id !== paymentId));
+};
+
+// Function to update payment transaction field
+const updatePaymentTransactionField = (paymentId, field, value) => {
+  setPaymentTransactions(prev => prev.map(payment => {
+    if (payment.id === paymentId) {
+      return { ...payment, [field]: value };
+    }
+    return payment;
+  }));
+};
+
+// Function to auto-calculate payment allocation
+const calculatePaymentAllocation = (paymentAmount, linkedLoan) => {
+  if (!linkedLoan) return { penaltyPaid: 0, interestPaid: 0, principalPaid: 0, excessPayment: 0 };
+  
+  const amount = parseFloat(paymentAmount) || 0;
+  const outstanding = parseFloat(linkedLoan.outstandingBalance) || 0;
+  const monthlyPayment = parseFloat(linkedLoan.totalMonthlyPayment) || 0;
+  
+  // Simple allocation logic - you can enhance this based on your business rules
+  let penaltyPaid = 0;
+  let interestPaid = Math.min(amount, linkedLoan.interestPerTerm || 0);
+  let principalPaid = Math.min(amount - interestPaid, outstanding);
+  let excessPayment = Math.max(0, amount - interestPaid - principalPaid);
+  
+  return {
+    penaltyPaid: Math.round(penaltyPaid * 100) / 100,
+    interestPaid: Math.round(interestPaid * 100) / 100,
+    principalPaid: Math.round(principalPaid * 100) / 100,
+    excessPayment: Math.round(excessPayment * 100) / 100
+  };
+};
+
+// Add this function to your DataMigration component, after the other helper functions
+
+// Function to add interest payments to Yields during migration
+const addInterestToYields = async (interestAmount, paymentDate = null) => {
+  try {
+    const now = new Date();
+    const dateKey = paymentDate ? new Date(paymentDate).toISOString().split('T')[0] : now.toISOString().split('T')[0];
+    
+    // Get current yields
+    const yieldsRef = database.ref('Settings/Yields');
+    const yieldsSnap = await yieldsRef.once('value');
+    const currentYields = parseFloat(yieldsSnap.val()) || 0;
+    
+    // Add interest to yields
+    const newYieldsAmount = Math.ceil((currentYields + interestAmount) * 100) / 100;
+    await yieldsRef.set(newYieldsAmount);
+    
+    // Update YieldsHistory for the specific date
+    const yieldsHistoryRef = database.ref('Settings/YieldsHistory');
+    const currentDayYieldsSnap = await yieldsHistoryRef.child(dateKey).once('value');
+    const currentDayYields = parseFloat(currentDayYieldsSnap.val()) || 0;
+    const newDayYields = Math.ceil((currentDayYields + interestAmount) * 100) / 100;
+    
+    await yieldsHistoryRef.update({ [dateKey]: newDayYields });
+    
+    console.log(`Added ${formatCurrency(interestAmount)} to Yields on ${dateKey}`);
+    return true;
+  } catch (error) {
+    console.error('Error adding interest to yields:', error);
+    throw error;
+  }
+};
+
+// Add this useEffect to prevent auto-calculation interference
+useEffect(() => {
+  // This ensures that when loans are added, they don't get auto-calculated values
+  if (existingLoans.length > 0) {
+    const loansWithManualOutstanding = existingLoans.map(loan => {
+      // If user has manually set outstanding balance, preserve it
+      if (loan.outstandingBalance && loan.outstandingBalance !== loan.totalTermPayment) {
+        return loan;
+      }
+      return loan;
+    });
+    
+    // Only update if there's actually a change needed
+    if (JSON.stringify(existingLoans) !== JSON.stringify(loansWithManualOutstanding)) {
+      setExistingLoans(loansWithManualOutstanding);
+    }
+  }
+}, [existingLoans.length]); // Only run when number of loans changes
+
+// Add this to your useEffect
+useEffect(() => {
+  (async () => {
+    await fetchLoanSettings();
+    await fetchMembers();
+  })();
+}, []);
 
   const filteredData = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     let filtered = members;
-
+    
     // Apply status filter
     if (memberFilter === 'active') {
       filtered = members.filter(member => member.status === 'active');
     } else if (memberFilter === 'inactive') {
       filtered = members.filter(member => member.status === 'inactive');
     }
-
+    
     // Apply search filter
     if (q) {
       filtered = filtered.filter(m => (
@@ -845,7 +1344,7 @@ const DataMigration = () => {
         String(m.id || '').includes(q)
       ));
     }
-
+    
     return filtered;
   }, [searchQuery, members, memberFilter]);
 
@@ -870,18 +1369,18 @@ const DataMigration = () => {
         setErrorModalVisible(true);
         return;
       }
-
+      
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Members');
-
+      
       const headers = Object.keys(filteredData[0]);
       worksheet.addRow(headers);
-
+      
       filteredData.forEach(item => {
         const row = headers.map(header => item[header]);
         worksheet.addRow(row);
       });
-
+      
       const buffer = await workbook.xlsx.writeBuffer();
       
       const blob = new Blob([buffer], { 
@@ -890,7 +1389,7 @@ const DataMigration = () => {
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `Members.xlsx`;
+      link.download = `Members_Migration.xlsx`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -915,6 +1414,59 @@ const DataMigration = () => {
     
     return newId;
   };
+
+// UPDATE THE VALIDATION - Allow outstanding balance to be any value
+const validateLoans = () => {
+  for (const loan of existingLoans) {
+    // Check required fields
+    if (!loan.loanType || !loan.loanAmount || !loan.term || !loan.outstandingBalance) {
+      setErrorMessage('Please fill all required fields for all loans (Loan Type, Amount, Term, and Outstanding Balance)');
+      setErrorModalVisible(true);
+      return false;
+    }
+    
+    // Validate disbursement fields
+    if (loan.disbursement !== 'Cash') {
+      if (!loan.accountName || !loan.accountNumber) {
+        setErrorMessage(`Account Name and Account Number are required for ${loan.disbursement} disbursement`);
+        setErrorModalVisible(true);
+        return false;
+      }
+      
+      if (!isAccountNumberValid(loan.accountNumber, loan.disbursement)) {
+        const message = getAccountNumberValidationMessage(loan.accountNumber, loan.disbursement);
+        setErrorMessage(`Invalid account number for ${loan.disbursement}: ${message}`);
+        setErrorModalVisible(true);
+        return false;
+      }
+      
+      // Validate bank type for Bank disbursement
+      if (loan.disbursement === 'Bank' && !loan.bankType) {
+        setErrorMessage('Bank Type is required for Bank disbursement');
+        setErrorModalVisible(true);
+        return false;
+      }
+    }
+    
+    const loanAmount = parseFloat(loan.loanAmount);
+    const outstanding = parseFloat(loan.outstandingBalance);
+    const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
+    
+    // FIX: Remove strict validation - allow any outstanding balance for migration
+    // This handles cases where members paid more than principal
+    if (outstanding < 0) {
+      setErrorMessage(`Outstanding balance cannot be negative for ${loan.loanType}`);
+      setErrorModalVisible(true);
+      return false;
+    }
+    
+    // Only warn if outstanding balance seems too high, but don't block
+    if (outstanding > totalTermPayment * 1.5) {
+      console.warn(`Outstanding balance seems high for ${loan.loanType}, but allowing for migration`);
+    }
+  }
+  return true;
+};
 
   const validateFields = () => {
     let isValid = true;
@@ -969,6 +1521,18 @@ const DataMigration = () => {
       isValid = false;
     }
 
+    // Validate loan fields if has existing loan
+    if (formData.hasExistingLoan) {
+      if (!formData.loanAmount || parseFloat(formData.loanAmount) <= 0) {
+        setErrorMessage('Loan amount is required when adding existing loan');
+        isValid = false;
+      }
+      if (!formData.loanTerm) {
+        setErrorMessage('Loan term is required when adding existing loan');
+        isValid = false;
+      }
+    }
+
     return isValid;
   };
 
@@ -976,11 +1540,11 @@ const DataMigration = () => {
     const nextAvailableId = getNextAvailableMemberId();
     setFormData({ 
       ...emptyForm, 
-      memberId: nextAvailableId.toString() 
+      memberId: nextAvailableId.toString(),
+      hasExistingLoan: false
     });
     setValidIdFrontFile(null);
     setSelfieFile(null);
-    setProofOfPaymentFile(null);
     setEmailError('');
     setFirstNameError('');
     setLastNameError('');
@@ -1009,11 +1573,13 @@ const DataMigration = () => {
       governmentId: member.governmentId || '',
       balance: String(member.balance ?? 0),
       investment: String(member.investment ?? 0),
-      loans: String(member.loans ?? 0)
+      currentSavings: String(member.currentSavings ?? 0),
+      hasExistingLoan: false,
+      loanAmount: '',
+      loanTerm: ''
     });
     setValidIdFrontFile(null);
     setSelfieFile(null);
-    setProofOfPaymentFile(null);
     setEditModalVisible(true);
   };
 
@@ -1032,7 +1598,7 @@ const DataMigration = () => {
       ...prev,
       [name]: value
     }));
-
+    
     // Auto-suggest next available ID when typing in memberId field
     if (name === 'memberId' && value.trim() === '') {
       const nextAvailableId = getNextAvailableMemberId();
@@ -1056,24 +1622,105 @@ const DataMigration = () => {
     return await getDownloadURL(fileRef);
   };
 
+  // Validate account number based on disbursement type
+const validateAccountNumber = (value, disbursementType) => {
+  // Remove any non-digit characters
+  const cleanValue = value.replace(/\D/g, '');
+  
+  if (disbursementType === 'GCash') {
+    // GCash: exactly 11 digits
+    if (cleanValue.length > 11) {
+      return cleanValue.slice(0, 11);
+    }
+  } else if (disbursementType === 'Bank') {
+    // Bank: minimum 8 digits, maximum 16 digits
+    if (cleanValue.length > 16) {
+      return cleanValue.slice(0, 16);
+    }
+  }
+  
+  return cleanValue;
+};
+
+// Check if account number meets requirements
+const isAccountNumberValid = (accountNumber, disbursementType) => {
+  if (disbursementType === 'Cash') return true;
+  
+  const cleanAccountNumber = accountNumber.replace(/\D/g, '');
+  
+  if (disbursementType === 'GCash') {
+    return cleanAccountNumber.length === 11;
+  } else if (disbursementType === 'Bank') {
+    return cleanAccountNumber.length >= 8 && cleanAccountNumber.length <= 16;
+  }
+  
+  return false;
+};
+
+// Get account number validation message
+const getAccountNumberValidationMessage = (accountNumber, disbursementType) => {
+  if (disbursementType === 'Cash') return '';
+  
+  const cleanAccountNumber = accountNumber.replace(/\D/g, '');
+  
+  if (disbursementType === 'GCash') {
+    if (cleanAccountNumber.length === 0) return '';
+    if (cleanAccountNumber.length < 11) return 'GCash number must be 11 digits';
+    if (cleanAccountNumber.length > 11) return 'GCash number cannot exceed 11 digits';
+    return 'Valid GCash number';
+  } else if (disbursementType === 'Bank') {
+    if (cleanAccountNumber.length === 0) return '';
+    if (cleanAccountNumber.length < 8) return 'Bank account must be at least 8 digits';
+    if (cleanAccountNumber.length > 16) return 'Bank account cannot exceed 16 digits';
+    return 'Valid bank account number';
+  }
+  
+  return '';
+};
+
   const validateAddFields = () => {
     if (!validateFields()) {
       return false;
     }
-
-    if (!validIdFrontFile || !selfieFile || !proofOfPaymentFile) {
-      setErrorMessage('Please upload all required images/documents.');
+    
+    if (!validIdFrontFile || !selfieFile) {
+      setErrorMessage('Please upload Valid ID Front and Selfie images.');
       setErrorModalVisible(true);
       return false;
     }
-
+    
     // Check if email already exists
     const emailExists = members.some(member => member.email.toLowerCase() === formData.email.toLowerCase());
     if (emailExists) {
       setEmailError('Email address is already in use');
       return false;
     }
-
+      // Validate existing loans if any
+  if (existingLoans.length > 0) {
+    for (const loan of existingLoans) {
+      if (!loan.loanType || !loan.loanAmount || !loan.term || !loan.outstandingBalance) {
+        setErrorMessage('Please fill all required fields for all loans (Loan Type, Amount, Term, and Outstanding Balance)');
+        setErrorModalVisible(true);
+        return false;
+      }
+      
+      const loanAmount = parseFloat(loan.loanAmount);
+      const outstanding = parseFloat(loan.outstandingBalance);
+      
+      if (outstanding > loanAmount) {
+        setErrorMessage(`Outstanding balance cannot be greater than original loan amount for ${loan.loanType}`);
+        setErrorModalVisible(true);
+        return false;
+      }
+    }
+  }
+    // Validate existing loans if any
+  if (existingLoans.length > 0) {
+    if (!validateLoans()) {
+      return false;
+    }
+  }
+    
     return true;
   };
 
@@ -1083,93 +1730,387 @@ const DataMigration = () => {
     setConfirmModalVisible(true);
   };
 
-  const submitAddMember = async () => {
-    setConfirmModalVisible(false);
-    setUploading(true);
-
-    try {
-      const password = generateRandomPassword();
-      const userCredential = await createUserWithEmailAndPassword(auth, formData.email, password);
-      const userId = userCredential.user.uid;
-
-      const newId = parseInt(formData.memberId);
-      if (isNaN(newId) || newId < 5001) {
-        throw new Error('Invalid member ID');
-      }
-
-      // Double-check if member ID already exists
-      const idExists = members.some(member => member.id === newId);
-      if (idExists) {
-        throw new Error(`Member ID ${newId} is already taken`);
-      }
-
-      const now = new Date();
-      const dateAdded = formatDate(now);
-      const timeAdded = formatTime(now);
-
-      // Upload images
-      const validIdFrontUrl = await uploadImageToStorage(validIdFrontFile, `member_docs/${newId}/valid_id_front_${Date.now()}`);
-      const selfieUrl = await uploadImageToStorage(selfieFile, `member_docs/${newId}/selfie_${Date.now()}`);
-      const proofOfPaymentUrl = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${newId}/registration_payment_proof_${Date.now()}`);
-
-      const balance = parseFloat(formData.balance || 0);
-      const investment = parseFloat(formData.investment || 0);
-      const loans = parseFloat(formData.loans || 0);
-
-      const memberData = {
-        id: newId,
-        authUid: userId,
-        email: formData.email,
-        firstName: formData.firstName,
-        middleName: formData.middleName || '',
-        lastName: formData.lastName,
-        phoneNumber: formData.phoneNumber,
-        dateOfBirth: formData.dateOfBirth,
-        placeOfBirth: formData.placeOfBirth,
-        address: formData.address,
-        governmentId: formData.governmentId,
-        dateAdded,
-        timeAdded,
-        status: 'active',
-        balance: balance,
-        investment: investment,
-        loans: loans,
-        validIdFront: validIdFrontUrl,
-        selfie: selfieUrl,
-        registrationPaymentProof: proofOfPaymentUrl,
-        initialPassword: password
-      };
-
-      // Save member data
-      await database.ref(`Members/${newId}`).set(memberData);
-
-      // Store pending add for email sending
-      setPendingAdd({
-        firstName: memberData.firstName,
-        lastName: memberData.lastName,
-        email: memberData.email,
-        password: password,
-        memberId: memberData.id,
-        dateAdded: memberData.dateAdded
-      });
-
-      setSuccessMessage('Member added successfully! Credentials have been sent to the member.');
-      setSuccessModalVisible(true);
-      closeModals();
-      await fetchMembers();
-    } catch (error) {
-      console.error('Error adding member:', error);
-      setErrorMessage(error.message || 'Failed to add member');
-      setErrorModalVisible(true);
-    } finally {
-      setUploading(false);
+// Function to create loan record in database
+// Enhanced createLoanRecord function
+const createLoanRecord = async (memberId, loanData) => {
+  try {
+    const now = new Date();
+    
+    const {
+      loanType,
+      loanAmount,
+      term,
+      outstandingBalance,
+      paymentsMade,
+      status,
+      dateApproved,
+      interestRate,
+      disbursement,
+      accountName,
+      accountNumber,
+      bankType,
+      interestPerTerm,
+      totalInterest,
+      totalTermPayment,
+      totalMonthlyPayment,
+      monthlyPrincipal
+    } = loanData;
+    
+    const amount = parseFloat(loanAmount);
+    const outstanding = parseFloat(outstandingBalance) || amount;
+    const termMonths = parseInt(term);
+    const payments = parseInt(paymentsMade) || 0;
+    const releaseAmount = Math.round((amount - processingFee) * 100) / 100;
+    
+    // Calculate total amount paid (principal + interest)
+    const totalPaid = Math.max(0, (totalTermPayment || (amount + totalInterest)) - outstanding);
+    
+    // Calculate how much interest has been paid based on payments made
+    const totalInterestForLoan = parseFloat(totalInterest) || (interestPerTerm * termMonths) || 0;
+    const interestPaidSoFar = Math.min(totalInterestForLoan, totalPaid * 0.3); // Assume 30% of payments go to interest
+    
+    // Set due date
+    const dueDate = new Date(dateApproved || now);
+    dueDate.setMonth(dueDate.getMonth() + payments + 1);
+    
+    const loanRecord = {
+      transactionId: loanData.transactionId,
+      id: memberId,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
+      disbursement: disbursement || 'Cash',
+      accountName: accountName || '',
+      accountNumber: accountNumber || '',
+      bankType: bankType || (disbursement === 'Bank' ? '' : null),
+      loanAmount: amount,
+      loanType: loanType,
+      term: termMonths,
+      interestRate: parseFloat(interestRate) || 0,
+      
+      // Calculated fields
+      interest: Math.round(interestPerTerm * 100) / 100,
+      totalInterest: Math.round(totalInterestForLoan * 100) / 100,
+      monthlyPayment: Math.round(monthlyPrincipal * 100) / 100,
+      totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100,
+      totalTermPayment: Math.round(totalTermPayment * 100) / 100,
+      releaseAmount: releaseAmount,
+      processingFee: processingFee,
+      
+      // Dates
+      dateApplied: formatDate(new Date(dateApproved || now)),
+      timeApplied: formatTime(now),
+      dateApproved: formatDate(new Date(dateApproved || now)),
+      timeApproved: formatTime(now),
+      timestamp: now.getTime(),
+      dueDate: formatDate(dueDate),
+      
+      // Payment tracking
+      status: status || 'approved',
+      paymentsMade: payments,
+      amountPaid: Math.round(totalPaid * 100) / 100,
+      remainingBalance: Math.round(outstanding * 100) / 100,
+      outstandingBalance: Math.round(outstanding * 100) / 100,
+      interestPaid: Math.round(interestPaidSoFar * 100) / 100,
+      principalPaid: Math.round((totalPaid - interestPaidSoFar) * 100) / 100,
+      
+      // Migration flags
+      isMigration: true,
+      originalLoanAmount: amount
+    };
+    
+    // Save to all relevant locations
+    await database.ref(`Loans/LoanApplications/${memberId}/${loanData.transactionId}`).set(loanRecord);
+    await database.ref(`Loans/ApprovedLoans/${memberId}/${loanData.transactionId}`).set(loanRecord);
+    
+    if (status === 'active') {
+      await database.ref(`Loans/CurrentLoans/${memberId}/${loanData.transactionId}`).set(loanRecord);
     }
-  };
+    
+    // Save to transactions
+    await database.ref(`Transactions/Loans/${memberId}/${loanData.transactionId}`).set({
+      ...loanRecord,
+      label: 'Loan',
+      type: 'Loans'
+    });
+    
+    // Save to member's loans
+    await database.ref(`Members/${memberId}/loans/${loanData.transactionId}`).set(loanRecord);
+    
+    // If paid, move to PaidLoans and add interest to yields
+    if (status === 'paid' && interestPaidSoFar > 0) {
+      await database.ref(`Loans/PaidLoans/${memberId}/${loanData.transactionId}`).set(loanRecord);
+      await database.ref(`Loans/CurrentLoans/${memberId}/${loanData.transactionId}`).remove();
+      
+      // ADD INTEREST TO YIELDS for paid loans
+      await addInterestToYields(interestPaidSoFar, dateApproved);
+    }
+    
+    return loanRecord;
+    
+  } catch (error) {
+    console.error('Error creating loan record:', error);
+    throw error;
+  }
+};
+
+// Function to create payment record in database
+const createPaymentRecord = async (memberId, paymentData, linkedLoan) => {
+  try {
+    const now = new Date();
+    const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    const {
+      loanTransactionId,
+      paymentDate,
+      paymentTime,
+      paymentAmount,
+      paymentMethod,
+      accountName,
+      accountNumber,
+      bankType,
+      penaltyPaid,
+      interestPaid,
+      principalPaid,
+      excessPayment
+    } = paymentData;
+    
+    const paymentAmountNum = parseFloat(paymentAmount) || 0;
+    const interestPaidNum = parseFloat(interestPaid) || 0;
+    
+    const paymentRecord = {
+      transactionId,
+      id: memberId,
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      
+      // Payment details
+      amountToBePaid: paymentAmountNum,
+      paymentOption: paymentMethod,
+      accountName: accountName || 'Migration',
+      accountNumber: accountNumber || 'Migration',
+      bankType: bankType || (paymentMethod === 'Bank' ? 'Migration' : null),
+      
+      // Dates
+      dateApplied: `${formatDate(new Date(paymentDate))} at ${paymentTime}`,
+      timestamp: now.getTime(),
+      
+      // Breakdown
+      penalty: parseFloat(penaltyPaid) || 0,
+      penaltyPaid: parseFloat(penaltyPaid) || 0,
+      interestPaid: interestPaidNum,
+      principalPaid: parseFloat(principalPaid) || 0,
+      excessPayment: parseFloat(excessPayment) || 0,
+      
+      // Status
+      status: 'approved',
+      dateApproved: formatDate(now),
+      timeApproved: formatTime(now),
+      
+      // Links
+      selectedLoanId: loanTransactionId,
+      
+      // Migration flags
+      isMigration: true
+    };
+    
+    // Save to payment records
+    await database.ref(`Payments/PaymentApplications/${memberId}/${transactionId}`).set(paymentRecord);
+    await database.ref(`Payments/ApprovedPayments/${memberId}/${transactionId}`).set(paymentRecord);
+    
+    // Save to transactions
+    await database.ref(`Transactions/Payments/${memberId}/${transactionId}`).set({
+      ...paymentRecord,
+      label: 'Payment',
+      type: 'Payments'
+    });
+    
+    // ADD INTEREST TO YIELDS for payment transactions with interest
+    if (interestPaidNum > 0) {
+      await addInterestToYields(interestPaidNum, paymentDate);
+    }
+    
+    return paymentRecord;
+    
+  } catch (error) {
+    console.error('Error creating payment record:', error);
+    throw error;
+  }
+};
+
+// Enhanced submit function that handles both loans and payments
+// Enhanced submitAddMember function
+const submitAddMember = async () => {
+  setConfirmModalVisible(false);
+  setUploading(true);
+  
+  try {
+    const password = generateRandomPassword();
+    const userCredential = await createUserWithEmailAndPassword(auth, formData.email, password);
+    const userId = userCredential.user.uid;
+    
+    const newId = parseInt(formData.memberId);
+    if (isNaN(newId) || newId < 5001) {
+      throw new Error('Invalid member ID');
+    }
+    
+    // Double-check if member ID already exists
+    const idExists = members.some(member => member.id === newId);
+    if (idExists) {
+      throw new Error(`Member ID ${newId} is already taken`);
+    }
+    
+    const now = new Date();
+    
+    // Deduct 1 year from current date for dateAdded
+    const oneYearAgo = new Date(now);
+    oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+    
+    const dateAdded = formatDate(oneYearAgo);
+    const timeAdded = formatTime(now);
+    
+    // Upload member documents
+// Upload member documents
+const validIdFrontUrl = await uploadImageToStorage(validIdFrontFile, `member_docs/${newId}/valid_id_front_${Date.now()}`);
+const selfieUrl = await uploadImageToStorage(selfieFile, `member_docs/${newId}/selfie_${Date.now()}`);
+    
+    const investment = parseFloat(formData.investment || 0);
+    const currentSavings = parseFloat(formData.currentSavings || 0);
+    const balance = parseFloat(formData.balance || 0);
+    
+    const finalBalance = balance;
+    
+    const memberData = {
+      id: newId,
+      authUid: userId,
+      email: formData.email,
+      firstName: formData.firstName,
+      middleName: formData.middleName || '',
+      lastName: formData.lastName,
+      phoneNumber: formData.phoneNumber,
+      dateOfBirth: formData.dateOfBirth,
+      placeOfBirth: formData.placeOfBirth,
+      address: formData.address,
+      governmentId: formData.governmentId,
+      dateAdded,
+      timeAdded,
+      status: 'active',
+      balance: finalBalance,
+      investment: investment,
+      loans: 0,
+      validIdFront: validIdFrontUrl,
+      selfie: selfieUrl,
+      initialPassword: password,
+      isMigration: true
+    };
+    
+    // Save member data
+    await database.ref(`Members/${newId}`).set(memberData);
+    
+    // Update Funds with investment
+    if (investment > 0) {
+      const fundsRef = database.ref('Settings/Funds');
+      const fundsSnap = await fundsRef.once('value');
+      const currentFunds = parseFloat(fundsSnap.val()) || 0;
+      const newFunds = currentFunds + balance;
+      await fundsRef.set(newFunds);
+      
+      // Update Funds History
+      const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+      await database.ref(`Settings/FundsHistory/${timestamp}`).set(newFunds);
+    }
+    
+    // Update Savings
+    if (currentSavings > 0) {
+      const savingsRef = database.ref('Settings/Savings');
+      const savingsSnap = await savingsRef.once('value');
+      const currentSavingsAmount = parseFloat(savingsSnap.val()) || 0;
+      const newSavings = currentSavingsAmount + currentSavings;
+      await savingsRef.set(newSavings);
+      
+      // Update Savings History
+      const dateKey = now.toISOString().split('T')[0];
+      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+      const daySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+      const currentDaySavings = parseFloat(daySavingsSnap.val()) || 0;
+      await savingsHistoryRef.child(dateKey).set(currentDaySavings + currentSavings);
+    }
+    
+    // Track total interest for all loans
+    let totalInterestForAllLoans = 0;
+    
+    // Create loan records for all existing loans
+    let totalLoansAmount = 0;
+    if (existingLoans.length > 0) {
+      for (const loan of existingLoans) {
+        if (loan.loanType && loan.loanAmount && loan.term) {
+          const loanRecord = await createLoanRecord(newId, loan);
+          totalLoansAmount += parseFloat(loan.loanAmount);
+          
+          // Accumulate interest for paid loans
+          if (loan.status === 'paid') {
+            const interestPaid = parseFloat(loanRecord.interestPaid) || 0;
+            totalInterestForAllLoans += interestPaid;
+          }
+          
+          console.log(`Created loan record: ${loan.loanType} - ${formatCurrency(loan.loanAmount)}`);
+        }
+      }
+      
+      // Update member's total loans amount
+      await database.ref(`Members/${newId}/loans`).set(totalLoansAmount);
+    }
+    
+    // Create payment transactions and track interest
+    if (paymentTransactions.length > 0) {
+      for (const payment of paymentTransactions) {
+        if (payment.loanTransactionId && payment.paymentAmount) {
+          const linkedLoan = existingLoans.find(loan => loan.transactionId === payment.loanTransactionId);
+          const paymentRecord = await createPaymentRecord(newId, payment, linkedLoan);
+          
+          // Interest from payment transactions is already added in createPaymentRecord
+          const interestFromPayment = parseFloat(payment.interestPaid) || 0;
+          totalInterestForAllLoans += interestFromPayment;
+          
+          console.log(`Created payment record: ${formatCurrency(payment.paymentAmount)} for loan ${payment.loanTransactionId}`);
+        }
+      }
+    }
+    
+    // Log total interest added to Yields
+    if (totalInterestForAllLoans > 0) {
+      console.log(`Total interest added to Yields during migration: ${formatCurrency(totalInterestForAllLoans)}`);
+    }
+    
+    // Store pending add for email sending
+    setPendingAdd({
+      firstName: memberData.firstName,
+      lastName: memberData.lastName,
+      email: memberData.email,
+      password: password,
+      memberId: memberData.id,
+      dateAdded: memberData.dateAdded
+    });
+    
+    setSuccessMessage('Member migrated successfully with all transactions!');
+    setSuccessModalVisible(true);
+    closeModals();
+    await fetchMembers();
+    
+  } catch (error) {
+    console.error('Error adding member:', error);
+    setErrorMessage(error.message || 'Failed to migrate member');
+    setErrorModalVisible(true);
+  } finally {
+    setUploading(false);
+  }
+};
 
   const submitEditMember = async () => {
     if (!editingMember) return;
     setUploading(true);
-
+    
     try {
       const id = editingMember.id;
       const updates = {
@@ -1185,17 +2126,17 @@ const DataMigration = () => {
         investment: parseFloat(formData.investment || editingMember.investment || 0),
         loans: parseFloat(formData.loans || editingMember.loans || 0)
       };
-
+      
       if (validIdFrontFile) updates.validIdFront = await uploadImageToStorage(validIdFrontFile, `member_docs/${id}/valid_id_front_${Date.now()}`);
       if (selfieFile) updates.selfie = await uploadImageToStorage(selfieFile, `member_docs/${id}/selfie_${Date.now()}`);
-      if (proofOfPaymentFile) updates.registrationPaymentProof = await uploadImageToStorage(proofOfPaymentFile, `member_docs/${id}/registration_payment_proof_${Date.now()}`);
-
+      
       await database.ref(`Members/${id}`).update(updates);
-
+      
       setSuccessMessage('Member updated successfully!');
       setSuccessModalVisible(true);
       closeModals();
       await fetchMembers();
+      
     } catch (error) {
       console.error('Error updating member:', error);
       setErrorMessage(error.message || 'Failed to update member');
@@ -1212,22 +2153,15 @@ const DataMigration = () => {
         console.log('No UID provided for Firebase user deletion');
         return true;
       }
-
-      // Get current user
+      
       const currentUser = auth.currentUser;
       
       if (currentUser && currentUser.uid === uid) {
-        // If deleting current user, use deleteUser directly
         await deleteUser(currentUser);
         console.log('Current Firebase user deleted successfully');
       } else {
-        // For deleting other users, you would typically use a Cloud Function
-        // This is a limitation of Firebase Auth client-side SDK
         console.warn('Cannot delete other users client-side. UID:', uid);
         console.log('Note: To delete other users, implement a Cloud Function');
-        
-        // Alternative: Sign in as admin user first (not recommended for production)
-        // This would require having admin credentials in the client, which is insecure
         throw new Error('Cannot delete other users client-side. Implement a Cloud Function for this operation.');
       }
       
@@ -1242,14 +2176,14 @@ const DataMigration = () => {
     setConfirmDeleteVisible(false);
     setIsProcessing(true);
     setActionInProgress(true);
-
+    
     try {
       const idToDelete = pendingDelete.id;
       const uidToDelete = pendingDelete.authUid;
-
+      
       // Delete from database first
       await database.ref(`Members/${idToDelete}`).remove();
-
+      
       // Delete Firebase authentication user if UID exists
       if (uidToDelete) {
         try {
@@ -1257,11 +2191,9 @@ const DataMigration = () => {
           console.log('Firebase authentication user deletion completed for UID:', uidToDelete);
         } catch (authError) {
           console.warn('Could not delete Firebase auth user, but proceeding with database deletion:', authError);
-          // Continue with success even if auth deletion fails
-          // In production, you might want to implement a Cloud Function to handle this
         }
       }
-
+      
       setSuccessMessage(`Member account #${idToDelete} deleted successfully!`);
       setSuccessModalVisible(true);
       
@@ -1305,7 +2237,7 @@ const DataMigration = () => {
       
       setPendingAdd(null);
     }
-
+    
     // Send delete notification after successful deletion
     if (pendingDelete) {
       sendMemberDeleteData({
@@ -1315,7 +2247,6 @@ const DataMigration = () => {
         memberId: pendingDelete.id
       }).catch(error => console.error('Error sending member delete notification:', error));
       
-      // Close the view modal if it's open (after delete action)
       setViewModalVisible(false);
       setSelectedMember(null);
     }
@@ -1340,7 +2271,6 @@ const DataMigration = () => {
           <FaFilter />
           <span>{memberFilter === 'all' ? 'All Members' : memberFilter === 'active' ? 'Active' : 'Inactive'}</span>
         </button>
-
         {showFilterDropdown && (
           <div style={styles.filterDropdown}>
             <button 
@@ -1388,336 +2318,779 @@ const DataMigration = () => {
     );
   };
 
-  const renderAddEditModal = (mode) => (
-    <div style={styles.modalOverlay} onClick={closeModals}>
-      <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
-        <div style={styles.modalHeader}>
-          <h2 style={styles.modalTitle}>{mode === 'add' ? 'Add New Member' : `Edit Member #${editingMember?.id}`}</h2>
-          <button 
-            onClick={closeModals}
-            style={styles.closeButton}
-          >
-            <AiOutlineClose />
-          </button>
-        </div>
-
-        <div style={styles.modalContent}>
-          <div style={styles.formGrid}>
-            {/* Left Column */}
-            <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Member ID<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter member ID"
-                  value={formData.memberId}
-                  onChange={(e) => handleInputChange('memberId', e.target.value)}
-                  type="number"
-                  min="5001"
-                  disabled={mode === 'edit'}
-                />
-                {memberIdError && <span style={styles.errorText}>{memberIdError}</span>}
-                {mode === 'add' && !memberIdError && (
-                  <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
-                    Next available ID: {getNextAvailableMemberId()}
-                  </span>
-                )}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  First Name<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter first name"
-                  value={formData.firstName}
-                  onChange={(e) => handleInputChange('firstName', e.target.value)}
-                  autoCapitalize="words"
-                />
-                {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Last Name<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter last name"
-                  value={formData.lastName}
-                  onChange={(e) => handleInputChange('lastName', e.target.value)}
-                  autoCapitalize="words"
-                />
-                {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Email Address<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter email address"
-                  value={formData.email}
-                  onChange={(e) => handleInputChange('email', e.target.value)}
-                  type="email"
-                  autoCapitalize="none"
-                  disabled={mode === 'edit'}
-                />
-                {emailError && <span style={styles.errorText}>{emailError}</span>}
-              </div>
-
-              {mode === 'add' && (
-                <div style={styles.formSection}>
-                  <label style={styles.formLabel}>
-                    Valid ID Front<span style={styles.requiredAsterisk}>*</span>
-                  </label>
-                  <div 
-                    style={styles.fileUploadSection}
-                    onClick={() => document.getElementById('validIdFront').click()}
-                  >
-                    <input
-                      id='validIdFront'
-                      style={styles.fileInput}
-                      type="file"
-                      onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
-                      accept="image/*"
-                    />
-                    <p style={styles.fileUploadText}>
-                      {validIdFrontFile ? 'Change file' : 'Click to upload'}
-                    </p>
-                    {validIdFrontFile && (
-                      <p style={styles.fileName}>{validIdFrontFile.name}</p>
-                    )}
-                  </div>
-                </div>
+const renderAddEditModal = (mode) => (
+  <div style={styles.modalOverlay} onClick={closeModals}>
+    <div style={styles.modalCard} onClick={(e) => e.stopPropagation()}>
+      <div style={styles.modalHeader}>
+        <h2 style={styles.modalTitle}>
+          {mode === 'add' ? 'Migrate Existing Member' : `Edit Member #${editingMember?.id}`}
+        </h2>
+        <button 
+          onClick={closeModals}
+          style={styles.closeButton}
+        >
+          <AiOutlineClose />
+        </button>
+      </div>
+      
+      <div style={styles.modalContent}>
+        <div style={styles.formGrid}>
+          {/* Left Column */}
+          <div>
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Member ID<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter member ID"
+                value={formData.memberId}
+                onChange={(e) => handleInputChange('memberId', e.target.value)}
+                type="number"
+                min="5001"
+                disabled={mode === 'edit'}
+              />
+              {memberIdError && <span style={styles.errorText}>{memberIdError}</span>}
+              {mode === 'add' && !memberIdError && (
+                <span style={{ fontSize: '12px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  Next available ID: {getNextAvailableMemberId()}
+                </span>
               )}
             </div>
-
-            {/* Right Column */}
-            <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>Middle Name</label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter middle name"
-                  value={formData.middleName}
-                  onChange={(e) => handleInputChange('middleName', e.target.value)}
-                  autoCapitalize="words"
-                />
-              </div>
-
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                First Name<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter first name"
+                value={formData.firstName}
+                onChange={(e) => handleInputChange('firstName', e.target.value)}
+                autoCapitalize="words"
+              />
+              {firstNameError && <span style={styles.errorText}>{firstNameError}</span>}
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Last Name<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter last name"
+                value={formData.lastName}
+                onChange={(e) => handleInputChange('lastName', e.target.value)}
+                autoCapitalize="words"
+              />
+              {lastNameError && <span style={styles.errorText}>{lastNameError}</span>}
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Email Address<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter email address"
+                value={formData.email}
+                onChange={(e) => handleInputChange('email', e.target.value)}
+                type="email"
+                autoCapitalize="none"
+                disabled={mode === 'edit'}
+              />
+              {emailError && <span style={styles.errorText}>{emailError}</span>}
+            </div>
+            
+            {mode === 'add' && (
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
-                  Phone Number<span style={styles.requiredAsterisk}>*</span>
+                  Valid ID Front<span style={styles.requiredAsterisk}>*</span>
                 </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter 11-digit contact number"
-                  value={formData.phoneNumber}
-                  onChange={(e) => {
-                    const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
-                    handleInputChange('phoneNumber', numericText);
-                  }}
-                  type="tel"
-                />
-                {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
+                <div 
+                  style={styles.fileUploadSection}
+                  onClick={() => document.getElementById('validIdFront').click()}
+                >
+                  <input
+                    id='validIdFront'
+                    style={styles.fileInput}
+                    type="file"
+                    onChange={(e) => handleFileChange(e, setValidIdFrontFile)}
+                    accept="image/*"
+                  />
+                  <p style={styles.fileUploadText}>
+                    {validIdFrontFile ? 'Change file' : 'Click to upload'}
+                  </p>
+                  {validIdFrontFile && (
+                    <p style={styles.fileName}>{validIdFrontFile.name}</p>
+                  )}
+                </div>
               </div>
-
+            )}
+          </div>
+          
+          {/* Right Column */}
+          <div>
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>Middle Name</label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter middle name"
+                value={formData.middleName}
+                onChange={(e) => handleInputChange('middleName', e.target.value)}
+                autoCapitalize="words"
+              />
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Phone Number<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter 11-digit contact number"
+                value={formData.phoneNumber}
+                onChange={(e) => {
+                  const numericText = e.target.value.replace(/[^0-9]/g, '').slice(0, 11);
+                  handleInputChange('phoneNumber', numericText);
+                }}
+                type="tel"
+              />
+              {phoneNumberError && <span style={styles.errorText}>{phoneNumberError}</span>}
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Government ID<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <select
+                style={styles.formSelect}
+                value={formData.governmentId}
+                onChange={(e) => handleInputChange('governmentId', e.target.value)}
+              >
+                <option value="">Select Government ID</option>
+                {governmentIdOptions.map((option) => (
+                  <option key={option.key} value={option.label}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>Current Balance</label>
+              <input
+                style={styles.formInput}
+                type="number"
+                step="0.01"
+                placeholder="Enter current balance"
+                value={formData.balance}
+                onChange={(e) => handleInputChange('balance', e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                Initial balance (before investment is added)
+              </span>
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>Investment Amount</label>
+              <input
+                style={styles.formInput}
+                type="number"
+                step="0.01"
+                placeholder="Enter investment amount"
+                value={formData.investment}
+                onChange={(e) => handleInputChange('investment', e.target.value)}
+              />
+              <span style={{ fontSize: '11px', color: '#059669', marginTop: '4px', display: 'block' }}>
+                Will be added to balance and system Funds
+              </span>
+            </div>
+            
+            {mode === 'add' && (
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
-                  Government ID<span style={styles.requiredAsterisk}>*</span>
+                  Selfie Photo<span style={styles.requiredAsterisk}>*</span>
+                </label>
+                <div 
+                  style={styles.fileUploadSection}
+                  onClick={() => document.getElementById('selfie').click()}
+                >
+                  <input
+                    id='selfie'
+                    style={styles.fileInput}
+                    type="file"
+                    onChange={(e) => handleFileChange(e, setSelfieFile)}
+                    accept="image/*"
+                  />
+                  <p style={styles.fileUploadText}>
+                    {selfieFile ? 'Change file' : 'Click to upload selfie'}
+                  </p>
+                  {selfieFile && (
+                    <p style={styles.fileName}>{selfieFile.name}</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+        
+        {/* Additional Required Fields */}
+        <div style={styles.formGrid}>
+          <div>
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Date of Birth<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                value={formData.dateOfBirth}
+                onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
+                type="date"
+              />
+            </div>
+            
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Place of Birth<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter place of birth"
+                value={formData.placeOfBirth}
+                onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
+                autoCapitalize="words"
+              />
+            </div>
+          </div>
+          
+          <div>
+            <div style={styles.formSection}>
+              <label style={styles.formLabel}>
+                Address<span style={styles.requiredAsterisk}>*</span>
+              </label>
+              <input
+                style={styles.formInput}
+                placeholder="Enter complete address"
+                value={formData.address}
+                onChange={(e) => handleInputChange('address', e.target.value)}
+                autoCapitalize="words"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Enhanced Existing Loans Section - ONLY FOR ADD MODE */}
+        {mode === 'add' && (
+  <div style={styles.loanSection}>
+    <div style={styles.loanCheckbox}>
+      <input
+        type="checkbox"
+        checked={existingLoans.length > 0}
+        onChange={(e) => {
+          if (e.target.checked) {
+            // Only add one loan when checkbox is checked
+            addNewLoan();
+          } else {
+            // Clear all loans when unchecked
+            setExistingLoans([]);
+            setPaymentTransactions([]);
+          }
+        }}
+        style={{ cursor: 'pointer' }}
+      />
+      <label style={{ cursor: 'pointer', fontWeight: '600', color: '#1e3a8a' }}>
+        <FaHandHoldingUsd style={{ marginRight: '8px' }} />
+        Member has existing loans
+      </label>
+    </div>
+    
+    {existingLoans.length > 0 && (
+      <>        
+        <div style={styles.loansContainer}>
+          {existingLoans.map((loan, index) => (
+            <div key={loan.id} style={styles.loanCard}>
+              <div style={styles.loanHeader}>
+                <h4 style={styles.loanTitle}>Loan #{index + 1}</h4>
+                {/* Always show remove button, even if there's only one loan */}
+                <button
+                  type="button"
+                  style={styles.removeLoanButton}
+                  onClick={() => removeLoan(loan.id)}
+                >
+                  <FaTimes />
+                </button>
+     
+            </div>
+            
+            <div style={styles.loanFields}>
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Loan Type<span style={styles.requiredAsterisk}>*</span>
                 </label>
                 <select
                   style={styles.formSelect}
-                  value={formData.governmentId}
-                  onChange={(e) => handleInputChange('governmentId', e.target.value)}
+                  value={loan.loanType}
+                  onChange={(e) => updateLoanField(loan.id, 'loanType', e.target.value)}
                 >
-                  <option value="">Select Government ID</option>
-                  {governmentIdOptions.map((option) => (
-                    <option key={option.key} value={option.label}>
-                      {option.label}
+                  <option value="">Select Loan Type</option>
+                  {loanTypeOptions.map((type) => (
+                    <option key={type.key} value={type.key}>
+                      {type.label}
                     </option>
                   ))}
                 </select>
               </div>
-
+              
               <div style={styles.formSection}>
-                <label style={styles.formLabel}>Current Balance</label>
+                <label style={styles.formLabel}>
+                  Original Loan Amount<span style={styles.requiredAsterisk}>*</span>
+                </label>
                 <input
                   style={styles.formInput}
                   type="number"
                   step="0.01"
-                  placeholder="Enter current balance"
-                  value={formData.balance}
-                  onChange={(e) => handleInputChange('balance', e.target.value)}
+                  placeholder="Enter original loan amount"
+                  value={loan.loanAmount}
+                  onChange={(e) => updateLoanField(loan.id, 'loanAmount', e.target.value)}
                 />
               </div>
-
+              
               <div style={styles.formSection}>
-                <label style={styles.formLabel}>Investment</label>
+                <label style={styles.formLabel}>
+                  Term (Months)<span style={styles.requiredAsterisk}>*</span>
+                </label>
+                <select
+                  style={styles.formSelect}
+                  value={loan.term}
+                  onChange={(e) => updateLoanField(loan.id, 'term', e.target.value)}
+                >
+                  <option value="">Select Term</option>
+                  {availableTerms.map((term) => (
+                    <option key={term.key} value={term.key}>
+                      {term.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Outstanding Balance<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <input
+    style={styles.formInput}
+    type="number"
+    step="0.01"
+    placeholder="Enter current remaining balance"
+    value={loan.outstandingBalance}
+    onChange={(e) => {
+      // FIX: Directly update outstanding balance without triggering auto-calculation
+      const newValue = e.target.value;
+      setExistingLoans(prev => prev.map(l => {
+        if (l.id === loan.id) {
+          return { ...l, outstandingBalance: newValue };
+        }
+        return l;
+      }));
+    }}
+    onFocus={(e) => {
+      // FIX: Store current value to prevent auto-fill interference
+      e.target.setAttribute('data-current-value', e.target.value);
+    }}
+    onBlur={(e) => {
+      // FIX: Ensure manual input is preserved
+      const manualValue = e.target.value;
+      if (manualValue !== e.target.getAttribute('data-current-value')) {
+        setExistingLoans(prev => prev.map(l => {
+          if (l.id === loan.id) {
+            return { ...l, outstandingBalance: manualValue };
+          }
+          return l;
+        }));
+      }
+    }}
+  />
+  <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+    Enter the ACTUAL current remaining balance (not auto-calculated)
+  </span>
+</div>
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Payments Made
+                </label>
+                <input
+                  style={styles.formInput}
+                  type="number"
+                  placeholder="Number of payments completed"
+                  value={loan.paymentsMade}
+                  onChange={(e) => updateLoanField(loan.id, 'paymentsMade', e.target.value)}
+                />
+              </div>
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Months Remaining
+                </label>
+                <input
+                  style={styles.formInput}
+                  type="number"
+                  placeholder="Months left to complete"
+                  value={loan.monthsRemaining}
+                  onChange={(e) => updateLoanField(loan.id, 'monthsRemaining', e.target.value)}
+                  readOnly
+                />
+                <span style={{ fontSize: '11px', color: '#059669', marginTop: '4px', display: 'block' }}>
+                  Auto-calculated: Term - Payments Made
+                </span>
+              </div>
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Loan Status
+                </label>
+                <select
+                  style={styles.formSelect}
+                  value={loan.status}
+                  onChange={(e) => updateLoanField(loan.id, 'status', e.target.value)}
+                >
+                  <option value="active">Active</option>
+                  <option value="paid">Paid</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+
+              {/* ADD DISBURSEMENT FIELDS - Place this after the Loan Status field */}
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Disbursement Method<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <select
+    style={styles.formSelect}
+    value={loan.disbursement}
+    onChange={(e) => updateLoanField(loan.id, 'disbursement', e.target.value)}
+  >
+    {disbursementOptions.map((option) => (
+      <option key={option.key} value={option.key}>
+        {option.label}
+      </option>
+    ))}
+  </select>
+</div>
+
+{/* CONDITIONAL FIELDS BASED ON DISBURSEMENT TYPE */}
+{loan.disbursement !== 'Cash' && (
+  <>
+    <div style={styles.formSection}>
+      <label style={styles.formLabel}>
+        Account Name<span style={styles.requiredAsterisk}>*</span>
+      </label>
+      <input
+        style={styles.formInput}
+        placeholder="Enter account holder name"
+        value={loan.accountName}
+        onChange={(e) => updateLoanField(loan.id, 'accountName', e.target.value)}
+      />
+    </div>
+    
+    <div style={styles.formSection}>
+      <label style={styles.formLabel}>
+        Account Number<span style={styles.requiredAsterisk}>*</span>
+      </label>
+      <input
+        style={styles.formInput}
+        placeholder={
+          loan.disbursement === 'GCash' 
+            ? 'Enter 11-digit GCash number' 
+            : 'Enter 8-16 digit bank account number'
+        }
+        value={loan.accountNumber}
+        onChange={(e) => updateLoanField(loan.id, 'accountNumber', e.target.value)}
+        maxLength={loan.disbursement === 'GCash' ? 11 : 16}
+      />
+      {/* Validation Message */}
+      {loan.accountNumber && (
+        <span style={{
+          fontSize: '11px', 
+          color: isAccountNumberValid(loan.accountNumber, loan.disbursement) ? '#059669' : '#dc2626',
+          marginTop: '4px',
+          display: 'block'
+        }}>
+          {getAccountNumberValidationMessage(loan.accountNumber, loan.disbursement)}
+        </span>
+      )}
+    </div>
+    
+    {/* BANK TYPE FIELD - ONLY FOR BANK DISBURSEMENT */}
+    {loan.disbursement === 'Bank' && (
+      <div style={styles.formSection}>
+        <label style={styles.formLabel}>
+          Bank Type<span style={styles.requiredAsterisk}>*</span>
+        </label>
+        <select
+          style={styles.formSelect}
+          value={loan.bankType}
+          onChange={(e) => updateLoanField(loan.id, 'bankType', e.target.value)}
+        >
+          <option value="">Select Bank Type</option>
+          {bankTypeOptions.map((bank) => (
+            <option key={bank.key} value={bank.key}>
+              {bank.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    )}
+  </>
+)}
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Date Approved
+                </label>
+                <input
+                  style={styles.formInput}
+                  type="date"
+                  value={loan.dateApproved}
+                  onChange={(e) => updateLoanField(loan.id, 'dateApproved', e.target.value)}
+                />
+              </div>
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Interest Rate (%)
+                </label>
                 <input
                   style={styles.formInput}
                   type="number"
                   step="0.01"
-                  placeholder="Enter investment amount"
-                  value={formData.investment}
-                  onChange={(e) => handleInputChange('investment', e.target.value)}
+                  placeholder="Auto-filled from loan type"
+                  value={loan.interestRate}
+                  readOnly
                 />
+                <span style={{ fontSize: '11px', color: '#64748b', marginTop: '4px', display: 'block' }}>
+                  Auto-filled based on loan type and term
+                </span>
               </div>
-
-              {mode === 'add' && (
-                <div style={styles.formSection}>
-                  <label style={styles.formLabel}>
-                    Selfie Photo<span style={styles.requiredAsterisk}>*</span>
-                  </label>
-                  <div 
-                    style={styles.fileUploadSection}
-                    onClick={() => document.getElementById('selfie').click()}
-                  >
+              
+              {/* Auto-calculated fields display */}
+              {loan.totalMonthlyPayment > 0 && (
+                <>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Monthly Payment:</label>
                     <input
-                      id='selfie'
-                      style={styles.fileInput}
-                      type="file"
-                      onChange={(e) => handleFileChange(e, setSelfieFile)}
-                      accept="image/*"
+                      style={styles.formInput}
+                      value={formatCurrency(loan.totalMonthlyPayment)}
+                      readOnly
                     />
-                    <p style={styles.fileUploadText}>
-                      {selfieFile ? 'Change file' : 'Click to upload selfie'}
-                    </p>
-                    {selfieFile && (
-                      <p style={styles.fileName}>{selfieFile.name}</p>
-                    )}
                   </div>
-                </div>
+                  
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Total Interest:</label>
+                    <input
+                      style={styles.formInput}
+                      value={formatCurrency(loan.totalInterest)}
+                      readOnly
+                    />
+                  </div>
+                </>
               )}
             </div>
           </div>
-
-          {/* Additional Required Fields */}
-          <div style={styles.formGrid}>
-            <div>
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Date of Birth<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  value={formData.dateOfBirth}
-                  onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                  type="date"
-                />
-              </div>
-
-              <div style={styles.formSection}>
-                <label style={styles.formLabel}>
-                  Place of Birth<span style={styles.requiredAsterisk}>*</span>
-                </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter place of birth"
-                  value={formData.placeOfBirth}
-                  onChange={(e) => handleInputChange('placeOfBirth', e.target.value)}
-                  autoCapitalize="words"
-                />
-              </div>
+        ))}
+        
+        <button
+          type="button"
+          style={styles.addAnotherLoanButton}
+          onClick={addNewLoan}
+        >
+          <FaPlus style={{ marginRight: '8px' }} />
+          Add Another Loan
+        </button>
+      </div>
+      
+      {/* Payment Transactions Section */}
+      <div style={styles.loanSection}>
+        <h4 style={{ margin: '0 0 16px 0', color: '#1e3a8a' }}>
+          <FaReceipt style={{ marginRight: '8px' }} />
+          Payment Transactions
+        </h4>
+        
+        {paymentTransactions.map((payment, index) => (
+          <div key={payment.id} style={styles.loanCard}>
+            <div style={styles.loanHeader}>
+              <h5 style={styles.loanTitle}>Payment #{index + 1}</h5>
+              <button
+                type="button"
+                style={styles.removeLoanButton}
+                onClick={() => removePaymentTransaction(payment.id)}
+              >
+                <FaTimes />
+              </button>
             </div>
-
-            <div>
+            
+            <div style={styles.loanFields}>
               <div style={styles.formSection}>
                 <label style={styles.formLabel}>
-                  Address<span style={styles.requiredAsterisk}>*</span>
+                  Linked Loan<span style={styles.requiredAsterisk}>*</span>
                 </label>
-                <input
-                  style={styles.formInput}
-                  placeholder="Enter complete address"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange('address', e.target.value)}
-                  autoCapitalize="words"
-                />
+                <select
+                  style={styles.formSelect}
+                  value={payment.loanTransactionId}
+                  onChange={(e) => updatePaymentTransactionField(payment.id, 'loanTransactionId', e.target.value)}
+                >
+                  <option value="">Select Loan</option>
+                  {existingLoans.map((loan) => (
+                    <option key={loan.transactionId} value={loan.transactionId}>
+                      {loan.loanType} - {formatCurrency(loan.loanAmount)}
+                    </option>
+                  ))}
+                </select>
               </div>
-
+              
               <div style={styles.formSection}>
-                <label style={styles.formLabel}>Loans</label>
+                <label style={styles.formLabel}>
+                  Payment Amount<span style={styles.requiredAsterisk}>*</span>
+                </label>
                 <input
                   style={styles.formInput}
                   type="number"
                   step="0.01"
-                  placeholder="Enter loans amount"
-                  value={formData.loans}
-                  onChange={(e) => handleInputChange('loans', e.target.value)}
+                  placeholder="Enter payment amount"
+                  value={payment.paymentAmount}
+                  onChange={(e) => {
+                    updatePaymentTransactionField(payment.id, 'paymentAmount', e.target.value);
+                    
+                    // Auto-calculate allocation when amount changes
+                    const linkedLoan = existingLoans.find(loan => loan.transactionId === payment.loanTransactionId);
+                    if (linkedLoan) {
+                      const allocation = calculatePaymentAllocation(e.target.value, linkedLoan);
+                      updatePaymentTransactionField(payment.id, 'penaltyPaid', allocation.penaltyPaid);
+                      updatePaymentTransactionField(payment.id, 'interestPaid', allocation.interestPaid);
+                      updatePaymentTransactionField(payment.id, 'principalPaid', allocation.principalPaid);
+                      updatePaymentTransactionField(payment.id, 'excessPayment', allocation.excessPayment);
+                    }
+                  }}
                 />
               </div>
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Payment Date
+                </label>
+                <input
+                  style={styles.formInput}
+                  type="date"
+                  value={payment.paymentDate}
+                  onChange={(e) => updatePaymentTransactionField(payment.id, 'paymentDate', e.target.value)}
+                />
+              </div>
+              
+              <div style={styles.formSection}>
+                <label style={styles.formLabel}>
+                  Payment Method
+                </label>
+                <select
+                  style={styles.formSelect}
+                  value={payment.paymentMethod}
+                  onChange={(e) => updatePaymentTransactionField(payment.id, 'paymentMethod', e.target.value)}
+                >
+                  <option value="Cash">Cash</option>
+                  <option value="Bank">Bank</option>
+                  <option value="GCash">GCash</option>
+                </select>
+              </div>
+              
+              {/* Auto-calculated allocation display */}
+              {payment.paymentAmount > 0 && (
+                <>
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Interest Paid:</label>
+                    <input
+                      style={styles.formInput}
+                      value={formatCurrency(payment.interestPaid)}
+                      readOnly
+                    />
+                  </div>
+                  
+                  <div style={styles.formSection}>
+                    <label style={styles.formLabel}>Principal Paid:</label>
+                    <input
+                      style={styles.formInput}
+                      value={formatCurrency(payment.principalPaid)}
+                      readOnly
+                    />
+                  </div>
+                  
+                  {payment.excessPayment > 0 && (
+                    <div style={styles.formSection}>
+                      <label style={styles.formLabel}>Excess Payment:</label>
+                      <input
+                        style={styles.formInput}
+                        value={formatCurrency(payment.excessPayment)}
+                        readOnly
+                      />
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
-
-          {/* Proof of Payment for Add */}
-          {mode === 'add' && (
-            <div style={styles.formSection}>
-              <label style={styles.formLabel}>
-                Proof of Payment<span style={styles.requiredAsterisk}>*</span>
-              </label>
-              <div 
-                style={styles.fileUploadSection}
-                onClick={() => document.getElementById('proofOfPayment').click()}
-              >
-                <input
-                  id='proofOfPayment'
-                  style={styles.fileInput}
-                  type="file"
-                  onChange={(e) => handleFileChange(e, setProofOfPaymentFile)}
-                  accept="image/*,application/pdf"
-                />
-                <p style={styles.fileUploadText}>
-                  {proofOfPaymentFile ? 'Change file' : 'Click to upload proof of payment'}
-                </p>
-                {proofOfPaymentFile && (
-                  <p style={styles.fileName}>{proofOfPaymentFile.name}</p>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-
-        <div style={styles.modalActions}>
-          <button
-            style={{
-              ...styles.actionButton,
-              ...styles.secondaryButton
-            }}
-            onClick={closeModals}
-            disabled={uploading}
-          >
-            Cancel
-          </button>
-          <button
-            style={{
-              ...styles.actionButton,
-              ...styles.primaryButton,
-              ...(uploading ? styles.disabledButton : {})
-            }}
-            onClick={mode === 'add' ? handleSubmitConfirmation : submitEditMember}
-            disabled={uploading}
-          >
-            {uploading ? (
-              <>
-                <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
-                <span>{mode === 'add' ? 'Adding...' : 'Updating...'}</span>
-              </>
-            ) : (
-              <>
-                <FaCheckCircle />
-                <span>{mode === 'add' ? 'Add Member' : 'Update Member'}</span>
+        ))}
+        
+        <button
+          type="button"
+          style={styles.addAnotherLoanButton}
+          onClick={addPaymentTransaction}
+        >
+          <FaPlus style={{ marginRight: '8px' }} />
+          Add Payment Transaction
+        </button>
+      </div>
               </>
             )}
-          </button>
-        </div>
+          </div>
+        )}
+      </div>
+      
+      <div style={styles.modalActions}>
+        <button
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }}
+          onClick={closeModals}
+          disabled={uploading}
+        >
+          Cancel
+        </button>
+        <button
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(uploading ? styles.disabledButton : {})
+          }}
+          onClick={mode === 'add' ? handleSubmitConfirmation : submitEditMember}
+          disabled={uploading}
+        >
+          {uploading ? (
+            <>
+              <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+              <span>{mode === 'add' ? 'Migrating...' : 'Updating...'}</span>
+            </>
+          ) : (
+            <>
+              <FaCheckCircle />
+              <span>{mode === 'add' ? 'Migrate Member' : 'Update Member'}</span>
+            </>
+          )}
+        </button>
       </div>
     </div>
-  );
+  </div>
+);
 
   if (loading) {
     return (
@@ -1735,9 +3108,9 @@ const DataMigration = () => {
         {/* Header Section */}
         <div style={styles.headerSection}>
           <div>
-            <h1 style={styles.headerText}>Members Management</h1>
+            <h1 style={styles.headerText}>Data Migration</h1>
             <p style={styles.headerSubtitle}>
-              Manage all member accounts, balances, and information in one place
+              Migrate existing member records into the system
             </p>
           </div>
         </div>
@@ -1755,7 +3128,7 @@ const DataMigration = () => {
                 className="hover-lift"
               >
                 <FaUser style={styles.tabIcon} />
-                <span>All Members</span>
+                <span>Migrated Members</span>
               </button>
             </div>
 
@@ -1777,7 +3150,7 @@ const DataMigration = () => {
                   onBlur={() => handleMouseLeave('search')}
                 />
               </div>
-
+              
               <button 
                 style={{
                   ...styles.downloadButton,
@@ -1813,7 +3186,6 @@ const DataMigration = () => {
                 >
                   <FaChevronLeft />
                 </button>
-
                 <button
                   onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages - 1))}
                   disabled={currentPage === totalPages - 1}
@@ -1836,20 +3208,20 @@ const DataMigration = () => {
           ) : filteredData.length === 0 ? (
             <div style={styles.noDataContainer}>
               <FaUser style={styles.noDataIcon} />
-              <p style={styles.noDataText}>No members available</p>
+              <p style={styles.noDataText}>No migrated members yet</p>
             </div>
           ) : (
             <div style={styles.tableContainer}>
               <table style={styles.table}>
                 <thead>
                   <tr style={styles.tableHeader}>
-                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>ID</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '8%' }}>ID</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Name</th>
                     <th style={{ ...styles.tableHeaderCell, width: '15%' }}>Email</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Contact</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Balance</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Investment</th>
-                    <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Loans</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Contact</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Balance</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Investment</th>
+                    <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Loans</th>
                     <th style={{ ...styles.tableHeaderCell, width: '12%' }}>Date Added</th>
                     <th style={{ ...styles.tableHeaderCell, width: '10%' }}>Actions</th>
                   </tr>
@@ -1864,11 +3236,11 @@ const DataMigration = () => {
                         </div>
                       </td>
                       <td style={styles.tableCell}>{m.email}</td>
-                      <td style={styles.tableCell}>{m.phoneNumber || m.contactNumber || 'N/A'}</td>
+                      <td style={styles.tableCell}>{m.phoneNumber || 'N/A'}</td>
                       <td style={styles.tableCell}>{toPeso(m.balance)}</td>
                       <td style={styles.tableCell}>{toPeso(m.investment)}</td>
                       <td style={styles.tableCell}>{toPeso(m.loans)}</td>
-                      <td style={styles.tableCell}>{m.dateAdded || m.dateApproved || 'N/A'}</td>
+                      <td style={styles.tableCell}>{m.dateAdded || 'N/A'}</td>
                       <td style={styles.tableCell}>
                         <button 
                           style={styles.viewButton}
@@ -1896,6 +3268,7 @@ const DataMigration = () => {
           onMouseLeave={() => handleMouseLeave('addMember')}
           onClick={openAddModal}
           className="hover-lift"
+          title="Migrate New Member"
         >
           <FaPlus />
         </button>
@@ -2038,6 +3411,20 @@ const DataMigration = () => {
                           </span>
                         </span>
                       </div>
+                      {selectedMember.isMigration && (
+                        <div style={styles.fieldGroup}>
+                          <span style={styles.fieldLabel}>Migration:</span>
+                          <span style={styles.fieldValue}>
+                            <span style={{
+                              ...styles.statusBadge,
+                              background: '#dbeafe',
+                              color: '#1e40af'
+                            }}>
+                              MIGRATED DATA
+                            </span>
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2083,7 +3470,14 @@ const DataMigration = () => {
             <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
               <FiAlertCircle style={{ ...styles.confirmIcon, color: '#f59e0b' }} />
               <p style={styles.modalText}>
-                Are you sure you want to add this member? This will create their account and send them login credentials.
+                Are you sure you want to migrate this member? This will create their account with the provided data and send them login credentials.
+              
+                {formData.currentSavings && parseFloat(formData.currentSavings) > 0 && (
+                  <><br/><strong>Current savings of {toPeso(formData.currentSavings)} will be added to system Savings.</strong></>
+                )}
+                {formData.hasExistingLoan && formData.loanAmount && (
+                  <><br/><strong>Existing loan of {toPeso(formData.loanAmount)} for {formData.loanTerm} months will be created.</strong></>
+                )}
               </p>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
@@ -2094,7 +3488,7 @@ const DataMigration = () => {
                   onClick={submitAddMember}
                   disabled={actionInProgress}
                 >
-                  {actionInProgress ? 'Processing...' : 'Yes'}
+                  {actionInProgress ? 'Processing...' : 'Yes, Migrate'}
                 </button>
                 <button 
                   style={{
@@ -2104,7 +3498,7 @@ const DataMigration = () => {
                   onClick={() => setConfirmModalVisible(false)}
                   disabled={actionInProgress}
                 >
-                  No
+                  Cancel
                 </button>
               </div>
             </div>
@@ -2116,7 +3510,7 @@ const DataMigration = () => {
             <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
               <FiAlertCircle style={{ ...styles.confirmIcon, color: '#dc2626' }} />
               <p style={styles.modalText}>
-                Are you sure you want to delete this member account? This action cannot be undone.
+                Are you sure you want to delete this member account? This action cannot be undone and will remove all associated data.
               </p>
               <div style={{ display: 'flex', gap: '10px' }}>
                 <button 
