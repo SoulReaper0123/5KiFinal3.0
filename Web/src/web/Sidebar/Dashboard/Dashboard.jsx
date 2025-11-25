@@ -764,124 +764,128 @@ const Dashboard = () => {
           }
         }
         
-        // Filter transactions by selected year and process them
-        if (!isAdvancedView) {
-          // Only process transactions for current year view
-          memberTransactions.forEach(transaction => {
-            const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
-            if (transactionDate && transactionDate.getFullYear() === parseInt(targetYear)) {
-              const month = transactionDate.getMonth();
+// Filter transactions by selected year and process them
+if (!isAdvancedView) {
+  // Only process transactions for current year view
+  memberTransactions.forEach(transaction => {
+    // EXCLUDE WITHDRAWALS FROM MONTHLY DIVIDENDS CALCULATION
+    if (transaction.type === 'Withdrawals') {
+      return; // Skip withdrawals entirely
+    }
+    
+    const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
+    if (transactionDate && transactionDate.getFullYear() === parseInt(targetYear)) {
+      const month = transactionDate.getMonth();
 
-              // Only include approved transactions for dividends (ignore any 'paid' status)
-              const status = (transaction.status || '').toLowerCase();
-              if (status !== 'approved') {
-                return; // skip non-approved or missing status
-              }
-              
-              // Extract amount using correct field name for each transaction type
-              // Exclude Deposits from monthly table (Jan-Dec)
-              if (transaction.type === 'Deposits') {
-                return; // skip counting deposits in monthly breakdown
-              }
-              let amount = 0;
-              switch (transaction.type) {
-                case 'Registrations':
-                  // Registrations don't have monetary amounts, skip them
-                  return;
-                case 'Loans':
-                  amount = parseFloat(transaction.loanAmount) || 0;
-                  break;
-                case 'Payments':
-                  amount = parseFloat(transaction.amountToBePaid) || 0;
-                  break;
-                case 'Withdrawals':
-                  amount = parseFloat(transaction.amountWithdrawn) || 0;
-                  break;
-                default:
-                  // Fallback to generic amount field
-                  amount = parseFloat(transaction.amount) || 0;
-              }
-              
-              // Determine if transaction is positive or negative
-              let adjustedAmount = amount;
-              if (transaction.type === 'Loans' || transaction.type === 'Withdrawals') {
-                adjustedAmount = -amount; // Loans and Withdrawals are negative (money going out)
-              } else {
-                adjustedAmount = amount; // Deposits and Payments are positive (money coming in)
-              }
-              
-              monthlyDividends[month] += adjustedAmount;
-              
-              // Store the actual transaction with processed amount
-              monthlyTransactions[month].push({
-                ...transaction,
-                adjustedAmount,
-                originalAmount: amount,
-                transactionDate: transactionDate,
-                formattedDate: transactionDate.toLocaleDateString('en-US', {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric'
-                })
-              });
-            }
-          });
-        }
+      // Only include approved transactions for dividends (ignore any 'paid' status)
+      const status = (transaction.status || '').toLowerCase();
+      if (status !== 'approved') {
+        return; // skip non-approved or missing status
+      }
+      
+      // Extract amount using correct field name for each transaction type
+      // Exclude Deposits from monthly table (Jan-Dec)
+      if (transaction.type === 'Deposits') {
+        return; // skip counting deposits in monthly breakdown
+      }
+      
+      let amount = 0;
+      switch (transaction.type) {
+        case 'Registrations':
+          // Registrations don't have monetary amounts, skip them
+          return;
+        case 'Loans':s
+          amount = parseFloat(transaction.loanAmount) || 0;
+          break;
+        case 'Payments':
+          amount = parseFloat(transaction.amountToBePaid) || parseFloat(transaction.amount)|| 0;
+          break;
+        // REMOVED Withdrawals case since we're excluding them above
+        default:
+          // Fallback to generic amount field
+          amount = parseFloat(transaction.amount) || 0;
+      }
+      
+      // Determine if transaction is positive or negative
+      let adjustedAmount = amount;
+      if (transaction.type === 'Loans') { // REMOVED Withdrawals from negative transactions
+        adjustedAmount = -amount; // Loans are negative (money going out)
+      } else {
+        adjustedAmount = amount; // Payments are positive (money coming in)
+      }
+      
+      monthlyDividends[month] += adjustedAmount;
+      
+      // Store the actual transaction with processed amount
+      monthlyTransactions[month].push({
+        ...transaction,
+        adjustedAmount,
+        originalAmount: amount,
+        transactionDate: transactionDate,
+        formattedDate: transactionDate.toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        })
+      });
+    }
+  });
+}
         
         const totalDividends = monthlyDividends.reduce((sum, dividend) => sum + dividend, 0);
         
-        // Count approved loans and calculate total loan amount for this member from Transactions/Loans
-        let approvedLoansCount = 0;
-        let totalLoanAmount = 0;
-        
-        if (!isAdvancedView) {
-          // Only count loans for current year view
-          try {
-            const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
-            if (memberLoansSnapshot.exists()) {
-              const memberLoans = memberLoansSnapshot.val();
-              // Count transactions with dateApproved field and sum loan amounts
-              Object.values(memberLoans).forEach(loan => {
-                if (loan.dateApproved) {
-                  // Check if the loan was approved in the selected year
-                  const approvedDate = parseTransactionDate(loan.dateApproved);
-                  if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
-                    approvedLoansCount++;
-                    // Add the loan amount to the total
-                    const loanAmount = parseFloat(loan.loanAmount) || 0;
-                    totalLoanAmount += loanAmount;
-                  }
-                }
-              });
-            }
-          } catch (error) {
-            console.error(`Error fetching approved loans count for member ${memberId}:`, error);
-          }
-        }
+ // Count approved loans and calculate total loan amount for this member from Transactions/Loans
+let approvedLoansCount = 0;
+let totalLoanAmount = 0;
 
-        // Determine Active Months based on registration dateApproved in Transactions/Registrations
-        let registrationDate = null;
-        try {
-          const regsSnapshot = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
-          if (regsSnapshot.exists()) {
-            const regs = regsSnapshot.val();
-            Object.values(regs).forEach(reg => {
-              const d = parseTransactionDate(reg.dateApproved);
-              if (d) {
-                if (!registrationDate || d < registrationDate) {
-                  registrationDate = d;
-                }
-              }
-            });
+if (!isAdvancedView) {
+  // Only count loans for current year view
+  try {
+    const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
+    if (memberLoansSnapshot.exists()) {
+      const memberLoans = memberLoansSnapshot.val();
+      // Count transactions with dateApproved field and sum loan amounts
+      Object.values(memberLoans).forEach(loan => {
+        if (loan.dateApproved && loan.status === 'approved') { // ADD STATUS CHECK
+          // Check if the loan was approved in the selected year
+          const approvedDate = parseTransactionDate(loan.dateApproved);
+          if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
+            approvedLoansCount++;
+            // Add the loan amount to the total
+            const loanAmount = parseFloat(loan.loanAmount) || 0;
+            totalLoanAmount += loanAmount;
           }
-        } catch (error) {
-          console.error(`Error fetching registration for member ${memberId}:`, error);
         }
-        
-        // If no registration date found in transactions, use the member's registration date
-        if (!registrationDate && member.registrationDate) {
-          registrationDate = new Date(member.registrationDate);
-        }
+      });
+    }
+  } catch (error) {
+    console.error(`Error fetching approved loans count for member ${memberId}:`, error);
+  }
+}
+
+// Determine Active Months based on registration data from Members table only
+let registrationDate = null;
+
+// FIRST PRIORITY: Use dateApproved from Members table (set when registration was approved)
+if (member.dateApproved) {
+  registrationDate = parseTransactionDate(member.dateApproved);
+}
+
+// SECOND PRIORITY: Use dateAdded from Members table (alternative date field)
+if (!registrationDate && member.dateAdded) {
+  registrationDate = parseTransactionDate(member.dateAdded);
+}
+
+// THIRD PRIORITY: Fallback to registrationDate from Members table
+if (!registrationDate && member.registrationDate) {
+  registrationDate = new Date(member.registrationDate);
+}
+
+// If no registration date found at all, use current date as fallback
+if (!registrationDate) {
+  console.warn(`No registration date found for member ${memberId}, using current date`);
+  registrationDate = new Date();
+}
         
         const activeMonthsCount = calculateActiveMonths(registrationDate, targetYear, isAdvancedView, dividendsHistoryData);
         
@@ -2611,100 +2615,112 @@ if (loading) {
           </div>
         )}
 
-        {/* Transaction Breakdown Modal */}
-        {transactionBreakdownModal && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCard}>
-              <button 
-                style={styles.closeButton} 
-                onClick={() => setTransactionBreakdownModal(false)}
-                aria-label="Close modal"
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                <FaTimes />
-              </button>
-              
-              <h3 style={styles.modalTitle}>
-                Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
-              </h3>
-              
-              <div style={{marginBottom: '16px', color: '#666', fontSize: '14px'}}>
-                <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
-              </div>
+{/* Transaction Breakdown Modal */}
+{transactionBreakdownModal && (
+  <div style={styles.centeredModal}>
+    <div style={styles.modalCard}>
+      <button 
+        style={styles.closeButton} 
+        onClick={() => setTransactionBreakdownModal(false)}
+        aria-label="Close modal"
+        onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
+        onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+      >
+        <FaTimes />
+      </button>
+      
+      <h3 style={styles.modalTitle}>
+        Transaction Breakdown - {selectedMonthTransactions.month} {selectedMonthTransactions.year}
+      </h3>
+      
+      <div style={{marginBottom: '16px', color: '#666', fontSize: '14px'}}>
+        <strong>{selectedMonthTransactions.member?.memberName}</strong> (ID: {selectedMonthTransactions.member?.memberId})
+      </div>
 
-              <div style={{ overflowX: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                  <thead>
-                    <tr style={styles.dividendsHeaderRow}>
-                      <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
-                      <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
-                      <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedMonthTransactions.transactions.map((transaction, index) => (
-                      <tr key={index} style={styles.dividendsDataRow}>
-                        <td style={styles.dividendsDataCell}>
-                          {transaction.formattedDate}
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <span style={{
-                            backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
-                            color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
-                            padding: '6px 12px',
-                            borderRadius: '8px',
-                            fontSize: '12px',
-                            fontWeight: '600'
-                          }}>
-                            {transaction.type}
-                          </span>
-                        </td>
-                        <td style={styles.dividendsDataCell}>
-                          <div>
-                            <span style={{
-                              color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
-                              fontWeight: 'bold',
-                              fontSize: '14px'
-                            }}>
-                              {transaction.adjustedAmount > 0 ? '+' : transaction.adjustedAmount < 0 ? '-' : ''}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
-                            </span>
-                            <div style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
-                              Original: ₱{formatCurrency(transaction.originalAmount)}
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-                
-                <div style={{
-                  marginTop: '20px', 
-                  padding: '16px', 
-                  backgroundColor: '#f8f9fa', 
-                  borderRadius: '8px',
-                  borderLeft: '4px solid #2D5783'
-                }}>
-                  <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
-                    <span style={{fontWeight: '600', color: '#2D5783', fontSize: '14px'}}>
-                      Month Total ({selectedMonthTransactions.transactions.length} transactions):
-                    </span>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+          <thead>
+            <tr style={styles.dividendsHeaderRow}>
+              <th style={{...styles.dividendsHeaderCell, width: '140px'}}>Date</th>
+              <th style={{...styles.dividendsHeaderCell, width: '120px'}}>Type</th>
+              <th style={{...styles.dividendsHeaderCell, width: '160px'}}>Amount</th>
+            </tr>
+          </thead>
+          <tbody>
+            {/* FILTER OUT WITHDRAWALS FROM DISPLAY */}
+            {selectedMonthTransactions.transactions
+              .filter(transaction => transaction.type !== 'Withdrawals') // Exclude withdrawals
+              .map((transaction, index) => (
+              <tr key={index} style={styles.dividendsDataRow}>
+                <td style={styles.dividendsDataCell}>
+                  {transaction.formattedDate}
+                </td>
+                <td style={styles.dividendsDataCell}>
+                  <span style={{
+                    backgroundColor: transaction.type === 'Loans' ? '#fee2e2' : '#d1fae5',
+                    color: transaction.type === 'Loans' ? '#dc2626' : '#059669',
+                    padding: '6px 12px',
+                    borderRadius: '8px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {transaction.type}
+                  </span>
+                </td>
+                <td style={styles.dividendsDataCell}>
+                  <div>
                     <span style={{
-                      fontSize: '18px',
+                      color: transaction.adjustedAmount > 0 ? '#059669' : '#dc2626',
                       fontWeight: 'bold',
-                      color: selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
+                      fontSize: '14px'
                     }}>
-                      {selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
-                       selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
-                      ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions.reduce((sum, t) => sum + t.adjustedAmount, 0)))}
+                      {transaction.adjustedAmount > 0 ? '+' : transaction.adjustedAmount < 0 ? '-' : ''}₱{formatCurrency(Math.abs(transaction.adjustedAmount))}
                     </span>
+                    <div style={{fontSize: '12px', color: '#666', marginTop: '4px'}}>
+                      Original: ₱{formatCurrency(transaction.originalAmount)}
+                    </div>
                   </div>
-                </div>
-              </div>
-            </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        
+        {/* Update the total calculation to exclude withdrawals */}
+        <div style={{
+          marginTop: '20px', 
+          padding: '16px', 
+          backgroundColor: '#f8f9fa', 
+          borderRadius: '8px',
+          borderLeft: '4px solid #2D5783'
+        }}>
+          <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center'}}>
+            <span style={{fontWeight: '600', color: '#2D5783', fontSize: '14px'}}>
+              Month Total ({selectedMonthTransactions.transactions.filter(t => t.type !== 'Withdrawals').length} transactions):
+            </span>
+            <span style={{
+              fontSize: '18px',
+              fontWeight: 'bold',
+              color: selectedMonthTransactions.transactions
+                .filter(t => t.type !== 'Withdrawals')
+                .reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '#059669' : '#dc2626'
+            }}>
+              {selectedMonthTransactions.transactions
+                .filter(t => t.type !== 'Withdrawals')
+                .reduce((sum, t) => sum + t.adjustedAmount, 0) > 0 ? '+' : 
+               selectedMonthTransactions.transactions
+                .filter(t => t.type !== 'Withdrawals')
+                .reduce((sum, t) => sum + t.adjustedAmount, 0) < 0 ? '-' : ''}
+              ₱{formatCurrency(Math.abs(selectedMonthTransactions.transactions
+                .filter(t => t.type !== 'Withdrawals')
+                .reduce((sum, t) => sum + t.adjustedAmount, 0)))}
+            </span>
           </div>
-        )}
+        </div>
+      </div>
+    </div>
+  </div>
+)}
       </div>
     </div>
   );
