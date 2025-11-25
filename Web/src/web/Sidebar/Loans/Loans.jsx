@@ -864,7 +864,6 @@ const Loans = () => {
   const [addModalVisible, setAddModalVisible] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [showAddLoanConfirmation, setShowAddLoanConfirmation] = useState(false);
-  const [actionInProgress, setActionInProgress] = useState(false);
   const [isHovered, setIsHovered] = useState({});
   // Add these to your existing state variables in Loans component
 const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -2002,7 +2001,6 @@ const updateForm = (field, value) => {
 
   // NEW: Process action following ApplyLoans structure
   const processAction = async (loanData, action) => {
-    setActionInProgress(true);
     setIsProcessing(true);
     setCurrentAction(action);
 
@@ -2079,7 +2077,6 @@ const updateForm = (field, value) => {
         setPendingLoanForSavings(loanData);
         setShowSavingsConfirmModal(true);
         setIsProcessing(false);
-        setActionInProgress(false);
         return;
       }
     } catch (error) {
@@ -2088,7 +2085,6 @@ const updateForm = (field, value) => {
       setErrorModalVisible(true);
     } finally {
       setIsProcessing(false);
-      setActionInProgress(false);
     }
   };
 
@@ -2134,7 +2130,6 @@ const handleConfirmAction = async () => {
   }
 
   try {
-    setActionInProgress(true);
     // Handle the confirmed action here
     // You can add your specific logic based on pendingActionData
     setConfirmModalVisible(false);
@@ -2143,7 +2138,6 @@ const handleConfirmAction = async () => {
     setErrorMessage(error.message || 'An error occurred during confirmation.');
     setErrorModalVisible(true);
   } finally {
-    setActionInProgress(false);
     setPendingActionData(null);
   }
 };
@@ -2205,7 +2199,6 @@ const handleSuccessOk = async () => {
       customBankName: ''
     });
     setIsProcessing(false);
-    setActionInProgress(false);
   }
 };
 
@@ -3047,15 +3040,15 @@ const handleAddApprovedLoan = async () => {
           style={{
             ...styles.actionButton,
             ...styles.primaryButtonStyle,
-            ...(actionInProgress ? styles.disabledButton : {})
+            ...(isProcessing ? styles.disabledButton : {}) // FIXED: actionInProgress → isProcessing
           }} 
           onClick={async () => {
             setShowAddLoanConfirmation(false);
             await handleAddApprovedLoan();
           }}
-          disabled={actionInProgress}
+          disabled={isProcessing} // FIXED: actionInProgress → isProcessing
         >
-          {actionInProgress ? 'Processing...' : 'Yes'}
+          {isProcessing ? 'Processing...' : 'Yes'} {/* FIXED: actionInProgress → isProcessing */}
         </button>
         <button 
           style={{
@@ -3063,7 +3056,7 @@ const handleAddApprovedLoan = async () => {
             ...styles.secondaryButtonStyle
           }} 
           onClick={() => setShowAddLoanConfirmation(false)}
-          disabled={actionInProgress}
+          disabled={isProcessing} // FIXED: actionInProgress → isProcessing
         >
           No
         </button>
@@ -3072,54 +3065,54 @@ const handleAddApprovedLoan = async () => {
   </div>
 )}
 
-        {/* Savings Confirmation Modal */}
-        {showSavingsConfirmModal && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.savingsConfirmModal}>
-              <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-              <div style={styles.modalTitle}>
-                Insufficient Funds - Use Savings?
-              </div>
-              <div style={styles.savingsInfoBox}>
-                <div style={styles.savingsInfoTitle}>Loan Approval Breakdown:</div>
-                <div style={styles.savingsInfoText}>
-                  • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
-                  • Deduct from Member Balance: <strong>{formatCurrency(savingsShortfall.deductFromBalance)}</strong><br/>
-                  • Deduct from Funds: <strong>{formatCurrency(savingsShortfall.deductFromFunds)}</strong><br/>
-                  • Deduct from Savings: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
-                  • Processing Fee Added to Savings: <strong>{formatCurrency(savingsShortfall.processingFee)}</strong><br/>
-                  • Savings After Approval: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
-                </div>
-              </div>
-              <p style={styles.modalText}>
-                The loan amount exceeds available balance and funds. Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall? Note that the processing fee of <strong>{formatCurrency(savingsShortfall.processingFee)}</strong> will be added to savings.
-              </p>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.approveButton,
-                    ...(actionInProgress ? styles.disabledButton : {})
-                  }}
-                  onClick={handleSavingsConfirm}
-                  disabled={actionInProgress}
-                >
-                  {actionInProgress ? 'Processing...' : 'Yes, Use Savings'}
-                </button>
-                <button
-                  style={{
-                    ...styles.actionButton,
-                    ...styles.rejectButton
-                  }}
-                  onClick={handleSavingsCancel}
-                  disabled={actionInProgress}
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+{/* Savings Confirmation Modal */}
+{showSavingsConfirmModal && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.savingsConfirmModal}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <div style={styles.modalTitle}>
+        Insufficient Funds - Use Savings?
+      </div>
+      <div style={styles.savingsInfoBox}>
+        <div style={styles.savingsInfoTitle}>Loan Approval Breakdown:</div>
+        <div style={styles.savingsInfoText}>
+          • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
+          • Deduct from Member Balance: <strong>{formatCurrency(savingsShortfall.deductFromBalance)}</strong><br/>
+          • Deduct from Funds: <strong>{formatCurrency(savingsShortfall.deductFromFunds)}</strong><br/>
+          • Deduct from Savings: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
+          • Processing Fee Added to Savings: <strong>{formatCurrency(savingsShortfall.processingFee)}</strong><br/>
+          • Savings After Approval: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
+        </div>
+      </div>
+      <p style={styles.modalText}>
+        The loan amount exceeds available balance and funds. Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall? Note that the processing fee of <strong>{formatCurrency(savingsShortfall.processingFee)}</strong> will be added to savings.
+      </p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button
+          style={{
+            ...styles.actionButton,
+            ...styles.approveButton,
+            ...(isProcessing ? styles.disabledButton : {}) // FIXED: actionInProgress → isProcessing
+          }}
+          onClick={handleSavingsConfirm}
+          disabled={isProcessing} // FIXED: actionInProgress → isProcessing
+        >
+          {isProcessing ? 'Processing...' : 'Yes, Use Savings'} {/* FIXED: actionInProgress → isProcessing */}
+        </button>
+        <button
+          style={{
+            ...styles.actionButton,
+            ...styles.rejectButton
+          }}
+          onClick={handleSavingsCancel}
+          disabled={isProcessing} // FIXED: actionInProgress → isProcessing
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 {/* Success Modal - EXACT SAME DESIGN AS REGISTER */}
 {successModalVisible && (
@@ -3165,18 +3158,6 @@ const handleAddApprovedLoan = async () => {
     <div style={styles.loadingSpinner}></div>
   </div>
 )}
-
-        {/* Processing Overlay */}
-        {(isProcessing || actionInProgress) && (
-          <div style={styles.loadingOverlay}>
-            <div style={styles.loadingContent}>
-              <div style={styles.spinner}></div>
-              <div style={styles.loadingTextOverlay}>
-                {currentAction === 'approve' ? 'Approving loan...' : 'Processing...'}
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
