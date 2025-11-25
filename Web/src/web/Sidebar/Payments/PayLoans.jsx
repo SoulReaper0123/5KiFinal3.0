@@ -16,7 +16,8 @@ import {
   FaCreditCard,
   FaCalendarAlt,
   FaReceipt,
-  FaBan
+  FaBan,
+  FaSpinner
 } from 'react-icons/fa';
 import { FiAlertCircle } from 'react-icons/fi';
 import { AiOutlineClose } from 'react-icons/ai';
@@ -638,18 +639,6 @@ const styles = {
     zIndex: 1000,
     padding: '20px'
   },
-  modalCardSmall: {
-    width: '300px',
-    backgroundColor: 'white',
-    borderRadius: '14px',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    textAlign: 'center',
-    border: '1px solid #F1F5F9'
-  },
   confirmIcon: {
     marginBottom: '14px',
     fontSize: '28px'
@@ -718,7 +707,7 @@ const styles = {
     marginTop: '4px',
     fontWeight: '500'
   },
-  // Loan Details Modal Styles - FIXED: Removed conflicting CSS properties
+  // Loan Details Modal Styles
   loanDetailsModal: {
     maxWidth: '600px',
     maxHeight: '80vh'
@@ -819,6 +808,117 @@ const styles = {
   viewDetailsButtonHover: {
     backgroundColor: '#2D5783',
     color: 'white'
+  },
+  // ADD THESE EXACT STYLES FROM PaymentApplications:
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  actionButton: {
+    padding: '0.75rem 2rem',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
+  },
+  primaryButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  secondaryButton: {
+    background: '#6b7280',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
+  },
+  modalOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '2rem',
+    backdropFilter: 'blur(4px)'
+  },
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+    backdropFilter: 'blur(4px)',
+  },
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  loadingTextOverlay: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: '500'
+  },
+  spinner: {
+    border: '3px solid rgba(59, 130, 246, 0.3)',
+    borderTop: '3px solid #3B82F6',
+    borderRadius: '50%',
+    width: '36px',
+    height: '36px',
+    animation: 'spin 1s linear infinite'
   }
 };
 
@@ -828,7 +928,7 @@ const PayLoans = () => {
   const [completed, setCompleted] = useState([]);
   const [failed, setFailed] = useState([]);
   const [filteredData, setFilteredData] = useState([]);
-  const [loading, setLoading] = useState(true);
+   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [noMatch, setNoMatch] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
@@ -837,6 +937,9 @@ const PayLoans = () => {
   const [successModalVisible, setSuccessModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [addModalVisible, setAddModalVisible] = useState(false);
+  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
+
+  const pageSize = 10;
   const [formData, setFormData] = useState({
     memberId: '',
     firstName: '',
@@ -885,47 +988,13 @@ const PayLoans = () => {
   // Admin data for print report
   const [adminData, setAdminData] = useState(null);
 
-  // Utility function to convert image to base64
-  const getImageAsBase64 = async (imageSrc) => {
-    try {
-      const response = await fetch(imageSrc);
-      const blob = await response.blob();
-      return new Promise((resolve) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(blob);
-      });
-    } catch (error) {
-      console.error('Error converting image to base64:', error);
-      return null;
-    }
-  };
+  // Payment processing states (same as PaymentApplications)
+  const [currentAction, setCurrentAction] = useState(null);
+  const [showApproveConfirmation, setShowApproveConfirmation] = useState(false);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
-  const pageSize = 10;
-
-  // Tab configuration
-  const tabs = [
-    { 
-      key: 'pendingPayments', 
-      label: 'Pending', 
-      icon: FaFileAlt,
-      color: '#f59e0b'
-    },
-    { 
-      key: 'completedPayments', 
-      label: 'Approved', 
-      icon: FaCheckCircle,
-      color: '#059669'
-    },
-    { 
-      key: 'failedPayments', 
-      label: 'Rejected', 
-      icon: FaTimes,
-      color: '#dc2626'
-    }
-  ];
-
-  // Create style element and append to head - FIXED CSS with print header/footer removal
+  // Create style element and append to head
   useEffect(() => {
     const styleElement = document.createElement('style');
     styleElement.innerHTML = `
@@ -943,7 +1012,6 @@ const PayLoans = () => {
       
       /* PRINT STYLES - REMOVE BROWSER HEADERS/FOOTERS */
       @media print {
-        /* Remove browser default headers and footers */
         @page {
           margin: 0.5in !important;
           size: auto;
@@ -951,28 +1019,11 @@ const PayLoans = () => {
           margin-footer: 0 !important;
         }
         
-        /* Target Webkit browsers (Chrome, Safari) */
-        @page :first {
-          margin-top: 0;
-        }
-        
-        @page :left {
-          margin-left: 0.5in;
-          margin-right: 0.5in;
-        }
-        
-        @page :right {
-          margin-left: 0.5in;
-          margin-right: 0.5in;
-        }
-        
-        /* Hide URL, page numbers, and date in print */
         body::before,
         body::after {
           display: none !important;
         }
         
-        /* Hide any browser-generated content */
         .print-header:empty,
         .print-footer:empty {
           display: none;
@@ -1219,7 +1270,6 @@ const PayLoans = () => {
           found.push({ 
             ...loan, 
             _loanId: loanId,
-            // Ensure all required fields have fallbacks
             loanType: loan.loanType || 'Personal Loan',
             loanAmount: loan.loanAmount || loan.amount || 0,
             outstandingBalance: loan.outstandingBalance || loan.loanAmount || loan.amount || 0,
@@ -1256,7 +1306,7 @@ const PayLoans = () => {
     }
   };
 
-  // Calculate penalty and total amount due - FIXED with proper date parsing
+  // Calculate penalty and total amount due
   const calculatePenaltyAndTotal = (loan) => {
     if (!loan) {
       setPenaltyAmount(0);
@@ -1285,7 +1335,7 @@ const PayLoans = () => {
     }
   };
 
-  // Calculate penalty for loan details modal - FIXED with proper date parsing
+  // Calculate penalty for loan details modal
   const calculateLoanDetails = (loan) => {
     if (!loan) {
       return { penalty: 0, totalDue: 0, overdueDays: 0, isOverdue: false };
@@ -1311,7 +1361,7 @@ const PayLoans = () => {
     }
   };
 
-  // Format display date for loans - FIXED to match React Native component
+  // Format display date for loans
   const formatDisplayDate = (dateInput) => {
     try {
       if (!dateInput) return 'N/A';
@@ -1352,11 +1402,9 @@ const PayLoans = () => {
     }
   };
 
-  // Open loan details modal - FIXED with proper error handling
+  // Open loan details modal
   const openLoanDetails = (loan) => {
     try {
-      console.log('Opening loan details for:', loan);
-      // Ensure loan has all required properties with fallbacks
       const safeLoan = {
         ...loan,
         loanType: loan.loanType || 'Personal Loan',
@@ -1390,7 +1438,608 @@ const PayLoans = () => {
     }));
   };
 
-  // FIXED PRINT FUNCTION - Removed browser headers and footers
+  // PAYMENT APPROVAL LOGIC (SAME AS PaymentApplications)
+const processDatabaseApprove = async (paymentData) => {
+  try {
+    const { memberId, amount, selectedLoanId } = paymentData;
+    
+    // 1. Verify member details
+    const memberRef = database.ref(`Members/${memberId}`);
+    const memberSnap = await memberRef.once('value');
+    const memberData = memberSnap.val();
+
+    if (!memberData || 
+        memberData.email !== paymentData.email ||
+        memberData.firstName !== paymentData.firstName || 
+        memberData.lastName !== paymentData.lastName) {
+      throw new Error('Member details do not match our records');
+    }
+
+    // 2. Load Settings (Funds, Yields, Savings, Penalty)
+    const fundsRef = database.ref('Settings/Funds');
+    const yieldsRef = database.ref('Settings/Yields');
+    const yieldsHistoryRef = database.ref('Settings/YieldsHistory');
+    const savingsRef = database.ref('Settings/Savings');
+    const penaltyValueRef = database.ref('Settings/PenaltyValue');
+
+    // 3. Find current loan (if any)
+    const memberLoansRef = database.ref(`Loans/CurrentLoans/${memberId}`);
+
+    let currentLoanData = null;
+    let currentLoanKey = null;
+    let isLoanPayment = false;
+    let interestAmount = 0;
+    let loanAmount = 0;
+    let dueDateStr = '';
+    let approvedLoanData = null;
+
+    // Prefer the loan explicitly selected in the application
+    const preferredLoanKey = paymentData.selectedLoanId;
+    if (preferredLoanKey) {
+      const specificLoanSnap = await database.ref(`Loans/CurrentLoans/${memberId}/${preferredLoanKey}`).once('value');
+      if (specificLoanSnap.exists()) {
+        currentLoanData = specificLoanSnap.val();
+        currentLoanKey = preferredLoanKey;
+        isLoanPayment = true;
+        loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+        dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+      }
+    }
+
+    // Fallback: pick the first loan if none explicitly selected or not found
+    if (!currentLoanData) {
+      const memberLoansSnap = await memberLoansRef.once('value');
+      if (memberLoansSnap.exists()) {
+        memberLoansSnap.forEach((loanSnap) => {
+          if (!currentLoanData) {
+            currentLoanData = loanSnap.val();
+            currentLoanKey = loanSnap.key;
+            isLoanPayment = true;
+            loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+            dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
+          }
+        });
+      }
+    }
+
+    // 4. Fetch the original interest and term from ApprovedLoans (not from CurrentLoans)
+    if (currentLoanKey) {
+      const approvedLoanRef = database.ref(`Loans/ApprovedLoans/${memberId}/${currentLoanKey}`);
+      const approvedLoanSnap = await approvedLoanRef.once('value');
+      
+      if (approvedLoanSnap.exists()) {
+        approvedLoanData = approvedLoanSnap.val();
+        interestAmount = parseFloat(approvedLoanData.interest) || 0;
+      } else {
+        interestAmount = 0;
+      }
+    }
+
+    // FIXED: Generate transaction IDs - for NEW payments (not from PaymentApplications)
+    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    const originalTransactionId = paymentData.transactionId || newTransactionId; // Use existing or create new
+
+    // Database references for Payment and Logs
+    const approvedRef = database.ref(`Payments/ApprovedPayments/${memberId}/${newTransactionId}`);
+    const transactionRef = database.ref(`Transactions/Payments/${memberId}/${newTransactionId}`);
+
+    // 4. Fetch current values
+    const [fundsSnap, savingsSnap, penaltySnap] = await Promise.all([
+      fundsRef.once('value'),
+      savingsRef.once('value'),
+      penaltyValueRef.once('value')
+    ]);
+
+    const paymentAmount = parseFloat(amount) || 0;
+    const currentFunds = parseFloat(fundsSnap.val()) || 0;
+    const currentSavings = parseFloat(savingsSnap.val()) || 0;
+    const memberBalance = parseFloat(memberData.balance || 0);
+    const memberInvestment = parseFloat(memberData.investment || 0);
+    const penaltyPerDay = parseFloat(penaltySnap.val()) || 0;
+
+    // 5. NEW PENALTY CALCULATION: Continuous penalty from original due date
+    const parseToStartOfDay = (d) => {
+      const dt = new Date(d);
+      return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+    };
+
+    // Prefer penalty provided in payment application; fallback to computed
+    const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
+
+    let overdueDays = 0;
+    let penaltyDue = 0;
+    
+    if (penaltyFromApp > 0) {
+      penaltyDue = Math.round((penaltyFromApp + Number.EPSILON) * 100) / 100;
+    } else if (isLoanPayment && dueDateStr) {
+      const todayStart = parseToStartOfDay(new Date());
+      const dueDateParsed = parseToStartOfDay(new Date(dueDateStr));
+      
+      if (!isNaN(dueDateParsed.getTime()) && todayStart > dueDateParsed) {
+        const ms = todayStart.getTime() - dueDateParsed.getTime();
+        overdueDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
+      }
+      
+      // Overdue penalty = monthly interest * (days_lapsed / 30)
+      const interestForPenalty = parseFloat(interestAmount) || 0;
+      penaltyDue = Math.max(0, Math.round(((interestForPenalty * (overdueDays / 30)) + Number.EPSILON) * 100) / 100);
+    }
+
+    // Include any previously accrued penalties from the loan record
+    const existingAccruedPenalty = parseFloat(currentLoanData?.penaltyAccrued) || 0;
+    penaltyDue = Math.round(((penaltyDue + existingAccruedPenalty) + Number.EPSILON) * 100) / 100;
+
+    const penaltyPaid = Math.min(paymentAmount, penaltyDue);
+
+    // Amount left for interest/principal after penalty
+    const remainingAfterPenalty = paymentAmount - penaltyPaid;
+
+    // NEW: Calculate ExcessMonthlyPayment (amount beyond scheduled monthly payment)
+    let currentTotalMonthlyPayment = 0;
+    let scheduledMonthlyPayment = 0;
+    let excessMonthlyPayment = 0;
+
+    if (isLoanPayment && currentLoanData) {
+      currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
+      scheduledMonthlyPayment = currentTotalMonthlyPayment + penaltyDue;
+      excessMonthlyPayment = Math.max(0, paymentAmount - scheduledMonthlyPayment);
+    }
+
+    // 6. Split remaining into interest then principal
+    let interestPaid = 0;
+    let principalPaid = 0;
+    let excessPayment = 0;
+    let investmentIncrease = 0;
+    let balanceIncrease = 0;
+
+    if (isLoanPayment && currentLoanData) {
+      interestPaid = Math.min(remainingAfterPenalty, interestAmount);
+      const afterInterest = remainingAfterPenalty - interestPaid;
+      principalPaid = Math.min(afterInterest, loanAmount);
+
+      // Remaining beyond loan principal becomes excess
+      const remainingAfterPrincipal = afterInterest - principalPaid;
+      excessPayment = Math.max(0, remainingAfterPrincipal);
+
+      // Update or clear the loan
+      const remainingLoan = loanAmount - (principalPaid + excessPayment);
+      
+      // Track remainingBalance (principal + total interest not yet paid) and cumulative amountPaid (principal + interest only)
+      const prevRemainingBalance = parseFloat(
+        (currentLoanData && currentLoanData.remainingBalance) ?? (approvedLoanData && approvedLoanData.totalTermPayment) ?? 0
+      ) || 0;
+      const prevAmountPaid = parseFloat(currentLoanData?.amountPaid) || 0;
+      const amountPaidThisApproval = (interestPaid + principalPaid); 
+      const newAmountPaid = prevAmountPaid + amountPaidThisApproval;
+      const newRemainingBalance = Math.max(0, prevRemainingBalance - amountPaidThisApproval); 
+
+      if (newRemainingBalance <= 0) {
+        // Fully settled: archive as paid, remove from Current/Approved, and log transaction
+        const nowPaid = new Date();
+        const datePaid = formatDate(nowPaid);
+        const timePaid = formatTime(nowPaid);
+        const paidTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Try to read original loan transaction to get canonical fields like loanAmount
+        let originalLoanTxn = null;
+        try {
+          const origTxnSnap = await database.ref(`Transactions/Loans/${memberId}/${currentLoanKey}`).once('value');
+          if (origTxnSnap.exists()) originalLoanTxn = origTxnSnap.val();
+        } catch (e) {
+          console.warn('Could not read original loan transaction for', currentLoanKey, e);
+        }
+
+        const loanAmountFromTxn = parseFloat(originalLoanTxn?.loanAmount ?? approvedLoanData?.loanAmount ?? currentLoanData?.loanAmount) || 0;
+
+        const paidRecord = {
+          ...(approvedLoanData || currentLoanData || {}),
+          transactionId: paidTransactionId,
+          originalTransactionId: currentLoanKey,
+          status: 'paid',
+          datePaid,
+          timePaid,
+          timestamp: nowPaid.getTime(),
+          loanAmount: Math.ceil(loanAmountFromTxn * 100) / 100
+        };
+
+        // Write to Loans/PaidLoans and Transactions/Loans (paid event)
+        const paidLoansRef = database.ref(`Loans/PaidLoans/${memberId}/${paidTransactionId}`);
+        const paidTxnRef = database.ref(`Transactions/Loans/${memberId}/${paidTransactionId}`);
+        await Promise.all([
+          paidLoansRef.set(paidRecord),
+          paidTxnRef.set(paidRecord)
+        ]);
+
+        // Remove from CurrentLoans and member mirror
+        const memberLoanRef = database.ref(`Members/${memberId}/loans/${currentLoanKey}`);
+        await Promise.all([
+          memberLoansRef.child(currentLoanKey).remove(),
+          memberLoanRef.remove()
+        ]);
+
+        // Note: Borrowed savings have been gradually deducted during payments
+        // No need to return borrowed amount here as it's been handled incrementally
+        const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
+        if (borrowedFromSavings > 0) {
+          console.log(`Loan fully paid. Borrowed amount (${formatCurrency(borrowedFromSavings)}) was gradually deducted during payments.`);
+        }
+
+        // Remove from ApprovedLoans (both possible paths), specific key only
+        try { await database.ref(`Loans/ApprovedLoans/${memberId}/${currentLoanKey}`).remove(); } catch (_) {}
+        try { await database.ref(`ApprovedLoans/${memberId}/${currentLoanKey}`).remove(); } catch (_) {}
+
+      } else {
+        // STEP 1: UPDATE CURRENTLOANS WITH CONTINUOUS PENALTY SYSTEM
+        const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
+        const currentMonthlyPayment = parseFloat(currentLoanData.monthlyPayment) || 0;
+        const currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
+        
+        // Calculate excess/shortage relative to scheduled payment
+        const scheduledPayment = currentTotalMonthlyPayment + penaltyDue;
+        const excessBeyondScheduled = Math.max(0, paymentAmount - scheduledPayment);
+        
+        // NEW: Check if payment is insufficient (less than total monthly payment)
+        const isPaymentInsufficient = paymentAmount < currentTotalMonthlyPayment;
+        
+        // Calculate shortage (only interest+principal, exclude penalty)
+        const shortageBeyondScheduled = Math.max(0, currentTotalMonthlyPayment - remainingAfterPenalty);
+        
+        // Calculate next monthly principal by adjusting for excess/shortage
+        const originalTerm = parseFloat(approvedLoanData?.term) || 1;
+        const remainingTerm = Math.max(1, originalTerm - paymentsMade);
+        
+        // If this is the last payment term, calculate based on remaining principal portion only
+        let newMonthlyPayment;
+        if (remainingTerm === 1) {
+          // Last payment: monthly principal portion equals remaining principal
+          newMonthlyPayment = Math.max(0, remainingLoan);
+        } else {
+          // Normal payment: decrease by excess, increase by shortage
+          newMonthlyPayment = Math.max(0, currentMonthlyPayment - excessBeyondScheduled + shortageBeyondScheduled);
+        }
+        
+        // NEW CONTINUOUS PENALTY SYSTEM
+        let newPenaltyAccrued = 0;
+        let newDueDate = '';
+        
+        if (isPaymentInsufficient) {
+          // For insufficient payments: KEEP THE ORIGINAL DUE DATE and continue penalty accrual
+          // This means the member is still considered "overdue" from the original due date
+          newDueDate = dueDateStr; // Keep the same due date
+          
+          // Calculate continuous penalty: interest × (30 days / 30 days) = full monthly interest
+          const continuousPenalty = interestAmount; // Full monthly interest as penalty
+          newPenaltyAccrued = Math.max(0, penaltyDue - penaltyPaid) + continuousPenalty;
+          
+        } else {
+          // Sufficient payment: extend due date by 30 days and carry forward remaining penalty
+          let newDueDateObj;
+          if (dueDateStr) {
+            // Parse the current due date and add 30 days to it
+            newDueDateObj = new Date(dueDateStr);
+            newDueDateObj.setDate(newDueDateObj.getDate() + 30);
+          } else {
+            // Fallback: if no current due date, use today + 30 days
+            newDueDateObj = new Date(new Date().getTime() + 30 * 24 * 60 * 60 * 1000);
+          }
+          
+          newDueDate = formatDate(newDueDateObj);
+          newPenaltyAccrued = Math.max(0, penaltyDue - penaltyPaid); // Only carry forward unpaid penalty
+        }
+        
+        // New total monthly payment = new monthly principal + scheduled interest + carried penalty
+        const newTotalMonthlyPayment = newMonthlyPayment + interestAmount + newPenaltyAccrued;
+
+        // Update CurrentLoans
+        const loanUpdates = {};
+        loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100;
+        loanUpdates['dueDate'] = newDueDate;
+        loanUpdates['monthlyPayment'] = Math.ceil(newMonthlyPayment * 100) / 100;
+        loanUpdates['totalMonthlyPayment'] = Math.ceil(newTotalMonthlyPayment * 100) / 100;
+        loanUpdates['paymentsMade'] = paymentsMade;
+        loanUpdates['amountPaid'] = newAmountPaid;
+        loanUpdates['remainingBalance'] = newRemainingBalance;
+        loanUpdates['penaltyAccrued'] = newPenaltyAccrued;
+        
+        // Also update mirrored copy under Members/{id}/loans/{loanId}
+        const memberLoanRef = database.ref(`Members/${memberId}/loans/${currentLoanKey}`);
+        await Promise.all([
+          memberLoansRef.child(currentLoanKey).update(loanUpdates),
+          memberLoanRef.update(loanUpdates)
+        ]);
+      }
+    }
+
+    // STEP 2: UPDATE MEMBERS BALANCE AND INVESTMENT
+    const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
+    
+    // Return any borrowed amount back to savings when principal is paid
+    let savingsAfterBorrowedReturn = currentSavings;
+    if (borrowedFromSavings > 0) {
+      // Calculate how much of the borrowed amount to return based on payment progress
+      const totalLoanAmount = parseFloat(currentLoanData.loanAmount) || 0;
+      
+      // Return proportional borrowed amount based on principal payment
+      const borrowedToReturn = borrowedFromSavings * (principalPaid / totalLoanAmount);
+      
+      if (borrowedToReturn > 0) {
+        savingsAfterBorrowedReturn = Math.ceil((currentSavings + borrowedToReturn) * 100) / 100;
+        await savingsRef.set(savingsAfterBorrowedReturn);
+        
+        // Update daily SavingsHistory by adding the borrowed amount back
+        const now = new Date();
+        const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+        const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+        const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+        const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+        const newDaySavings = Math.ceil((currentDaySavings + borrowedToReturn) * 100) / 100;
+        await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+      }
+    }
+    
+    // Calculate allocation for balance and investment
+    const principalToMember = principalPaid - borrowedFromSavings;
+    
+    // ALLOCATION LOGIC: Excess goes to investment, balance, and funds
+    investmentIncrease = excessPayment;
+    balanceIncrease = principalToMember + excessPayment;
+
+    const memberBalanceToSet = Math.ceil((memberBalance + balanceIncrease) * 100) / 100;
+    const memberInvestmentToSet = Math.ceil((memberInvestment + investmentIncrease) * 100) / 100;
+
+    // Validate final values to prevent invalid numbers
+    if (isNaN(memberBalanceToSet) || !isFinite(memberBalanceToSet)) {
+      const fallbackBalance = Math.ceil((memberBalance + principalPaid + excessPayment) * 100) / 100;
+      await memberRef.update({ balance: fallbackBalance });
+    } else {
+      await memberRef.update({ 
+        balance: memberBalanceToSet,
+        investment: memberInvestmentToSet 
+      });
+    }
+
+    // Update Savings with penalty only, and Yields with interest
+    const now = new Date();
+    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+    // 2a) Add penalties to Savings and SavingsHistory (daily aggregate)
+    if (penaltyPaid > 0) {
+      const newSavingsAmount = Math.ceil((savingsAfterBorrowedReturn + penaltyPaid) * 100) / 100;
+      await savingsRef.set(newSavingsAmount);
+
+      // Update daily SavingsHistory by adding to the existing value for the date
+      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+      const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
+      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+      const newDaySavings = Math.ceil((currentDaySavings + penaltyPaid) * 100) / 100;
+      await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+    }
+
+    // 2b) Add interest to Yields and YieldsHistory
+    if (interestPaid > 0) {
+      const currentYieldsSnap = await yieldsRef.once('value');
+      const currentYields = parseFloat(currentYieldsSnap.val()) || 0;
+      const newYieldsAmount = Math.ceil((currentYields + interestPaid) * 100) / 100;
+      await yieldsRef.set(newYieldsAmount);
+
+      // Update daily YieldsHistory by adding to the existing value for the date
+      const currentDayYieldsSnap = await yieldsHistoryRef.child(dateKey).once('value');
+      const currentDayYields = parseFloat(currentDayYieldsSnap.val()) || 0;
+      const newDayYields = Math.ceil((currentDayYields + interestPaid) * 100) / 100;
+      const yieldsHistoryUpdate = {};
+      yieldsHistoryUpdate[dateKey] = newDayYields;
+      await yieldsHistoryRef.update(yieldsHistoryUpdate);
+    }
+
+    // Update Funds with principal amount minus borrowed portion (excess is allocated to investment, balance, and funds)
+    const principalToFunds = principalPaid - borrowedFromSavings;
+    const fundsIncrease = principalToFunds + excessPayment;
+    
+    if (fundsIncrease > 0) {
+      const newFundsAmount = Math.ceil((currentFunds + fundsIncrease) * 100) / 100;
+      await fundsRef.set(newFundsAmount);
+      
+      // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD to match SavingsHistory)
+      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+      await fundsHistoryRef.set(newFundsAmount);
+    }
+
+    // 10. Write approved/transaction records
+    const approvedData = {
+      ...paymentData,
+      transactionId: newTransactionId,
+      originalTransactionId: originalTransactionId, // NOW THIS IS DEFINED
+      selectedLoanId: paymentData.selectedLoanId,
+      dateApproved: formatDate(now),
+      timeApproved: formatTime(now),
+      timestamp: now.getTime(),
+      status: 'approved',
+      // breakdown
+      penaltyPerDay,
+      overdueDays,
+      penaltyDue,
+      penaltyPaid,
+      interestScheduled: interestAmount,
+      interestPaid,
+      principalPaid,
+      excessPayment,
+      excessMonthlyPayment,   
+      investmentIncrease,
+      balanceIncrease,
+      isLoanPayment,
+      appliedToLoan: currentLoanKey,
+      // NEW: Track if payment was insufficient
+      isPaymentInsufficient: isLoanPayment && currentLoanData ? (paymentAmount < (currentLoanData.totalMonthlyPayment || 0)) : false
+    };
+
+    await approvedRef.set(approvedData);
+    await transactionRef.set(approvedData);
+
+    return newTransactionId;
+
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve payment');
+  }
+};
+
+const callApiApprove = async (paymentData) => {
+  try {
+    const now = new Date();
+    const memberSnap = await database.ref(`Members/${paymentData.memberId}`).once('value');
+    const memberData = memberSnap.val();
+
+    const response = await ApprovePayments({
+      memberId: paymentData.memberId,
+      transactionId: paymentData.transactionId, // Use the transactionId from paymentData
+      amount: paymentData.amount,
+      paymentMethod: paymentData.paymentOption,
+      dateApproved: paymentData.dateApproved || formatDate(now),
+      timeApproved: paymentData.timeApproved || formatTime(now),
+      email: paymentData.email,
+      firstName: memberData.firstName,
+      lastName: memberData.lastName,
+      status: 'approved',
+      interestPaid: (paymentData.interestPaid || 0).toFixed(2),
+      principalPaid: (paymentData.principalPaid || 0).toFixed(2),
+      excessPayment: (paymentData.excessPayment || 0).toFixed(2),
+      isLoanPayment: paymentData.isLoanPayment || false
+    });
+    
+    if (!response.ok) {
+      console.error('Failed to send approval email');
+    }
+    return response;
+  } catch (err) {
+    console.error('API approve error:', err);
+    throw err;
+  }
+};
+
+const processAction = async (paymentData, action) => {
+  setIsProcessing(true); // Use only one loading state
+  setCurrentAction(action);
+
+  try {
+    setSuccessMessage('Payment approved successfully!');
+
+    const now = new Date();
+    const approveData = {
+      ...paymentData,
+      dateApproved: formatDate(now),
+      timeApproved: formatTime(now)
+    };
+
+    setPendingApiCall({
+      type: 'approve',
+      data: approveData
+    });
+
+    setSuccessMessageModalVisible(true);
+  } catch (error) {
+    console.error('Error preparing action:', error);
+    setErrorMessage(error.message || 'An error occurred. Please try again.');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false); // Use only one loading state
+  }
+};
+
+const handleSuccessOk = async () => {
+  // Show loading and hide success modal
+  setIsProcessing(true);
+  setSuccessMessageModalVisible(false);
+
+  try {
+    // Finalize DB changes only when user clicks OK
+    if (pendingApiCall) {
+      if (pendingApiCall.type === 'approve') {
+        await processDatabaseApprove(pendingApiCall.data);
+      }
+    }
+  } catch (err) {
+    console.error('Finalize DB on OK error:', err);
+    setErrorMessage('Failed to process payment in database');
+    setErrorModalVisible(true);
+    setIsProcessing(false);
+    return;
+  }
+
+  // Trigger background email after DB success
+  try {
+    if (pendingApiCall) {
+      if (pendingApiCall.type === 'approve') {
+        // Run API in background (don't await)
+        callApiApprove(pendingApiCall.data);
+      }
+    }
+  } catch (error) {
+    console.error('Error calling API:', error);
+    // Don't show error to user since main operation succeeded
+  } finally {
+    setPendingApiCall(null);
+  }
+
+  // Close modal and clean state
+  closeAddModal();
+  setCurrentAction(null);
+
+  // Refresh data
+  fetchAllData();
+
+  // Hide loading spinner
+  setIsProcessing(false);
+};
+
+// 1. Handle Approve Click - Show Confirmation
+const handleApproveClick = () => {
+  if (!validateFields()) return;
+  setShowApproveConfirmation(true);
+};
+
+const confirmApprove = async () => {
+  setShowApproveConfirmation(false);
+  setIsProcessing(true); // Use only one loading state
+  setCurrentAction('approve');
+
+  try {
+    // Prepare payment data (but don't save to database yet)
+    const paymentData = {
+      memberId: formData.memberId,
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      paymentOption: formData.paymentOption,
+      accountName: formData.accountName,
+      accountNumber: formData.accountNumber,
+      amount: parseFloat(formData.amount),
+      selectedLoanId: selectedLoanId,
+      ...(penaltyAmount > 0 && { 
+        penalty: penaltyAmount,
+        overdueDays: overdueDays 
+      })
+    };
+
+    // Store the data for later processing
+    setPendingApiCall({
+      type: 'approve',
+      data: paymentData
+    });
+
+    // Show success message
+    setSuccessMessage('Payment added and approved successfully!');
+    setSuccessMessageModalVisible(true);
+
+  } catch (error) {
+    console.error('Error preparing approval:', error);
+    setErrorMessage(error.message || 'An error occurred. Please try again.');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false); // Use only one loading state
+  }
+};
+
+  // PRINT FUNCTION (same as before)
   const handlePrint = (format = 'print') => {
     setPrinting(true);
     
@@ -1400,7 +2049,6 @@ const PayLoans = () => {
         activeSection === 'completedPayments' ? 'Approved Payments' :
         'Rejected Payments';
 
-      // Get the data that's currently displayed in the table (paginated)
       const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
       const printContent = document.createElement('div');
@@ -1410,7 +2058,7 @@ const PayLoans = () => {
       printContent.style.boxSizing = 'border-box';
       printContent.style.margin = '0';
 
-      // Create your custom header
+      // Create header
       const header = document.createElement('div');
       header.className = 'print-header';
       header.style.borderBottom = '2px solid #333';
@@ -1418,12 +2066,10 @@ const PayLoans = () => {
       header.style.marginBottom = '20px';
       header.style.boxSizing = 'border-box';
 
-      // Logo and Report Title (Centered)
       const logoSection = document.createElement('div');
       logoSection.style.textAlign = 'center';
       logoSection.style.marginBottom = '15px';
 
-      // Add logo image
       const logoImg = document.createElement('img');
       logoImg.src = logoImage;
       logoImg.style.width = '80px';
@@ -1450,7 +2096,6 @@ const PayLoans = () => {
       logoSection.appendChild(logo);
       logoSection.appendChild(reportTitle);
 
-      // Info Row (Generated Date on left, Prepared By on right)
       const infoRow = document.createElement('div');
       infoRow.style.display = 'flex';
       infoRow.style.justifyContent = 'space-between';
@@ -1459,7 +2104,6 @@ const PayLoans = () => {
       infoRow.style.marginBottom = '10px';
       infoRow.style.boxSizing = 'border-box';
 
-      // Left side - Generated Date
       const generatedDate = document.createElement('div');
       generatedDate.style.textAlign = 'left';
       generatedDate.style.flex = '1';
@@ -1468,7 +2112,6 @@ const PayLoans = () => {
         ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
       `;
 
-      // Right side - Prepared By
       const preparedBy = document.createElement('div');
       preparedBy.style.textAlign = 'right';
       preparedBy.style.flex = '1';
@@ -1483,7 +2126,6 @@ const PayLoans = () => {
       infoRow.appendChild(generatedDate);
       infoRow.appendChild(preparedBy);
 
-      // Report Details
       const reportDetails = document.createElement('div');
       reportDetails.style.textAlign = 'center';
       reportDetails.style.marginBottom = '15px';
@@ -1506,12 +2148,10 @@ const PayLoans = () => {
         table.style.marginTop = '20px';
         table.style.boxSizing = 'border-box';
 
-        // Table Header - Define columns based on active section
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
         headerRow.style.backgroundColor = '#f8f9fa';
         
-        // Define columns for each section
         let headers = [];
         
         switch(activeSection) {
@@ -1528,7 +2168,6 @@ const PayLoans = () => {
             headers = [];
         }
 
-        // Create header cells
         headers.forEach(headerText => {
           const th = document.createElement('th');
           th.textContent = headerText;
@@ -1544,7 +2183,6 @@ const PayLoans = () => {
         thead.appendChild(headerRow);
         table.appendChild(thead);
 
-        // Table Body
         const tbody = document.createElement('tbody');
         displayedData.forEach((item, index) => {
           const row = document.createElement('tr');
@@ -1554,7 +2192,6 @@ const PayLoans = () => {
             const td = document.createElement('td');
             let cellValue = '';
             
-            // Handle data extraction based on header and active section
             switch(header) {
               case 'Member ID':
                 cellValue = item.id || '';
@@ -1612,7 +2249,7 @@ const PayLoans = () => {
         printContent.appendChild(noData);
       }
 
-      // Create a hidden iframe for printing to avoid browser headers
+      // Create hidden iframe for printing
       const printFrame = document.createElement('iframe');
       printFrame.style.position = 'fixed';
       printFrame.style.right = '0';
@@ -1629,7 +2266,6 @@ const PayLoans = () => {
         printDocument = printDocument.document;
       }
 
-      // Write the print content to the iframe with CSS to remove headers/footers
       printDocument.open();
       printDocument.write(`
         <!DOCTYPE html>
@@ -1637,7 +2273,6 @@ const PayLoans = () => {
           <head>
             <title>${sectionTitle} Report</title>
             <style>
-              /* Reset all margins and remove browser headers/footers */
               @page {
                 margin: 0.5in !important;
                 size: auto;
@@ -1657,7 +2292,6 @@ const PayLoans = () => {
                 padding: 20px;
               }
               
-              /* Hide any potential browser elements */
               header, footer, .header, .footer {
                 display: none !important;
               }
@@ -1687,7 +2321,6 @@ const PayLoans = () => {
       `);
       printDocument.close();
 
-      // Wait for content to load then print
       printFrame.onload = function() {
         try {
           if (format === 'pdf') {
@@ -1698,7 +2331,6 @@ const PayLoans = () => {
             const worksheet = workbook.addWorksheet(sectionTitle);
 
             if (displayedData.length > 0) {
-              // Define headers for Excel based on active section
               let excelHeaders = [];
               
               switch(activeSection) {
@@ -1777,11 +2409,9 @@ const PayLoans = () => {
               window.URL.revokeObjectURL(url);
             });
           } else {
-            // Direct print
             printFrame.contentWindow.print();
           }
           
-          // Clean up after printing
           setTimeout(() => {
             document.body.removeChild(printFrame);
             setPrintModalVisible(false);
@@ -1900,7 +2530,6 @@ const PayLoans = () => {
     }));
 
     if (name === 'paymentOption' && value) {
-      // FIX: Safely access paymentAccounts with fallback
       const selectedAccount = paymentAccounts[value] || { accountName: '', accountNumber: '' };
       setFormData(prev => ({
         ...prev,
@@ -1908,13 +2537,11 @@ const PayLoans = () => {
         accountNumber: selectedAccount.accountNumber || ''
       }));
 
-      // Clear proof of payment for Cash-on-Hand
       if (value === 'Cash-on-Hand') {
         setProofOfPaymentFile(null);
       }
     }
 
-    // AUTO FETCH member data when member ID is entered
     if (name === 'memberId') {
       fetchMemberData(value);
     }
@@ -1963,7 +2590,6 @@ const PayLoans = () => {
       setErrorModalVisible(true);
       return false;
     }
-    // Only require proof of payment for non-Cash-on-Hand payments
     if (formData.paymentOption !== 'Cash-on-Hand' && !proofOfPaymentFile) {
       setErrorMessage('Proof of payment is required for non-cash payments');
       setErrorModalVisible(true);
@@ -1989,123 +2615,48 @@ const PayLoans = () => {
     }
   };
 
-  const submitPayment = async () => {
-    setConfirmModalVisible(false);
-    setUploading(true);
-    setIsProcessing(true);
+const submitPayment = async () => {
+  setConfirmModalVisible(false);
+  setUploading(true);
+  setIsProcessing(true); // Use only one loading state
 
-    try {
-      let proofOfPaymentUrl = '';
-      
-      // Only upload proof of payment for non-Cash-on-Hand payments
-      if (formData.paymentOption !== 'Cash-on-Hand' && proofOfPaymentFile) {
-        proofOfPaymentUrl = await uploadImageToStorage(
-          proofOfPaymentFile, 
-          `proofsOfPayment/${formData.memberId}_${Date.now()}`
-        );
-      }
-
-      const transactionId = generateTransactionId();
-      const now = new Date();
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const amount = parseFloat(formData.amount);
-
-      const paymentData = {
-        transactionId,
-        id: formData.memberId,
-        email: formData.email,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        paymentOption: formData.paymentOption,
-        accountName: formData.accountName,
-        accountNumber: formData.accountNumber,
-        amountToBePaid: amount,
-        proofOfPaymentUrl,
-        dateApplied: approvalDate,
-        timeApplied: approvalTime,
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        status: 'approved',
-        selectedLoanId: selectedLoanId,
-        // Include penalty information if applicable
-        ...(penaltyAmount > 0 && { 
-          penalty: penaltyAmount,
-          overdueDays: overdueDays 
-        })
-      };
-
-      const approvedRef = database.ref(`Payments/ApprovedPayments/${formData.memberId}/${transactionId}`);
-      const transactionRef = database.ref(`Transactions/Payments/${formData.memberId}/${transactionId}`);
-      const memberRef = database.ref(`Members/${formData.memberId}`);
-      const fundsRef = database.ref('Settings/Funds');
-
-      const memberSnap = await memberRef.once('value');
-
-      if (memberSnap.exists()) {
-        const member = memberSnap.val();
-
-        await approvedRef.set(paymentData);
-        await transactionRef.set(paymentData);
-
-        const newBalance = parseFloat(member.balance || 0) + amount;
-        await memberRef.update({ balance: newBalance });
-
-        const fundSnap = await fundsRef.once('value');
-        const updatedFund = (parseFloat(fundSnap.val()) || 0) + amount;
-        await fundsRef.set(updatedFund);
-
-        await callApiApprove(paymentData);
-
-        setSuccessMessage('Payment added and approved successfully!');
-        setSuccessModalVisible(true);
-        closeAddModal();
-
-        await fetchAllData();
-      } else {
-        throw new Error('Member not found');
-      }
-    } catch (error) {
-      console.error('Error adding payment:', error);
-      setErrorMessage(error.message || 'Failed to add payment');
-      setErrorModalVisible(true);
-    } finally {
-      setUploading(false);
-      setIsProcessing(false);
+  try {
+    let proofOfPaymentUrl = '';
+    
+    if (formData.paymentOption !== 'Cash-on-Hand' && proofOfPaymentFile) {
+      proofOfPaymentUrl = await uploadImageToStorage(
+        proofOfPaymentFile, 
+        `proofsOfPayment/${formData.memberId}_${Date.now()}`
+      );
     }
-  };
 
-  const generateTransactionId = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
-  };
+    const paymentData = {
+      memberId: formData.memberId,
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      paymentOption: formData.paymentOption,
+      accountName: formData.accountName,
+      accountNumber: formData.accountNumber,
+      amount: parseFloat(formData.amount),
+      proofOfPaymentUrl,
+      selectedLoanId: selectedLoanId,
+      ...(penaltyAmount > 0 && { 
+        penalty: penaltyAmount,
+        overdueDays: overdueDays 
+      })
+    };
 
-  const callApiApprove = async (paymentData) => {
-    try {
-      const response = await ApprovePayments({
-        memberId: paymentData.id,
-        transactionId: paymentData.transactionId,
-        amount: paymentData.amountToBePaid,
-        paymentMethod: paymentData.paymentOption,
-        dateApproved: paymentData.dateApproved || formatDate(new Date()),
-        timeApproved: paymentData.timeApproved || formatTime(new Date()),
-        email: paymentData.email,
-        firstName: paymentData.firstName,
-        lastName: paymentData.lastName,
-        status: 'approved'
-      });
-      
-      if (!response.ok) {
-        throw new Error('Failed to send approval email');
-      }
-    } catch (error) {
-      console.error('API error:', error);
-      throw error;
-    }
-  };
+    await processAction(paymentData, 'approve');
 
-  const handleSuccessOk = () => {
-    setSuccessModalVisible(false);
-  };
+  } catch (error) {
+    console.error('Error adding payment:', error);
+    setErrorMessage(error.message || 'Failed to add payment');
+    setErrorModalVisible(true);
+    setUploading(false);
+    setIsProcessing(false);
+  }
+};
 
   const handleMouseEnter = (element) => {
     setIsHovered(prev => ({ ...prev, [element]: true }));
@@ -2151,7 +2702,11 @@ const PayLoans = () => {
           <div style={styles.controlsRow}>
             {/* Tabs - Left side */}
             <div style={styles.tabContainer}>
-              {tabs.map((tab) => {
+              {[
+                { key: 'pendingPayments', label: 'Pending', icon: FaFileAlt },
+                { key: 'completedPayments', label: 'Approved', icon: FaCheckCircle },
+                { key: 'failedPayments', label: 'Rejected', icon: FaTimes }
+              ].map((tab) => {
                 const isActive = activeSection === tab.key;
                 const IconComponent = tab.icon;
                 return (
@@ -2352,8 +2907,6 @@ const PayLoans = () => {
                     Download as PDF file
                   </p>
                 </button>
-
-
 
                 <button
                   style={{
@@ -2672,47 +3225,49 @@ const PayLoans = () => {
                 )}
               </div>
 
-              <div style={styles.modalActions}>
-                <button
-                  style={{
-                    ...styles.secondaryButton,
-                    ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('cancelButton')}
-                  onMouseLeave={() => handleMouseLeave('cancelButton')}
-                  onClick={closeAddModal}
-                  disabled={uploading}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    ...(isHovered.submitButton ? styles.primaryButtonHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('submitButton')}
-                  onMouseLeave={() => handleMouseLeave('submitButton')}
-                  onClick={handleSubmitConfirmation}
-                  disabled={uploading || memberNotFound || memberLoading}
-                >
-                  {uploading ? (
-                    <>
-                      <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
-                      <span>Adding Payment...</span>
-                    </>
-                  ) : (
-                    <>
-                      <FaCheckCircle />
-                      <span>Add Payment</span>
-                    </>
-                  )}
-                </button>
-              </div>
+ {/* In your modal actions section */}
+<div style={styles.modalActions}>
+  <button
+    style={{
+      ...styles.secondaryButton,
+      ...(isHovered.cancelButton ? styles.secondaryButtonHover : {})
+    }}
+    onMouseEnter={() => handleMouseEnter('cancelButton')}
+    onMouseLeave={() => handleMouseLeave('cancelButton')}
+    onClick={closeAddModal}
+     disabled={uploading || isProcessing} 
+  >
+    Cancel
+  </button>
+  <button
+    style={{
+      ...styles.primaryButton,
+      ...(isHovered.submitButton ? styles.primaryButtonHover : {}),
+      ...((uploading || isProcessing || memberNotFound || memberLoading) ? styles.disabledButton : {})
+    }}
+    onMouseEnter={() => handleMouseEnter('submitButton')}
+    onMouseLeave={() => handleMouseLeave('submitButton')}
+    onClick={handleApproveClick}  // Changed from direct submit
+    disabled={uploading || isProcessing || memberNotFound || memberLoading}
+  >
+    {uploading || isProcessing ? (
+      <>
+        <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
+        <span>Processing...</span>
+      </>
+    ) : (
+      <>
+        <FaCheckCircle />
+        <span>Add Payment</span>
+      </>
+    )}
+  </button>
+</div>
             </div>
           </div>
         )}
 
-        {/* FIXED Loan Details Modal - Proper data handling */}
+        {/* Loan Details Modal */}
         {loanDetailsModalVisible && selectedLoanForDetails && (
           <div style={styles.modalOverlay} onClick={() => setLoanDetailsModalVisible(false)}>
             <div style={{...styles.modalCard, ...styles.loanDetailsModal}} onClick={(e) => e.stopPropagation()}>
@@ -2913,63 +3468,61 @@ const PayLoans = () => {
           </div>
         )}
 
-        {/* Confirmation Modal - Fixed centering */}
-        {confirmModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-                <p style={styles.modalText}>Are you sure you want to add this payment?</p>
-                <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
-                  <button 
-                    style={{
-                      ...styles.secondaryButton,
-                      flex: 1
-                    }} 
-                    onClick={() => setConfirmModalVisible(false)}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    style={{
-                      ...styles.primaryButton,
-                      flex: 1
-                    }}
-                    onClick={submitPayment}
-                  >
-                    Confirm
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
+{/* Approve Confirmation Modal - MATCHING PaymentApplications DESIGN */}
+{showApproveConfirmation && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <p style={styles.modalText}>Are you sure you want to add and approve this payment?</p>
+      <div style={{ display: 'flex', gap: '10px', width: '100%' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(isProcessing ? styles.disabledButton : {}),
+            flex: 1
+          }} 
+          onClick={confirmApprove}
+          disabled={isProcessing}
+        >
+          {isProcessing ? 'Processing...' : 'Yes'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton,
+            flex: 1
+          }} 
+          onClick={() => setShowApproveConfirmation(false)}
+          disabled={isProcessing}
+        >
+          No
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+{/* Success Modal - MATCHING PaymentApplications DESIGN */}
+{successMessageModalVisible && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.modalCardSmall}>
+      <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+      <p style={styles.modalText}>{successMessage}</p>
+      <button 
+        style={{
+          ...styles.actionButton,
+          ...styles.primaryButton,
+          width: '100%'
+        }} 
+        onClick={handleSuccessOk}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
 
-        {/* Success Modal - Fixed centering */}
-        {successModalVisible && (
-          <div style={styles.modalOverlay}>
-            <div style={styles.centeredModal}>
-              <div style={styles.modalCardSmall}>
-                <FaCheckCircle style={{ ...styles.confirmIcon, color: '#059669' }} />
-                <h2 style={{...styles.modalTitle, fontSize: '18px', marginBottom: '10px'}}>Success!</h2>
-                <p style={styles.modalText}>
-                  {successMessage}
-                </p>
-                <button
-                  style={{
-                    ...styles.primaryButton,
-                    width: '100%'
-                  }}
-                  onClick={handleSuccessOk}
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Error Modal - Fixed centering and styling issues */}
+        {/* Error Modal */}
         {errorModalVisible && (
           <div style={styles.modalOverlay}>
             <div style={styles.centeredModal}>
@@ -2998,7 +3551,6 @@ const PayLoans = () => {
           <div style={styles.loadingOverlay}>
             <div style={styles.loadingContent}>
               <div style={styles.spinner}></div>
-              <div style={styles.loadingTextOverlay}>Processing payment...</div>
             </div>
           </div>
         )}
