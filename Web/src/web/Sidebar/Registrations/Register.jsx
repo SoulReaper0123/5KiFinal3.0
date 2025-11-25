@@ -60,6 +60,20 @@ const generateRandomPassword = () => {
   return pwd;
 };
 
+// Add this function in your Register component, after the generateRandomPassword function
+const validatePhoneNumber = (phoneNumber) => {
+  const digits = String(phoneNumber || '').replace(/\D/g, '');
+  if (!digits) {
+    return { isValid: false, message: 'Phone number is required' };
+  }
+  if (digits.length !== 11) {
+    return { isValid: false, message: 'Phone number must be exactly 11 digits' };
+  }
+  return { isValid: true, message: '' };
+};
+
+
+
 const formatDate = (date) => {
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return date.toLocaleDateString('en-US', options);
@@ -593,7 +607,93 @@ const styles = {
     fontSize: '14px',
     color: '#64748b',
     margin: '4px 0 0 0'
+  },
+ // Add these EXACT styles to your Register component's style object
+modalCardSmall: {
+  width: '300px',
+  backgroundColor: 'white',
+  borderRadius: '14px',
+  padding: '20px',
+  position: 'relative',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+  textAlign: 'center',
+  border: '1px solid #F1F5F9'
+},
+confirmIcon: {
+  marginBottom: '14px',
+  fontSize: '28px'
+},
+modalText: {
+  fontSize: '14px',
+  marginBottom: '18px',
+  textAlign: 'center',
+  color: '#475569',
+  lineHeight: '1.5',
+  fontWeight: '500'
+},
+actionButton: {
+  padding: '0.75rem 2rem',
+  borderRadius: '8px',
+  border: 'none',
+  cursor: 'pointer',
+  fontWeight: '600',
+  fontSize: '0.875rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.5rem',
+  transition: 'all 0.2s ease',
+  minWidth: '140px'
+},
+primaryButton: {
+  background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
+  color: 'white',
+  '&:hover': {
+    transform: 'translateY(-1px)',
+    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
   }
+},
+secondaryButton: {
+  background: '#6b7280',
+  color: 'white',
+  '&:hover': {
+    transform: 'translateY(-1px)',
+    boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+  }
+},
+disabledButton: {
+  background: '#9ca3af',
+  cursor: 'not-allowed',
+  opacity: '0.7',
+  '&:hover': {
+    transform: 'none',
+    boxShadow: 'none'
+  }
+},
+loadingSpinnerOverlay: {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0,0,0,0.5)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 3000,
+  backdropFilter: 'blur(4px)'
+},
+loadingSpinner: {
+  border: '4px solid #f3f4f6',
+  borderLeft: '4px solid #2563eb',
+  borderRadius: '50%',
+  width: '40px',
+  height: '40px',
+  animation: 'spin 1s linear infinite'
+},
 };
 
 const Register = () => {
@@ -611,6 +711,7 @@ const Register = () => {
   const [memberFilter, setMemberFilter] = useState('all');
   const [showFilterDropdown, setShowFilterDropdown] = useState(false);
   const [isHovered, setIsHovered] = useState({});
+  const [phoneNumberError, setPhoneNumberError] = useState('');
 
   // Add Member Modal State - ONLY FIELDS THAT MATCH YOUR APP
   const [addModalVisible, setAddModalVisible] = useState(false);
@@ -643,6 +744,11 @@ const Register = () => {
   // Print Modal State
   const [printModalVisible, setPrintModalVisible] = useState(false);
   const [printing, setPrinting] = useState(false);
+  
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [currentAction, setCurrentAction] = useState(null);
+  const [actionInProgress, setActionInProgress] = useState(false);
+  const [pendingApiCall, setPendingApiCall] = useState(null);
 
   const pageSize = 10;
 
@@ -713,6 +819,25 @@ const Register = () => {
       document.head.removeChild(styleElement);
     };
   }, []);
+
+  const handlePhoneNumberChange = (value) => {
+  // Remove any non-digit characters
+  const digitsOnly = value.replace(/\D/g, '');
+  
+  // Limit to 11 digits
+  const limitedDigits = digitsOnly.slice(0, 11);
+  
+  // Update the form data
+  setFormData(prev => ({
+    ...prev,
+    phoneNumber: limitedDigits
+  }));
+  
+  // Validate and show error message
+  const validation = validatePhoneNumber(limitedDigits);
+  setPhoneNumberError(validation.message);
+};
+
 
   const fetchAllData = async () => {
     setLoading(true);
@@ -1272,14 +1397,37 @@ const Register = () => {
       setErrorModalVisible(true);
       return false;
     }
+      if (!formData.phoneNumber) {
+    setErrorMessage('Phone number is required');
+    setErrorModalVisible(true);
+    return false;
+  }
+  
+  // Add phone number validation
+  const phoneValidation = validatePhoneNumber(formData.phoneNumber);
+  if (!phoneValidation.isValid) {
+    setErrorMessage(phoneValidation.message);
+    setErrorModalVisible(true);
+    return false;
+  }
     return true;
   };
 
-  const handleSubmitConfirmation = () => {
-    if (!validateFields()) return;
-    setPendingAdd({ ...formData });
-    setConfirmModalVisible(true);
-  };
+const handleSubmitConfirmation = () => {
+  // Validate phone number first
+  const phoneValidation = validatePhoneNumber(formData.phoneNumber);
+  if (!phoneValidation.isValid) {
+    setErrorMessage(phoneValidation.message);
+    setErrorModalVisible(true);
+    return;
+  }
+  
+  // Then validate other fields
+  if (!validateFields()) return;
+  
+  setPendingAdd({ ...formData });
+  setConfirmModalVisible(true);
+};
 
   const uploadImageToStorage = async (file, path) => {
     try {
@@ -1295,101 +1443,58 @@ const Register = () => {
   
   const toPeso = (n) => `₱${Number(n).toFixed(2)}`;
 
-  const submitManualMember = async () => {
-    setConfirmModalVisible(false);
-    setUploading(true);
+  const createRegistrationTransaction = async (memberData, registrationFee) => {
+  try {
+    const now = new Date();
+    const transactionData = {
+      type: 'registration',
+      amount: parseFloat(registrationFee),
+      dateApplied: memberData.dateAdded || '',
+      dateApproved: memberData.dateAdded, // Use the same date since it's auto-approved
+      approvedTime: memberData.timeAdded,
+      timestamp: now.getTime(),
+      status: 'approved',
+      memberId: memberData.id,
+      firstName: memberData.firstName,
+      lastName: memberData.lastName,
+      email: memberData.email,
+      transactionId: `REG-${Date.now()}`,
+      description: 'Registration fee payment - Manual Admin Addition'
+    };
 
-    try {
-      const password = generateRandomPassword();
-      const { email, firstName, middleName, lastName, registrationFee, ...rest } = pendingAdd;
-      
-      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const userId = userCredential.user.uid;
+    // Create transaction record
+    await database.ref(`Transactions/Registrations/${memberData.id}/${transactionData.transactionId}`).set(transactionData);
+    
+    console.log('Transaction record created successfully');
+  } catch (error) {
+    console.error('Error creating transaction record:', error);
+    throw error;
+  }
+};
 
-      const membersSnap = await database.ref('Members').once('value');
-      const membersData = membersSnap.val() || {};
-      const existingIds = Object.keys(membersData).map(Number).sort((a, b) => a - b);
-      
-      let newId = 5001;
-      for (const id of existingIds) {
-        if (id === newId) newId++;
-        else if (id > newId) break;
-      }
+const submitManualMember = async () => {
+  setConfirmModalVisible(false);
+  setActionInProgress(true);
+  setCurrentAction('add');
 
-      const now = new Date();
-      const dateAdded = now.toLocaleDateString('en-US', { 
-        year: 'numeric', 
-        month: 'long', 
-        day: 'numeric' 
-      });
-      const timeAdded = now.toLocaleTimeString('en-US', {
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true
-      });
+  try {
+    // Show success modal immediately (like Registrations)
+    setSuccessMessage('Member added successfully!');
+    setSuccessModalVisible(true);
+    
+    // Store the data for processing after success modal
+    setPendingApiCall({
+      type: 'add',
+      data: { ...formData, validIdFrontFile, selfieFile, proofOfPaymentFile }
+    });
 
-      // Upload images - ONLY THE ONES THAT MATCH YOUR APP
-      const validIdFrontUrl = await uploadImageToStorage(
-        validIdFrontFile, 
-        `member_docs/${newId}/valid_id_front_${Date.now()}`
-      );
-      const selfieUrl = await uploadImageToStorage(
-        selfieFile, 
-        `member_docs/${newId}/selfie_${Date.now()}`
-      );
-
-      // Upload proof of payment
-      const proofOfPaymentUrl = await uploadImageToStorage(
-        proofOfPaymentFile,
-        `member_docs/${newId}/registration_payment_proof_${Date.now()}`
-      );
-
-      const memberData = {
-        id: newId,
-        authUid: userId,
-        email,
-        firstName,
-        middleName: middleName || '',
-        lastName,
-        ...rest,
-        dateAdded,
-        timeAdded,
-        status: 'active',
-        balance: parseFloat(registrationFee) || 0,
-        investment: parseFloat(registrationFee) || 0,
-        loans: 0.0,
-        validIdFront: validIdFrontUrl,
-        selfie: selfieUrl,
-        registrationFee: parseFloat(registrationFee),
-        registrationPaymentProof: proofOfPaymentUrl,
-        // Add orientation fields to match your app
-        attendedOrientation: true,
-        orientationCode: 'ADMIN_ADDED' // Special code for admin-added members
-      };
-
-      await database.ref(`Members/${newId}`).set(memberData);
-
-      // Update funds with registration fee
-      await updateFunds(registrationFee);
-
-      setSuccessMessage('Member added successfully!');
-      setSuccessModalVisible(true);
-      closeAddModal();
-
-      // Refresh data after successful addition
-      await fetchAllData();
-      
-      await callApiAddMember(memberData, password);
-    } catch (error) {
-      console.error('Error adding member:', error);
-      setErrorMessage(error.message || 'Failed to add member');
-      setErrorModalVisible(true);
-    } finally {
-      setUploading(false);
-    }
-  };
-
+  } catch (error) {
+    console.error('Error preparing member data:', error);
+    setErrorMessage('Failed to prepare member data');
+    setErrorModalVisible(true);
+    setActionInProgress(false);
+  }
+};
   const updateFunds = async (amount) => {
     try {
       const fundsRef = database.ref('Settings/Funds');
@@ -1430,12 +1535,131 @@ const Register = () => {
     }
   };
 
-  const handleSuccessOk = () => {
-    setSuccessModalVisible(false);
-    if (pendingAdd) {
-      setPendingAdd(null);
+const handleSuccessOk = async () => {
+  // Close success modal and show loading spinner
+  setSuccessModalVisible(false);
+  setIsProcessing(true);
+
+  try {
+    // Process the actual database operations (like Registrations)
+    if (pendingApiCall && pendingApiCall.type === 'add') {
+      const { data } = pendingApiCall;
+      const password = generateRandomPassword();
+      const { email, firstName, middleName, lastName, registrationFee, ...rest } = data;
+      
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const userId = userCredential.user.uid;
+
+      const membersSnap = await database.ref('Members').once('value');
+      const membersData = membersSnap.val() || {};
+      const existingIds = Object.keys(membersData).map(Number).sort((a, b) => a - b);
+      
+      let newId = 5001;
+      for (const id of existingIds) {
+        if (id === newId) newId++;
+        else if (id > newId) break;
+      }
+
+      const now = new Date();
+      const dateAdded = now.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+      const timeAdded = now.toLocaleTimeString('en-US', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true
+      });
+
+      // Upload images
+      const validIdFrontUrl = await uploadImageToStorage(
+        data.validIdFrontFile, 
+        `member_docs/${newId}/valid_id_front_${Date.now()}`
+      );
+      const selfieUrl = await uploadImageToStorage(
+        data.selfieFile, 
+        `member_docs/${newId}/selfie_${Date.now()}`
+      );
+      const proofOfPaymentUrl = await uploadImageToStorage(
+        data.proofOfPaymentFile,
+        `member_docs/${newId}/registration_payment_proof_${Date.now()}`
+      );
+
+      const memberData = {
+        id: newId,
+        authUid: userId,
+        email,
+        firstName,
+        middleName: middleName || '',
+        lastName,
+        ...rest,
+        dateAdded,
+        timeAdded,
+        status: 'active',
+        balance: parseFloat(registrationFee) || 0,
+        investment: parseFloat(registrationFee) || 0,
+        loans: 0.0,
+        validIdFront: validIdFrontUrl,
+        selfie: selfieUrl,
+        registrationFee: parseFloat(registrationFee),
+        registrationPaymentProof: proofOfPaymentUrl,
+        attendedOrientation: true,
+        orientationCode: 'ADMIN_ADDED'
+      };
+
+      // STEP 1: Save member to database
+      await database.ref(`Members/${newId}`).set(memberData);
+
+      // STEP 2: Create transaction record (EXACTLY LIKE REGISTRATIONS)
+      const transactionData = {
+        type: 'registration',
+        amount: parseFloat(registrationFee),
+        dateApplied: dateAdded, // Use the dateAdded as application date
+        dateApproved: dateAdded, // For admin-added members, approved immediately
+        approvedTime: timeAdded,
+        timestamp: now.getTime(),
+        status: 'approved',
+        memberId: newId,
+        firstName,
+        lastName,
+        email,
+        transactionId: `REG-${Date.now()}`,
+        description: 'Registration fee payment - Admin Added'
+      };
+
+      // STEP 3: Save transaction to Transactions/Registrations (EXACTLY LIKE REGISTRATIONS)
+      await database.ref(`Transactions/Registrations/${newId}/${transactionData.transactionId}`).set(transactionData);
+
+      // STEP 4: Update funds
+      await updateFunds(registrationFee);
+
+      // STEP 5: Call API in background (like Registrations)
+      try {
+        await callApiAddMember(memberData, password);
+      } catch (apiError) {
+        console.error('Background API error:', apiError);
+        // Don't show error to user - this is background process
+      }
+
+      // STEP 6: Refresh data (like Registrations)
+      await fetchAllData();
     }
-  };
+
+  } catch (error) {
+    console.error('Error adding member:', error);
+    setErrorMessage(error.message || 'Failed to add member');
+    setErrorModalVisible(true);
+  } finally {
+    // Clean up and close everything
+    closeAddModal();
+    setPendingAdd(null);
+    setPendingApiCall(null);
+    setIsProcessing(false);
+    setActionInProgress(false);
+  }
+};
 
   const handleMouseEnter = (element) => {
     setIsHovered(prev => ({ ...prev, [element]: true }));
@@ -1846,18 +2070,41 @@ const Register = () => {
                       />
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Phone Number<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Enter phone number"
-                        value={formData.phoneNumber}
-                        onChange={(e) => handleInputChange('phoneNumber', e.target.value)}
-                        type="tel"
-                      />
-                    </div>
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Phone Number<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <input
+    style={{
+      ...styles.formInput,
+      ...(phoneNumberError ? styles.errorInput : {})
+    }}
+    placeholder="Enter 11-digit phone number"
+    value={formData.phoneNumber}
+    onChange={(e) => handlePhoneNumberChange(e.target.value)}
+    type="tel"
+    maxLength="11" // This helps with visual feedback
+  />
+  {phoneNumberError && (
+    <div style={{
+      color: '#dc2626',
+      fontSize: '12px',
+      marginTop: '4px',
+      marginLeft: '2px'
+    }}>
+      {phoneNumberError}
+    </div>
+  )}
+  {/* Add a helper text */}
+  <div style={{
+    color: '#6b7280',
+    fontSize: '12px',
+    marginTop: '4px',
+    marginLeft: '2px'
+  }}>
+
+  </div>
+</div>
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
@@ -2084,78 +2331,85 @@ const Register = () => {
           </div>
         )}
 
-        {/* Confirmation Modal */}
-        {confirmModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={styles.modalHeader}>
-                <h2 style={styles.modalTitle}>Confirm Registration</h2>
-              </div>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FiAlertCircle style={{fontSize: '48px', color: '#f59e0b', marginBottom: '16px'}} />
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  Are you sure you want to register this new member? This action cannot be undone.
-                </p>
-              </div>
-              <div style={styles.modalActions}>
-                <button
-                  style={styles.secondaryButton}
-                  onClick={() => setConfirmModalVisible(false)}
-                >
-                  Cancel
-                </button>
-                <button
-                  style={styles.primaryButton}
-                  onClick={submitManualMember}
-                >
-                  Confirm Registration
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+{/* Confirmation Modal - EXACT SAME AS REGISTRATIONS */}
+{confirmModalVisible && (
+  <div style={styles.modalOverlay} onClick={() => setConfirmModalVisible(false)}>
+    <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+      <FiAlertCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
+      <p style={styles.modalText}>
+        Are you sure you want to register this new member? This action cannot be undone.
+      </p>
+      <div style={{ display: 'flex', gap: '10px' }}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(actionInProgress ? styles.disabledButton : {})
+          }} 
+          onClick={submitManualMember}
+          disabled={actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Yes'} {/* Changed from 'Confirm Registration' to 'Yes' */}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }} 
+          onClick={() => setConfirmModalVisible(false)}
+          disabled={actionInProgress}
+        >
+          No {/* Changed from 'Cancel' to 'No' */}
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-        {/* Success Modal */}
-        {successModalVisible && (
-          <div style={styles.modalOverlay} onClick={handleSuccessOk}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaCheckCircle style={{fontSize: '48px', color: '#059669', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Success!</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {successMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={handleSuccessOk}
-                >
-                  Continue
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+{/* Success Modal - EXACT SAME AS REGISTRATIONS */}
+{successModalVisible && (
+  <div style={styles.modalOverlay} onClick={handleSuccessOk}>
+    <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+      <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+      <p style={styles.modalText}>{successMessage}</p>
+      <button 
+        style={{
+          ...styles.actionButton,
+          ...styles.primaryButton
+        }} 
+        onClick={handleSuccessOk}
+      >
+        OK {/* Changed from 'Continue' to 'OK' */}
+      </button>
+    </div>
+  </div>
+)}
 
-        {/* Error Modal */}
-        {errorModalVisible && (
-          <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
-            <div style={{...styles.modalCard, maxWidth: '400px'}} onClick={(e) => e.stopPropagation()}>
-              <div style={{padding: '24px', textAlign: 'center'}}>
-                <FaExclamationCircle style={{fontSize: '48px', color: '#dc2626', marginBottom: '16px'}} />
-                <h2 style={{...styles.modalTitle, marginBottom: '12px'}}>Error</h2>
-                <p style={{margin: '0 0 24px 0', color: '#64748b'}}>
-                  {errorMessage}
-                </p>
-                <button
-                  style={styles.primaryButton}
-                  onClick={() => setErrorModalVisible(false)}
-                >
-                  Try Again
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+{/* Error Modal - EXACT SAME AS REGISTRATIONS */}
+{errorModalVisible && (
+  <div style={styles.modalOverlay} onClick={() => setErrorModalVisible(false)}>
+    <div style={styles.modalCardSmall} onClick={(e) => e.stopPropagation()}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#ef4444' }} />
+      <p style={styles.modalText}>{errorMessage}</p>
+      <button 
+        style={{
+          ...styles.actionButton,
+          ...styles.primaryButton
+        }} 
+        onClick={() => setErrorModalVisible(false)}
+      >
+        Try Again
+      </button>
+    </div>
+  </div>
+)}
+
+{/* Loading Spinner - EXACT SAME AS REGISTRATIONS */}
+{isProcessing && (
+  <div style={styles.loadingSpinnerOverlay}>
+    <div style={styles.loadingSpinner}></div>
+  </div>
+)}
       </div>
     </div>
   );
