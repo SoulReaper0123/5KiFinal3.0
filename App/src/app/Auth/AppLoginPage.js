@@ -633,6 +633,7 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 5,
   },
+  // UPDATED: Input container with explicit border styling
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -642,18 +643,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FAFF',
     marginBottom: 12,
     width: '90%',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    // Platform-specific shadow handling
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        // For web, use boxShadow and ensure border is visible
+        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.06)',
+        borderStyle: 'solid', // Explicitly set border style for web
+      },
+    }),
   },
-  input: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#333',
-  },
+  // UPDATED: Password container with same improvements
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -663,17 +671,48 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FAFF',
     marginBottom: 12,
     width: '90%',
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    // Platform-specific shadow handling
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+      },
+      android: {
+        elevation: 2,
+      },
+      web: {
+        boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.06)',
+        borderStyle: 'solid', // Explicitly set border style for web
+      },
+    }),
+  },
+  input: {
+    flex: 1,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: '#333',
+    // Add platform-specific styles for web
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none', // Remove default web focus outline
+        borderWidth: 0, // Ensure no internal borders
+      },
+    }),
   },
   passwordInput: {
     flex: 1,
     paddingVertical: 12,
     fontSize: 16,
     color: '#333',
+    // Add platform-specific styles for web
+    ...Platform.select({
+      web: {
+        outlineStyle: 'none', // Remove default web focus outline
+        borderWidth: 0, // Ensure no internal borders
+      },
+    }),
   },
   eyeIcon: {
     paddingHorizontal: 10,
