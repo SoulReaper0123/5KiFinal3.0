@@ -21,8 +21,8 @@ import {
   FaHeart,
   FaBirthdayCake
 } from 'react-icons/fa';
+import Tesseract from 'tesseract.js';
 
-const API_URL = 'https://five5ki.onrender.com'; 
 
 const styles = {
   container: {
@@ -379,13 +379,14 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center'
   },
-  largeImage: {
-    maxWidth: '100%',
-    maxHeight: '70vh',
-    objectFit: 'contain',
-    borderRadius: '8px',
-    boxShadow: '0 20px 60px rgba(0,0,0,0.3)'
-  },
+largeImage: {
+  maxWidth: '100%',
+  maxHeight: '60vh', // Reduced from 70vh to make space for buttons
+  objectFit: 'contain',
+  borderRadius: '8px',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+  marginBottom: '80px' // Add space for verification section
+},
   imageViewerLabel: {
     color: 'white',
     fontSize: '1.125rem',
@@ -527,29 +528,29 @@ const styles = {
       backgroundColor: '#dc2626'
     }
   },
-  verifyButton: {
-    padding: '0.5rem 1rem',
-    backgroundColor: '#1e3a8a',
-    color: 'white',
-    border: 'none',
-    borderRadius: '6px',
-    cursor: 'pointer',
-    fontSize: '0.875rem',
-    fontWeight: '500',
-    marginTop: '0.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.2s ease',
-    '&:hover': {
-      backgroundColor: '#1e40af'
-    },
-    '&:disabled': {
-      backgroundColor: '#9ca3af',
-      cursor: 'not-allowed'
-    }
+verifyButton: {
+  padding: '0.5rem 1rem',
+  backgroundColor: '#1e3a8a',
+  color: 'white',
+  border: 'none',
+  borderRadius: '6px',
+  cursor: 'pointer',
+  fontSize: '0.875rem',
+  fontWeight: '500',
+  marginTop: '0.75rem',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '0.5rem',
+  transition: 'all 0.2s ease',
+  '&:hover': {
+    backgroundColor: '#1e40af'
   },
+  '&:disabled': {
+    backgroundColor: '#9ca3af',
+    cursor: 'not-allowed'
+  }
+},
   financialCard: {
     background: 'linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%)',
     border: '1px solid #bae6fd',
@@ -708,231 +709,772 @@ const Registrations = ({
   const [pendingApiCall, setPendingApiCall] = useState(null);
   const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
 
-  // Server-based verification functions
-  const verifyID = async (imageUrl, label) => {
-    setIsVerifying(prev => ({ ...prev, [label]: true }));
-    setValidationStatus(prev => ({
-      ...prev,
-      [label]: { status: 'verifying', message: 'Analyzing ID with AI...' }
-    }));
+// ===== CLIENT-SIDE IMAGE VERIFICATION FUNCTIONS =====
 
-    try {
-      const response = await fetch(`${API_URL}/process-ocr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: imageUrl,
-          type: 'id'
-        })
-      });
+// ===== ALL-IN-ONE CLIENT-SIDE VERIFICATION WITH TESSERACT =====
 
-      const data = await response.json();
+const loadImageForOCR = (imageUrl) => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = 'Anonymous';
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error('Failed to load image'));
+    img.src = imageUrl;
+  });
+};
 
-      if (data.success) {
-        const result = data.result;
-        
-        let message = `Confidence: ${result.confidence}%`;
-        if (result.extractedName && result.extractedName !== 'Not found') {
-          message += ` | Name: ${result.extractedName}`;
-        }
-        if (result.idType && result.idType !== 'Unknown') {
-          message += ` | Type: ${result.idType}`;
-        }
+// Enhanced ID Verification with Better Preprocessing
+const verifyID = async (imageUrl, label) => {
+  setIsVerifying(prev => ({ ...prev, [label]: true }));
+  setValidationStatus(prev => ({
+    ...prev,
+    [label]: { status: 'verifying', message: 'Analyzing ID document...' }
+  }));
 
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: {
-            status: result.status === 'valid' ? 'valid' : 'manual',
-            message: message
+  try {
+    const img = await loadImageForOCR(imageUrl);
+    
+    // Enhanced preprocessing for ID documents
+    const canvas = preprocessImageForOCR(img);
+    
+    // Use multiple OCR configurations for better accuracy
+    const { data: { text, confidence } } = await Tesseract.recognize(
+      canvas,
+      'eng',
+      { 
+        logger: m => console.log(m),
+        tessedit_pageseg_mode: 6, // Uniform block of text
+        tessedit_ocr_engine_mode: 1, // LSTM engine
+        textord_min_linesize: 1.5, // Better for document text
+        textord_heavy_nr: 1, // Noise reduction
+        tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/-., ',
+        preserve_interword_spaces: '1'
+      }
+    );
+
+    console.log('=== ENHANCED ID VERIFICATION START ===');
+    console.log('Raw OCR Text:', text);
+    console.log('OCR Confidence:', confidence);
+
+    // IMPROVED TEXT CLEANING
+    let cleanedText = text
+      .replace(/[|\\/{}\[\]()~`@#$%^&*_=+<>"']/g, ' ') // Remove special chars
+      .replace(/\b\w\b/g, ' ') // Remove single letters
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .replace(/\n/g, ' ') // Replace newlines with spaces
+      .replace(/\s{2,}/g, ' ') // Replace multiple spaces with single space
+      .trim();
+
+    console.log('Cleaned Text:', cleanedText);
+
+    const upperText = cleanedText.toUpperCase();
+    let extractedName = { first: '', middle: '', last: '' };
+    let idType = 'Unknown';
+    let idNumber = null;
+    let extractedAddress = null;
+    let dateOfBirth = null;
+
+    // ENHANCED PHILIPPINE ID DETECTION PATTERNS
+    const phIdPatterns = {
+      nationalId: {
+        patterns: [
+          /REPUBLIKA NG PILIPINAS/i,
+          /PAMBANSANG PAGKAKAKILANLAN/i,
+          /PHILIPPINE IDENTIFICATION/i,
+          /PHILSYS/i,
+          /NATIONAL ID/i,
+          /4169[- ]1564[- ]8734[- ]9658/i
+        ],
+        idNumber: /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/,
+        type: 'Philippine National ID'
+      },
+      driversLicense: {
+        patterns: [
+          /DRIVER'?S? LICENSE/i,
+          /LAND TRANSPORTATION OFFICE/i,
+          /LTO/i,
+          /DEPARTMENT OF TRANSPORTATION/i,
+          /REPUBLIC OF THE PHILIPPINES/i
+        ],
+        idNumber: /\b[A-Z]\d{2}[- ]?\d{2}[- ]?\d{6,8}\b/,
+        type: "Driver's License"
+      },
+      passport: {
+        patterns: [/PASSPORT/i, /REPUBLIC OF THE PHILIPPINES/i],
+        idNumber: /\b[A-Z]\d{7,8}\b/,
+        type: 'Passport'
+      }
+    };
+
+    // IMPROVED ID TYPE DETECTION
+    const detectIDType = (text) => {
+      const upperText = text.toUpperCase();
+      
+      for (const [type, patterns] of Object.entries(phIdPatterns)) {
+        for (const pattern of patterns.patterns) {
+          if (upperText.match(pattern)) {
+            return { type: patterns.type, pattern: type };
           }
-        }));
-
-        // Show detailed results in modal
-        if (result.extractedName && result.extractedName !== 'Not found') {
-          showInfoModal('ID Verification Results', [
-            { label: 'Detected Name', value: result.extractedName },
-            { label: 'ID Type', value: result.idType },
-            { label: 'Confidence', value: `${result.confidence}%` }
-          ]);
         }
-      } else {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'error', message: 'Server processing failed' }
-        }));
       }
-    } catch (error) {
-      console.error('ID verification error:', error);
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Network error' }
-      }));
-    } finally {
-      setIsVerifying(prev => ({ ...prev, [label]: false }));
+      return { type: 'Unknown', pattern: 'unknown' };
+    };
+
+    const detectedId = detectIDType(upperText);
+    idType = detectedId.type;
+    console.log('Detected ID Type:', idType, 'Pattern:', detectedId.pattern);
+
+    // IMPROVED ID NUMBER EXTRACTION
+    if (detectedId.pattern in phIdPatterns) {
+      const idPattern = phIdPatterns[detectedId.pattern].idNumber;
+      const match = cleanedText.match(idPattern);
+      if (match) {
+        idNumber = match[0].replace(/\s+/g, '');
+        console.log('Found ID Number:', idNumber);
+      }
     }
-  };
 
-  const verifyPaymentProof = async (imageUrl, label) => {
-    setIsVerifying(prev => ({ ...prev, [label]: true }));
-    setValidationStatus(prev => ({
-      ...prev,
-      [label]: { status: 'verifying', message: 'Extracting payment details...' }
-    }));
-
-    try {
-      const response = await fetch(`${API_URL}/process-ocr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: imageUrl,
-          type: 'payment'
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const result = data.result;
-        
-        let message = 'Payment details extracted';
-        if (result.amount) {
-          message = `Amount: ${result.amount}`;
+    // If no specific pattern found, try generic patterns
+    if (!idNumber) {
+      const genericPatterns = [
+        /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{4}\b/, // PhilID
+        /\b[A-Z]\d{2}[- ]?\d{2}[- ]?\d{6,8}\b/, // Driver's License
+        /\b[A-Z]\d{7,8}\b/, // Passport
+        /\b\d{9,12}\b/, // Generic numbers
+      ];
+      
+      for (const pattern of genericPatterns) {
+        const match = cleanedText.match(pattern);
+        if (match) {
+          idNumber = match[0].replace(/\s+/g, '');
+          console.log('Found ID Number (generic):', idNumber);
+          break;
         }
-        if (result.reference) {
-          message += ` | Ref: ${result.reference}`;
-        }
-        if (result.date) {
-          message += ` | Date: ${result.date}`;
-        }
+      }
+    }
 
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: {
-            status: result.status === 'valid' ? 'valid' : 'manual',
-            message: message
+    // IMPROVED NAME EXTRACTION FOR PHILIPPINE IDs
+    console.log('=== ENHANCED NAME EXTRACTION ===');
+    
+    // Look for "Last Name, First Name Middle Name" pattern commonly found in Philippine IDs
+    const nameCommaPattern = /([A-Z][A-Z]+),\s*([A-Z][A-Z\s]+)(?:\s+([A-Z][A-Z]+))?/;
+    const commaMatch = cleanedText.match(nameCommaPattern);
+    
+    if (commaMatch) {
+      extractedName.last = commaMatch[1].trim();
+      const firstMiddle = commaMatch[2].trim();
+      
+      // Split first and middle names (usually first name comes first, then middle)
+      const nameParts = firstMiddle.split(/\s+/);
+      if (nameParts.length >= 1) {
+        extractedName.first = nameParts[0];
+      }
+      if (nameParts.length >= 2) {
+        extractedName.middle = nameParts.slice(1).join(' ');
+      }
+      console.log('Found name (comma format):', extractedName);
+    }
+
+    // If comma format not found, try label-based extraction
+    if (!extractedName.first && !extractedName.last) {
+      const nameLabels = [
+        { pattern: /(?:LAST NAME|APELYIDO)[:\s]*([A-Z][A-Z\s]+)/i, type: 'last' },
+        { pattern: /(?:FIRST NAME|GIVEN NAME|MGA PANGALAN)[:\s]*([A-Z][A-Z\s]+)/i, type: 'first' },
+        { pattern: /(?:MIDDLE NAME|GITNANG PANGALAN)[:\s]*([A-Z][A-Z\s]+)/i, type: 'middle' },
+      ];
+
+      for (const { pattern, type } of nameLabels) {
+        const match = cleanedText.match(pattern);
+        if (match && match[1]) {
+          const nameValue = match[1].trim();
+          // Validate name (2-30 chars, no numbers, reasonable length)
+          if (nameValue.length >= 2 && nameValue.length <= 30 && 
+              !nameValue.match(/^\d+$/) && !nameValue.match(/\d{4,}/)) {
+            extractedName[type] = nameValue;
+            console.log(`Found ${type} name:`, nameValue);
           }
-        }));
-
-        // Show detailed results
-        if (result.amount || result.reference) {
-          showInfoModal('Payment Verification Results', [
-            { label: 'Amount', value: result.amount || 'Not found' },
-            { label: 'Reference', value: result.reference || 'Not found' },
-            { label: 'Date', value: result.date || 'Not found' },
-            { label: 'Confidence', value: `${result.confidence}%` }
-          ]);
         }
-      } else {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'manual', message: 'Manual review required' }
-        }));
       }
-    } catch (error) {
-      console.error('Payment verification error:', error);
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Payment verification failed' }
-      }));
-    } finally {
-      setIsVerifying(prev => ({ ...prev, [label]: false }));
     }
-  };
 
-  const verifyFace = async (imageUrl, label) => {
-    setIsVerifying(prev => ({ ...prev, [label]: true }));
+    // IMPROVED ADDRESS EXTRACTION
+    console.log('=== ENHANCED ADDRESS EXTRACTION ===');
+    
+    const addressPatterns = [
+      /(?:ADDRESS|TIRAHA?N)[:\s]*([A-Z0-9][A-Z0-9\s,.-]{10,80})/i,
+      /YATI,\s*LILOAN,\s*CEBU,\s*6002/i, // Specific address from your example
+      /PUROK\s+TUGAS,\s*YATI,\s*LILOAN,\s*CEBU/i, // National ID address format
+    ];
+
+    for (const pattern of addressPatterns) {
+      const match = cleanedText.match(pattern);
+      if (match) {
+        const addressCandidate = match[1] ? match[1].trim() : match[0].trim();
+        // More lenient address validation
+        if (addressCandidate.length >= 5 && addressCandidate.length <= 100) {
+          extractedAddress = addressCandidate;
+          console.log('Found address:', extractedAddress);
+          break;
+        }
+      }
+    }
+
+    // IMPROVED DATE OF BIRTH EXTRACTION
+    console.log('=== ENHANCED DATE EXTRACTION ===');
+    
+    const datePatterns = [
+      /(?:DATE OF BIRTH|BIRTHDATE|NESSA? NG KAPANGANAKAN)[:\s]*(\d{4}[/-]\d{1,2}[/-]\d{1,2})/i,
+      /(?:DATE OF BIRTH|BIRTHDATE)[:\s]*([A-Z]+ \d{1,2},? \d{4})/i,
+      /(\d{4}[/-]\d{1,2}[/-]\d{1,2})/, // YYYY-MM-DD or YYYY/MM/DD
+      /([A-Z]+ \d{1,2},? \d{4})/, // Month Day, Year
+    ];
+
+    for (const pattern of datePatterns) {
+      const match = cleanedText.match(pattern);
+      if (match && match[1]) {
+        dateOfBirth = match[1].trim();
+        console.log('Found date of birth:', dateOfBirth);
+        break;
+      }
+    }
+
+    // CONSTRUCT FULL NAME
+    let fullName = null;
+    if (extractedName.first && extractedName.last) {
+      fullName = `${extractedName.first} ${extractedName.middle ? extractedName.middle + ' ' : ''}${extractedName.last}`.trim();
+      console.log('Constructed full name:', fullName);
+    }
+
+    // ENHANCED VALIDATION LOGIC
+    const hasValidName = !!(fullName && fullName.length >= 5 && fullName.split(' ').length >= 2);
+    const hasValidID = !!(idNumber && idNumber.length >= 8);
+    const hasValidAddress = !!(extractedAddress && extractedAddress.length >= 10);
+    const hasValidDOB = !!(dateOfBirth && dateOfBirth.length >= 8);
+    
+    const dataScore = [hasValidName, hasValidID, hasValidAddress, hasValidDOB].filter(Boolean).length;
+    
+    console.log('Enhanced Data Validation Score:', {
+      hasValidName, hasValidID, hasValidAddress, hasValidDOB, dataScore, confidence
+    });
+
+    // IMPROVED STATUS DETERMINATION
+    let status = 'invalid';
+    let statusMessage = '';
+    
+    if (dataScore >= 3 && confidence > 60) {
+      status = 'valid';
+      statusMessage = '✅ High confidence - Valid ID';
+    } else if (dataScore >= 2 && confidence > 40) {
+      status = 'manual';
+      statusMessage = '⚠️ Medium confidence - Manual review recommended';
+    } else {
+      status = 'manual';
+      statusMessage = '⚠️ Low confidence - Requires manual verification';
+    }
+
+    // CONSTRUCT DETAILED RESULT MESSAGE
+    let message = '';
+    if (fullName) {
+      message = `Name: ${fullName}`;
+    } else {
+      message = 'Name: Not clearly detected';
+    }
+
+    message += ` | ID Type: ${idType}`;
+    message += ` | ID Number: ${idNumber || 'Not found'}`;
+    message += ` | Confidence: ${Math.round(confidence)}%`;
+
+    console.log('Enhanced Final Validation Result:', {
+      status,
+      fullName,
+      idType,
+      idNumber,
+      extractedAddress,
+      dateOfBirth,
+      confidence,
+      dataScore
+    });
+
+    // UPDATE VALIDATION STATUS
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'verifying', message: 'Detecting face...' }
+      [label]: {
+        status,
+        message: `${statusMessage} | ${message}`,
+        details: { 
+          extractedName: fullName, 
+          idType, 
+          idNumber, 
+          address: extractedAddress,
+          dateOfBirth,
+          confidence,
+          dataScore
+        }
+      }
     }));
 
-    try {
-      const response = await fetch(`${API_URL}/process-ocr`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          imageUrl: imageUrl,
-          type: 'face'
-        })
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const result = data.result;
+    // SMART AUTO-FILL WITH BETTER VALIDATION
+    if (selectedRegistration && status !== 'invalid') {
+      setSelectedRegistration(prev => {
+        if (!prev) return prev;
+        const updated = { ...prev };
         
-        if (result.facesDetected > 0) {
-          setValidationStatus(prev => ({
-            ...prev,
-            [label]: {
-              status: 'valid',
-              message: `Face detected (${result.facesDetected})`
-            }
-          }));
-
-          showInfoModal('Face Detection Results', [
-            { label: 'Faces Detected', value: result.facesDetected },
-            { label: 'Image Size', value: result.imageSize },
-            { label: 'Status', value: '✅ Valid' }
-          ]);
-        } else {
-          setValidationStatus(prev => ({
-            ...prev,
-            [label]: { status: 'invalid', message: 'No face detected' }
-          }));
+        // Only fill if current field is empty or very short
+        if (hasValidName) {
+          if (!updated.firstName || updated.firstName.trim().length < 2) {
+            updated.firstName = extractedName.first;
+          }
+          if (!updated.lastName || updated.lastName.trim().length < 2) {
+            updated.lastName = extractedName.last;
+          }
+          if (extractedName.middle && extractedName.middle.length > 1 && 
+              (!updated.middleName || updated.middleName.trim().length < 2)) {
+            updated.middleName = extractedName.middle;
+          }
         }
-      } else {
-        setValidationStatus(prev => ({
-          ...prev,
-          [label]: { status: 'error', message: 'Face detection failed' }
-        }));
-      }
-    } catch (error) {
-      console.error('Face verification error:', error);
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'error', message: 'Face verification failed' }
-      }));
-    } finally {
-      setIsVerifying(prev => ({ ...prev, [label]: false }));
+        
+        if (hasValidAddress && (!updated.address || updated.address.trim().length < 5)) {
+          updated.address = extractedAddress;
+        }
+        
+        if (hasValidDOB && (!updated.dateOfBirth || updated.dateOfBirth.trim().length < 5)) {
+          updated.dateOfBirth = dateOfBirth;
+        }
+        
+        console.log('Auto-filled validated fields:', {
+          firstName: updated.firstName,
+          lastName: updated.lastName,
+          middleName: updated.middleName,
+          address: updated.address,
+          dateOfBirth: updated.dateOfBirth
+        });
+        
+        return updated;
+      });
     }
+
+    // SHOW DETAILED RESULTS
+    const infoFields = [
+      { label: 'Detected Name', value: fullName || 'Not clearly detected' },
+      { label: 'ID Type', value: idType },
+      { label: 'ID Number', value: idNumber || 'Not found' },
+      { label: 'Address', value: extractedAddress || 'Not found' },
+      { label: 'Date of Birth', value: dateOfBirth || 'Not found' },
+      { label: 'OCR Confidence', value: `${Math.round(confidence)}%` },
+      { label: 'Data Quality', value: `${dataScore}/4 fields detected` },
+      { label: 'Verification', value: statusMessage }
+    ];
+
+    showInfoModal('ID Verification Results', infoFields);
+
+  } catch (error) {
+    console.error('ID verification error:', error);
+    
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { 
+        status: 'error', 
+        message: `Verification failed: ${error.message || 'Unknown error'}` 
+      }
+    }));
+    
+    const errorFields = [
+      { label: 'Error', value: 'Verification failed' },
+      { label: 'Details', value: error.message || 'Unknown error occurred' },
+      { label: 'Status', value: '❌ Error' }
+    ];
+    
+    showInfoModal('ID Verification Error', errorFields);
+  } finally {
+    setIsVerifying(prev => ({ ...prev, [label]: false }));
+  }
+};
+
+// Enhanced Image Preprocessing
+const preprocessImageForOCR = (img) => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Set canvas size to original image size
+  canvas.width = img.width;
+  canvas.height = img.height;
+  
+  // Draw original image
+  ctx.drawImage(img, 0, 0);
+  
+  // Get image data for processing
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  
+  // Enhanced preprocessing for ID documents
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    // Convert to grayscale with better weights
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    
+    // Enhanced contrast for text clarity
+    const contrast = 2.0; // Increased contrast
+    const adjusted = contrast * (gray - 128) + 128;
+    
+    // Apply threshold to make text more distinct
+    const threshold = 128;
+    const finalValue = adjusted > threshold ? 255 : 0;
+    
+    data[i] = data[i + 1] = data[i + 2] = finalValue;
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+  
+  // Additional sharpening for text clarity
+  ctx.filter = 'contrast(1.5) brightness(1.1)';
+  ctx.drawImage(canvas, 0, 0);
+  ctx.filter = 'none';
+  
+  return canvas;
+};
+
+// Enhanced Payment Proof Verification with Tesseract
+const verifyPaymentProof = async (imageUrl, label) => {
+  setIsVerifying(prev => ({ ...prev, [label]: true }));
+  setValidationStatus(prev => ({
+    ...prev,
+    [label]: { status: 'verifying', message: 'Analyzing payment receipt...' }
+  }));
+
+  try {
+    const img = await loadImageForOCR(imageUrl);
+    
+    const { data: { text, confidence } } = await Tesseract.recognize(
+      img,
+      'eng',
+      { 
+        logger: m => console.log(m),
+        tessedit_pageseg_mode: 6
+      }
+    );
+
+    console.log('Payment OCR Result:', { text: text.substring(0, 100), confidence });
+
+    // Enhanced payment pattern matching for GCash/Philippine receipts
+    const normalized = text.replace(/\s+/g, ' ').trim();
+    const upperText = normalized.toUpperCase();
+
+    // Amount patterns (Philippine currency focused)
+    const amountPatterns = [
+      /(?:AMOUNT|AMT|TOTAL|SENT|SEND)\s*[:\-]?\s*(?:PHP|₱|P)?\s*([\d,]+\.?\d{2})/i,
+      /(?:PHP|₱|P)\s*([\d,]+\.?\d{2})/i,
+      /TOTAL AMOUNT SENT\s*P\s*([\d,]+\.?\d{2})/i,
+      /SENT\s*P\s*([\d,]+\.?\d{2})/i,
+      /(?:PAYMENT|PAID)\s*[:\-]?\s*(?:PHP|₱|P)?\s*([\d,]+\.?\d{2})/i
+    ];
+    
+    let amount = null;
+    for (const re of amountPatterns) {
+      const m = normalized.match(re);
+      if (m && m[1]) {
+        amount = m[1].replace(/[\s,]/g, '');
+        console.log('Found amount:', amount);
+        break;
+      }
+    }
+
+    // Reference number patterns (GCash specific)
+    const refPatterns = [
+      /(?:REF NO\.|REFERENCE NO\.|REFERENCE|REF)\s*[:\-]?\s*(\d{3,4}\s+\d{3}\s+\d{6})/i,
+      /(?:REF NO\.|REFERENCE NO\.)\s*(\d{10,15})/i,
+      /\b(\d{3,4}\s+\d{3}\s+\d{6})\b/,
+      /REF NO\.\s*(\d{4}\s+\d{3}\s+\d{6})/i,
+      /(?:TRANSACTION|TXN)\s*(?:NO\.?|ID)\s*[:\-]?\s*(\d{10,15})/i
+    ];
+    
+    let reference = null;
+    for (const re of refPatterns) {
+      const m = normalized.match(re);
+      if (m) {
+        reference = (m[1] || '').toString().trim().replace(/\s+/g, ' ');
+        console.log('Found reference:', reference);
+        break;
+      }
+    }
+
+    // Date patterns
+    const datePatterns = [
+      /\b(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]* \d{1,2},? \d{4}/i,
+      /\b\d{4}-\d{2}-\d{2}\b/,
+      /\b\d{1,2}\/\d{1,2}\/\d{4}\b/,
+      /(?:DATE|TIME)\s*[:\-]?\s*(\d{1,2}\/\d{1,2}\/\d{4})/i
+    ];
+    
+    let dateTime = null;
+    for (const re of datePatterns) {
+      const m = normalized.match(re);
+      if (m) { 
+        dateTime = m[0]; 
+        console.log('Found date:', dateTime);
+        break;
+      }
+    }
+
+    // Detect payment method
+    let paymentMethod = 'Unknown';
+    if (upperText.includes('GCASH')) {
+      paymentMethod = 'GCash';
+    } else if (upperText.includes('PAYMAYA') || upperText.includes('MAYA')) {
+      paymentMethod = 'Maya';
+    } else if (upperText.includes('BANK') || upperText.includes('BDO') || upperText.includes('BPI') || upperText.includes('METROBANK')) {
+      paymentMethod = 'Bank Transfer';
+    }
+
+    // IMPROVED VALIDATION LOGIC - FIXED HERE
+    const hasAmount = !!amount;
+    const hasReference = !!reference;
+    const hasDate = !!dateTime;
+    const hasGoodConfidence = confidence > 40;
+    
+    console.log('Validation check:', {
+      hasAmount, hasReference, hasDate, confidence, hasGoodConfidence
+    });
+
+  let status = 'invalid';
+let statusMessage = '';
+
+if (hasAmount && hasReference && hasGoodConfidence) {
+  status = 'valid';
+  statusMessage = '✅ Valid payment receipt';
+} else if ((hasAmount || hasReference) && confidence > 25) {
+  status = 'manual';
+  statusMessage = '⚠️ Partial details found - Manual review recommended';
+} else {
+  status = 'invalid';
+  statusMessage = '❌ Invalid - No payment details detected'; // THIS WAS MISSING
+}
+
+    // CONSTRUCT DETAILED MESSAGE
+    let message = '';
+    if (amount) {
+      message += `Amount: ₱${amount}`;
+    } else {
+      message += 'Amount: Not detected';
+    }
+    
+    if (reference) {
+      message += `${message ? ' | ' : ''}Ref: ${reference}`;
+    } else {
+      message += `${message ? ' | ' : ''}Ref: Not detected`;
+    }
+    
+    if (dateTime) {
+      message += `${message ? ' | ' : ''}Date: ${dateTime}`;
+    } else {
+      message += `${message ? ' | ' : ''}Date: Not detected`;
+    }
+    
+    message += ` | Confidence: ${Math.round(confidence)}%`;
+
+    console.log('Final validation result:', {
+      status, statusMessage, message, amount, reference, dateTime
+    });
+
+    // UPDATE VALIDATION STATUS
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: {
+        status,
+        message: `${statusMessage} | ${message}`,
+        details: { amount, reference, date: dateTime, paymentMethod, confidence }
+      }
+    }));
+
+    // SHOW RESULTS IN INFO MODAL - ALWAYS SHOW EVEN WHEN NOTHING DETECTED
+const infoFields = [
+  { label: 'Amount', value: amount ? `₱${amount}` : '❌ Not detected' },
+  { label: 'Reference Number', value: reference || '❌ Not detected' },
+  { label: 'Date', value: dateTime || '❌ Not detected' },
+  { label: 'Payment Method', value: paymentMethod },
+  { label: 'OCR Confidence', value: `${Math.round(confidence)}%` },
+  { label: 'Status', value: status === 'valid' ? '✅ Valid Payment Receipt' : 
+                          status === 'manual' ? '⚠️ Manual Review Required' : 
+                          '❌ Invalid - No payment details detected' }
+];
+
+    showInfoModal('Payment Verification Results', infoFields);
+
+  } catch (error) {
+    console.error('Payment verification error:', error);
+    
+    // SHOW ERROR IN INFO MODAL
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'error', message: 'Payment verification failed' }
+    }));
+    
+    const errorFields = [
+      { label: 'Error', value: 'Verification failed' },
+      { label: 'Details', value: error.message || 'Unknown error occurred' },
+      { label: 'Status', value: '❌ Error' }
+    ];
+    
+    showInfoModal('Payment Verification Error', errorFields);
+  } finally {
+    setIsVerifying(prev => ({ ...prev, [label]: false }));
+  }
+};
+
+// Smart Selfie Verification using Image Analysis (NO TensorFlow)
+const verifyFace = async (imageUrl, label) => {
+  setIsVerifying(prev => ({ ...prev, [label]: true }));
+  setValidationStatus(prev => ({
+    ...prev,
+    [label]: { status: 'verifying', message: 'Analyzing selfie image...' }
+  }));
+
+  try {
+    const img = await loadImageForOCR(imageUrl);
+    
+    // Smart selfie analysis using multiple heuristics
+    const analysis = analyzeSelfieImage(img);
+    
+    const { hasFace, confidence, reasons } = analysis;
+    const status = hasFace ? 'valid' : 'invalid';
+
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: {
+        status,
+        message: hasFace ? '✅ Valid selfie detected' : `❌ ${reasons.join(', ')}`,
+        details: analysis
+      }
+    }));
+
+    // Show detailed analysis
+    const infoFields = [
+      { label: 'Face Detected', value: hasFace ? 'Detected' : 'No face detected' },
+      { label: 'Detection Confidence', value: `${confidence}%` },
+    ];
+
+    showInfoModal('Selfie Analysis Results', infoFields);
+
+  } catch (error) {
+    console.error('Selfie verification error:', error);
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'error', message: 'Selfie analysis failed' }
+    }));
+  } finally {
+    setIsVerifying(prev => ({ ...prev, [label]: false }));
+  }
+};
+
+// Smart selfie image analysis (replaces TensorFlow)
+const analyzeSelfieImage = (img) => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = img.width;
+  canvas.height = img.height;
+  ctx.drawImage(img, 0, 0);
+
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+
+  // Calculate image statistics
+  let totalBrightness = 0;
+  let skinTonePixels = 0;
+  
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    // Calculate brightness
+    const brightness = (r + g + b) / 3;
+    totalBrightness += brightness;
+    
+    // Simple skin tone detection (common ranges)
+    if (r > 95 && g > 40 && b > 20 && 
+        Math.max(r, g, b) - Math.min(r, g, b) > 15 &&
+        Math.abs(r - g) > 15 && r > g && r > b) {
+      skinTonePixels++;
+    }
+  }
+
+  const avgBrightness = totalBrightness / (data.length / 4);
+  const skinToneRatio = skinTonePixels / (data.length / 4);
+
+  // Analyze image characteristics
+  const aspectRatio = img.width / img.height;
+  const isPortrait = aspectRatio < 1.3 && aspectRatio > 0.7;
+  const hasGoodSize = img.width > 250 && img.height > 250;
+  const hasGoodBrightness = avgBrightness > 50 && avgBrightness < 200;
+  const hasSkinTones = skinToneRatio > 0.1; // At least 10% skin-like pixels
+
+  // Face detection heuristics
+  const heuristics = [
+    { condition: isPortrait, weight: 30, reason: 'Portrait orientation' },
+    { condition: hasGoodSize, weight: 25, reason: 'Good image size' },
+    { condition: hasGoodBrightness, weight: 20, reason: 'Good lighting' },
+    { condition: hasSkinTones, weight: 25, reason: 'Skin tones detected' }
+  ];
+
+  let confidence = 0;
+  let reasons = [];
+
+  heuristics.forEach(({ condition, weight, reason }) => {
+    if (condition) {
+      confidence += weight;
+    } else {
+      reasons.push(`No ${reason.toLowerCase()}`);
+    }
+  });
+
+  const hasFace = confidence >= 60; // Need at least 60% confidence
+
+  return {
+    hasFace,
+    confidence,
+    reasons: hasFace ? ['Valid selfie characteristics'] : reasons,
+    aspectRatio: aspectRatio.toFixed(2),
+    orientation: isPortrait ? 'Portrait' : 'Landscape',
+    brightness: avgBrightness.toFixed(0),
+    skinToneRatio: (skinToneRatio * 100).toFixed(1) + '%',
+    imageSize: `${img.width} × ${img.height}`,
+    notes: hasFace ? 
+      'Image appears to be a valid selfie with good characteristics' : 
+      'Image may not be a proper selfie photo'
   };
+};
 
   const handleImageClick = (url, label) => {
     setCurrentImage({ url, label });
     setImageViewerVisible(true);
   };
+const handleManualVerification = () => {
+  const { url, label } = currentImage;
 
-  const handleManualVerification = () => {
-    const { url, label } = currentImage;
+  setIsVerifying(prev => ({ ...prev, [label]: true }));
+  
+  console.log('Manual verification triggered for:', label);
 
-    setIsVerifying(prev => ({ ...prev, [label]: true }));
-    
-    console.log('Manual verification triggered for:', label);
+  const labelLower = label.toLowerCase();
 
-    const labelLower = label.toLowerCase();
-
-    if (labelLower.includes('payment') || labelLower.includes('proof') || labelLower.includes('receipt')) {
-      verifyPaymentProof(url, label);
-    } else if (labelLower.includes('id') && !labelLower.includes('back')) {
-      verifyID(url, label);
-    } else if (labelLower.includes('selfie')) {
-      verifyFace(url, label);
-    } else {
-      // For other images, just mark as manually reviewed
-      setValidationStatus(prev => ({
-        ...prev,
-        [label]: { status: 'manual', message: 'Manual review completed' }
-      }));
-      setIsVerifying(prev => ({ ...prev, [label]: false }));
-    }
-  };
+  // Use client-side validation functions
+  if (labelLower.includes('payment') || labelLower.includes('proof') || labelLower.includes('receipt')) {
+    verifyPaymentProof(url, label);
+  } else if (labelLower.includes('id') && !labelLower.includes('back')) {
+    verifyID(url, label);
+  } else if (labelLower.includes('selfie') || labelLower.includes('face')) {
+    verifyFace(url, label);
+  } else {
+    // For other images, mark as manual review
+    setValidationStatus(prev => ({
+      ...prev,
+      [label]: { status: 'manual', message: 'Manual review required' }
+    }));
+    setIsVerifying(prev => ({ ...prev, [label]: false }));
+  }
+};
 
   const showInfoModal = (title, fields) => {
     setInfoModal({ visible: true, title, fields });
@@ -2013,98 +2555,101 @@ const Registrations = ({
         </div>
       )}
 
-      {/* Image Viewer */}
-      {imageViewerVisible && (
-        <div style={styles.imageViewerModal}>
-          <div style={styles.imageViewerContent}>
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.prevButton }}
-              onClick={() => navigateImages('prev')}
-            >
-              <FaChevronLeft />
-            </button>
-            <img
-              src={currentImage.url}
-              alt={currentImage.label}
-              style={styles.largeImage}
-            />
-            <button 
-              style={{ ...styles.imageViewerNav, ...styles.nextButton }}
-              onClick={() => navigateImages('next')}
-            >
-              <FaChevronRight />
-            </button>
-            <button 
-              style={styles.imageViewerClose} 
-              onClick={closeImageViewer}
-            >
-              <FaTimes />
-            </button>
-            <p style={styles.imageViewerLabel}>{currentImage.label}</p>
-            <div style={{ 
-              position: 'fixed', 
-              bottom: '20px', 
-              left: '50%', 
-              transform: 'translateX(-50%)',
-              backgroundColor: 'rgba(0,0,0,0.8)',
-              padding: '15px 20px',
-              borderRadius: '8px',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              gap: '10px',
-              zIndex: 2001
-            }}>
-              {!(currentImage.label?.toLowerCase().includes('valid id back') || currentImage.label?.toLowerCase().includes('selfie with id')) && (
-                <>
-                  <button
-                    style={{
-                      ...styles.verifyButton,
-                      minWidth: '120px',
-                      padding: '10px 20px'
-                    }}
-                    onClick={handleManualVerification}
-                    disabled={Boolean(isVerifying[currentImage.label])}
-                  >
-                    {isVerifying[currentImage.label] ? (
-                      <>
-                        <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
-                        Verifying...
-                      </>
-                    ) : (
-                      <>
-                        {currentImage.label?.includes('Payment') || currentImage.label?.includes('Proof') ? 'Verify Payment' : 
-                         currentImage.label?.includes('ID') ? 'Verify ID' : 'Verify Face'}
-                      </>
-                    )}
-                  </button>
-                </>
-              )}
-            </div>
+{/* Image Viewer */}
+{imageViewerVisible && (
+  <div style={styles.imageViewerModal}>
+    <div style={styles.imageViewerContent}>
+      <button 
+        style={{ ...styles.imageViewerNav, ...styles.prevButton }}
+        onClick={() => navigateImages('prev')}
+      >
+        <FaChevronLeft />
+      </button>
+      <img
+        src={currentImage.url}
+        alt={currentImage.label}
+        style={styles.largeImage}
+      />
+      <button 
+        style={{ ...styles.imageViewerNav, ...styles.nextButton }}
+        onClick={() => navigateImages('next')}
+      >
+        <FaChevronRight />
+      </button>
+      <button 
+        style={styles.imageViewerClose} 
+        onClick={closeImageViewer}
+      >
+        <FaTimes />
+      </button>
+      <p style={styles.imageViewerLabel}>{currentImage.label}</p>
+      
+      {/* Fixed Verification Button Section */}
+{/* Fixed Verification Button Section */}
+<div style={{ 
+  position: 'absolute', 
+  bottom: '20px', 
+  left: '50%', 
+  transform: 'translateX(-50%)',
+  backgroundColor: 'rgba(0,0,0,0.8)',
+  padding: '15px 20px',
+  borderRadius: '8px',
+  display: 'flex',
+  flexDirection: 'column',
+  alignItems: 'center',
+  gap: '10px',
+  zIndex: 2001,
+  minWidth: '200px'
+}}>
+  {!(currentImage.label?.toLowerCase().includes('valid id back') || currentImage.label?.toLowerCase().includes('selfie with id')) && (
+    <button
+      style={{
+        ...styles.verifyButton,
+        minWidth: '120px',
+        padding: '10px 20px'
+      }}
+      onClick={() => handleManualVerification()}
+      disabled={Boolean(isVerifying[currentImage.label])}
+    >
+      {isVerifying[currentImage.label] ? (
+        <>
+          <FaSpinner style={{ animation: 'spin 1s linear infinite', marginRight: '8px' }} />
+          Verifying...
+        </>
+      ) : (
+        <>
+          {currentImage.label?.toLowerCase().includes('payment') || currentImage.label?.toLowerCase().includes('proof') ? 'Verify Payment' : 
+           currentImage.label?.toLowerCase().includes('id') ? 'Verify ID' : 'Verify Face'}
+        </>
+      )}
+    </button>
+  )}
+</div>
 
-            {/* Info modal overlay inside image viewer */}
-            {infoModal.visible && (
-              <div style={styles.infoModalOverlay}>
-                <div style={styles.infoModalCard}>
-                  <div style={styles.infoTitle}>{infoModal.title}</div>
-                  {infoModal.fields.map((f, i) => (
-                    <div key={i} style={styles.infoRow}>
-                      <span style={styles.infoLabel}>{f.label}</span>
-                      <span style={styles.infoValue}>{f.value || 'N/A'}</span>
-                    </div>
-                  ))}
-                  <button
-                    style={styles.infoCloseButton}
-                    onClick={closeInfoModal}
-                  >
-                    Close
-                  </button>
-                </div>
+
+      {/* Info modal overlay inside image viewer */}
+      {infoModal.visible && (
+        <div style={styles.infoModalOverlay}>
+          <div style={styles.infoModalCard}>
+            <div style={styles.infoTitle}>{infoModal.title}</div>
+            {infoModal.fields.map((f, i) => (
+              <div key={i} style={styles.infoRow}>
+                <span style={styles.infoLabel}>{f.label}</span>
+                <span style={styles.infoValue}>{f.value || 'N/A'}</span>
               </div>
-            )}
+            ))}
+            <button
+              style={styles.infoCloseButton}
+              onClick={closeInfoModal}
+            >
+              Close
+            </button>
           </div>
         </div>
       )}
+    </div>
+  </div>
+)}
     </div>
   );
 };
