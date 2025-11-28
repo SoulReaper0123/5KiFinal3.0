@@ -507,7 +507,7 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                     {item.firstName} {item.lastName}
                   </div>
                 </td>
-                <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid)}</td>
+                <td style={styles.tableCell}>{formatCurrency(item.amountToBePaid) || formatCurrency(item.amount)}</td>
                 <td style={styles.tableCell}>{item.paymentOption}</td>
                 <td style={styles.tableCell}>
                   <span style={{
@@ -642,7 +642,7 @@ const ApprovedPayments = ({ payments, currentPage, totalPages, onPageChange }) =
                     <div style={styles.paymentItem}>
                       <span style={styles.paymentLabel}>Amount Paid:</span>
                       <span style={styles.paymentValue}>
-                        {formatCurrency(selectedPayment.amountToBePaid)}
+                        {formatCurrency(selectedPayment.amountToBePaid) || formatCurrency(selectedPayment.amount)}
                       </span>
                     </div>
                     <div style={styles.paymentItem}>
