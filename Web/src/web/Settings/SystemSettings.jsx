@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import {
   getDatabase, ref, onValue, update, push, set
 } from 'firebase/database';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import Calendar from 'react-calendar';
 import 'react-calendar/dist/Calendar.css';
 import { FaTrashAlt, FaPlus, FaExchangeAlt, FaCopy, FaRedo, FaCheck, FaTimes, FaCheckCircle, FaPiggyBank, FaPercentage, FaCalendarAlt, FaFileContract, FaShieldAlt, FaInfoCircle, FaPhone, FaMoneyBillWave, FaBusinessTime } from 'react-icons/fa';
@@ -134,6 +135,7 @@ const SystemSettings = () => {
   const [adminData, setAdminData] = useState(null);
 
   const db = getDatabase();
+  const storage = getStorage();
 
   // Helper function to format peso amounts with at least 2 decimal places
   const formatCurrency = (amount) => {
@@ -168,6 +170,30 @@ const SystemSettings = () => {
     hours = hours ? hours : 12;
     
     return `${hours}:${minutes}:${seconds} ${ampm}`;
+  };
+
+  // Upload file to Firebase Storage and return download URL
+  const uploadFileToStorage = async (file, folder) => {
+    try {
+      // Generate unique filename
+      const timestamp = new Date().getTime();
+      const fileExtension = file.name.split('.').pop();
+      const fileName = `${folder}/${timestamp}_${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
+      
+      // Create storage reference
+      const fileRef = storageRef(storage, fileName);
+      
+      // Upload file
+      const snapshot = await uploadBytes(fileRef, file);
+      
+      // Get download URL
+      const downloadURL = await getDownloadURL(snapshot.ref);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      throw new Error('Failed to upload file: ' + error.message);
+    }
   };
 
   // Fetch admin data
@@ -729,168 +755,192 @@ const SystemSettings = () => {
   };
 
   // New function to handle savings deposit with proof
-  const handleSavingsDeposit = async () => {
-    if (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0) {
-      showMessage('Error', 'Please enter a valid amount greater than 0', true);
-      return;
-    }
+// In your SystemSettings component, update the handleSavingsDeposit and handleSavingsWithdraw functions:
 
-    if (!proofOfDepositFile) {
-      showMessage('Error', 'Please upload proof of deposit', true);
-      return;
-    }
+// Updated handleSavingsDeposit function in SystemSettings:
+const handleSavingsDeposit = async () => {
+  if (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0) {
+    showMessage('Error', 'Please enter a valid amount greater than 0', true);
+    return;
+  }
 
-    try {
-      setActionInProgress(true);
+  if (!proofOfDepositFile) {
+    showMessage('Error', 'Please upload proof of deposit', true);
+    return;
+  }
 
-      // Generate transaction ID
-      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
-      const now = new Date();
-      const depositDate = formatDate(now);
-      const depositTime = formatTime(now);
-      const amount = parseFloat(savingsDepositAmount);
+  try {
+    setActionInProgress(true);
 
-      // Get admin info
-      const adminId = localStorage.getItem('adminId');
-      const adminRole = localStorage.getItem('userRole') || 'admin';
-      const adminName = adminData?.firstName || 'Admin';
+    // Upload proof of deposit to Firebase Storage
+    const proofOfDepositUrl = await uploadFileToStorage(proofOfDepositFile, 'savings_deposits');
 
-      // Create deposit record
-      const depositData = {
-        transactionId,
-        amountToBeDeposited: amount,
-        proofOfDepositUrl: 'admin_deposit', // You can modify this to actually upload the file if needed
-        dateApplied: depositDate,
-        timeApplied: depositTime,
-        dateApproved: depositDate,
-        timeApproved: depositTime,
-        timestamp: now.getTime(),
-        status: 'approved',
-        depositOption: 'Bank', // Default for admin deposits
-        accountName: settings.Accounts.Bank.accountName || 'Admin Account',
-        accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
-        processedBy: adminName,
-        processedByRole: adminRole,
-        processedById: adminId,
-        type: 'savings_deposit',
-        note: 'Savings deposit added by admin'
-      };
+    // Generate transaction ID
+    const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    const now = new Date();
+    const depositDate = formatDate(now);
+    const depositTime = formatTime(now);
+    const amount = parseFloat(savingsDepositAmount);
 
-      // Save to approved deposits
-      const approvedRef = ref(db, `Deposits/ApprovedDeposits/admin/${transactionId}`);
-      await set(approvedRef, depositData);
+    // Get admin info
+    
+    const adminRole = localStorage.getItem('userRole') || 'admin';
+    const adminName = adminData?.firstName || 'Admin';
+    const adminNameLast = adminData?.lastName || 'Admin';
+    const adminEmail = adminData?.email || 'Admin';
+    const adminId = adminData?.id || 'Admin';
 
-      // Update savings amount
-      const currentSavings = parseFloat(settings.Savings || 0);
-      const newSavingsTotal = currentSavings + amount;
-      
-      await update(ref(db, 'Settings'), {
-        Savings: parseFloat(newSavingsTotal.toFixed(2))
-      });
+    // Create deposit record - USING CORRECT VARIABLE NAMES
+    const depositData = {
+      transactionId,
+      amountToBeDeposited: amount, // This matches ApprovedDeposits
+      proofOfDepositUrl: proofOfDepositUrl, // This matches ApprovedDeposits
+      dateApplied: depositDate,
+      timeApplied: depositTime,
+      dateApproved: depositDate,
+      timeApproved: depositTime,
+      timestamp: now.getTime(),
+      status: 'approved',
+      depositOption: 'Bank', // This matches ApprovedDeposits
+      accountName: settings.Accounts.Bank.accountName || 'Admin Account',
+      accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
+      processedBy: adminName,
+      processedByRole: adminRole,
+      processedById: adminId,
+      type: 'savings_deposit',
+      note: 'Savings deposit added by admin',
+      // Add fields that ApprovedDeposits expects
+      id: adminId, 
+      firstName: adminName,
+      lastName: adminNameLast,
+      email: adminEmail
+    };
 
-      // Update local state
-      setSettings(prev => ({ 
-        ...prev, 
-        Savings: newSavingsTotal.toString() 
-      }));
+    // Save to approved deposits
+    const approvedRef = ref(db, `Deposits/ApprovedDeposits/admin/${transactionId}`);
+    await set(approvedRef, depositData);
 
-      setSavingsDepositModalVisible(false);
-      setSavingsDepositAmount('');
-      setProofOfDepositFile(null);
-      
-      showSuccessMessage(`₱${formatPesoAmount(amount)} added to savings successfully!`);
-    } catch (error) {
-      console.error('Error adding savings deposit:', error);
-      showMessage('Error', 'Failed to add savings deposit: ' + error.message, true);
-    } finally {
-      setActionInProgress(false);
-    }
-  };
-
-  // New function to handle savings withdrawal with proof
-  const handleSavingsWithdraw = async () => {
-    if (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0) {
-      showMessage('Error', 'Please enter a valid amount greater than 0', true);
-      return;
-    }
-
-    if (!proofOfWithdrawFile) {
-      showMessage('Error', 'Please upload proof of withdrawal', true);
-      return;
-    }
-
-    const amount = parseFloat(savingsWithdrawAmount);
+    // Update savings amount
     const currentSavings = parseFloat(settings.Savings || 0);
+    const newSavingsTotal = currentSavings + amount;
+    
+    await update(ref(db, 'Settings'), {
+      Savings: parseFloat(newSavingsTotal.toFixed(2))
+    });
 
-    if (amount > currentSavings) {
-      showMessage('Error', 'Insufficient savings balance', true);
-      return;
-    }
+    // Update local state
+    setSettings(prev => ({ 
+      ...prev, 
+      Savings: newSavingsTotal.toString() 
+    }));
 
-    try {
-      setActionInProgress(true);
+    setSavingsDepositModalVisible(false);
+    setSavingsDepositAmount('');
+    setProofOfDepositFile(null);
+    
+    showSuccessMessage(`₱${formatPesoAmount(amount)} added to savings successfully!`);
+  } catch (error) {
+    console.error('Error adding savings deposit:', error);
+    showMessage('Error', 'Failed to add savings deposit: ' + error.message, true);
+  } finally {
+    setActionInProgress(false);
+  }
+};
 
-      // Generate transaction ID
-      const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
-      const now = new Date();
-      const withdrawDate = formatDate(now);
-      const withdrawTime = formatTime(now);
+// Updated handleSavingsWithdraw function in SystemSettings:
+const handleSavingsWithdraw = async () => {
+  if (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0) {
+    showMessage('Error', 'Please enter a valid amount greater than 0', true);
+    return;
+  }
 
-      // Get admin info
-      const adminId = localStorage.getItem('adminId');
-      const adminRole = localStorage.getItem('userRole') || 'admin';
-      const adminName = adminData?.firstName || 'Admin';
+  if (!proofOfWithdrawFile) {
+    showMessage('Error', 'Please upload proof of withdrawal', true);
+    return;
+  }
 
-      // Create withdrawal record
-      const withdrawData = {
-        transactionId,
-        amountToBeWithdrawn: amount,
-        proofOfWithdrawUrl: 'admin_withdrawal', // You can modify this to actually upload the file if needed
-        dateApplied: withdrawDate,
-        timeApplied: withdrawTime,
-        dateApproved: withdrawDate,
-        timeApproved: withdrawTime,
-        timestamp: now.getTime(),
-        status: 'approved',
-        withdrawOption: 'Bank', // Default for admin withdrawals
-        accountName: settings.Accounts.Bank.accountName || 'Admin Account',
-        accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
-        processedBy: adminName,
-        processedByRole: adminRole,
-        processedById: adminId,
-        type: 'savings_withdrawal',
-        note: 'Savings withdrawal processed by admin'
-      };
+  const amount = parseFloat(savingsWithdrawAmount);
+  const currentSavings = parseFloat(settings.Savings || 0);
 
-      // Save to approved withdrawals
-      const approvedRef = ref(db, `Withdrawals/ApprovedWithdrawals/admin/${transactionId}`);
-      await set(approvedRef, withdrawData);
+  if (amount > currentSavings) {
+    showMessage('Error', 'Insufficient savings balance', true);
+    return;
+  }
 
-      // Update savings amount
-      const newSavingsTotal = currentSavings - amount;
-      
-      await update(ref(db, 'Settings'), {
-        Savings: parseFloat(newSavingsTotal.toFixed(2))
-      });
+  try {
+    setActionInProgress(true);
 
-      // Update local state
-      setSettings(prev => ({ 
-        ...prev, 
-        Savings: newSavingsTotal.toString() 
-      }));
+    // Upload proof of withdrawal to Firebase Storage
+    const proofOfWithdrawalUrl = await uploadFileToStorage(proofOfWithdrawFile, 'savings_withdrawals');
 
-      setSavingsWithdrawModalVisible(false);
-      setSavingsWithdrawAmount('');
-      setProofOfWithdrawFile(null);
-      
-      showSuccessMessage(`₱${formatPesoAmount(amount)} withdrawn from savings successfully!`);
-    } catch (error) {
-      console.error('Error processing savings withdrawal:', error);
-      showMessage('Error', 'Failed to process savings withdrawal: ' + error.message, true);
-    } finally {
-      setActionInProgress(false);
-    }
-  };
+    // Generate transaction ID
+    const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    const now = new Date();
+    const withdrawDate = formatDate(now);
+    const withdrawTime = formatTime(now);
+
+    // Get admin info
+    const adminId = localStorage.getItem('adminId');
+    const adminRole = localStorage.getItem('userRole') || 'admin';
+    const adminName = adminData?.firstName || 'Admin';
+
+    // Create withdrawal record - USING CORRECT VARIABLE NAMES
+    const withdrawData = {
+      transactionId,
+      amountWithdrawn: amount, // This matches ApprovedWithdraws
+      proofOfWithdrawalUrl: proofOfWithdrawalUrl, // This matches ApprovedWithdraws
+      dateApplied: withdrawDate,
+      timeApplied: withdrawTime,
+      dateApproved: withdrawDate,
+      timeApproved: withdrawTime,
+      timestamp: now.getTime(),
+      status: 'approved',
+      withdrawOption: 'Bank', // This matches ApprovedWithdraws
+      accountName: settings.Accounts.Bank.accountName || 'Admin Account',
+      accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
+      processedBy: adminName,
+      processedByRole: adminRole,
+      processedById: adminId,
+      type: 'savings_withdrawal',
+      note: 'Savings withdrawal processed by admin',
+      // Add fields that ApprovedWithdraws expects
+      id: adminId, // Use 'admin' as ID for system withdrawals
+      firstName: adminName,
+      lastName: adminNameLast,
+      email: adminEmail,
+      bankName: settings.Accounts.Bank.accountName || 'Admin Bank',
+      // Add any other fields your ApprovedWithdraws component expects
+    };
+
+    // Save to approved withdrawals
+    const approvedRef = ref(db, `Withdrawals/ApprovedWithdrawals/admin/${transactionId}`);
+    await set(approvedRef, withdrawData);
+
+    // Update savings amount
+    const newSavingsTotal = currentSavings - amount;
+    
+    await update(ref(db, 'Settings'), {
+      Savings: parseFloat(newSavingsTotal.toFixed(2))
+    });
+
+    // Update local state
+    setSettings(prev => ({ 
+      ...prev, 
+      Savings: newSavingsTotal.toString() 
+    }));
+
+    setSavingsWithdrawModalVisible(false);
+    setSavingsWithdrawAmount('');
+    setProofOfWithdrawFile(null);
+    
+    showSuccessMessage(`₱${formatPesoAmount(amount)} withdrawn from savings successfully!`);
+  } catch (error) {
+    console.error('Error processing savings withdrawal:', error);
+    showMessage('Error', 'Failed to process savings withdrawal: ' + error.message, true);
+  } finally {
+    setActionInProgress(false);
+  }
+};
 
   const handleAddSavingsWithConfirmation = () => {
     if (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0) {
@@ -2044,7 +2094,7 @@ const SystemSettings = () => {
                   style={styles.fileInput}
                   type="file"
                   onChange={(e) => handleFileChange(e, setProofOfDepositFile)}
-                  accept="image/*"
+                  accept="image/*,.pdf"
                 />
                 {proofOfDepositFile ? (
                   <>
@@ -2063,7 +2113,7 @@ const SystemSettings = () => {
             </div>
 
             {/* Admin Info */}
-            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', border: '1px solid #dbeafe', border: '1px solid #fecaca' }}>
+            <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', border: '1px solid #dbeafe' }}>
               <p style={{ fontSize: 14, color: '#1e40af', margin: 0, fontWeight: '500' }}>
                 Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
               </p>
@@ -2148,7 +2198,7 @@ const SystemSettings = () => {
                   style={styles.fileInput}
                   type="file"
                   onChange={(e) => handleFileChange(e, setProofOfWithdrawFile)}
-                  accept="image/*"
+                  accept="image/*,.pdf"
                 />
                 {proofOfWithdrawFile ? (
                   <>
