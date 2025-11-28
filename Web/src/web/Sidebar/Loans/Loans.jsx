@@ -286,12 +286,6 @@ modalContent: {
   width: '100%',
   marginBottom: '20px',
 },
-modalText: {
-  fontSize: '16px',
-  marginBottom: '8px',
-  color: '#333',
-  textAlign: 'center'
-},
 modalButtonContainer: {
   flexDirection: 'row',
   justifyContent: 'space-between',
@@ -520,22 +514,6 @@ confirmButtonText: {
     zIndex: 1000,
     padding: '20px'
   },
-  modalCardSmall: {
-    width: '300px',
-    backgroundColor: 'white',
-    borderRadius: '14px',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    textAlign: 'center',
-    border: '1px solid #F1F5F9'
-  },
-  confirmIcon: {
-    marginBottom: '14px',
-    fontSize: '28px'
-  },
 
   // Error text styles
   errorText: {
@@ -681,21 +659,7 @@ confirmButtonText: {
     marginBottom: '12px',
     objectFit: 'cover'
   },
-  // Action button styles
-  actionButton: {
-    padding: '0.75rem 2rem',
-    borderRadius: '8px',
-    border: 'none',
-    cursor: 'pointer',
-    fontWeight: '600',
-    fontSize: '0.875rem',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: '0.5rem',
-    transition: 'all 0.2s ease',
-    minWidth: '140px'
-  },
+
   approveButton: {
     background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
     color: 'white',
@@ -710,15 +674,6 @@ confirmButtonText: {
     '&:hover': {
       transform: 'translateY(-1px)',
       boxShadow: '0 4px 12px rgba(220, 38, 38, 0.3)'
-    }
-  },
-  disabledButton: {
-    background: '#9ca3af',
-    cursor: 'not-allowed',
-    opacity: '0.7',
-    '&:hover': {
-      transform: 'none',
-      boxShadow: 'none'
     }
   },
   // Savings confirmation modal
@@ -750,7 +705,6 @@ confirmButtonText: {
     color: '#856404',
     lineHeight: '1.5'
   },
-  // Add these to your styles object
 modalCardSmall: {
   width: '300px',
   backgroundColor: 'white',
@@ -790,7 +744,7 @@ actionButton: {
   transition: 'all 0.2s ease',
   minWidth: '140px'
 },
-primaryButtonStyle: {  // Renamed to avoid conflict
+primaryButtonStyle: {  
   background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
   color: 'white',
   '&:hover': {
@@ -798,7 +752,7 @@ primaryButtonStyle: {  // Renamed to avoid conflict
     boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
   }
 },
-secondaryButtonStyle: {  // Renamed to avoid conflict
+secondaryButtonStyle: { 
   background: '#6b7280',
   color: 'white',
   '&:hover': {
