@@ -648,22 +648,6 @@ actionButton: {
   transition: 'all 0.2s ease',
   minWidth: '140px'
 },
-primaryButton: {
-  background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
-  color: 'white',
-  '&:hover': {
-    transform: 'translateY(-1px)',
-    boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
-  }
-},
-secondaryButton: {
-  background: '#6b7280',
-  color: 'white',
-  '&:hover': {
-    transform: 'translateY(-1px)',
-    boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
-  }
-},
 disabledButton: {
   background: '#9ca3af',
   cursor: 'not-allowed',
