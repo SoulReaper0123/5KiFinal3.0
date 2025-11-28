@@ -275,88 +275,143 @@ const maskPassword = (pwd) => {
 };
 
 // ==============================================
-// LIGHTWEIGHT IMAGE PROCESSING ENDPOINTS
+// ENHANCED VALIDATION ENDPOINTS FOR REGISTRATIONS
 // ==============================================
 
-const sharp = require('sharp');
-const { createWorker } = require('tesseract.js');
-
-// Global worker for OCR
-let ocrWorker = null;
-
-// Initialize OCR worker
-const initializeOCR = async () => {
+// Enhanced ID Validation
+app.post('/validate-id', async (req, res) => {
   try {
-    console.log('[OCR] Initializing Tesseract.js worker...');
-    ocrWorker = await createWorker('eng', 1, {
-      logger: m => console.log('[Tesseract]', m)
-    });
-    console.log('[OCR] Worker initialized successfully');
-  } catch (error) {
-    console.error('[OCR] Worker initialization failed:', error);
-  }
-};
-
-// Initialize when server starts
-initializeOCR();
-
-// Main OCR Processing Endpoint
-app.post('/process-ocr', async (req, res) => {
-  try {
-    const { imageUrl, type } = req.body;
+    const { imageUrl } = req.body;
     
-    console.log(`[SERVER-OCR] Processing ${type} from:`, imageUrl);
+    console.log('[VALIDATION] Processing ID validation for:', imageUrl);
     
-    // Set CORS headers
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
-    // Fetch the image through server (no CORS issues)
     const imageResponse = await fetch(imageUrl);
     if (!imageResponse.ok) {
       throw new Error(`Failed to fetch image: ${imageResponse.status}`);
     }
     
     const imageBuffer = await imageResponse.buffer();
+    const result = await validateIDCard(imageBuffer);
     
-    let result = {};
-    
-    if (type === 'id') {
-      result = await processIDCard(imageBuffer);
-    } else if (type === 'payment') {
-      result = await processPaymentProof(imageBuffer);
-    } else if (type === 'face') {
-      result = await processFaceDetection(imageBuffer);
-    } else {
-      throw new Error('Unknown processing type');
-    }
-    
-    console.log(`[SERVER-OCR] ${type} processing completed`);
+    console.log('[VALIDATION] ID validation completed:', result.status);
     
     res.json({
       success: true,
-      type,
+      type: 'id',
       result
     });
     
   } catch (error) {
-    console.error('[SERVER-OCR] Processing error:', error);
+    console.error('[VALIDATION] ID validation error:', error);
     res.status(500).json({
       success: false,
       error: error.message,
-      type: req.body.type
+      type: 'id'
     });
   }
 });
 
-// Handle preflight for OCR endpoint
-app.options('/process-ocr', (req, res) => {
+// Enhanced Face Validation
+app.post('/validate-face', async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    
+    console.log('[VALIDATION] Processing face validation for:', imageUrl);
+    
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    }
+    
+    const imageBuffer = await imageResponse.buffer();
+    const result = await validateFace(imageBuffer);
+    
+    console.log('[VALIDATION] Face validation completed:', result.status);
+    
+    res.json({
+      success: true,
+      type: 'face',
+      result
+    });
+    
+  } catch (error) {
+    console.error('[VALIDATION] Face validation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      type: 'face'
+    });
+  }
+});
+
+// Enhanced Payment Proof Validation
+app.post('/validate-payment', async (req, res) => {
+  try {
+    const { imageUrl } = req.body;
+    
+    console.log('[VALIDATION] Processing payment validation for:', imageUrl);
+    
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    
+    const imageResponse = await fetch(imageUrl);
+    if (!imageResponse.ok) {
+      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
+    }
+    
+    const imageBuffer = await imageResponse.buffer();
+    const result = await validatePaymentProof(imageBuffer);
+    
+    console.log('[VALIDATION] Payment validation completed:', result.status);
+    
+    res.json({
+      success: true,
+      type: 'payment',
+      result
+    });
+    
+  } catch (error) {
+    console.error('[VALIDATION] Payment validation error:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+      type: 'payment'
+    });
+  }
+});
+
+// OPTIONS handlers for new endpoints
+app.options('/validate-id', (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.status(200).end();
 });
+
+app.options('/validate-face', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
+});
+
+app.options('/validate-payment', (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.status(200).end();
+});
+
+
 
 // ID Card Processing with Tesseract.js
 async function processIDCard(imageBuffer) {
@@ -555,6 +610,9 @@ async function detectFaceHeuristic(imageBuffer) {
     return false;
   }
 }
+
+
+// ---------------------------------------------------------------------------------
 
 // Enhanced Health check endpoint
 // Enhanced Health check with activity tracking
@@ -3757,13 +3815,259 @@ app.post('/send-member-delete-data', async (req, res) => {
 });
 
 // ==============================================
+// ENHANCED VALIDATION FUNCTIONS FOR REGISTRATIONS
+// ==============================================
+
+// Enhanced ID Card Validation
+async function validateIDCard(imageBuffer) {
+  try {
+    console.log('[ID VALIDATION] Starting enhanced ID validation');
+    
+    if (!ocrWorker) {
+      throw new Error('OCR worker not ready');
+    }
+    
+    // Enhanced preprocessing
+    const processedImage = await sharp(imageBuffer)
+      .resize(1200)
+      .grayscale()
+      .normalize()
+      .linear(1.3, 0)
+      .sharpen()
+      .toBuffer();
+    
+    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage, 'eng', {
+      tessedit_pageseg_mode: 6
+    });
+    
+    // Enhanced name extraction for Philippine IDs
+    const name = extractNameFromIDTextEnhanced(text);
+    const idType = detectIDTypeEnhanced(text);
+    
+    // Calculate validation score
+    let validationScore = confidence;
+    if (name) validationScore += 20;
+    if (idType !== 'Unknown') validationScore += 15;
+    
+    const status = validationScore >= 70 ? 'valid' : 
+                  validationScore >= 50 ? 'manual' : 'invalid';
+    
+    return {
+      text: text || '',
+      confidence: Math.round(confidence),
+      name: name,
+      idType: idType,
+      validationScore: Math.min(100, validationScore),
+      status: status
+    };
+    
+  } catch (error) {
+    console.error('[ID VALIDATION] Error:', error);
+    return { 
+      error: 'ID validation failed',
+      status: 'error',
+      confidence: 0
+    };
+  }
+}
+
+// Enhanced Face Validation
+async function validateFace(imageBuffer) {
+  try {
+    console.log('[FACE VALIDATION] Starting face validation');
+    
+    const metadata = await sharp(imageBuffer).metadata();
+    
+    // Simple face detection using image characteristics
+    const aspectRatio = metadata.width / metadata.height;
+    const isPortrait = aspectRatio < 1.3 && aspectRatio > 0.7;
+    const hasGoodSize = metadata.width > 250 && metadata.height > 250;
+    
+    const faceCount = isPortrait && hasGoodSize ? 1 : 0;
+    const confidence = faceCount > 0 ? 75 : 25;
+    const status = faceCount > 0 ? 'valid' : 'invalid';
+    
+    return {
+      facesDetected: faceCount,
+      confidence: confidence,
+      status: status,
+      imageSize: `${metadata.width}x${metadata.height}`,
+      details: {
+        isPortrait: isPortrait,
+        hasGoodResolution: metadata.width >= 300 && metadata.height >= 300
+      }
+    };
+    
+  } catch (error) {
+    console.error('[FACE VALIDATION] Error:', error);
+    return { 
+      error: 'Face validation failed',
+      status: 'error',
+      facesDetected: 0,
+      confidence: 0
+    };
+  }
+}
+
+// Enhanced Payment Proof Validation
+async function validatePaymentProof(imageBuffer) {
+  try {
+    console.log('[PAYMENT VALIDATION] Starting payment validation');
+    
+    if (!ocrWorker) {
+      throw new Error('OCR worker not ready');
+    }
+    
+    const processedImage = await sharp(imageBuffer)
+      .resize(1200)
+      .grayscale()
+      .normalize()
+      .linear(1.4, 0)
+      .sharpen()
+      .toBuffer();
+    
+    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage, 'eng', {
+      tessedit_pageseg_mode: 6
+    });
+    
+    // Enhanced payment data extraction
+    const paymentData = extractPaymentDataEnhanced(text);
+    let validationScore = confidence;
+    
+    if (paymentData.amount) validationScore += 20;
+    if (paymentData.reference) validationScore += 15;
+    if (paymentData.date) validationScore += 10;
+    
+    const status = validationScore >= 70 ? 'valid' : 
+                  validationScore >= 50 ? 'manual' : 'invalid';
+    
+    return {
+      text: text || '',
+      confidence: Math.round(confidence),
+      ...paymentData,
+      validationScore: Math.min(100, validationScore),
+      status: status
+    };
+    
+  } catch (error) {
+    console.error('[PAYMENT VALIDATION] Error:', error);
+    return { 
+      error: 'Payment validation failed',
+      status: 'error',
+      confidence: 0
+    };
+  }
+}
+
+// Enhanced name extraction for Philippine IDs
+function extractNameFromIDTextEnhanced(text) {
+  if (!text) return null;
+  
+  const upperText = text.toUpperCase();
+  
+  // Philippine ID specific patterns
+  const patterns = [
+    // Pattern 1: Philippine ID format
+    /(?:LAST NAME|APELYIDO)[^\n]*\n([A-Z][A-Z\s,'-]+)\n(?:FIRST NAME|MGA PANGALAN)[^\n]*\n([A-Z][A-Z\s,'-]+)(?:\n(?:MIDDLE NAME|GITNANG PANGALAN)[^\n]*\n([A-Z][A-Z\s,'-]+))?/i,
+    
+    // Pattern 2: Standard format
+    /^([A-Z][A-Za-z\s,'-]+),\s*([A-Z][A-Za-z\s'-]+)(?:\s+([A-Z][A-Za-z\s'-]+))?$/,
+    
+    // Pattern 3: Driver's License
+    /(?:LICENSEE|NAME)[^\n]*\n([^\n]+)/i
+  ];
+  
+  for (const pattern of patterns) {
+    const match = upperText.match(pattern);
+    if (match) {
+      let name = '';
+      
+      if (pattern.toString().includes('APELYIDO')) {
+        const lastName = match[1]?.trim();
+        const firstName = match[2]?.trim();
+        const middleName = match[3]?.trim();
+        name = `${firstName} ${middleName || ''} ${lastName}`.trim();
+      } else if (match[1] && match[2]) {
+        name = `${match[2]} ${match[1]}`.trim();
+        if (match[3]) name = `${match[2]} ${match[3]} ${match[1]}`.trim();
+      } else if (match[1]) {
+        name = match[1].trim();
+      }
+      
+      // Clean name
+      name = name.replace(/[^A-Za-z\s,'-]/g, ' ').replace(/\s+/g, ' ').trim();
+      
+      if (name.length >= 6 && name.split(' ').length >= 2) {
+        return name;
+      }
+    }
+  }
+  
+  return null;
+}
+
+// Enhanced payment data extraction
+function extractPaymentDataEnhanced(text) {
+  if (!text) return { amount: null, reference: null, date: null, paymentMethod: null };
+  
+  const normalized = text.replace(/\s+/g, ' ').trim();
+  
+  // Amount patterns
+  const amountPatterns = [
+    /(?:AMOUNT|AMT|TOTAL|PAID)\s*[:\-]?\s*(?:PHP|₱)?\s*([\d,]+\.?\d*)/i,
+    /(?:PHP|₱)\s*([\d,]+\.?\d*)/i
+  ];
+  
+  let amount = null;
+  for (const re of amountPatterns) {
+    const m = normalized.match(re);
+    if (m && m[1]) {
+      amount = m[1].replace(/[\s,]/g, '');
+      break;
+    }
+  }
+  
+  // Reference patterns
+  const refPatterns = [
+    /(REF(?:ERENCE)?\s*(?:NO\.?|#|NUMBER)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
+    /(REF(?:ERENCE)?\s*(?:NO\.?|#)?)\s*[:\-]?\s*([A-Z0-9\-]{6,})/i
+  ];
+  
+  let reference = null;
+  for (const re of refPatterns) {
+    const m = normalized.match(re);
+    if (m) {
+      reference = (m[2] || m[1] || '').toString().trim();
+      break;
+    }
+  }
+  
+  // Date patterns
+  const datePatterns = [
+    /\b(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\s+\d{1,2},?\s+\d{4}\b/i,
+    /\b\d{4}-\d{2}-\d{2}\b/,
+    /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/
+  ];
+  
+  let date = null;
+  for (const re of datePatterns) {
+    const m = normalized.match(re);
+    if (m) { 
+      date = m[0]; 
+      break;
+    }
+  }
+  
+  return { amount, reference, date, paymentMethod: null };
+}
+
+
+
+// ==============================================
 // SERVER INITIALIZATION - ALWAYS RUNNING
 // ==============================================
 
 // Continuous self-ping to prevent shutdown
-// ==============================================
-// ENHANCED KEEP-ALIVE SYSTEM FOR RENDER.COM
-// ==============================================
 
 // ==============================================
 // ENHANCED KEEP-ALIVE SYSTEM FOR RENDER.COM
