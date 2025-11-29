@@ -327,48 +327,7 @@ const styles = {
     transform: 'scale(1.05)',
     boxShadow: '0 15px 30px rgba(30, 64, 175, 0.4)'
   },
-  modalCard: {
-    backgroundColor: 'white',
-    borderRadius: '16px',
-    width: '90%',
-    maxWidth: '900px',
-    maxHeight: '90vh',
-    overflow: 'hidden',
-    boxShadow: '0 25px 50px rgba(0,0,0,0.25)',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  modalHeader: {
-    padding: '24px',
-    borderBottom: '1px solid #e2e8f0',
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    flexShrink: 0
-  },
-  modalTitle: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#1e293b',
-    margin: 0
-  },
-  closeButton: {
-    background: 'none',
-    border: 'none',
-    fontSize: '20px',
-    color: '#64748b',
-    cursor: 'pointer',
-    padding: '4px',
-    borderRadius: '4px',
-    transition: 'all 0.2s ease',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center'
-  },
-  closeButtonHover: {
-    backgroundColor: '#f1f5f9',
-    color: '#374151'
-  },
+
   modalContent: {
     padding: '24px',
     overflowY: 'auto',
@@ -451,14 +410,6 @@ const styles = {
     marginTop: '4px',
     textAlign: 'center',
     wordBreak: 'break-word'
-  },
-  modalActions: {
-    padding: '24px',
-    borderTop: '1px solid #e2e8f0',
-    display: 'flex',
-    justifyContent: 'flex-end',
-    gap: '12px',
-    flexShrink: 0
   },
   secondaryButtonHover: {
     backgroundColor: '#4b5563'
@@ -806,8 +757,75 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 1000,
-    padding: '2rem',
-    backdropFilter: 'blur(4px)'
+    padding: '20px'
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: '10px',
+    padding: '20px',
+    alignItems: 'center',
+    maxWidth: '500px',
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    position: 'relative',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  modalHeader: {
+    padding: '24px',
+    borderBottom: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    flexShrink: 0
+  },
+  modalTitle: {
+    fontSize: '24px',
+    fontWeight: '700',
+    color: '#1e293b',
+    margin: 0
+  },
+  modalContent: {
+    padding: '24px',
+    overflowY: 'auto',
+    flex: 1,
+      maxHeight: '60vh', // Add this
+  overflowY: 'auto', // Add this for scrolling
+  paddingRight: '10px', // Add some padding for scrollbar
+  },
+  modalActions: {
+    padding: '24px',
+    borderTop: '1px solid #e2e8f0',
+    display: 'flex',
+    justifyContent: 'flex-end',
+    gap: '12px',
+    flexShrink: 0
+  },
+  closeButton: {
+    background: 'none',
+    border: 'none',
+    fontSize: '20px',
+    color: '#64748b',
+    cursor: 'pointer',
+    padding: '4px',
+    borderRadius: '4px',
+    transition: 'all 0.2s ease',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  closeButtonHover: {
+    backgroundColor: '#f1f5f9',
+    color: '#374151'
   },
   loadingOverlay: {
     position: 'fixed',
@@ -2849,20 +2867,25 @@ const submitPayment = async () => {
                       />
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Amount<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Enter amount"
-                        value={formData.amount}
-                        onChange={(e) => handleInputChange('amount', e.target.value)}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Pay Amount<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <input
+    style={styles.formInput}
+    placeholder="Enter amount"
+    value={formData.amount}
+    onChange={(e) => {
+      const value = e.target.value;
+      // Only allow numbers and at most one decimal point
+      if (value === '' || /^\d*\.?\d*$/.test(value)) {
+        handleInputChange('amount', value);
+      }
+    }}
+    type="text"
+    inputMode="decimal"
+  />
+</div>
                   </div>
                 </div>
 
