@@ -327,12 +327,6 @@ const styles = {
     transform: 'scale(1.05)',
     boxShadow: '0 15px 30px rgba(30, 64, 175, 0.4)'
   },
-
-  modalContent: {
-    padding: '24px',
-    overflowY: 'auto',
-    flex: 1
-  },
   formGrid: {
     display: 'grid',
     gridTemplateColumns: '1fr 1fr',
@@ -680,20 +674,6 @@ const styles = {
     backgroundColor: '#2D5783',
     color: 'white'
   },
-  // ADD THESE EXACT STYLES FROM PaymentApplications:
-  modalCardSmall: {
-    width: '300px',
-    backgroundColor: 'white',
-    borderRadius: '14px',
-    padding: '20px',
-    position: 'relative',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
-    textAlign: 'center',
-    border: '1px solid #F1F5F9'
-  },
   confirmIcon: {
     marginBottom: '14px',
     fontSize: '28px'
@@ -799,7 +779,6 @@ const styles = {
     overflowY: 'auto',
     flex: 1,
       maxHeight: '60vh', // Add this
-  overflowY: 'auto', // Add this for scrolling
   paddingRight: '10px', // Add some padding for scrollbar
   },
   modalActions: {
