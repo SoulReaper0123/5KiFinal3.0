@@ -2165,20 +2165,34 @@ const handleSuccessOk = async () => {
                       </select>
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Registration Fee<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder={`Minimum ${toPeso(minRegistrationFee)}`}
-                        value={formData.registrationFee}
-                        onChange={(e) => handleInputChange('registrationFee', e.target.value)}
-                        type="number"
-                        min={minRegistrationFee}
-                        step="0.01"
-                      />
-                    </div>
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Registration Fee<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <input
+    style={styles.formInput}
+    placeholder={`Minimum ${toPeso(minRegistrationFee)}`}
+    value={formData.registrationFee}
+    onChange={(e) => {
+      // Only allow numbers and one decimal point - SAME AS LOANS COMPONENT
+      const value = e.target.value;
+      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      if (value === '' || regex.test(value)) {
+        handleInputChange('registrationFee', value);
+      }
+    }}
+    type="text"
+    inputMode="decimal"
+  />
+  <div style={{
+    color: '#6b7280',
+    fontSize: '12px',
+    marginTop: '4px',
+    marginLeft: '2px'
+  }}>
+    Minimum: {toPeso(minRegistrationFee)}
+  </div>
+</div>
 
                     <div style={styles.formSection}>
                       <label style={styles.formLabel}>
