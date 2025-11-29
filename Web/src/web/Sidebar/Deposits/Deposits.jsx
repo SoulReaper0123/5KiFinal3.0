@@ -2103,20 +2103,26 @@ const Deposits = () => {
                       </div>
                     )}
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Amount<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Enter amount"
-                        value={formData.amount}
-                        onChange={(e) => handleInputChange('amount', e.target.value)}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Amount<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <input
+    style={styles.formInput}
+    placeholder="Enter amount"
+    value={formData.amount}
+    onChange={(e) => {
+      // Only allow numbers and one decimal point - SAME AS LOANS COMPONENT
+      const value = e.target.value;
+      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      if (value === '' || regex.test(value)) {
+        handleInputChange('amount', value);
+      }
+    }}
+    type="text"
+    inputMode="decimal"
+  />
+</div>
                   </div>
                 </div>
 
