@@ -263,14 +263,15 @@ const styles = {
     padding: '20px',
     overflowY: 'auto'
   },
- // Add these to your existing styles object
+  
 modalCard: {
   width: '80%',
   backgroundColor: 'white',
   borderRadius: '10px',
   padding: '20px',
   alignItems: 'center',
-  maxWidth: '500px'
+  maxWidth: '500px',
+
 },
 modalIcon: {
   marginBottom: '15px',
@@ -285,6 +286,9 @@ modalTitle: {
 modalContent: {
   width: '100%',
   marginBottom: '20px',
+  maxHeight: '60vh', // Add this
+  overflowY: 'auto', // Add this for scrolling
+  paddingRight: '10px', // Add some padding for scrollbar
 },
 modalButtonContainer: {
   flexDirection: 'row',
@@ -2560,20 +2564,26 @@ const handleAddApprovedLoan = async () => {
                       />
                     </div>
 
-                    <div style={styles.formSection}>
-                      <label style={styles.formLabel}>
-                        Loan Amount<span style={styles.requiredAsterisk}>*</span>
-                      </label>
-                      <input
-                        style={styles.formInput}
-                        placeholder="Enter loan amount"
-                        value={addForm.loanAmount}
-                        onChange={(e) => updateForm('loanAmount', e.target.value)}
-                        type="number"
-                        min="0"
-                        step="0.01"
-                      />
-                    </div>
+<div style={styles.formSection}>
+  <label style={styles.formLabel}>
+    Loan Amount<span style={styles.requiredAsterisk}>*</span>
+  </label>
+  <input
+    style={styles.formInput}
+    placeholder="Enter loan amount"
+    value={addForm.loanAmount}
+    onChange={(e) => {
+      // Only allow numbers and one decimal point
+      const value = e.target.value;
+      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      if (value === '' || regex.test(value)) {
+        updateForm('loanAmount', value);
+      }
+    }}
+    type="text"
+    inputMode="decimal"
+  />
+</div>
 
          {/* Account Name - Conditionally Required */}
 <div style={styles.formSection}>
