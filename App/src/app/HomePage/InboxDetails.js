@@ -5,7 +5,7 @@ import { MaterialIcons, Ionicons, FontAwesome } from '@expo/vector-icons';
 import { auth, database } from '../../firebaseConfig';
 import { ref as dbRef, get } from 'firebase/database';
 
-// In InboxDetails.js - Update the iconByType function
+// Update the iconByType function
 const iconByType = (type) => {
   switch ((type || '').toLowerCase()) {
     case 'deposit':
@@ -24,6 +24,10 @@ const iconByType = (type) => {
       return { name: 'alarm', lib: 'MaterialIcons', color: '#FF9800' };
     case 'membership withdrawal':
       return { name: 'logout', lib: 'MaterialIcons', color: '#1E3A5F' };
+    // ADD DIVIDEND CASE
+    case 'dividend':
+    case 'dividend distribution':
+      return { name: 'attach-money', lib: 'MaterialIcons', color: '#4CAF50' };
     default:
       return { name: 'receipt', lib: 'MaterialIcons', color: '#1E3A5F' };
   }
@@ -68,7 +72,7 @@ export default function InboxDetails() {
     })();
   }, []);
 
-  // Compose sentence
+  // Compose sentence - FIXED VERSION
   const sentence = useMemo(() => {
     const status = (item?.status || '').toLowerCase();
     const originalRef = item?.originalTransactionId || item?.transactionId || 'N/A';
@@ -92,20 +96,33 @@ export default function InboxDetails() {
     })();
 
     const type = (item?.type || title || '').toLowerCase();
-
-    const method = type.includes('deposit')
-      ? (item?.depositOption || item?.paymentOption || item?.withdrawOption)
-      : type.includes('payment')
-      ? (item?.paymentOption || item?.depositOption || item?.withdrawOption)
-      : type.includes('withdraw')
-      ? (item?.withdrawOption || item?.paymentOption || item?.depositOption)
-      : (item?.paymentOption || item?.depositOption || item?.withdrawOption);
-
     const amount = item?.amount || 0;
 
     // Handle Loan Payment Reminder specific message
     if (type.includes('loan payment reminder') || item?.isReminder) {
       return `Reminder: ${item?.message || 'Your loan payment is due soon.'}\nRef No. ${newRef}`;
+    }
+
+    // ========== DIVIDEND SPECIFIC MESSAGE ==========
+    if (type.includes('dividend')) {
+      if (status === 'approved' || status === 'distributed') {
+        let message = `Your dividend of ${peso(amount)} has been distributed on ${dateStr}.`;
+        
+        // Add investment/balance details if available
+        if (item?.addedToInvestment) {
+          message += '\n• Added to your investment';
+        }
+        if (item?.addedToBalance) {
+          message += '\n• Added to your balance';
+        }
+        
+        message += `\nRef No. ${newRef}`;
+        return message;
+      } else if (status === 'pending') {
+        return `Your dividend of ${peso(amount)} is pending distribution.\nRef No. ${newRef}`;
+      } else {
+        return `Dividend: ${peso(amount)} - Status: ${status}\nRef No. ${newRef}`;
+      }
     }
 
     // Handle Membership Withdrawal specific message
@@ -120,11 +137,41 @@ export default function InboxDetails() {
       return `${base}${reasonText}${ref2}`;
     }
 
-    // Original logic for other types
+    // ========== FIXED: Use proper wording for each transaction type ==========
+    const method = type.includes('deposit')
+      ? (item?.depositOption || item?.paymentOption || item?.withdrawOption)
+      : type.includes('payment')
+      ? (item?.paymentOption || item?.depositOption || item?.withdrawOption)
+      : type.includes('withdraw')
+      ? (item?.withdrawOption || item?.paymentOption || item?.depositOption)
+      : (item?.paymentOption || item?.depositOption || item?.withdrawOption);
+
     const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
-    const base = `Your ${type} application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
-    const ref2 = `\nRef No. ${newRef}`;
-    return `${base}${ref2}`;
+    
+    // Use appropriate wording based on transaction type
+    let baseMessage = '';
+    
+    if (type.includes('deposit')) {
+      baseMessage = `Your deposit${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` via ${method}` : ''}.`;
+    } else if (type.includes('withdrawal')) {
+      baseMessage = `Your withdrawal${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` via ${method}` : ''}.`;
+    } else if (type.includes('loan')) {
+      baseMessage = `Your loan${descRef} of ${peso(amount)} on ${dateStr} has been ${status}.`;
+    } else if (type.includes('payment')) {
+      baseMessage = `Your payment${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` via ${method}` : ''}.`;
+    } else if (type.includes('registration')) {
+      baseMessage = `Your registration${descRef} with fee of ${peso(amount)} on ${dateStr} has been ${status}.`;
+    } else {
+      // Fallback for unknown types
+      baseMessage = `Your ${type}${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
+    }
+
+    // Add rejection reason if applicable
+    const rejectionText = status === 'rejected' && item?.rejectionReason 
+      ? `\nReason: ${item.rejectionReason}` 
+      : '';
+
+    return `${baseMessage}${rejectionText}\nRef No. ${newRef}`;
   }, [item, title]);
 
   const icon = iconByType(title);
