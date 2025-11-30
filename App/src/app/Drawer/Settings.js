@@ -14,12 +14,16 @@ import {
 } from 'react-native';
 import { MaterialIcons, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import * as SecureStore from 'expo-secure-store';
-import * as LocalAuthentication from 'expo-local-authentication';
 import { auth } from '../../firebaseConfig';
 import { reauthenticateWithCredential, EmailAuthProvider, updatePassword } from 'firebase/auth';
 import CustomModal from '../../components/CustomModal';
 import CustomConfirmModal from '../../components/CustomConfirmModal';
+import { 
+  checkBiometricSupport, 
+  Storage, 
+  authenticateBiometric,
+  isMobileBrowser 
+} from '../../utils/platformUtils';
 
 const Settings = () => {
   const navigation = useNavigation();
@@ -113,33 +117,31 @@ useEffect(() => {
   }, [email]);
 
   useEffect(() => {
-    const checkBiometrics = async () => {
-      // Disable biometric features on web
-      if (Platform.OS === 'web') {
-        setBiometricsAvailable(false);
-        setBiometricsEnabled(false);
-        return;
-      }
+const checkBiometrics = async () => {
+  // Disable biometric features on web and mobile browsers
+  if (Platform.OS === 'web' || isMobileBrowser()) {
+    setBiometricsAvailable(false);
+    setBiometricsEnabled(false);
+    return;
+  }
 
-      try {
-        // Check if device supports biometrics
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-        
-        setBiometricsAvailable(hasHardware && isEnrolled);
-        
-        // Check if biometrics are enabled for this user
-        const credentials = await SecureStore.getItemAsync('biometricCredentials');
-        if (credentials && currentEmail) {
-          const storedData = JSON.parse(credentials);
-          if (storedData.email === currentEmail) {
-            setBiometricsEnabled(true);
-          }
-        }
-      } catch (error) {
-        console.error('Biometric check error:', error);
+  try {
+    const biometricSupport = await checkBiometricSupport();
+    
+    setBiometricsAvailable(biometricSupport.isSupported);
+    
+    // Check if biometrics are enabled for this user
+    const credentials = await Storage.getItem('biometricCredentials');
+    if (credentials && currentEmail) {
+      const storedData = JSON.parse(credentials);
+      if (storedData.email === currentEmail) {
+        setBiometricsEnabled(true);
       }
-    };
+    }
+  } catch (error) {
+    console.error('Biometric check error:', error);
+  }
+};
     
     checkBiometrics();
     
@@ -208,38 +210,37 @@ useEffect(() => {
   };
 
   // ← UPDATE testFingerprint function:
-  const testFingerprint = async () => {
-    // Don't run on web
-    if (Platform.OS === 'web') {
-      setModalMessage('Fingerprint testing is not available on web browser');
-      setModalType('error');
+const testFingerprint = async () => {
+  // Don't run on web or mobile browsers
+  if (Platform.OS === 'web' || isMobileBrowser()) {
+    setModalMessage('Fingerprint testing is only available in the mobile app.');
+    setModalType('error');
+    setModalVisible(true);
+    return;
+  }
+
+  try {
+    const result = await authenticateBiometric({
+      promptMessage: 'Test your fingerprint',
+      fallbackLabel: 'Use passcode instead'
+    });
+
+    if (result.success) {
+      setModalMessage('Fingerprint authentication test passed!');
+      setModalType('success');
       setModalVisible(true);
-      return;
-    }
-
-    try {
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Test your fingerprint',
-        fallbackLabel: 'Use password instead',
-      });
-
-      if (result.success) {
-        setModalMessage('Fingerprint authentication test passed!');
-        setModalType('success');
-        setModalVisible(true);
-      } else {
-        setModalMessage('Fingerprint authentication test failed. Please try again.');
-        setModalType('error');
-        setModalVisible(true);
-      }
-    } catch (error) {
-      console.error('Fingerprint test error:', error);
-      setModalMessage('Could not test fingerprint authentication');
+    } else {
+      setModalMessage(result.message || 'Fingerprint authentication test failed. Please try again.');
       setModalType('error');
       setModalVisible(true);
     }
-  };
-
+  } catch (error) {
+    console.error('Fingerprint test error:', error);
+    setModalMessage('Could not test fingerprint authentication');
+    setModalType('error');
+    setModalVisible(true);
+  }
+};
   // Toggle fingerprint login
   const toggleFingerprint = async (value) => {
     if (value) {
