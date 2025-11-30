@@ -21,12 +21,12 @@ export default function BiometricSetupScreen() {
   const [showPasswordInput, setShowPasswordInput] = useState(false);
   const navigation = useNavigation();
   const route = useRoute();
-  const { email, password } = route.params || {};
+  const { email, password, fromHome } = route.params || {};
 
   useEffect(() => {
     checkBiometricSupport();
     
-    // If no password was provided (coming from Profile screen), show password input
+    // If no password was provided (coming from Profile/Settings screen), show password input
     if (!password) {
       setShowPasswordInput(true);
     }
@@ -75,14 +75,33 @@ export default function BiometricSetupScreen() {
       });
 
       if (result.success) {
+        // Store biometric credentials securely
         await SecureStore.setItemAsync(
           'biometricCredentials',
-          JSON.stringify({ email, password: passwordToStore })
+          JSON.stringify({ 
+            email, 
+            password: passwordToStore 
+          })
         );
+        
         Alert.alert(
           'Success', 
           'Fingerprint login has been enabled!',
-          [{ text: 'OK', onPress: () => navigation.navigate('DrawerNav', { email })}]
+          [{ 
+            text: 'OK', 
+            onPress: () => {
+              // Navigate back with refresh parameter
+              if (fromHome) {
+                navigation.goBack(); // Go back to home
+              } else {
+                // Pass refresh flag to Settings screen
+                navigation.navigate('Settings', { 
+                  email,
+                  refreshBiometrics: true 
+                });
+              }
+            }
+          }]
         );
       } else {
         setError('Fingerprint authentication failed. Please try again.');
@@ -96,7 +115,11 @@ export default function BiometricSetupScreen() {
   };
 
   const skipSetup = () => {
-    navigation.navigate('DrawerNav', { email });
+    if (fromHome) {
+      navigation.goBack();
+    } else {
+      navigation.navigate('Settings', { email });
+    }
   };
 
   return (
@@ -121,21 +144,29 @@ export default function BiometricSetupScreen() {
           </Text>
         )}
         
-        {/* Password input field - only shown when coming from Profile screen */}
+        {/* Password input field - only shown when coming from Profile/Settings screen */}
         {showPasswordInput && (
-          <TextInput
-            style={styles.passwordInput}
-            placeholder="Enter your password"
-            placeholderTextColor="#999"
-            secureTextEntry
-            value={inputPassword}
-            onChangeText={setInputPassword}
-            autoCapitalize="none"
-          />
+          <View style={styles.passwordContainer}>
+            <TextInput
+              style={styles.passwordInput}
+              placeholder="Enter your password"
+              placeholderTextColor="#999"
+              secureTextEntry
+              value={inputPassword}
+              onChangeText={setInputPassword}
+              autoCapitalize="none"
+            />
+            <Text style={styles.passwordNote}>
+              For security, we need your password to enable fingerprint login.
+            </Text>
+          </View>
         )}
 
         <TouchableOpacity
-          style={styles.primaryButton}
+          style={[
+            styles.primaryButton,
+            (showPasswordInput && !inputPassword.trim()) && styles.disabledButton
+          ]}
           onPress={setupBiometrics}
           disabled={isLoading || (showPasswordInput && !inputPassword.trim())}
         >
@@ -193,6 +224,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     paddingHorizontal: 20,
   },
+  passwordContainer: {
+    width: '100%',
+    marginBottom: 20,
+  },
+  passwordInput: {
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 8,
+    padding: 15,
+    width: '100%',
+    color: 'white',
+    fontSize: 16,
+    marginBottom: 10,
+  },
+  passwordNote: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.7)',
+    textAlign: 'center',
+    fontStyle: 'italic',
+  },
   primaryButton: {
     backgroundColor: '#4FE7AF',
     paddingVertical: 15,
@@ -201,6 +251,9 @@ const styles = StyleSheet.create({
     width: '100%',
     alignItems: 'center',
     marginBottom: 15,
+  },
+  disabledButton: {
+    backgroundColor: '#cccccc',
   },
   buttonText: {
     color: '#1A1A1A',
@@ -214,15 +267,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   secondaryButtonText: {
-    color: 'white',
-    fontSize: 16,
-  },
-  passwordInput: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    borderRadius: 8,
-    padding: 15,
-    width: '100%',
-    marginBottom: 20,
     color: 'white',
     fontSize: 16,
   },
