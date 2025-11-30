@@ -14,6 +14,7 @@ import {
   Modal
 } from 'react-native';
 import CustomModal from '../../components/CustomModal';
+import CustomConfirmModal from '../../components/CustomConfirmModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import Icon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -40,7 +41,13 @@ const RegistrationFeePage = () => {
   const [minRegistrationFee, setMinRegistrationFee] = useState(5000);
   const [amount, setAmount] = useState('');
   
-  // Image handling states (same as RegisterPage2)
+  // Modal states
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false);
+
+  // Image handling states
   const [showSourceOptions, setShowSourceOptions] = useState(false);
   const [showCropOptions, setShowCropOptions] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
@@ -66,15 +73,6 @@ const RegistrationFeePage = () => {
       const isAndroid = /android/i.test(userAgent);
 
       setBrowserInfo({
-        isChrome,
-        isFirefox,
-        isSafari,
-        isMobile,
-        isIOS,
-        isAndroid,
-        userAgent
-      });
-      console.log('Browser detected:', {
         isChrome,
         isFirefox,
         isSafari,
@@ -115,7 +113,11 @@ const RegistrationFeePage = () => {
   // Validate form submission
   useEffect(() => {
     const validAmount = parseFloat(amount) >= parseFloat(minRegistrationFee);
-    setIsSubmitDisabled(!paymentOption || !proofOfPayment || !validAmount);
+    if (paymentOption === 'Cash') {
+      setIsSubmitDisabled(!paymentOption || !validAmount);
+    } else {
+      setIsSubmitDisabled(!paymentOption || !proofOfPayment || !validAmount);
+    }
   }, [paymentOption, proofOfPayment, amount, minRegistrationFee]);
 
   const fetchPaymentSettings = async () => {
@@ -154,16 +156,23 @@ const RegistrationFeePage = () => {
   const paymentOptions = [
     { key: 'Bank', label: 'Bank' },
     { key: 'GCash', label: 'GCash' },
+    { key: 'Cash', label: 'Cash on Hand' },
   ];
 
   const handlePaymentOptionChange = (option) => {
     setPaymentOption(option.key);
+    if (option.key === 'Cash') {
+      setAccountNumber('');
+      setAccountName('');
+      setProofOfPayment(null);
+      return;
+    }
     const selectedAccount = paymentAccounts[option.key];
-    setAccountNumber(selectedAccount.accountNumber || '');
-    setAccountName(selectedAccount.accountName || '');
+    setAccountNumber(selectedAccount?.accountNumber || '');
+    setAccountName(selectedAccount?.accountName || '');
   };
 
-  // IMAGE HANDLING FUNCTIONS (same as RegisterPage2)
+  // IMAGE HANDLING FUNCTIONS (same as Deposit page)
 
   // Show source selection options
   const showSourceSelection = (setImageFunction, imageType) => {
@@ -339,27 +348,24 @@ const RegistrationFeePage = () => {
         cleanup();
       };
       
-      // Add event listeners
       input.addEventListener('change', handleChange);
       input.addEventListener('cancel', handleCancel);
       
-      // Add to document and trigger click
       document.body.appendChild(input);
       
-      // Set timeout for safety
       setTimeout(() => {
         if (!resolved) {
           console.log('Gallery selection timeout');
           cleanup();
         }
-      }, 30000); // 30 second timeout
+      }, 30000);
       
       console.log('Triggering file input click');
       input.click();
     });
   };
 
-  // Web camera capture - CORRECT SELFIE ORIENTATION
+  // Web camera capture
   const handleWebCameraCapture = (imageType) => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -375,8 +381,7 @@ const RegistrationFeePage = () => {
         return;
       }
 
-      // Use back camera for ID, front camera for selfie
-      const facingMode = imageType === 'selfie' ? 'user' : 'environment';
+      const facingMode = 'environment';
       
       navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -436,7 +441,6 @@ const RegistrationFeePage = () => {
           box-shadow: 0 4px 20px rgba(0,0,0,0.3);
         `;
         
-        // Add camera frame/border that matches the camera size
         const cameraFrame = document.createElement('div');
         cameraFrame.style.cssText = `
           position: absolute;
@@ -499,32 +503,15 @@ const RegistrationFeePage = () => {
         cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
         
         video.onloadedmetadata = () => {
-          // Set video to fill the container completely
           video.style.width = '100%';
           video.style.height = '100%';
           video.style.objectFit = 'cover';
-          
-          // For front camera preview, we want the mirrored view (like a mirror)
-          // This is what users expect to see when taking selfies
-          if (imageType === 'selfie') {
-            video.style.transform = 'scaleX(-1)'; // Mirror the preview
-          }
           
           canvas.width = video.videoWidth;
           canvas.height = video.videoHeight;
           
           captureButton.onclick = () => {
-            // FIX: For selfies, we need to handle the captured image differently
-            if (imageType === 'selfie') {
-              // Method 1: Draw normally but flip horizontally to correct the mirroring
-              context.save();
-              context.scale(-1, 1); // Flip horizontally
-              context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
-              context.restore();
-            } else {
-              // For back camera, draw normally
-              context.drawImage(video, 0, 0, canvas.width, canvas.height);
-            }
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
             const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
             
@@ -558,9 +545,7 @@ const RegistrationFeePage = () => {
         };
       }).catch((error) => {
         console.error('Camera access error:', error);
-        // If the preferred camera fails, try the other one as fallback
-        console.log('Trying fallback camera...');
-        const fallbackFacingMode = imageType === 'selfie' ? 'environment' : 'user';
+        const fallbackFacingMode = 'user';
         
         navigator.mediaDevices.getUserMedia({ 
           video: { 
@@ -570,7 +555,6 @@ const RegistrationFeePage = () => {
           } 
         })
         .then((stream) => {
-          // Same camera setup code as above but with fallback camera
           const video = document.createElement('video');
           video.srcObject = stream;
           video.autoplay = true;
@@ -683,12 +667,10 @@ const RegistrationFeePage = () => {
           cancelButton.onmouseout = () => cancelButton.style.background = '#dc2626';
           
           video.onloadedmetadata = () => {
-            // Set video to fill the container completely
             video.style.width = '100%';
             video.style.height = '100%';
             video.style.objectFit = 'cover';
             
-            // For front camera preview in fallback, also mirror it
             if (fallbackFacingMode === 'user') {
               video.style.transform = 'scaleX(-1)';
             }
@@ -697,15 +679,12 @@ const RegistrationFeePage = () => {
             canvas.height = video.videoHeight;
             
             captureButton.onclick = () => {
-              // Handle the captured image based on camera type
               if (fallbackFacingMode === 'user') {
-                // For front camera, flip the captured image
                 context.save();
                 context.scale(-1, 1);
                 context.drawImage(video, -canvas.width, 0, canvas.width, canvas.height);
                 context.restore();
               } else {
-                // For back camera, draw normally
                 context.drawImage(video, 0, 0, canvas.width, canvas.height);
               }
               
@@ -751,7 +730,7 @@ const RegistrationFeePage = () => {
     });
   };
 
-  // Handle crop selected image - PROPERLY SET THE CROPPED IMAGE
+  // Handle crop selected image
   const handleCropSelectedImage = async () => {
     if (!selectedImageUri) return;
 
@@ -761,18 +740,16 @@ const RegistrationFeePage = () => {
         console.log('Cropped image result:', croppedImage ? 'Success' : 'Failed');
         
         if (croppedImage && currentSetFunction) {
-          // FIX: Actually set the cropped image to the state
           currentSetFunction(croppedImage);
           console.log('Cropped image set to state successfully');
         } else {
           console.log('No cropped image to set');
         }
       } else {
-        // For native, use Expo's built-in cropping
         const result = await ImagePicker.launchImageLibraryAsync({
           mediaTypes: ImagePicker.MediaTypeOptions.Images,
           allowsEditing: true,
-          aspect: currentImageType === 'selfie' ? [1, 1] : [4, 3],
+          aspect: [4, 3],
           quality: 0.8,
         });
 
@@ -781,7 +758,6 @@ const RegistrationFeePage = () => {
         }
       }
       
-      // Close crop options regardless of success
       setShowCropOptions(false);
       setSelectedImageUri(null);
       setCurrentImageType(null);
@@ -789,12 +765,11 @@ const RegistrationFeePage = () => {
       
     } catch (error) {
       console.error('Crop error:', error);
-      // If crop fails, just use the original image
       handleUseAsIs();
     }
   };
 
-  // INTERACTIVE CROPPER WITH PROPER LANDSCAPE SUPPORT
+  // INTERACTIVE CROPPER
   const createInteractiveCrop = (imageUri, imageType) => {
     return new Promise((resolve) => {
       if (Platform.OS !== 'web') {
@@ -854,7 +829,7 @@ const RegistrationFeePage = () => {
         height: 400px;
         border: 2px solid #1E3A5F;
         border-radius: 12px;
-        margin-bottom: 16px;
+        marginBottom: 16px;
         overflow: hidden;
         background: #f8fafc;
         position: relative;
@@ -907,7 +882,7 @@ const RegistrationFeePage = () => {
         border: none;
         border-radius: 8px;
         font-size: 14px;
-        font-weight: 600;
+        fontWeight: 600;
         cursor: pointer;
         flex: 1;
         min-width: 120px;
@@ -925,7 +900,7 @@ const RegistrationFeePage = () => {
         border: none;
         border-radius: 8px;
         font-size: 14px;
-        font-weight: 600;
+        fontWeight: 600;
         cursor: pointer;
         flex: 1;
         min-width: 120px;
@@ -934,7 +909,6 @@ const RegistrationFeePage = () => {
       cancelCropButton.onmouseover = () => cancelCropButton.style.background = '#b91c1c';
       cancelCropButton.onmouseout = () => cancelCropButton.style.background = '#dc2626';
 
-      // Zoom and drag variables
       let scale = 1;
       let posX = 0;
       let posY = 0;
@@ -942,17 +916,14 @@ const RegistrationFeePage = () => {
       let startX, startY;
       let initialDistance = null;
 
-      // Touch event handlers for mobile
       const handleTouchStart = (e) => {
         e.preventDefault();
         if (e.touches.length === 1) {
-          // Single touch - start dragging
           isDragging = true;
           startX = e.touches[0].clientX - posX;
           startY = e.touches[0].clientY - posY;
           img.style.cursor = 'grabbing';
         } else if (e.touches.length === 2) {
-          // Two touches - start pinch to zoom
           initialDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -964,12 +935,10 @@ const RegistrationFeePage = () => {
         e.preventDefault();
         
         if (isDragging && e.touches.length === 1) {
-          // Dragging
           posX = e.touches[0].clientX - startX;
           posY = e.touches[0].clientY - startY;
           updateImageTransform();
         } else if (e.touches.length === 2 && initialDistance !== null) {
-          // Pinch to zoom
           const currentDistance = Math.hypot(
             e.touches[0].clientX - e.touches[1].clientX,
             e.touches[0].clientY - e.touches[1].clientY
@@ -987,7 +956,6 @@ const RegistrationFeePage = () => {
         img.style.cursor = 'grab';
       };
 
-      // Mouse event handlers for desktop
       const handleMouseDown = (e) => {
         e.preventDefault();
         isDragging = true;
@@ -1010,13 +978,11 @@ const RegistrationFeePage = () => {
         img.style.cursor = 'grab';
       };
 
-      // Wheel event for zoom on desktop
       const handleWheel = (e) => {
         e.preventDefault();
         const delta = -e.deltaY * 0.01;
         const newScale = Math.max(0.5, Math.min(3, scale + delta));
         
-        // Zoom towards mouse position
         const rect = cropArea.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
@@ -1033,18 +999,15 @@ const RegistrationFeePage = () => {
         img.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
       };
 
-      // Add event listeners
       img.addEventListener('mousedown', handleMouseDown);
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
       cropArea.addEventListener('wheel', handleWheel, { passive: false });
       
-      // Touch events - attach to cropArea for better mobile support
       cropArea.addEventListener('touchstart', handleTouchStart, { passive: false });
       cropArea.addEventListener('touchmove', handleTouchMove, { passive: false });
       cropArea.addEventListener('touchend', handleTouchEnd);
 
-      // Improved image centering logic for both portrait and landscape
       const centerImage = () => {
         const containerWidth = cropArea.clientWidth;
         const containerHeight = cropArea.clientHeight;
@@ -1055,84 +1018,57 @@ const RegistrationFeePage = () => {
           const imgAspectRatio = imgWidth / imgHeight;
           const containerAspectRatio = containerWidth / containerHeight;
           
-          console.log('Image dimensions:', { imgWidth, imgHeight, imgAspectRatio });
-          console.log('Container dimensions:', { containerWidth, containerHeight, containerAspectRatio });
-          
-          // Determine if image is portrait or landscape
           if (imgAspectRatio > containerAspectRatio) {
-            // Landscape image - fit to width
             scale = (containerWidth / imgWidth) * 0.9;
-            console.log('Landscape image - scaling to width');
           } else {
-            // Portrait image - fit to height
             scale = (containerHeight / imgHeight) * 0.9;
-            console.log('Portrait image - scaling to height');
           }
           
-          // Calculate centered position
           const scaledWidth = imgWidth * scale;
           const scaledHeight = imgHeight * scale;
           posX = (containerWidth - scaledWidth) / 2;
           posY = (containerHeight - scaledHeight) / 2;
           
-          console.log('Centered position:', { posX, posY, scale, scaledWidth, scaledHeight });
           updateImageTransform();
           img.style.cursor = 'grab';
         };
       };
 
-      // Proper cropping logic for both portrait and landscape images
       cropButton.onclick = () => {
         console.log('Crop button clicked');
         
-        // Get actual dimensions
         const containerWidth = cropArea.clientWidth;
         const containerHeight = cropArea.clientHeight;
         const imgWidth = img.naturalWidth;
         const imgHeight = img.naturalHeight;
         
-        console.log('Cropping dimensions:', {
-          containerWidth, containerHeight, imgWidth, imgHeight, scale, posX, posY
-        });
-        
-        // Create a canvas to crop the image
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
-        // Set canvas size to match the visible crop area
         canvas.width = containerWidth;
         canvas.height = containerHeight;
         
-        // Calculate the visible portion of the image in the crop area
-        // Convert crop area coordinates to original image coordinates
         const visibleSourceX = Math.max(0, -posX / scale);
         const visibleSourceY = Math.max(0, -posY / scale);
         const visibleSourceWidth = Math.min(imgWidth - visibleSourceX, containerWidth / scale);
         const visibleSourceHeight = Math.min(imgHeight - visibleSourceY, containerHeight / scale);
         
-        console.log('Visible source coordinates:', {
-          visibleSourceX, visibleSourceY, visibleSourceWidth, visibleSourceHeight
-        });
-        
-        // Clear canvas with white background
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         
         if (visibleSourceWidth > 0 && visibleSourceHeight > 0) {
-          // Draw exactly what's visible in the crop area
           ctx.drawImage(
             img,
-            visibleSourceX, visibleSourceY,           // Source x, y
-            visibleSourceWidth, visibleSourceHeight,   // Source width, height
-            0, 0,                                     // Destination x, y
-            canvas.width, canvas.height               // Destination width, height
+            visibleSourceX, visibleSourceY,
+            visibleSourceWidth, visibleSourceHeight,
+            0, 0,
+            canvas.width, canvas.height
           );
         }
         
         const croppedImageDataUrl = canvas.toDataURL('image/jpeg', 0.9);
         console.log('Image cropped successfully');
         
-        // Cleanup event listeners
         cleanupEventListeners();
         document.body.removeChild(cropUI);
         resolve(croppedImageDataUrl);
@@ -1165,7 +1101,6 @@ const RegistrationFeePage = () => {
       cropUI.appendChild(container);
       document.body.appendChild(cropUI);
       
-      // Center the image after it's added to DOM
       setTimeout(centerImage, 100);
       
       console.log('Crop interface created successfully');
@@ -1195,21 +1130,29 @@ const RegistrationFeePage = () => {
   };
 
   const handleSubmit = () => {
-    if (!paymentOption || !proofOfPayment) {
-      setModalMessage('All fields are required');
-      setModalType('error');
-      setModalVisible(true);
+    if (!paymentOption || !amount) {
+      setErrorMessage('All fields are required');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    if (paymentOption !== 'Cash' && !proofOfPayment) {
+      setErrorMessage('All fields are required');
+      setErrorModalVisible(true);
       return;
     }
 
     const amt = parseFloat(amount);
     if (isNaN(amt) || amt < parseFloat(minRegistrationFee)) {
-      setModalMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
-      setModalType('error');
-      setModalVisible(true);
+      setErrorMessage(`Minimum registration fee is ₱${minRegistrationFee.toFixed(2)}`);
+      setErrorModalVisible(true);
       return;
     }
 
+    setConfirmModalVisible(true);
+  };
+
+  const submitRegistrationFee = () => {
     setLoading(true);
     
     // Navigate to AccountDetails step with accumulated registration data
@@ -1219,10 +1162,23 @@ const RegistrationFeePage = () => {
       accountNumber,
       accountName,
       proofOfPayment,
-      registrationFee: amt
+      registrationFee: parseFloat(amount)
     });
     
     setLoading(false);
+    setConfirmModalVisible(false);
+  };
+
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+  };
+
+  const handleErrorOk = () => {
+    setErrorModalVisible(false);
+  };
+
+  const formatCurrency = (amount) => {
+    return `₱${parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
   };
 
   return (
@@ -1231,6 +1187,7 @@ const RegistrationFeePage = () => {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer}>
+        {/* Original header design - back button on left, title on left */}
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
         </TouchableOpacity>
@@ -1244,7 +1201,7 @@ const RegistrationFeePage = () => {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.label}>Minimum Registration Fee: ₱{minRegistrationFee.toFixed(2)}</Text>
+          <Text style={styles.label}>Minimum Registration Fee: {formatCurrency(minRegistrationFee)}</Text>
           
           <Text style={styles.label}>Enter Amount<Text style={styles.required}>*</Text></Text>
           <TextInput
@@ -1252,14 +1209,13 @@ const RegistrationFeePage = () => {
             onChangeText={setAmount}
             style={styles.input}
             keyboardType="numeric"
-            placeholder={`Enter amount (min ₱${minRegistrationFee.toFixed(2)})`}
+            placeholder={`Enter amount (min ${formatCurrency(minRegistrationFee)})`}
           />
 
           <Text style={styles.label}>Payment Option<Text style={styles.required}>*</Text></Text>
           <ModalSelector
             data={paymentOptions}
             initValue="Select Payment Option"
-            cancelText="Cancel"
             onChange={handlePaymentOptionChange}
             style={styles.picker}
             overlayStyle={{ 
@@ -1280,35 +1236,43 @@ const RegistrationFeePage = () => {
             </TouchableOpacity>
           </ModalSelector>
 
-          <Text style={styles.label}>Account Name</Text>
-          <TextInput 
-            value={accountName} 
-            style={[styles.input, styles.fixedInput]} 
-            editable={false} 
-          />
+          {paymentOption !== 'Cash' && (
+            <>
+              <Text style={styles.label}>Account Name</Text>
+              <TextInput 
+                value={accountName} 
+                style={[styles.input, styles.fixedInput]} 
+                editable={false} 
+              />
 
-          <Text style={styles.label}>Account Number</Text>
-          <TextInput 
-            value={accountNumber} 
-            style={[styles.input, styles.fixedInput]} 
-            editable={false} 
-          />
+              <Text style={styles.label}>Account Number</Text>
+              <TextInput 
+                value={accountNumber} 
+                style={[styles.input, styles.fixedInput]} 
+                editable={false} 
+              />
+            </>
+          )}
 
-          <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
-          <TouchableOpacity 
-            onPress={handleProofOfPaymentPress} 
-            style={styles.imagePreviewContainer}
-          >
-            {proofOfPayment ? (
-              <Image source={getImageSource(proofOfPayment)} style={styles.imagePreview} />
-            ) : (
-              <View style={styles.iconContainer}>
-                <Icon name="add" size={40} color="#1E3A5F" />
-                <Text style={styles.uploadText}>Tap to upload</Text>
-                <Text style={styles.uploadSubText}>Camera or Gallery</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+          {paymentOption !== 'Cash' && (
+            <>
+              <Text style={styles.label}>Proof of Payment<Text style={styles.required}>*</Text></Text>
+              <TouchableOpacity 
+                onPress={handleProofOfPaymentPress} 
+                style={styles.imagePreviewContainer}
+              >
+                {proofOfPayment ? (
+                  <Image source={getImageSource(proofOfPayment)} style={styles.imagePreview} />
+                ) : (
+                  <View style={styles.iconContainer}>
+                    <Icon name="add" size={40} color="#1E3A5F" />
+                    <Text style={styles.uploadText}>Tap to upload</Text>
+                    <Text style={styles.uploadSubText}>Camera or Gallery</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
 
           <TouchableOpacity 
             style={[
@@ -1316,118 +1280,170 @@ const RegistrationFeePage = () => {
               isSubmitDisabled && styles.buttonDisabled
             ]}
             onPress={handleSubmit}
-            disabled={isSubmitDisabled}
+            disabled={isSubmitDisabled || loading}
           >
             <Text style={styles.submitButtonText}>Next</Text>
           </TouchableOpacity>
         </View>
-      </ScrollView>
 
-      {/* Loading Modal */}
-      {loading && (
-        <View style={styles.modalOverlay}>
-          <ActivityIndicator size="large" color="#0000ff" />
-          <Text style={styles.loadingText}>Processing...</Text>
-        </View>
-      )}
-
-      {/* Source Selection Modal */}
-      <Modal
-        transparent={true}
-        visible={showSourceOptions}
-        onRequestClose={() => setShowSourceOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.sourceOptionsModal}>
-            <Text style={styles.modalTitle}>Select Image Source</Text>
-            
-            <View style={styles.sourceButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.sourceOptionButton, styles.cameraButton]}
-                onPress={handleCameraSelection}
-              >
-                <MaterialIcons name="photo-camera" size={30} color="#fff" />
-                <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={[styles.sourceOptionButton, styles.galleryButton]}
-                onPress={handleGallerySelection}
-              >
-                <MaterialIcons name="photo-library" size={30} color="#fff" />
-                <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
-              </TouchableOpacity>
-            </View>
-            
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => setShowSourceOptions(false)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Crop Options Modal */}
-      <Modal
-        transparent={true}
-        visible={showCropOptions}
-        onRequestClose={() => setShowCropOptions(false)}
-        animationType="slide"
-      >
-        <View style={styles.modalBackground}>
-          <View style={styles.cropOptionsModal}>
-            <Text style={styles.modalTitle}>
-              Proof of Payment Preview
-            </Text>
-            
-            {selectedImageUri && (
-              <View style={styles.previewImageContainer}>
-                <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
+        {/* Success Modal */}
+        <Modal visible={successModalVisible} transparent animationType="fade" statusBarTranslucent={true}>
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.centeredModal}>
+              <View style={styles.modalCard}>
+                <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
+                <Text style={styles.modalText}>
+                  Registration fee submitted successfully!
+                </Text>
+                <TouchableOpacity 
+                  style={styles.modalButton} 
+                  onPress={handleSuccessOk}
+                >
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
               </View>
-            )}
-            
-            <Text style={styles.cropInstructions}>
-              Would you like to crop this image?
-            </Text>
-            
-            <View style={styles.cropButtonsContainer}>
-              <TouchableOpacity 
-                style={[styles.cropOptionButton, styles.useAsIsButton]}
-                onPress={handleUseAsIs}
-              >
-                <MaterialIcons name="check" size={20} color="#fff" />
-                <Text style={styles.cropOptionButtonText}>Use as is</Text>
-              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Error Modal */}
+        <Modal visible={errorModalVisible} transparent animationType="fade" statusBarTranslucent={true}>
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.centeredModal}>
+              <View style={styles.modalCard}>
+                <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
+                <Text style={styles.modalText}>{errorMessage}</Text>
+                <TouchableOpacity style={styles.modalButton} onPress={handleErrorOk}>
+                  <Text style={styles.modalButtonText}>OK</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Source Selection Modal */}
+        <Modal
+          transparent={true}
+          visible={showSourceOptions}
+          onRequestClose={() => setShowSourceOptions(false)}
+          animationType="slide"
+          statusBarTranslucent={true}
+        >
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.sourceOptionsModal}>
+              <Text style={styles.modalTitle}>Select Image Source</Text>
+              
+              <View style={styles.sourceButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.sourceOptionButton, styles.cameraButton]}
+                  onPress={handleCameraSelection}
+                >
+                  <MaterialIcons name="photo-camera" size={30} color="#fff" />
+                  <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.sourceOptionButton, styles.galleryButton]}
+                  onPress={handleGallerySelection}
+                >
+                  <MaterialIcons name="photo-library" size={30} color="#fff" />
+                  <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
+                </TouchableOpacity>
+              </View>
               
               <TouchableOpacity 
-                style={[styles.cropOptionButton, styles.cropImageButton]}
-                onPress={handleCropSelectedImage}
+                style={styles.cancelButton}
+                onPress={() => setShowSourceOptions(false)}
               >
-                <MaterialIcons name="crop" size={20} color="#fff" />
-                <Text style={styles.cropOptionButtonText}>Crop Image</Text>
+                <Text style={styles.cancelText}>Cancel</Text>
               </TouchableOpacity>
             </View>
-            
-            <TouchableOpacity 
-              style={styles.cancelButton}
-              onPress={() => setShowCropOptions(false)}
-            >
-              <Text style={styles.cancelText}>Cancel</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </Modal>
+        </Modal>
 
-      {/* Custom Modal */}
-      <CustomModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        message={modalMessage}
-        type={modalType}
-      />
+        {/* Crop Options Modal */}
+        <Modal
+          transparent={true}
+          visible={showCropOptions}
+          onRequestClose={() => setShowCropOptions(false)}
+          animationType="slide"
+          statusBarTranslucent={true}
+        >
+          <View style={styles.fullScreenModalBackground}>
+            <View style={styles.cropOptionsModal}>
+              <Text style={styles.modalTitle}>
+                Proof of Payment Preview
+              </Text>
+              
+              {selectedImageUri && (
+                <View style={styles.previewImageContainer}>
+                  <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
+                </View>
+              )}
+              
+              <Text style={styles.cropInstructions}>
+                Would you like to crop this image?
+              </Text>
+              
+              <View style={styles.cropButtonsContainer}>
+                <TouchableOpacity 
+                  style={[styles.cropOptionButton, styles.useAsIsButton]}
+                  onPress={handleUseAsIs}
+                >
+                  <MaterialIcons name="check" size={20} color="#fff" />
+                  <Text style={styles.cropOptionButtonText}>Use as is</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.cropOptionButton, styles.cropImageButton]}
+                  onPress={handleCropSelectedImage}
+                >
+                  <MaterialIcons name="crop" size={20} color="#fff" />
+                  <Text style={styles.cropOptionButtonText}>Crop Image</Text>
+                </TouchableOpacity>
+              </View>
+              
+              <TouchableOpacity 
+                style={styles.cancelButton}
+                onPress={() => setShowCropOptions(false)}
+              >
+                <Text style={styles.cancelText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Custom Confirmation Modal */}
+        <CustomConfirmModal
+          visible={confirmModalVisible}
+          onClose={() => setConfirmModalVisible(false)}
+          title="Confirm Registration Fee"
+          message={`Are you sure you want to submit this registration fee of ${formatCurrency(amount)}?`}
+          type="info"
+          cancelText="Cancel"
+          confirmText="Confirm"
+          onCancel={() => setConfirmModalVisible(false)}
+          onConfirm={submitRegistrationFee}
+        />
+
+        {/* Custom Modal for general errors */}
+        <CustomModal
+          visible={modalVisible}
+          onClose={() => setModalVisible(false)}
+          message={modalMessage}
+          type={modalType}
+        />
+
+        {/* Loading Overlay */}
+        {loading && (
+          <View style={styles.loadingOverlay}>
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color="#4FE7AF" />
+              <Text style={styles.loadingText}>Processing...</Text>
+            </View>
+          </View>
+        )}
+      </ScrollView>
     </KeyboardAvoidingView>
   );
 };
@@ -1555,42 +1571,94 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '700',
   },
-  modalOverlay: {
+  // Full screen modal backgrounds
+  fullScreenModalBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  centeredModal: {
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalCard: {
+    width: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    alignItems: 'center',
+  },
+  modalIcon: {
+    marginBottom: 15,
+  },
+  modalText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+  modalButton: {
+    backgroundColor: '#2C5282',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 5,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
   },
   loadingText: {
     marginTop: 10,
-    color: 'white',
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2C5282',
   },
-  required: {
-    color: 'red',
-  },
-  // Modal styles (matching RegisterPage2 design)
-  modalBackground: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 23, 42, 0.5)',
-  },
+  // Modal styles with full screen backgrounds
   sourceOptionsModal: {
     backgroundColor: 'white',
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
   },
   cropOptionsModal: {
     backgroundColor: 'white',
     padding: 20,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%', 
-    minHeight: 300, 
+    maxHeight: '80%',
+    minHeight: 300,
+    width: '100%',
+    position: 'absolute',
+    bottom: 0,
   },
   modalTitle: {
     fontSize: 18,
@@ -1680,6 +1748,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#DC2626',
     fontWeight: '600',
+  },
+  required: {
+    color: 'red',
   },
 });
 
