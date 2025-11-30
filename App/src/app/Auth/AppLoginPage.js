@@ -90,103 +90,122 @@ export default function AppLoginPage() {
     }
   }, [isFocused]);
 
-  const checkForBiometricCredentials = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!hasHardware || !isEnrolled) {
-        setShowBiometricOption(false);
-        return;
-      }
+// In your checkForBiometricCredentials function:
+const checkForBiometricCredentials = async () => {
+  // Don't run SecureStore on web
+  if (Platform.OS === 'web') {
+    setShowBiometricOption(false);
+    return;
+  }
 
+  try {
+    const hasHardware = await LocalAuthentication.hasHardwareAsync();
+    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    
+    if (!hasHardware || !isEnrolled) {
+      setShowBiometricOption(false);
+      return;
+    }
+
+    const credentials = await SecureStore.getItemAsync('biometricCredentials');
+    
+    if (credentials) {
+      const { email } = JSON.parse(credentials);
+      
+      // Check if the user is still active before showing biometric option
+      const userStatusInfo = await checkUserStatus(email);
+      
+      if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
+        // User is inactive, don't show biometric option and clear stored credentials
+        await SecureStore.deleteItemAsync('biometricCredentials');
+        setShowBiometricOption(false);
+        setEmail('');
+      } else {
+        setShowBiometricOption(true);
+        setEmail(email);
+      }
+    } else {
+      setShowBiometricOption(false);
+    }
+  } catch (error) {
+    console.log('SecureStore error:', error);
+    setShowBiometricOption(false);
+  }
+};
+
+// In handleBiometricLogin:
+const handleBiometricLogin = async () => {
+  // Don't run on web
+  if (Platform.OS === 'web') {
+    showModal(
+      'Not Available',
+      'Biometric login is not available on web browser. Please use the mobile app.',
+      'error',
+      'OK'
+    );
+    return;
+  }
+
+  try {
+    setLoading(true);
+    
+    const result = await LocalAuthentication.authenticateAsync({
+      promptMessage: 'Authenticate with biometrics to login',
+      disableDeviceFallback: true,
+      fallbackLabel: '',
+    });
+
+    if (result.success) {
       const credentials = await SecureStore.getItemAsync('biometricCredentials');
       
       if (credentials) {
-        const { email } = JSON.parse(credentials);
+        const { email, password } = JSON.parse(credentials);
         
-        // Check if the user is still active before showing biometric option
+        // Check user status before proceeding
         const userStatusInfo = await checkUserStatus(email);
         
         if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
-          // User is inactive, don't show biometric option and clear stored credentials
-          await SecureStore.deleteItemAsync('biometricCredentials');
-          setShowBiometricOption(false);
-          setEmail('');
-        } else {
-          setShowBiometricOption(true);
-          setEmail(email);
+          showModal(
+            'Account Inactive',
+            'Your account has been deactivated. Please contact the administrator for assistance.',
+            'error',
+            'OK'
+          );
+          setLoading(false);
+          return;
         }
-      } else {
-        setShowBiometricOption(false);
-      }
-    } catch (error) {
-      console.log('SecureStore error:', error);
-      setShowBiometricOption(false);
-    }
-  };
-
-  const handleBiometricLogin = async () => {
-    try {
-      setLoading(true);
-      
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate with biometrics to login',
-        disableDeviceFallback: true,
-        fallbackLabel: '',
-      });
-
-      if (result.success) {
-        const credentials = await SecureStore.getItemAsync('biometricCredentials');
         
-        if (credentials) {
-          const { email, password } = JSON.parse(credentials);
-          
-          // Check user status before proceeding
-          const userStatusInfo = await checkUserStatus(email);
-          
-          if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
-            showModal(
-              'Account Inactive',
-              'Your account has been deactivated. Please contact the administrator for assistance.',
-              'error',
-              'OK'
-            );
-            setLoading(false);
-            return;
-          }
-          
-          // Store current user email for session management
-          await SecureStore.setItemAsync('currentUserEmail', email);
-          console.log('Stored current user email for biometric login:', email);
-          
-          // Navigate directly to TwoFactorEmail with proper parameters
-          navigation.navigate('TwoFactorEmail', { 
-            email,
-            password,
-            fromBiometric: true 
-          });
-        }
-      } else {
-        showModal(
-          'Authentication Failed',
-          'Biometric authentication was cancelled or failed.',
-          'error',
-          'OK'
-        );
+        // Store current user email for session management
+        await SecureStore.setItemAsync('currentUserEmail', email);
+        console.log('Stored current user email for biometric login:', email);
+        
+        // Navigate directly to TwoFactorEmail with proper parameters
+        navigation.navigate('TwoFactorEmail', { 
+          email,
+          password,
+          fromBiometric: true 
+        });
       }
-    } catch (error) {
-      console.error('Biometric login error:', error);
+    } else {
       showModal(
         'Authentication Failed',
-        'Biometric authentication failed. Please try again or use email/password.',
+        'Biometric authentication was cancelled or failed.',
         'error',
         'OK'
       );
-    } finally {
-      setLoading(false);
     }
-  };
+  } catch (error) {
+    console.error('Biometric login error:', error);
+    showModal(
+      'Authentication Failed',
+      'Biometric authentication failed. Please try again or use email/password.',
+      'error',
+      'OK'
+    );
+  } finally {
+    setLoading(false);
+  }
+};
 
   const checkUserStatus = async (email) => {
     try {
@@ -262,149 +281,151 @@ export default function AppLoginPage() {
     }
   };
 
-  const handleLogin = async () => {
-    if (!email || !password) {
-      showModal(
-        'Missing Information',
-        'Please enter both your email and password to continue',
-        'warning',
-        'OK'
-      );
-      return;
-    }
+const handleLogin = async () => {
+  if (!email || !password) {
+    showModal(
+      'Missing Information',
+      'Please enter both your email and password to continue',
+      'warning',
+      'OK'
+    );
+    return;
+  }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showModal(
+      'Check Your Email',
+      'This doesn\'t look like a valid email address. Please check for typos (e.g., yourname@example.com)',
+      'error',
+      'OK'
+    );
+    return;
+  }
+
+  setLoading(true);
+
+  try {
+    // First check user status before attempting Firebase authentication
+    const userStatusInfo = await checkUserStatus(email);
+    
+    if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
       showModal(
-        'Check Your Email',
-        'This doesn\'t look like a valid email address. Please check for typos (e.g., yourname@example.com)',
+        'Account Inactive',
+        'Your account has been deactivated. Please contact the administrator for assistance.',
         'error',
         'OK'
       );
+      setLoading(false);
       return;
     }
 
-    setLoading(true);
-
-    try {
-      // First check user status before attempting Firebase authentication
-      const userStatusInfo = await checkUserStatus(email);
-      
-      if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
-        showModal(
-          'Account Inactive',
-          'Your account has been deactivated. Please contact the administrator for assistance.',
-          'error',
-          'OK'
-        );
-        setLoading(false);
-        return;
-      }
-
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
-      
-      // Double-check status after successful authentication (in case it changed)
-      const finalStatusCheck = await checkUserStatus(email);
-      if (finalStatusCheck.found && finalStatusCheck.status === 'inactive') {
-        // Sign out the user immediately if they're inactive
-        await auth.signOut();
-        showModal(
-          'Account Inactive',
-          'Your account has been deactivated. Please contact the administrator for assistance.',
-          'error',
-          'OK'
-        );
-        setLoading(false);
-        return;
-      }
-      
-      // Store current user email for session
-      await SecureStore.setItemAsync('currentUserEmail', email);
-      
-      navigation.navigate('TwoFactorEmail', { 
-        email,
-        password,
-        fromBiometric: false 
-      });
-      
-    } catch (error) {
-      console.log('=== FIREBASE LOGIN ERROR DEBUG ===');
-      console.log('Error code:', error.code);
-      console.log('Error message:', error.message);
-      
-      let title = '';
-      let message = '';
-      let buttonText = 'OK';
-      let action = null;
-
-      const errorMessage = error.message?.toLowerCase() || '';
-      const isCredentialError = errorMessage.includes('credential') || 
-                               errorMessage.includes('password') || 
-                               errorMessage.includes('invalid') ||
-                               errorMessage.includes('wrong');
-
-      if (error.code === 'auth/network-request-failed') {
-        if (email && password) {
-          title = 'Invalid Email or Password';
-          message = 'Please check your email and password and try again.';
-        } else {
-          title = 'Network Error';
-          message = 'Please check your internet connection and try again.';
-        }
-      } else {
-        switch (error.code) {
-          case 'auth/wrong-password':
-          case 'auth/invalid-credential':
-          case 'auth/invalid-login-credentials':
-            title = 'Invalid Password';
-            message = 'The password you entered is incorrect. Please try again.';
-            setInvalidPwdMessage('The password you entered is incorrect. Please try again.');
-            setInvalidPwdVisible(true);
-            buttonText = null;
-            action = null;
-            break;
-
-          case 'auth/user-not-found':
-            title = 'Invalid Email';
-            message = 'No account found with this email address. Please check your email or sign up.';
-            buttonText = 'Sign Up';
-            action = () => navigation.navigate('Register', { prefillEmail: email });
-            break;
-
-          case 'auth/invalid-email':
-            title = 'Invalid Email';
-            message = 'Please enter a valid email address (e.g., yourname@example.com)';
-            break;
-
-          case 'auth/too-many-requests':
-            title = 'Too Many Attempts';
-            message = 'For your security, login is temporarily blocked. Please try again later or reset your password.';
-            buttonText = 'Reset Password';
-            action = () => navigation.navigate('ForgotPassword', { email });
-            break;
-
-          case 'auth/user-disabled':
-            title = 'Account Disabled';
-            message = 'This account has been deactivated. Please contact support for assistance.';
-            break;
-
-          default:
-            if (isCredentialError || (error.code && error.code.startsWith('auth/'))) {
-              title = 'Invalid Email or Password';
-              message = 'Please check your email and password and try again.';
-            } else {
-              title = 'Login Error';
-              message = 'Something went wrong. Please try again.';
-            }
-        }
-      }
-
-      if (buttonText) {
-        showModal(title, message, 'error', buttonText, action);
-      }
-    } finally {
+    const userCredential = await signInWithEmailAndPassword(auth, email, password);
+    
+    // Double-check status after successful authentication (in case it changed)
+    const finalStatusCheck = await checkUserStatus(email);
+    if (finalStatusCheck.found && finalStatusCheck.status === 'inactive') {
+      // Sign out the user immediately if they're inactive
+      await auth.signOut();
+      showModal(
+        'Account Inactive',
+        'Your account has been deactivated. Please contact the administrator for assistance.',
+        'error',
+        'OK'
+      );
       setLoading(false);
+      return;
     }
-  };
+    
+    // Store current user email for session - WITH PLATFORM CHECK
+    if (Platform.OS !== 'web') {
+      await SecureStore.setItemAsync('currentUserEmail', email);
+    }
+    
+    navigation.navigate('TwoFactorEmail', { 
+      email,
+      password,
+      fromBiometric: false 
+    });
+    
+  } catch (error) {
+    console.log('=== FIREBASE LOGIN ERROR DEBUG ===');
+    console.log('Error code:', error.code);
+    console.log('Error message:', error.message);
+    
+    let title = '';
+    let message = '';
+    let buttonText = 'OK';
+    let action = null;
+
+    const errorMessage = error.message?.toLowerCase() || '';
+    const isCredentialError = errorMessage.includes('credential') || 
+                             errorMessage.includes('password') || 
+                             errorMessage.includes('invalid') ||
+                             errorMessage.includes('wrong');
+
+    if (error.code === 'auth/network-request-failed') {
+      if (email && password) {
+        title = 'Invalid Email or Password';
+        message = 'Please check your email and password and try again.';
+      } else {
+        title = 'Network Error';
+        message = 'Please check your internet connection and try again.';
+      }
+    } else {
+      switch (error.code) {
+        case 'auth/wrong-password':
+        case 'auth/invalid-credential':
+        case 'auth/invalid-login-credentials':
+          title = 'Invalid Password';
+          message = 'The password you entered is incorrect. Please try again.';
+          setInvalidPwdMessage('The password you entered is incorrect. Please try again.');
+          setInvalidPwdVisible(true);
+          buttonText = null;
+          action = null;
+          break;
+
+        case 'auth/user-not-found':
+          title = 'Invalid Email';
+          message = 'No account found with this email address. Please check your email or sign up.';
+          buttonText = 'Sign Up';
+          action = () => navigation.navigate('Register', { prefillEmail: email });
+          break;
+
+        case 'auth/invalid-email':
+          title = 'Invalid Email';
+          message = 'Please enter a valid email address (e.g., yourname@example.com)';
+          break;
+
+        case 'auth/too-many-requests':
+          title = 'Too Many Attempts';
+          message = 'For your security, login is temporarily blocked. Please try again later or reset your password.';
+          buttonText = 'Reset Password';
+          action = () => navigation.navigate('ForgotPassword', { email });
+          break;
+
+        case 'auth/user-disabled':
+          title = 'Account Disabled';
+          message = 'This account has been deactivated. Please contact support for assistance.';
+          break;
+
+        default:
+          if (isCredentialError || (error.code && error.code.startsWith('auth/'))) {
+            title = 'Invalid Email or Password';
+            message = 'Please check your email and password and try again.';
+          } else {
+            title = 'Login Error';
+            message = 'Something went wrong. Please try again.';
+          }
+      }
+    }
+
+    if (buttonText) {
+      showModal(title, message, 'error', buttonText, action);
+    }
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleRegister = () => {
     navigation.navigate('Register');
