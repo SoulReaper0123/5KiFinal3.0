@@ -11,9 +11,13 @@ import {
   Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { 
+  checkBiometricSupport, 
+  Storage, 
+  authenticateBiometric,
+  isMobileBrowser 
+} from '../Auth/utils/platformUtils';
 
 export default function BiometricSetupScreen() {
   const [isLoading, setIsLoading] = useState(false);
@@ -41,25 +45,30 @@ export default function BiometricSetupScreen() {
   }, [password]);
 
 
-  const checkBiometricSupport = async () => {
-    try {
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      
-      if (!hasHardware) {
-        setError('Fingerprint scanner not available on this device');
-        return;
-      }
-      
-      if (!isEnrolled) {
-        setError('No fingerprints registered on this device. Please set up fingerprints in your device settings.');
-        return;
-      }
-    } catch (err) {
-      console.error('Biometric check error:', err);
-      setError('Unable to check biometric capabilities');
+const checkBiometricSupport = async () => {
+  // Don't run on web or mobile browsers
+  if (Platform.OS === 'web' || isMobileBrowser()) {
+    setError('Biometric authentication is only available in the mobile app. Please use our mobile application for this feature.');
+    return;
+  }
+
+  try {
+    const biometricSupport = await checkBiometricSupport();
+    
+    if (!biometricSupport.hasHardware) {
+      setError('Fingerprint scanner not available on this device');
+      return;
     }
-  };
+    
+    if (!biometricSupport.isEnrolled) {
+      setError('No fingerprints registered on this device. Please set up fingerprints in your device settings.');
+      return;
+    }
+  } catch (err) {
+    console.error('Biometric check error:', err);
+    setError('Unable to check biometric capabilities');
+  }
+};
 
  const setupBiometrics = async () => {
     // Don't run on web
