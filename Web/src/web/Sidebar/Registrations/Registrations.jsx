@@ -1407,9 +1407,6 @@ const verifyFace = async (imageUrl, label) => {
       { label: 'Face Detected', value: hasFace ? '✅ Detected' : '❌ No face detected' },
       { label: 'Detection Confidence', value: `${confidence}%` },
       { label: 'Image Size', value: analysis.imageSize },
-      { label: 'Orientation', value: analysis.orientation },
-      { label: 'Brightness', value: analysis.brightness },
-      { label: 'Skin Tone Ratio', value: analysis.skinToneRatio },
       { label: 'Notes', value: analysis.notes }
     ];
 
