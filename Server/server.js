@@ -2917,7 +2917,7 @@ app.post('/send-loan-reminder', async (req, res) => {
               <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.totalInterest)}</td>
             </tr>
             <tr>
-              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Monthly Amortization</td>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Amortization</td>
               <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.totalMonthlyPayment)}</td>
             </tr>
 
@@ -2926,7 +2926,7 @@ app.post('/send-loan-reminder', async (req, res) => {
               <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.penalty)}</td>
             </tr>
             <tr style="background-color: #f8f9fa; font-weight: bold;">
-              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">New Total Amortization</td>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Amortization</td>
               <td style="padding: 8px; border: 1px solid #ddd; color: #e74c3c;">₱${formatAmount(sanitizedData.newTotalAmortization)}</td>
             </tr>
             <tr>
