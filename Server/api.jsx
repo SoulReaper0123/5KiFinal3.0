@@ -6,6 +6,20 @@ const API_URL = 'https://five5ki.onrender.com';
 const WEBSITE_URL = 'https://fivekiapp.onrender.com';
 const FACEBOOK_URL = 'https://www.facebook.com/5KiFS'; 
 
+
+export const SendDividendEmail = async (dividendData) => {
+  try {
+    const response = await axios.post(`${API_URL}/send-dividend-email`, {
+      ...dividendData,
+      websiteLink: WEBSITE_URL,
+      facebookLink: FACEBOOK_URL
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error sending dividend email:', error);
+    throw error;
+  }
+};
 // Admin Emails
 export const sendAdminCredentialsEmail = async (adminData) => {
   try {
