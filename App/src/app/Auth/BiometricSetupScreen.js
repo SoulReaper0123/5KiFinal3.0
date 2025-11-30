@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Alert,
   TextInput,
+  Platform,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
@@ -23,7 +24,14 @@ export default function BiometricSetupScreen() {
   const route = useRoute();
   const { email, password, fromHome } = route.params || {};
 
+  // ← REPLACE THIS ENTIRE useEffect SECTION:
   useEffect(() => {
+    // Don't run biometric setup on web
+    if (Platform.OS === 'web') {
+      setError('Biometric authentication is not available on web browser');
+      return;
+    }
+    
     checkBiometricSupport();
     
     // If no password was provided (coming from Profile/Settings screen), show password input
@@ -31,6 +39,7 @@ export default function BiometricSetupScreen() {
       setShowPasswordInput(true);
     }
   }, [password]);
+
 
   const checkBiometricSupport = async () => {
     try {
@@ -52,15 +61,19 @@ export default function BiometricSetupScreen() {
     }
   };
 
-  const setupBiometrics = async () => {
+ const setupBiometrics = async () => {
+    // Don't run on web
+    if (Platform.OS === 'web') {
+      setError('Biometric authentication is not available on web browser');
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     
-    // If we're showing the password input, use the inputPassword
-    // Otherwise use the password from route params
+    // Rest of your existing code...
     const passwordToStore = showPasswordInput ? inputPassword : password;
     
-    // Validate password if we're showing the input
     if (showPasswordInput && !inputPassword.trim()) {
       setError('Please enter your password');
       setIsLoading(false);
@@ -75,14 +88,16 @@ export default function BiometricSetupScreen() {
       });
 
       if (result.success) {
-        // Store biometric credentials securely
-        await SecureStore.setItemAsync(
-          'biometricCredentials',
-          JSON.stringify({ 
-            email, 
-            password: passwordToStore 
-          })
-        );
+        // Store biometric credentials securely - WITH PLATFORM CHECK
+        if (Platform.OS !== 'web') {
+          await SecureStore.setItemAsync(
+            'biometricCredentials',
+            JSON.stringify({ 
+              email, 
+              password: passwordToStore 
+            })
+          );
+        }
         
         Alert.alert(
           'Success', 
@@ -90,11 +105,9 @@ export default function BiometricSetupScreen() {
           [{ 
             text: 'OK', 
             onPress: () => {
-              // Navigate back with refresh parameter
               if (fromHome) {
-                navigation.goBack(); // Go back to home
+                navigation.goBack();
               } else {
-                // Pass refresh flag to Settings screen
                 navigation.navigate('Settings', { 
                   email,
                   refreshBiometrics: true 
@@ -113,7 +126,6 @@ export default function BiometricSetupScreen() {
       setIsLoading(false);
     }
   };
-
   const skipSetup = () => {
     if (fromHome) {
       navigation.goBack();
