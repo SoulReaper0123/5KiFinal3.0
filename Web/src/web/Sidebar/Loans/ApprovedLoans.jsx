@@ -599,9 +599,10 @@ const ApprovedLoans = ({ currentPage, totalPages, onPageChange }) => {
   }, []);
 
   // Automatic Loan Reminder Functionality
+// Fixed Automatic Loan Reminder Functionality
 const checkDueDates = async () => {
   try {
-    console.log('Checking due dates for loan reminders...');
+    console.log('🔍 Checking due dates for loan reminders...');
     const now = new Date();
     
     // Fetch reminder window (days) from Settings
@@ -610,11 +611,8 @@ const checkDueDates = async () => {
     const windowMs = Math.max(0, reminderDays) * 24 * 60 * 60 * 1000;
     const reminderWindowDate = new Date(now.getTime() + windowMs);
     
-    // Format dates for logging
-    const formattedNow = now.toISOString();
-    const formattedWindow = reminderWindowDate.toISOString();
-    console.log(`Current date: ${formattedNow}`);
-    console.log(`Reminder window end (+${reminderDays}d): ${formattedWindow}`);
+    console.log(`📅 Current date: ${now.toISOString()}`);
+    console.log(`⏰ Reminder window end (+${reminderDays}d): ${reminderWindowDate.toISOString()}`);
     
     const loansRef = database.ref('Loans/CurrentLoans');
     const loansSnapshot = await loansRef.once('value');
@@ -632,7 +630,7 @@ const checkDueDates = async () => {
     const notificationsSnapshot = await notificationsRef.once('value');
     const notificationsData = notificationsSnapshot.val() || {};
 
-    console.log(`Found ${Object.keys(loansData).length} members with loans`);
+    console.log(`📊 Found ${Object.keys(loansData).length} members with loans`);
     
     let remindersSent = 0;
     let loansChecked = 0;
@@ -642,31 +640,29 @@ const checkDueDates = async () => {
         loansChecked++;
         
         if (!currentLoan.dueDate) {
-          console.log(`Loan ${transactionId} for member ${memberId} has no due date`);
+          console.log(`❌ Loan ${transactionId} for member ${memberId} has no due date`);
           continue;
         }
         
         // Parse the due date properly
         const dueDate = new Date(currentLoan.dueDate);
         
-        // Log the due date for debugging
-        console.log(`Loan ${transactionId} for member ${memberId} has due date: ${dueDate.toISOString()}`);
+        console.log(`📋 Loan ${transactionId} for member ${memberId} has due date: ${dueDate.toISOString()}`);
         
-        // FIXED: Use startOfDay for proper date comparison
+        // Use startOfDay for proper date comparison
         const dueDateStart = startOfDay(dueDate);
         const nowStart = startOfDay(now);
         const reminderWindowStart = startOfDay(reminderWindowDate);
         
-        // FIXED: Check if the due date is within the configured reminder window
-        // We want to send reminders for due dates that are between today and the reminder window
+        // Check if the due date is within the configured reminder window
         const isWithinWindow = dueDateStart >= nowStart && dueDateStart <= reminderWindowStart;
-        console.log(`Is within reminder window: ${isWithinWindow} (Due: ${dueDateStart.toISOString()}, Now: ${nowStart.toISOString()}, Window: ${reminderWindowStart.toISOString()})`);
+        console.log(`🎯 Is within reminder window: ${isWithinWindow} (Due: ${dueDateStart.toISOString()}, Now: ${nowStart.toISOString()}, Window: ${reminderWindowStart.toISOString()})`);
         
         if (isWithinWindow) {
           const notificationKey = `${memberId}_${transactionId}`;
           const hasBeenNotified = notificationsData && notificationsData[notificationKey];
           
-          console.log(`Notification status for ${notificationKey}: ${hasBeenNotified ? 'Already sent' : 'Not sent yet'}`);
+          console.log(`📢 Notification status for ${notificationKey}: ${hasBeenNotified ? 'Already sent' : 'Not sent yet'}`);
           
           // Only send if no notification has been sent yet
           if (!hasBeenNotified) {
@@ -675,47 +671,108 @@ const checkDueDates = async () => {
             
             if (member && member.email) {
               try {
-                console.log(`Sending reminder to ${member.email} for loan ${transactionId}`);
+                console.log(`✉️ Sending reminder to ${member.email} for loan ${transactionId}`);
                 
-                let outstandingBalance = parseFloat(currentLoan.loanAmount) || 0;
+                // FIX: Get the actual remainingBalance from currentLoan
+                const outstandingBalance = parseFloat(currentLoan.remainingBalance) || parseFloat(currentLoan.loanAmount) || 0;
                 const originalAmount = approvedLoan 
                   ? parseFloat(approvedLoan.loanAmount) || 0 
                   : outstandingBalance;
 
+                // FIX: Create a complete loan object for penalty calculation
+                const loanForCalculation = {
+                  ...currentLoan,
+                  loanAmount: originalAmount,
+                  outstandingBalance: outstandingBalance,
+                  // Ensure all required fields are present
+                  term: currentLoan.term || approvedLoan?.term || 'N/A',
+                  interest: parseFloat(currentLoan.interest) || 0,
+                  monthlyPayment: parseFloat(currentLoan.monthlyPayment) || 0,
+                  totalMonthlyPayment: parseFloat(currentLoan.totalMonthlyPayment) || 0,
+                  totalTermPayment: parseFloat(currentLoan.totalTermPayment) || 0,
+                  dueDate: currentLoan.dueDate
+                };
+
+                // FIX: Calculate penalty and new total amortization using the same function as resend
+                const { penalty, newTotalAmortization } = computePenaltyAndNewTotal(loanForCalculation);
+                
+                console.log('💰 AUTO-REMINDER PENALTY CALCULATION:', {
+                  overdueDays: getOverdueDays(currentLoan.dueDate),
+                  totalMonthlyPayment: loanForCalculation.totalMonthlyPayment,
+                  interest: loanForCalculation.interest,
+                  penalty: penalty,
+                  newTotalAmortization: newTotalAmortization,
+                  calculation: `₱${formatCurrency(loanForCalculation.totalMonthlyPayment)} + ₱${formatCurrency(penalty)} = ₱${formatCurrency(newTotalAmortization)}`
+                });
+
+                // FIX: Send COMPLETE data including penalty calculations
                 await SendLoanReminder({
+                  // Member Information
                   memberId,
                   transactionId,
-                  dueDate: currentLoan.dueDate,
                   email: member.email,
                   firstName: member.firstName,
                   lastName: member.lastName,
+                  
+                  // Loan Basic Information
                   loanAmount: originalAmount,
-                  outstandingBalance: outstandingBalance
+                  outstandingBalance: outstandingBalance,
+                  dueDate: currentLoan.dueDate,
+                  
+                  // Loan Terms
+                  term: currentLoan.term || 'N/A',
+                  interestRate: approvedLoan?.interestRate || 'N/A',
+                  
+                  // Financial Breakdown - USE CALCULATED VALUES
+                  interest: parseFloat(currentLoan.interest) || 0,
+                  totalInterest: approvedLoan?.totalInterest || 0,
+                  monthlyPayment: parseFloat(currentLoan.monthlyPayment) || 0,
+                  totalMonthlyPayment: parseFloat(currentLoan.totalMonthlyPayment) || 0,
+                  totalTermPayment: parseFloat(currentLoan.totalTermPayment) || 0,
+                  releaseAmount: approvedLoan?.releaseAmount || 0,
+                  processingFee: approvedLoan?.processingFee || 0,
+                  
+                  // FIX: Include penalty calculations
+                  penalty: penalty,
+                  newTotalAmortization: newTotalAmortization,
+                  
+                  // Additional Loan Details
+                  dateApproved: approvedLoan?.dateApproved || 'N/A',
+                  accountName: approvedLoan?.accountName || 'N/A',
+                  accountNumber: approvedLoan?.accountNumber || 'N/A',
+                  disbursement: approvedLoan?.disbursement || 'N/A'
                 });
 
                 // Record that we've sent a notification
                 await notificationsRef.child(notificationKey).set({
                   sentAt: new Date().toISOString(),
                   dueDate: currentLoan.dueDate,
-                  reminderDays: reminderDays
+                  reminderDays: reminderDays,
+                  penaltyApplied: penalty,
+                  newTotalAmortization: newTotalAmortization,
+                  financialData: {
+                    totalMonthlyPayment: parseFloat(currentLoan.totalMonthlyPayment) || 0,
+                    penalty: penalty,
+                    newTotalAmortization: newTotalAmortization
+                  }
                 });
                 
                 remindersSent++;
-                console.log(`Successfully sent reminder for loan ${transactionId}`);
+                console.log(`✅ Successfully sent reminder for loan ${transactionId}`);
               } catch (error) {
-                console.error(`Failed to send reminder for ${memberId}/${transactionId}:`, error);
+                console.error(`❌ Failed to send reminder for ${memberId}/${transactionId}:`, error);
               }
             } else {
-              console.log(`Member ${memberId} has no email or member data not found`);
+              console.log(`❌ Member ${memberId} has no email or member data not found`);
             }
           }
         }
       }
     }
     
-    console.log(`Checked ${loansChecked} loans, sent ${remindersSent} reminders`);
+    console.log(`📈 Checked ${loansChecked} loans, sent ${remindersSent} reminders`);
   } catch (error) {
-    console.error('Error checking due dates:', error);
+    console.error('❌ Error checking due dates:', error);
   }
 };
 
@@ -833,14 +890,52 @@ const checkDueDates = async () => {
     return Math.ceil(ms / (1000 * 60 * 60 * 24));
   };
 
-  const computePenaltyAndNewTotal = (loan) => {
-    const overdueDays = getOverdueDays(loan.dueDate);
-    const interest = parseFloat(loan.interest) || 0;
-    const penalty = overdueDays > 0 ? (interest * (overdueDays / 30)) : 0;
-    const monthly = parseFloat(loan.totalMonthlyPayment) || 0;
-    const newTotalMonthly = monthly + penalty;
-    return { overdueDays, penalty, newTotalMonthly };
+const computePenaltyAndNewTotal = (loan) => {
+  const overdueDays = getOverdueDays(loan.dueDate);
+  
+  // Get the base values with proper fallbacks
+  const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
+  const interest = parseFloat(loan.interest) || 0;
+  
+  // Calculate penalty (interest * overdue days / 30)
+  const penalty = overdueDays > 0 ? (interest * (overdueDays / 30)) : 0;
+  
+  // Add penalty to existing total monthly payment
+  const newTotalAmortization = totalMonthlyPayment + penalty;
+  
+  console.log('🔍 CORRECT PENALTY CALCULATION:', {
+    overdueDays,
+    totalMonthlyPayment,
+    interest,
+    penalty,
+    newTotalAmortization,
+    calculation: `₱${formatCurrency(totalMonthlyPayment)} + ₱${formatCurrency(penalty)} = ₱${formatCurrency(newTotalAmortization)}`
+  });
+  
+  return { 
+    overdueDays, 
+    penalty: Number(penalty.toFixed(2)), // Ensure it's a number
+    newTotalAmortization: Number(newTotalAmortization.toFixed(2)) // Ensure it's a number
   };
+};
+
+const validateFinancialData = (loan) => {
+  // Ensure all financial fields are valid numbers
+  const validated = { ...loan };
+  
+  // Convert all financial fields to numbers with proper fallbacks
+  validated.loanAmount = parseFloat(loan.loanAmount) || 0;
+  validated.outstandingBalance = parseFloat(loan.outstandingBalance) || 0;
+  validated.monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
+  validated.interest = parseFloat(loan.interest) || 0;
+  validated.totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
+  validated.totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
+  validated.totalInterest = parseFloat(loan.totalInterest) || 0;
+  validated.releaseAmount = parseFloat(loan.releaseAmount) || 0;
+  validated.processingFee = parseFloat(loan.processingFee) || 0;
+  
+  return validated;
+};
 
   const openModal = (loan) => {
     setSelectedLoan(loan);
@@ -893,57 +988,122 @@ const checkDueDates = async () => {
     setShowResendConfirmation(true);
   };
 
-  const confirmResendReminder = async () => {
-    setShowResendConfirmation(false);
-    setActionInProgress(true);
-    
-    try {
-      const membersRef = database.ref(`Members/${selectedLoan.memberId}`);
-      const membersSnapshot = await membersRef.once('value');
-      const member = membersSnapshot.val();
+const confirmResendReminder = async () => {
+  setShowResendConfirmation(false);
+  setActionInProgress(true);
+  
+  try {
+    const membersRef = database.ref(`Members/${selectedLoan.memberId}`);
+    const membersSnapshot = await membersRef.once('value');
+    const member = membersSnapshot.val();
 
-      if (member && member.email) {
-        await SendLoanReminder({
-          memberId: selectedLoan.memberId,
-          transactionId: selectedLoan.transactionId,
-          dueDate: selectedLoan.dueDate,
-          email: member.email,
-          firstName: member.firstName,
-          lastName: member.lastName,
-          loanAmount: selectedLoan.loanAmount,
-          outstandingBalance: selectedLoan.outstandingBalance
-        });
-
-        const notificationKey = `${selectedLoan.memberId}_${selectedLoan.transactionId}`;
-        const updates = {
-          resentAt: new Date().toISOString()
-        };
+    if (member && member.email) {
+      // Calculate penalty and new total using CORRECT formula
+      const { penalty, newTotalAmortization } = computePenaltyAndNewTotal(selectedLoan);
+      
+      // Validate financial data first
+      const validatedLoan = validateFinancialData(selectedLoan);
+      
+      // Ensure all values are defined and properly formatted
+      const loanReminderData = {
+        // Member Information
+        memberId: validatedLoan.memberId || 'N/A',
+        transactionId: validatedLoan.transactionId || 'N/A',
+        email: member.email,
+        firstName: member.firstName || 'N/A',
+        lastName: member.lastName || 'N/A',
         
-        if (database.ServerValue && database.ServerValue.increment) {
-          updates.resendCount = database.ServerValue.increment(1);
-        } else {
-          const notificationRef = database.ref(`LoanNotifications/${notificationKey}`);
-          const notificationSnap = await notificationRef.once('value');
-          const currentCount = notificationSnap.val()?.resendCount || 0;
-          updates.resendCount = currentCount + 1;
+        // Loan Basic Information
+        loanAmount: validatedLoan.loanAmount || 0,
+        outstandingBalance: validatedLoan.outstandingBalance || 0,
+        dueDate: validatedLoan.dueDate || 'N/A',
+        
+        // Loan Terms
+        term: validatedLoan.term || 'N/A',
+        interestRate: validatedLoan.interestRate || 'N/A',
+        
+        // Financial Breakdown - USE VALIDATED DATA
+        interest: validatedLoan.interest || 0,
+        totalInterest: validatedLoan.totalInterest || 0,
+        monthlyPayment: validatedLoan.monthlyPayment || 0,
+        totalMonthlyPayment: validatedLoan.totalMonthlyPayment || 0,
+        totalTermPayment: validatedLoan.totalTermPayment || 0,
+        releaseAmount: validatedLoan.releaseAmount || 0,
+        processingFee: validatedLoan.processingFee || 0,
+        
+        // Penalty Calculations - ENSURE DEFINED VALUES
+        penalty: penalty || 0,
+        newTotalAmortization: newTotalAmortization || validatedLoan.totalMonthlyPayment || 0,
+        
+        // Additional Loan Details
+        dateApproved: validatedLoan.dateApproved || 'N/A',
+        accountName: validatedLoan.accountName || 'N/A',
+        accountNumber: validatedLoan.accountNumber || 'N/A',
+        disbursement: validatedLoan.disbursement || 'N/A'
+      };
+
+      // Debug: Show the complete calculation
+      console.log('💰 FINANCIAL CALCULATION BREAKDOWN:', {
+        totalMonthlyPayment: validatedLoan.totalMonthlyPayment,
+        penalty: penalty,
+        newTotalAmortization: newTotalAmortization,
+        calculation: `₱${formatCurrency(validatedLoan.totalMonthlyPayment)} + ₱${formatCurrency(penalty)} = ₱${formatCurrency(newTotalAmortization)}`
+      });
+
+      // Send to backend
+      await SendLoanReminder(loanReminderData);
+
+      // Record that we've sent a notification - FIX THE UNDEFINED ISSUE
+      const notificationKey = `${selectedLoan.memberId}_${selectedLoan.transactionId}`;
+      const updates = {
+        resentAt: new Date().toISOString(),
+        resentBy: 'admin',
+        dataSent: {
+          ...loanReminderData,
+          // Ensure these specific fields are defined
+          penalty: loanReminderData.penalty,
+          newTotalAmortization: loanReminderData.newTotalAmortization
+        },
+        financialBreakdown: {
+          totalMonthlyPayment: validatedLoan.totalMonthlyPayment,
+          penalty: penalty,
+          newTotalAmortization: newTotalAmortization,
+          calculationUsed: 'totalMonthlyPayment + penalty'
         }
+      };
+      
+      // Handle resend count increment
+      const notificationRef = database.ref(`LoanNotifications/${notificationKey}`);
+      const notificationSnap = await notificationRef.once('value');
+      const currentData = notificationSnap.val() || {};
+      updates.resendCount = (currentData.resendCount || 0) + 1;
 
-        await database.ref(`LoanNotifications/${notificationKey}`).update(updates);
-        
-        setSuccessMessage('Reminder resent successfully!');
-        setSuccessMessageModalVisible(true);
-      } else {
-        setErrorMessage('Member email not found');
-        setErrorModalVisible(true);
-      }
-    } catch (error) {
-      console.error('Error resending reminder:', error);
-      setErrorMessage('Failed to resend reminder');
+      await database.ref(`LoanNotifications/${notificationKey}`).update(updates);
+      
+      setSuccessMessage('Payment reminder resent successfully!');
+      setSuccessMessageModalVisible(true);
+      
+      console.log('✅ Loan reminder resent successfully to:', member.email);
+      console.log('✅ Correct financial data sent:', {
+        totalMonthly: `₱${formatCurrency(validatedLoan.totalMonthlyPayment)}`,
+        penalty: `₱${formatCurrency(penalty)}`,
+        newTotal: `₱${formatCurrency(newTotalAmortization)}`
+      });
+      
+    } else {
+      const errorMsg = member ? 'Member email not found' : 'Member data not found';
+      console.error('❌ Error resending loan reminder:', errorMsg);
+      setErrorMessage(errorMsg);
       setErrorModalVisible(true);
-    } finally {
-      setActionInProgress(false);
     }
-  };
+  } catch (error) {
+    console.error('❌ Error resending loan reminder:', error);
+    setErrorMessage(`Failed to resend reminder: ${error.message}`);
+    setErrorModalVisible(true);
+  } finally {
+    setActionInProgress(false);
+  }
+};
 
   if (loading) {
     return (
@@ -1135,13 +1295,7 @@ const checkDueDates = async () => {
                         ₱{formatCurrency(selectedLoan.loanAmount)}
                       </span>
                     </div>
-                    <div style={styles.loanDetailsItem}>
-                      <span style={styles.loanDetailsLabel}>Outstanding Balance:</span>
-                      <span style={styles.loanDetailsValue}>
-                        ₱{formatCurrency(selectedLoan.outstandingBalance)}
-                      </span>
-                    </div>
-                    <div style={styles.loanDetailsItem}>
+                      <div style={styles.loanDetailsItem}>
                       <span style={styles.loanDetailsLabel}>Term:</span>
                       <span style={styles.loanDetailsValue}>{selectedLoan.term}</span>
                     </div>
@@ -1155,70 +1309,85 @@ const checkDueDates = async () => {
                         ₱{formatCurrency(selectedLoan.interest)}
                       </span>
                     </div>
-                  </div>
-
-                  <div style={styles.financialCard}>
-                    <h3 style={styles.sectionTitle}>
-                      <FaFileInvoiceDollar />
-                      Financial Breakdown
-                    </h3>
-                    <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Monthly Amortization:</span>
-                      <span style={styles.financialValue}>
-                        ₱{formatCurrency(selectedLoan.monthlyPayment)}
-                      </span>
-                    </div>
-                    <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Total Monthly Amortization:</span>
-                      <span style={styles.financialValue}>
-                        ₱{formatCurrency(selectedLoan.totalMonthlyPayment)}
-                      </span>
-                    </div>
-                    <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Total Term Payment:</span>
-                      <span style={styles.financialValue}>
+                              <div style={styles.loanDetailsItem}>
+                      <span style={styles.loanDetailsLabel}>Total Term Payment:</span>
+                      <span style={styles.loanDetailsValue}>
                         ₱{formatCurrency(selectedLoan.totalTermPayment)}
                       </span>
                     </div>
-                    <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Release Amount:</span>
-                      <span style={styles.financialValue}>
-                        ₱{formatCurrency(selectedLoan.releaseAmount)}
+                    <div style={styles.loanDetailsItem}>
+                      <span style={styles.loanDetailsLabel}>Outstanding Balance:</span>
+                      <span style={styles.loanDetailsValue}>
+                        ₱{formatCurrency(selectedLoan.outstandingBalance)}
                       </span>
                     </div>
-                    <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Processing Fee:</span>
-                      <span style={styles.financialValue}>
-                        ₱{formatCurrency(selectedLoan.processingFee)}
-                      </span>
-                    </div>
-                    <div style={styles.financialItem}>
-                      <span style={styles.financialLabel}>Total Interest:</span>
-                      <span style={styles.financialValue}>
-                        ₱{formatCurrency(selectedLoan.totalInterest)}
-                      </span>
-                    </div>
-                    {(() => {
-                      const { penalty, newTotalMonthly } = computePenaltyAndNewTotal(selectedLoan);
-                      return (
-                        <>
-                          <div style={styles.financialItem}>
-                            <span style={styles.financialLabel}>Penalty:</span>
-                            <span style={styles.financialValue}>
-                              ₱{formatCurrency(penalty)}
-                            </span>
-                          </div>
-                          <div style={styles.financialItem}>
-                            <span style={styles.financialLabel}>New Total Amortization:</span>
-                            <span style={styles.financialValue}>
-                              ₱{formatCurrency(newTotalMonthly)}
-                            </span>
-                          </div>
-                        </>
-                      );
-                    })()}
+                  
                   </div>
 
+<div style={styles.financialCard}>
+  <h3 style={styles.sectionTitle}>
+    <FaFileInvoiceDollar />
+    Financial Breakdown
+  </h3>
+  
+
+  <div style={styles.financialItem}>
+    <span style={styles.financialLabel}>Monthly Principal:</span>
+    <span style={styles.financialValue}>
+      ₱{formatCurrency(selectedLoan.monthlyPayment)}
+    </span>
+  </div>
+  
+  <div style={styles.financialItem}>
+    <span style={styles.financialLabel}>Monthly Interest:</span>
+    <span style={styles.financialValue}>
+      ₱{formatCurrency(selectedLoan.interest)}
+    </span>
+  </div>
+
+    <div style={styles.financialItem}>
+    <span style={styles.financialLabel}>Total Interest:</span>
+    <span style={styles.financialValue}>
+      ₱{formatCurrency(selectedLoan.totalInterest)}
+    </span>
+  </div>
+  
+  <div style={styles.financialItem}>
+    <span style={styles.financialLabel}>Amortization:</span>
+    <span style={styles.financialValue}>
+      ₱{formatCurrency(parseFloat(selectedLoan.monthlyPayment || 0) + parseFloat(selectedLoan.interest || 0))}
+    </span>
+  </div>
+  
+  {(() => {
+    const { penalty, newTotalAmortization } = computePenaltyAndNewTotal(selectedLoan);
+    return (
+      <>
+        <div style={styles.financialItem}>
+          <span style={styles.financialLabel}>Penalty:</span>
+          <span style={styles.financialValue}>
+            ₱{formatCurrency(penalty)}
+          </span>
+        </div>
+        
+        <div style={{ 
+          ...styles.financialItem, 
+          borderTop: '2px solid #0369a1',
+          paddingTop: '12px',
+          marginTop: '8px'
+        }}>
+          <span style={{ ...styles.financialLabel, fontWeight: '700', color: '#0369a1' }}>
+            Total Amortization:
+          </span>
+          <span style={{ ...styles.financialValue, fontWeight: '700', color: '#0369a1', fontSize: '1.1em' }}>
+            ₱{formatCurrency(newTotalAmortization)}
+          </span>
+        </div>
+        
+      </>
+    );
+  })()}
+</div>
                   <div style={styles.section}>
                     <h3 style={styles.sectionTitle}>
                       <FaIdCard />
