@@ -20,10 +20,14 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import { MaterialIcons, FontAwesome } from '@expo/vector-icons';
 import { auth, database } from '../../firebaseConfig';
 import { signInWithEmailAndPassword } from 'firebase/auth';
-import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
 import CustomModal from '../../components/CustomModal';
 import CustomConfirmModal from '../../components/CustomConfirmModal';
+import { 
+  checkBiometricSupport, 
+  Storage, 
+  authenticateBiometric,
+  isMobileBrowser 
+} from './utils/platformUtils';
 
 const { width, height } = Dimensions.get('window');
 
@@ -90,24 +94,22 @@ export default function AppLoginPage() {
     }
   }, [isFocused]);
 
-// In your checkForBiometricCredentials function:
 const checkForBiometricCredentials = async () => {
-  // Don't run SecureStore on web
-  if (Platform.OS === 'web') {
+  // Don't run biometric on web or mobile browsers
+  if (Platform.OS === 'web' || isMobileBrowser()) {
     setShowBiometricOption(false);
     return;
   }
 
   try {
-    const hasHardware = await LocalAuthentication.hasHardwareAsync();
-    const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+    const biometricSupport = await checkBiometricSupport();
     
-    if (!hasHardware || !isEnrolled) {
+    if (!biometricSupport.isSupported) {
       setShowBiometricOption(false);
       return;
     }
 
-    const credentials = await SecureStore.getItemAsync('biometricCredentials');
+    const credentials = await Storage.getItem('biometricCredentials');
     
     if (credentials) {
       const { email } = JSON.parse(credentials);
@@ -117,7 +119,7 @@ const checkForBiometricCredentials = async () => {
       
       if (userStatusInfo.found && userStatusInfo.status === 'inactive') {
         // User is inactive, don't show biometric option and clear stored credentials
-        await SecureStore.deleteItemAsync('biometricCredentials');
+        await Storage.deleteItem('biometricCredentials');
         setShowBiometricOption(false);
         setEmail('');
       } else {
@@ -128,18 +130,17 @@ const checkForBiometricCredentials = async () => {
       setShowBiometricOption(false);
     }
   } catch (error) {
-    console.log('SecureStore error:', error);
+    console.log('Biometric credentials check error:', error);
     setShowBiometricOption(false);
   }
 };
-
 // In handleBiometricLogin:
 const handleBiometricLogin = async () => {
-  // Don't run on web
-  if (Platform.OS === 'web') {
+  // Don't run on web or mobile browsers
+  if (Platform.OS === 'web' || isMobileBrowser()) {
     showModal(
       'Not Available',
-      'Biometric login is not available on web browser. Please use the mobile app.',
+      'Biometric login is only available in the mobile app. Please download our app from the app store.',
       'error',
       'OK'
     );
@@ -149,14 +150,13 @@ const handleBiometricLogin = async () => {
   try {
     setLoading(true);
     
-    const result = await LocalAuthentication.authenticateAsync({
+    const result = await authenticateBiometric({
       promptMessage: 'Authenticate with biometrics to login',
-      disableDeviceFallback: true,
-      fallbackLabel: '',
+      disableDeviceFallback: false
     });
 
     if (result.success) {
-      const credentials = await SecureStore.getItemAsync('biometricCredentials');
+      const credentials = await Storage.getItem('biometricCredentials');
       
       if (credentials) {
         const { email, password } = JSON.parse(credentials);
@@ -176,7 +176,7 @@ const handleBiometricLogin = async () => {
         }
         
         // Store current user email for session management
-        await SecureStore.setItemAsync('currentUserEmail', email);
+        await Storage.setItem('currentUserEmail', email);
         console.log('Stored current user email for biometric login:', email);
         
         // Navigate directly to TwoFactorEmail with proper parameters
@@ -189,7 +189,7 @@ const handleBiometricLogin = async () => {
     } else {
       showModal(
         'Authentication Failed',
-        'Biometric authentication was cancelled or failed.',
+        result.message || 'Biometric authentication was cancelled or failed.',
         'error',
         'OK'
       );
