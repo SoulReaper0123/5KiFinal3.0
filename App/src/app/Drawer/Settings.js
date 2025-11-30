@@ -23,7 +23,7 @@ import {
   Storage, 
   authenticateBiometric,
   isMobileBrowser 
-} from '../../utils/platformUtils';
+} from '../Auth/utils/platformUtils';
 
 const Settings = () => {
   const navigation = useNavigation();
