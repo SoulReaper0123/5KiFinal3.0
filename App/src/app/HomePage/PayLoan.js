@@ -12,7 +12,7 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import * as ImagePicker from 'expo-image-picker';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { ref as dbRef, set, get } from 'firebase/database';
+import { ref as dbRef, set, get, onValue } from 'firebase/database';
 import { storage, database, auth } from '../../firebaseConfig';
 import { MemberPayment } from '../../api';
 
@@ -152,11 +152,6 @@ const PayLoan = () => {
     }
   }, [memberId]);
 
-  useEffect(() => {
-    if (email) {
-      fetchCurrentLoans(email);
-    }
-  }, [email]);
 
   // Request permissions
   useEffect(() => {
@@ -188,22 +183,24 @@ const PayLoan = () => {
   }, [interest]);
 
   // Refresh function
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      // Refresh all data
-      await fetchPaymentSettings();
-      await fetchSystemSettings();
-      if (email) {
-        await fetchUserData(email);
-        await fetchCurrentLoans(email);
-      }
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    } finally {
-      setRefreshing(false);
+
+const onRefresh = async () => {
+  setRefreshing(true);
+  try {
+    console.log('Manual refresh triggered');
+    // Refresh all data
+    await fetchPaymentSettings();
+    await fetchSystemSettings();
+    if (email) {
+      await fetchUserData(email);
+      await fetchCurrentLoans(email); // This uses the manual fetch function
     }
-  };
+  } catch (error) {
+    console.error('Error refreshing data:', error);
+  } finally {
+    setRefreshing(false);
+  }
+};
 
   // Recalculate penalty when current loan changes
   useEffect(() => {
@@ -274,41 +271,107 @@ const PayLoan = () => {
     }
   };
 
-  // Fetch all current loans for the member and support multiple selections
-  const fetchCurrentLoans = async (userEmail) => {
-    try {
-      const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
-      const snapshot = await get(currentLoansRef);
-      
-      const found = [];
-      if (snapshot.exists()) {
-        const allCurrentLoans = snapshot.val();
-        for (const mId in allCurrentLoans) {
-          const loans = allCurrentLoans[mId];
-          for (const loanId in loans) {
-            const loan = loans[loanId];
-            if (loan?.email === userEmail) {
-              found.push({ ...loan, _loanId: loanId, _memberId: mId });
-            }
+// Replace fetchCurrentLoans with real-time listener
+// Replace fetchCurrentLoans with real-time listener
+useEffect(() => {
+  if (!email) return;
+
+  const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+  
+  console.log('Setting up real-time loan listener for email:', email);
+  
+  // This automatically updates when data changes in Firebase
+  const unsubscribe = onValue(currentLoansRef, (snapshot) => {
+    console.log('Real-time loan update received');
+    const found = [];
+    if (snapshot.exists()) {
+      const allCurrentLoans = snapshot.val();
+      for (const mId in allCurrentLoans) {
+        const loans = allCurrentLoans[mId];
+        for (const loanId in loans) {
+          const loan = loans[loanId];
+          if (loan?.email === email) {
+            found.push({ ...loan, _loanId: loanId, _memberId: mId });
           }
         }
       }
-
-      if (found.length > 0) {
-        setActiveLoans(found);
-        // default to first loan if none selected
-        const first = found[0];
-        setSelectedLoanId(first._loanId);
-        setCurrentLoan(first);
-      } else {
-        setActiveLoans([]);
-        setSelectedLoanId(null);
-        setCurrentLoan(null);
-      }
-    } catch (error) {
-      console.error('PayLoan - Error fetching current loans:', error);
     }
+
+    console.log('Found loans for user:', found.length);
+    
+    if (found.length > 0) {
+      setActiveLoans(found);
+      // Keep current selection if still valid
+      const currentStillValid = found.find(loan => loan._loanId === selectedLoanId);
+      if (!currentStillValid && found.length > 0) {
+        const firstLoan = found[0];
+        setSelectedLoanId(firstLoan._loanId);
+        setCurrentLoan(firstLoan);
+        // Recalculate penalty for the newly selected loan
+        calculatePenaltyAndTotal(firstLoan);
+      } else if (currentStillValid) {
+        // Update current loan data
+        setCurrentLoan(currentStillValid);
+        calculatePenaltyAndTotal(currentStillValid);
+      }
+    } else {
+      setActiveLoans([]);
+      setSelectedLoanId(null);
+      setCurrentLoan(null);
+      setPenaltyAmount(0);
+      setTotalAmountDue(0);
+      setOverdueDays(0);
+    }
+  }, (error) => {
+    console.error('Real-time listener error:', error);
+  });
+
+  // Cleanup listener on unmount
+  return () => {
+    console.log('Cleaning up real-time loan listener');
+    unsubscribe();
   };
+}, [email]); // REMOVE selectedLoanId from dependencies to prevent loops
+
+const fetchCurrentLoans = async (userEmail) => {
+  try {
+    console.log('Manual fetch: Fetching current loans for:', userEmail);
+    const currentLoansRef = dbRef(database, 'Loans/CurrentLoans');
+    const snapshot = await get(currentLoansRef);
+    const found = [];
+    
+    if (snapshot.exists()) {
+      const allCurrentLoans = snapshot.val();
+      for (const mId in allCurrentLoans) {
+        const loans = allCurrentLoans[mId];
+        for (const loanId in loans) {
+          const loan = loans[loanId];
+          if (loan?.email === userEmail) {
+            found.push({ ...loan, _loanId: loanId, _memberId: mId });
+          }
+        }
+      }
+    }
+
+    console.log('Manual fetch found loans:', found.length);
+    setActiveLoans(found);
+    
+    if (found.length > 0) {
+      const currentStillValid = found.find(loan => loan._loanId === selectedLoanId);
+      if (!currentStillValid) {
+        const firstLoan = found[0];
+        setSelectedLoanId(firstLoan._loanId);
+        setCurrentLoan(firstLoan);
+        calculatePenaltyAndTotal(firstLoan);
+      }
+    } else {
+      setSelectedLoanId(null);
+      setCurrentLoan(null);
+    }
+  } catch (error) {
+    console.error('Error in manual fetch of current loans:', error);
+  }
+};
 
   // Robust date formatter (similar to ExistingLoan.js)
   const formatDisplayDate = (dateInput) => {
@@ -1913,8 +1976,8 @@ const PayLoan = () => {
                     }}
                   >
                     <Text style={styles.loanSelectTitle}>{ln.loanType || 'Loan'}</Text>
-                    <Text style={styles.loanSelectSub}>{`Amount: ${formatCurrency(ln.loanAmount || ln.outstandingBalance || 0)}`}</Text>
-                    <Text style={styles.loanSelectSub}>{`Due: ${formatDisplayDate(ln.dueDate || ln.nextDueDate)}`}</Text>
+                    <Text style={styles.loanSelectSub}>{`Outstanding Balance: ${formatCurrency(ln.loanAmount || ln.outstandingBalance || 0)}`}</Text>
+                    <Text style={styles.loanSelectSub}>{`Due Date: ${formatDisplayDate(ln.dueDate || ln.nextDueDate)}`}</Text>
                   </TouchableOpacity>
 
                   {/* Right: checkbox only toggles selection (no navigation) */}
