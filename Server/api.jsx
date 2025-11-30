@@ -390,27 +390,10 @@ export const RejectMembershipWithdrawal = async (rejectionData) => {
   }
 };
 
-// Add to your existing API exports
-export const SendLoanReminder = async ({ 
-  memberId, 
-  transactionId, 
-  dueDate, 
-  email, 
-  firstName, 
-  lastName, 
-  loanAmount, 
-  outstandingBalance 
-}) => {
+export const SendLoanReminder = async (loanReminderData) => {
   try {
     const response = await axios.post(`${API_URL}/send-loan-reminder`, {
-      memberId,
-      transactionId,
-      dueDate,
-      email,
-      firstName,
-      lastName,
-      loanAmount,
-      outstandingBalance,
+      ...loanReminderData,
       websiteLink: WEBSITE_URL,
       facebookLink: FACEBOOK_URL
     });
