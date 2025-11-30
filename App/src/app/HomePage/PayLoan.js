@@ -2154,7 +2154,7 @@ const fetchCurrentLoans = async (userEmail) => {
                     penaltyAmount > 0 ? { color: '#FF0000', fontWeight: 'bold' } : null
                   ]}>
                     Penalty: {penaltyAmount > 0 ? 
-                      `${formatCurrency(penaltyAmount)} (₱${(currentLoan?.interest || interest || 0).toFixed(2)} × ${overdueDays}/30 days)` : 
+                      `${formatCurrency(penaltyAmount)}` : 
                       formatCurrency(0)
                     }
                   </Text>
