@@ -709,21 +709,97 @@ const Registrations = ({
   const [pendingApiCall, setPendingApiCall] = useState(null);
   const [infoModal, setInfoModal] = useState({ visible: false, title: '', fields: [] });
 
-// ===== CLIENT-SIDE IMAGE VERIFICATION FUNCTIONS =====
-
-// ===== ALL-IN-ONE CLIENT-SIDE VERIFICATION WITH TESSERACT =====
-
+// ===== ENHANCED IMAGE LOADING WITH PROXY =====
 const loadImageForOCR = (imageUrl) => {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = 'Anonymous';
+    
+    // Use your proxy endpoint instead of direct Firebase URL
+    const proxyUrl = `https://five5ki.onrender.com/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+    
     img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = imageUrl;
+    img.onerror = () => {
+      console.error('Failed to load image via proxy, trying direct URL as fallback');
+      // Fallback to direct URL
+      const fallbackImg = new Image();
+      fallbackImg.onload = () => resolve(fallbackImg);
+      fallbackImg.onerror = () => reject(new Error('Failed to load image even with fallback'));
+      fallbackImg.src = imageUrl;
+    };
+    
+    img.src = proxyUrl;
   });
 };
 
-// Enhanced ID Verification with Better Preprocessing
+const getSafeImageUrl = (url) => {
+  if (!url) return '';
+  
+  // If it's already a proxy URL, use it directly
+  if (url.includes('/proxy-image')) {
+    return url;
+  }
+  
+  // Otherwise, convert to proxy URL
+  return `https://five5ki.onrender.com/proxy-image?url=${encodeURIComponent(url)}`;
+};
+
+// Enhanced function to get proxy URL
+const getProxyUrl = (originalUrl) => {
+  if (!originalUrl) return '';
+  const isFirebaseStorage = originalUrl.includes('firebasestorage.googleapis.com');
+  return isFirebaseStorage 
+    ? `https://five5ki.onrender.com/proxy-image?url=${encodeURIComponent(originalUrl)}`
+    : originalUrl;
+};
+
+
+// Enhanced Image Preprocessing
+const preprocessImageForOCR = (img) => {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  
+  // Set canvas size to original image size
+  canvas.width = img.width;
+  canvas.height = img.height;
+  
+  // Draw original image
+  ctx.drawImage(img, 0, 0);
+  
+  // Get image data for processing
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const data = imageData.data;
+  
+  // Enhanced preprocessing for ID documents
+  for (let i = 0; i < data.length; i += 4) {
+    const r = data[i];
+    const g = data[i + 1];
+    const b = data[i + 2];
+    
+    // Convert to grayscale with better weights
+    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
+    
+    // Enhanced contrast for text clarity
+    const contrast = 2.0; // Increased contrast
+    const adjusted = contrast * (gray - 128) + 128;
+    
+    // Apply threshold to make text more distinct
+    const threshold = 128;
+    const finalValue = adjusted > threshold ? 255 : 0;
+    
+    data[i] = data[i + 1] = data[i + 2] = finalValue;
+  }
+  
+  ctx.putImageData(imageData, 0, 0);
+  
+  // Additional sharpening for text clarity
+  ctx.filter = 'contrast(1.5) brightness(1.1)';
+  ctx.drawImage(canvas, 0, 0);
+  ctx.filter = 'none';
+  
+  return canvas;
+};
+
 const verifyID = async (imageUrl, label) => {
   setIsVerifying(prev => ({ ...prev, [label]: true }));
   setValidationStatus(prev => ({
@@ -732,7 +808,9 @@ const verifyID = async (imageUrl, label) => {
   }));
 
   try {
-    const img = await loadImageForOCR(imageUrl);
+    // Use proxy URL for OCR processing
+    const proxyUrl = `https://five5ki.onrender.com/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+    const img = await loadImageForOCR(proxyUrl);
     
     // Enhanced preprocessing for ID documents
     const canvas = preprocessImageForOCR(img);
@@ -1070,11 +1148,19 @@ const verifyID = async (imageUrl, label) => {
   } catch (error) {
     console.error('ID verification error:', error);
     
+    // More specific error messages
+    let errorMessage = 'Verification failed';
+    if (error.message.includes('Failed to load image')) {
+      errorMessage = 'Failed to load image. Please check the image URL or try again.';
+    } else if (error.message.includes('network')) {
+      errorMessage = 'Network error. Please check your connection.';
+    }
+    
     setValidationStatus(prev => ({
       ...prev,
       [label]: { 
         status: 'error', 
-        message: `Verification failed: ${error.message || 'Unknown error'}` 
+        message: errorMessage
       }
     }));
     
@@ -1090,53 +1176,6 @@ const verifyID = async (imageUrl, label) => {
   }
 };
 
-// Enhanced Image Preprocessing
-const preprocessImageForOCR = (img) => {
-  const canvas = document.createElement('canvas');
-  const ctx = canvas.getContext('2d');
-  
-  // Set canvas size to original image size
-  canvas.width = img.width;
-  canvas.height = img.height;
-  
-  // Draw original image
-  ctx.drawImage(img, 0, 0);
-  
-  // Get image data for processing
-  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-  const data = imageData.data;
-  
-  // Enhanced preprocessing for ID documents
-  for (let i = 0; i < data.length; i += 4) {
-    const r = data[i];
-    const g = data[i + 1];
-    const b = data[i + 2];
-    
-    // Convert to grayscale with better weights
-    const gray = 0.299 * r + 0.587 * g + 0.114 * b;
-    
-    // Enhanced contrast for text clarity
-    const contrast = 2.0; // Increased contrast
-    const adjusted = contrast * (gray - 128) + 128;
-    
-    // Apply threshold to make text more distinct
-    const threshold = 128;
-    const finalValue = adjusted > threshold ? 255 : 0;
-    
-    data[i] = data[i + 1] = data[i + 2] = finalValue;
-  }
-  
-  ctx.putImageData(imageData, 0, 0);
-  
-  // Additional sharpening for text clarity
-  ctx.filter = 'contrast(1.5) brightness(1.1)';
-  ctx.drawImage(canvas, 0, 0);
-  ctx.filter = 'none';
-  
-  return canvas;
-};
-
-// Enhanced Payment Proof Verification with Tesseract
 const verifyPaymentProof = async (imageUrl, label) => {
   setIsVerifying(prev => ({ ...prev, [label]: true }));
   setValidationStatus(prev => ({
@@ -1145,7 +1184,9 @@ const verifyPaymentProof = async (imageUrl, label) => {
   }));
 
   try {
-    const img = await loadImageForOCR(imageUrl);
+    // Use proxy URL for OCR processing
+    const proxyUrl = `https://five5ki.onrender.com/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+    const img = await loadImageForOCR(proxyUrl);
     
     const { data: { text, confidence } } = await Tesseract.recognize(
       img,
@@ -1228,7 +1269,7 @@ const verifyPaymentProof = async (imageUrl, label) => {
       paymentMethod = 'Bank Transfer';
     }
 
-    // IMPROVED VALIDATION LOGIC - FIXED HERE
+    // IMPROVED VALIDATION LOGIC
     const hasAmount = !!amount;
     const hasReference = !!reference;
     const hasDate = !!dateTime;
@@ -1238,19 +1279,19 @@ const verifyPaymentProof = async (imageUrl, label) => {
       hasAmount, hasReference, hasDate, confidence, hasGoodConfidence
     });
 
-  let status = 'invalid';
-let statusMessage = '';
+    let status = 'invalid';
+    let statusMessage = '';
 
-if (hasAmount && hasReference && hasGoodConfidence) {
-  status = 'valid';
-  statusMessage = '✅ Valid payment receipt';
-} else if ((hasAmount || hasReference) && confidence > 25) {
-  status = 'manual';
-  statusMessage = '⚠️ Partial details found - Manual review recommended';
-} else {
-  status = 'invalid';
-  statusMessage = '❌ Invalid - No payment details detected'; // THIS WAS MISSING
-}
+    if (hasAmount && hasReference && hasGoodConfidence) {
+      status = 'valid';
+      statusMessage = '✅ Valid payment receipt';
+    } else if ((hasAmount || hasReference) && confidence > 25) {
+      status = 'manual';
+      statusMessage = '⚠️ Partial details found - Manual review recommended';
+    } else {
+      status = 'invalid';
+      statusMessage = '❌ Invalid - No payment details detected';
+    }
 
     // CONSTRUCT DETAILED MESSAGE
     let message = '';
@@ -1288,27 +1329,38 @@ if (hasAmount && hasReference && hasGoodConfidence) {
       }
     }));
 
-    // SHOW RESULTS IN INFO MODAL - ALWAYS SHOW EVEN WHEN NOTHING DETECTED
-const infoFields = [
-  { label: 'Amount', value: amount ? `₱${amount}` : '❌ Not detected' },
-  { label: 'Reference Number', value: reference || '❌ Not detected' },
-  { label: 'Date', value: dateTime || '❌ Not detected' },
-  { label: 'Payment Method', value: paymentMethod },
-  { label: 'OCR Confidence', value: `${Math.round(confidence)}%` },
-  { label: 'Status', value: status === 'valid' ? '✅ Valid Payment Receipt' : 
+    // SHOW RESULTS IN INFO MODAL
+    const infoFields = [
+      { label: 'Amount', value: amount ? `₱${amount}` : '❌ Not detected' },
+      { label: 'Reference Number', value: reference || '❌ Not detected' },
+      { label: 'Date', value: dateTime || '❌ Not detected' },
+      { label: 'Payment Method', value: paymentMethod },
+      { label: 'OCR Confidence', value: `${Math.round(confidence)}%` },
+      { label: 'Status', value: status === 'valid' ? '✅ Valid Payment Receipt' : 
                           status === 'manual' ? '⚠️ Manual Review Required' : 
                           '❌ Invalid - No payment details detected' }
-];
+    ];
 
     showInfoModal('Payment Verification Results', infoFields);
 
   } catch (error) {
     console.error('Payment verification error:', error);
     
+    // More specific error messages
+    let errorMessage = 'Verification failed';
+    if (error.message.includes('Failed to load image')) {
+      errorMessage = 'Failed to load image. Please check the image URL or try again.';
+    } else if (error.message.includes('network')) {
+      errorMessage = 'Network error. Please check your connection.';
+    }
+    
     // SHOW ERROR IN INFO MODAL
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'error', message: 'Payment verification failed' }
+      [label]: { 
+        status: 'error', 
+        message: errorMessage
+      }
     }));
     
     const errorFields = [
@@ -1323,7 +1375,6 @@ const infoFields = [
   }
 };
 
-// Smart Selfie Verification using Image Analysis (NO TensorFlow)
 const verifyFace = async (imageUrl, label) => {
   setIsVerifying(prev => ({ ...prev, [label]: true }));
   setValidationStatus(prev => ({
@@ -1332,7 +1383,9 @@ const verifyFace = async (imageUrl, label) => {
   }));
 
   try {
-    const img = await loadImageForOCR(imageUrl);
+    // Use proxy URL for image processing
+    const proxyUrl = `https://five5ki.onrender.com/proxy-image?url=${encodeURIComponent(imageUrl)}`;
+    const img = await loadImageForOCR(proxyUrl);
     
     // Smart selfie analysis using multiple heuristics
     const analysis = analyzeSelfieImage(img);
@@ -1351,18 +1404,43 @@ const verifyFace = async (imageUrl, label) => {
 
     // Show detailed analysis
     const infoFields = [
-      { label: 'Face Detected', value: hasFace ? 'Detected' : 'No face detected' },
+      { label: 'Face Detected', value: hasFace ? '✅ Detected' : '❌ No face detected' },
       { label: 'Detection Confidence', value: `${confidence}%` },
+      { label: 'Image Size', value: analysis.imageSize },
+      { label: 'Orientation', value: analysis.orientation },
+      { label: 'Brightness', value: analysis.brightness },
+      { label: 'Skin Tone Ratio', value: analysis.skinToneRatio },
+      { label: 'Notes', value: analysis.notes }
     ];
 
     showInfoModal('Selfie Analysis Results', infoFields);
 
   } catch (error) {
     console.error('Selfie verification error:', error);
+    
+    // More specific error messages
+    let errorMessage = 'Verification failed';
+    if (error.message.includes('Failed to load image')) {
+      errorMessage = 'Failed to load image. Please check the image URL or try again.';
+    } else if (error.message.includes('network')) {
+      errorMessage = 'Network error. Please check your connection.';
+    }
+    
     setValidationStatus(prev => ({
       ...prev,
-      [label]: { status: 'error', message: 'Selfie analysis failed' }
+      [label]: { 
+        status: 'error', 
+        message: errorMessage
+      }
     }));
+    
+    const errorFields = [
+      { label: 'Error', value: 'Verification failed' },
+      { label: 'Details', value: error.message || 'Unknown error occurred' },
+      { label: 'Status', value: '❌ Error' }
+    ];
+    
+    showInfoModal('Selfie Verification Error', errorFields);
   } finally {
     setIsVerifying(prev => ({ ...prev, [label]: false }));
   }
@@ -2052,45 +2130,45 @@ const handleManualVerification = () => {
     setIsProcessing(false);
   };
 
-  const openImageViewer = (url, label, index) => {
-    const images = [];
-    
-    if (selectedRegistration?.validIdFront) {
-      images.push({ 
-        url: selectedRegistration.validIdFront, 
-        label: 'Valid ID Front' 
-      });
-    }
-    if (selectedRegistration?.validIdBack) {
-      images.push({ 
-        url: selectedRegistration.validIdBack, 
-        label: 'Valid ID Back' 
-      });
-    }
-    if (selectedRegistration?.selfie) {
-      images.push({ 
-        url: selectedRegistration.selfie, 
-        label: 'Selfie' 
-      });
-    }
-    if (selectedRegistration?.selfieWithId) {
-      images.push({ 
-        url: selectedRegistration.selfieWithId, 
-        label: 'Selfie with ID' 
-      });
-    }
-    if (selectedRegistration?.paymentProof) {
-      images.push({ 
-        url: selectedRegistration.paymentProof, 
-        label: 'Payment Proof' 
-      });
-    }
+const openImageViewer = (url, label, index) => {
+  const images = [];
+  
+  if (selectedRegistration?.validIdFront) {
+    images.push({ 
+      url: getSafeImageUrl(selectedRegistration.validIdFront), 
+      label: 'Valid ID Front' 
+    });
+  }
+  if (selectedRegistration?.validIdBack) {
+    images.push({ 
+      url: getSafeImageUrl(selectedRegistration.validIdBack), 
+      label: 'Valid ID Back' 
+    });
+  }
+  if (selectedRegistration?.selfie) {
+    images.push({ 
+      url: getSafeImageUrl(selectedRegistration.selfie), 
+      label: 'Selfie' 
+    });
+  }
+  if (selectedRegistration?.selfieWithId) {
+    images.push({ 
+      url: getSafeImageUrl(selectedRegistration.selfieWithId), 
+      label: 'Selfie with ID' 
+    });
+  }
+  if (selectedRegistration?.paymentProof) {
+    images.push({ 
+      url: getSafeImageUrl(selectedRegistration.paymentProof), 
+      label: 'Payment Proof' 
+    });
+  }
 
-    setAvailableImages(images);
-    setCurrentImage({ url, label });
-    setCurrentImageIndex(index);
-    setImageViewerVisible(true);
-  };
+  setAvailableImages(images);
+  setCurrentImage({ url, label });
+  setCurrentImageIndex(index);
+  setImageViewerVisible(true);
+};
 
   const closeImageViewer = () => {
     setImageViewerVisible(false);
@@ -2098,19 +2176,23 @@ const handleManualVerification = () => {
     setCurrentImageIndex(0);
   };
 
-  const navigateImages = (direction) => {
-    if (availableImages.length === 0) return;
+const navigateImages = (direction) => {
+  if (availableImages.length === 0) return;
 
-    let newIndex;
-    if (direction === 'prev') {
-      newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
-    } else {
-      newIndex = (currentImageIndex + 1) % availableImages.length;
-    }
+  let newIndex;
+  if (direction === 'prev') {
+    newIndex = (currentImageIndex - 1 + availableImages.length) % availableImages.length;
+  } else {
+    newIndex = (currentImageIndex + 1) % availableImages.length;
+  }
 
-    setCurrentImageIndex(newIndex);
-    setCurrentImage(availableImages[newIndex]);
-  };
+  const nextImage = availableImages[newIndex];
+  setCurrentImageIndex(newIndex);
+  setCurrentImage({
+    ...nextImage,
+    url: getSafeImageUrl(nextImage.url) // Ensure proxy URL
+  });
+};
 
   if (!registrations.length) return (
     <div style={styles.noDataContainer}>
@@ -2301,60 +2383,65 @@ const handleManualVerification = () => {
                       <FaIdCard />
                       Submitted Documents
                     </h3>
-                    <div style={styles.documentsGrid}>
-                      {selectedRegistration.validIdFront && (
-                        <div 
-                          style={styles.documentCard}
-                          onClick={() => openImageViewer(selectedRegistration.validIdFront, 'Valid ID Front', 0)}
-                        >
-                          <img
-                            src={selectedRegistration.validIdFront}
-                            alt="Valid ID Front"
-                            style={styles.documentImage}
-                          />
-                          <div style={styles.documentLabel}>Valid ID Front</div>
-                        </div>
-                      )}
-                      {selectedRegistration.validIdBack && (
-                        <div 
-                          style={styles.documentCard}
-                          onClick={() => openImageViewer(selectedRegistration.validIdBack, 'Valid ID Back', 1)}
-                        >
-                          <img
-                            src={selectedRegistration.validIdBack}
-                            alt="Valid ID Back"
-                            style={styles.documentImage}
-                          />
-                          <div style={styles.documentLabel}>Valid ID Back</div>
-                        </div>
-                      )}
-                      {selectedRegistration.selfie && (
-                        <div 
-                          style={styles.documentCard}
-                          onClick={() => openImageViewer(selectedRegistration.selfie, 'Selfie', 2)}
-                        >
-                          <img
-                            src={selectedRegistration.selfie}
-                            alt="Selfie"
-                            style={styles.documentImage}
-                          />
-                          <div style={styles.documentLabel}>Selfie</div>
-                        </div>
-                      )}
-                      {selectedRegistration.paymentProof && (
-                        <div 
-                          style={styles.documentCard}
-                          onClick={() => openImageViewer(selectedRegistration.paymentProof, 'Payment Proof', 3)}
-                        >
-                          <img
-                            src={selectedRegistration.paymentProof}
-                            alt="Payment Proof"
-                            style={styles.documentImage}
-                          />
-                          <div style={styles.documentLabel}>Payment Proof</div>
-                        </div>
-                      )}
-                    </div>
+                   <div style={styles.documentsGrid}>
+{selectedRegistration.validIdFront && (
+  <div 
+    style={styles.documentCard}
+    onClick={() => openImageViewer(
+      getSafeImageUrl(selectedRegistration.validIdFront), // ✅ This is correct
+      'Valid ID Front', 
+      0
+    )}
+  >
+    <img
+      src={getSafeImageUrl(selectedRegistration.validIdFront)} // ✅ This is correct
+      alt="Valid ID Front"
+      style={styles.documentImage}
+    />
+    <div style={styles.documentLabel}>Valid ID Front</div>
+  </div>
+)}
+  {selectedRegistration.validIdBack && (
+    <div 
+      style={styles.documentCard}
+      onClick={() => openImageViewer(getSafeImageUrl(selectedRegistration.validIdBack), 'Valid ID Back', 1)}
+    >
+      <img
+        src={getSafeImageUrl(selectedRegistration.validIdBack)}
+        alt="Valid ID Back"
+        style={styles.documentImage}
+      />
+      <div style={styles.documentLabel}>Valid ID Back</div>
+    </div>
+  )}
+  {selectedRegistration.selfie && (
+    <div 
+      style={styles.documentCard}
+      onClick={() => openImageViewer(getSafeImageUrl(selectedRegistration.selfie), 'Selfie', 2)}
+    >
+      <img
+        src={getSafeImageUrl(selectedRegistration.selfie)}
+        alt="Selfie"
+        style={styles.documentImage}
+      />
+      <div style={styles.documentLabel}>Selfie</div>
+    </div>
+  )}
+  {selectedRegistration.paymentProof && (
+    <div 
+      style={styles.documentCard}
+      onClick={() => openImageViewer(getSafeImageUrl(selectedRegistration.paymentProof), 'Payment Proof', 3)}
+    >
+      <img
+        src={getSafeImageUrl(selectedRegistration.paymentProof)}
+        alt="Payment Proof"
+        style={styles.documentImage}
+      />
+      <div style={styles.documentLabel}>Payment Proof</div>
+    </div>
+  )}
+</div>
+
                   </div>
                 </div>
               </div>
