@@ -18,7 +18,7 @@ const firebaseConfig = {
     measurementId: "G-FNCX3QBYWB"
 };
 
-// Initialize Firebase v8 compat (for existing code) with enhanced settings
+// Initialize Firebase v8 compat (for existing code) with SIMPLIFIED settings
 let storage, database, auth;
 
 try {
@@ -26,33 +26,19 @@ try {
         firebase.initializeApp(firebaseConfig);
     }
 
-    // Configure Firebase with optimized settings for serverless environments
-    const app = firebase.app();
-    
-    // Initialize Firebase Storage with optimized settings
+    // Initialize Firebase services with v8 compat
     storage = firebase.storage();
-    
-    // Set storage timeout and retry settings
-    storage.setMaxUploadRetryTime(30000); // 30 seconds
-    storage.setMaxOperationRetryTime(30000); // 30 seconds
-    
-    // Initialize Realtime Database with optimized settings
     database = firebase.database();
-    
-    // Configure database for better performance
-    database.setLogLevel(firebase.database.LogLevel.WARN);
-    
-    // Initialize Auth
     auth = firebase.auth();
     
-    // Configure auth settings
-    auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+    // REMOVED the problematic setLogLevel call and other v8-specific settings
+    // These settings are causing the error in v9 environment
     
     console.log('Firebase v8 compat initialized successfully');
 
 } catch (error) {
     console.error('Error initializing Firebase v8 compat:', error);
-    // Fallback initialization
+    // Simple fallback without any additional configuration
     if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
     }
@@ -62,12 +48,12 @@ try {
 }
 
 // Initialize Firebase v9 modular (for AI services)
-let app, vertexAI, aiModel;
+let aiApp, vertexAI, aiModel;
 
 try {
     // Create a separate app instance for AI services
-    app = initializeApp(firebaseConfig, 'ai-app');
-    vertexAI = getVertexAI(app);
+    aiApp = initializeApp(firebaseConfig, 'ai-app');
+    vertexAI = getVertexAI(aiApp);
     
     // Initialize Gemini 2.0 Flash model
     aiModel = getGenerativeModel(vertexAI, { 
@@ -78,7 +64,7 @@ try {
 } catch (error) {
     console.error('Error initializing Firebase AI:', error);
     // Set to null so we can handle gracefully
-    app = null;
+    aiApp = null;
     vertexAI = null;
     aiModel = null;
 }
@@ -245,7 +231,7 @@ export {
     auth, 
     storage, 
     database, 
-    app, 
+    aiApp, 
     vertexAI, 
     aiModel,
     uploadImageToFirebaseWithRetry,
