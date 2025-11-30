@@ -123,109 +123,111 @@ export default function Inbox() {
     }
   };
 
-  const parseMessages = (data) => {
-    const parsed = [];
+const parseMessages = (data) => {
+  const parsed = [];
+  
+  console.log('parseMessages - Processing transaction types:', Object.keys(data));
+  
+  for (const [type, members] of Object.entries(data)) {
+    console.log(`Processing transaction type: ${type}`);
     
-    for (const [type, members] of Object.entries(data)) {
-      for (const [memberId, transactions] of Object.entries(members)) {
-        for (const [transactionId, details] of Object.entries(transactions)) {
-          try {
-            const status = (details.status || 'pending').toLowerCase();
-            let displayDate, timestamp;
+    for (const [memberId, transactions] of Object.entries(members)) {
+      console.log(`Processing member: ${memberId}, transaction count:`, Object.keys(transactions).length);
+      
+      for (const [transactionId, details] of Object.entries(transactions)) {
+        try {
+          const status = (details.status || 'pending').toLowerCase();
+          
+          console.log(`Processing ${type} transaction ${transactionId} with status: ${status}`);
 
-            // Get the appropriate date based on status and create reliable timestamp
+          // ========== DIVIDENDS HANDLING ==========
+          if (type === 'Dividends') {
+            console.log('Found dividend transaction:', { transactionId, details });
+            
+            // Get reliable timestamp for dividends
             const getReliableTimestamp = (dateObj, details) => {
-              // First, check if there's already a timestamp field from web approval
               if (details.timestamp && typeof details.timestamp === 'number') {
                 return details.timestamp;
               }
-              
               if (!dateObj) return Date.now();
-              
-              // Handle Firebase timestamp objects
               if (typeof dateObj === 'object' && dateObj.seconds) {
                 return dateObj.seconds * 1000;
               }
-              
-              // Handle string dates
               if (typeof dateObj === 'string') {
                 const parsed = new Date(dateObj);
                 return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
               }
-              
-              // Handle Date objects
               if (dateObj instanceof Date) {
                 return dateObj.getTime();
               }
-              
               return new Date(dateObj).getTime() || Date.now();
             };
 
-            if (status === 'approved') {
-              displayDate = getRawDateFromFirebase(details.dateApproved);
-              timestamp = getReliableTimestamp(details.dateApproved, details);
-            } else if (status === 'rejected') {
-              displayDate = getRawDateFromFirebase(details.dateRejected);
-              timestamp = getReliableTimestamp(details.dateRejected, details);
-            } else {
-              // For pending items, show the date applied instead of a placeholder
-              displayDate = getRawDateFromFirebase(details.dateApplied);
-              timestamp = getReliableTimestamp(details.dateApplied, details);
-            }
+            // Get raw date for dividends
+            const getRawDateFromFirebase = (dateObj) => {
+              if (!dateObj) return 'Date not available';
+              if (typeof dateObj === 'object' && dateObj.seconds) {
+                const date = new Date(dateObj.seconds * 1000);
+                return date.toLocaleString();
+              }
+              if (typeof dateObj === 'string') {
+                return dateObj;
+              }
+              if (dateObj instanceof Date) {
+                return dateObj.toLocaleString();
+              }
+              return 'Date not available';
+            };
 
-            // normalized payload for each message item
-            let amount = 0;
-            let title = '';
-            let label = '';
-            let method = null; // payment/deposit/withdraw option
+            // Use the correct date field for dividends
+            const dividendDate = details.dateApproved || details.dateDistributed || details.timestamp;
+            const displayDate = getRawDateFromFirebase(dividendDate);
+            const timestamp = getReliableTimestamp(dividendDate, details);
+            
+            const amount = Number(details.amount || 0);
+            const title = 'Dividend Distribution';
+            const label = 'Dividend';
+            
+            // Get icon for dividends
+            const getIcon = (status) => {
+              switch (status) {
+                case 'approved': return 'check-circle';
+                case 'rejected': return 'cancel';
+                case 'reminder': return 'alarm';
+                case 'distributed': return 'check-circle';
+                default: return 'hourglass-empty';
+              }
+            };
+
+            // Get color for dividends
+            const getColor = (status) => {
+              switch (status) {
+                case 'approved': return '#4CAF50';
+                case 'rejected': return '#F44336';
+                case 'reminder': return '#FFC107';
+                case 'distributed': return '#4CAF50';
+                default: return '#FFC107';
+              }
+            };
+            
+            // Create appropriate message based on status
             let message = '';
-            let rejectionReason = details.rejectionReason || 'No reason provided';
-
-            switch (type) {
-              case 'Deposits':
-                amount = Number(details.amountToBeDeposited || 0);
-                title = 'Deposit';
-                label = 'Deposit';
-                method = details.depositOption || null;
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'deposit', rejectionReason);
-                break;
-              case 'Loans':
-                amount = Number(details.loanAmount || 0);
-                const monthlyPayment = Number(details.totalMonthlyPayment || 0).toFixed(2);
-                title = 'Loan';
-                label = 'Loan';
-                message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
-                
-                // REMOVED: Automatic loan reminder creation - only show actual reminders from LoanNotifications
-                break;
-              case 'Withdrawals':
-                amount = Number(details.amountWithdrawn || 0);
-                title = 'Withdrawal';
-                label = 'Withdrawal';
-                method = details.withdrawOption || null;
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'withdrawal', rejectionReason);
-                break;
-              case 'Payments':
-                amount = Number(details.amountToBePaid || 0);
-                title = 'Payment';
-                label = 'Loan Payment';
-                method = details.paymentOption || null;
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'payment', rejectionReason);
-                break;
-              case 'Registrations':
-                amount = Number(details.amount || details.registrationFee || 0);
-                title = 'Registration';
-                label = 'Registration';
-                message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'registration', rejectionReason);
-                break;
-              default:
-                title = type;
-                label = type;
-                message = `${type} update`;
+            if (status === 'distributed' || status === 'approved') {
+              message = `Your dividend of ₱${amount.toFixed(2)} has been distributed to your account.`;
+              if (details.addedToInvestment) {
+                message += ' It has been added to your investment.';
+              }
+              if (details.addedToBalance) {
+                message += ' It has been added to your balance.';
+              }
+            } else if (status === 'pending') {
+              message = `Your dividend of ₱${amount.toFixed(2)} is pending distribution.`;
+            } else {
+              message = `Dividend update: ₱${amount.toFixed(2)} - Status: ${status}`;
             }
-
-            parsed.push({
-              id: `${type}-${transactionId}`,
+            
+            const dividendMessage = {
+              id: `dividend-${transactionId}`,
               title,
               label,
               type: title,
@@ -233,30 +235,193 @@ export default function Inbox() {
               timestamp,
               displayDate,
               email: details.email,
-              icon: getIcon(status),
-              color: getColor(status),
-              rejectionReason,
-              status,
+              icon: getIcon(status === 'distributed' ? 'approved' : status),
+              color: getColor(status === 'distributed' ? 'approved' : status),
+              status: status === 'distributed' ? 'approved' : status,
               amount,
-              paymentOption: details.paymentOption,
-              depositOption: details.depositOption,
-              withdrawOption: details.withdrawOption,
-              // Bare DB key for this Transactions entry
               transactionId,
-              // Preserve originalTransactionId if explicitly stored in DB; fallback to details.transactionId or the key
-              originalTransactionId: details.originalTransactionId || details.transactionId || transactionId,
-              dateApplied: details.dateApplied || null,
-              dateApproved: details.dateApproved || null,
-              dateRejected: details.dateRejected || null,
-            });
-          } catch (error) {
-            console.error(`Error parsing ${type} transaction ${transactionId}:`, error);
+              originalTransactionId: details.originalTransactionId || transactionId,
+              dateApplied: details.dateDistributed || null,
+              dateApproved: details.dateDistributed || details.dateApproved || null,
+              addedToInvestment: details.addedToInvestment || false,
+              addedToBalance: details.addedToBalance || false,
+              memberId: details.memberId || memberId,
+              firstName: details.firstName,
+              lastName: details.lastName,
+            };
+            
+            console.log('Parsed dividend message:', dividendMessage);
+            parsed.push(dividendMessage);
+            continue; // Skip to next transaction
           }
+          
+          // ========== EXISTING TRANSACTION TYPES ==========
+          let displayDate, timestamp;
+
+          // Get reliable timestamp for other transactions
+          const getReliableTimestamp = (dateObj, details) => {
+            if (details.timestamp && typeof details.timestamp === 'number') {
+              return details.timestamp;
+            }
+            if (!dateObj) return Date.now();
+            if (typeof dateObj === 'object' && dateObj.seconds) {
+              return dateObj.seconds * 1000;
+            }
+            if (typeof dateObj === 'string') {
+              const parsed = new Date(dateObj);
+              return isNaN(parsed.getTime()) ? Date.now() : parsed.getTime();
+            }
+            if (dateObj instanceof Date) {
+              return dateObj.getTime();
+            }
+            return new Date(dateObj).getTime() || Date.now();
+          };
+
+          // Get raw date for other transactions
+          const getRawDateFromFirebase = (dateObj) => {
+            if (!dateObj) return 'Date not available';
+            if (typeof dateObj === 'object' && dateObj.seconds) {
+              const date = new Date(dateObj.seconds * 1000);
+              return date.toLocaleString();
+            }
+            if (typeof dateObj === 'string') {
+              return dateObj;
+            }
+            return 'Date not available';
+          };
+
+          if (status === 'approved') {
+            displayDate = getRawDateFromFirebase(details.dateApproved);
+            timestamp = getReliableTimestamp(details.dateApproved, details);
+          } else if (status === 'rejected') {
+            displayDate = getRawDateFromFirebase(details.dateRejected);
+            timestamp = getReliableTimestamp(details.dateRejected, details);
+          } else {
+            displayDate = getRawDateFromFirebase(details.dateApplied);
+            timestamp = getReliableTimestamp(details.dateApplied, details);
+          }
+
+          // Get status message
+          const getStatusMessage = (status, amount, type, rejectionReason) => {
+            switch (status) {
+              case 'approved':
+              case 'distributed':
+                if (type === 'dividend') {
+                  return `Your dividend of ${amount} has been distributed to your account.`;
+                }
+                return `Your ${type} of ${amount} has been approved.`;
+              case 'rejected':
+                return `Your ${type} of ${amount} was rejected. Reason: ${rejectionReason}`;
+              default:
+                return `Your ${type} of ${amount} is pending approval.`;
+            }
+          };
+
+          // Get icon for other transactions
+          const getIcon = (status) => {
+            switch (status) {
+              case 'approved': return 'check-circle';
+              case 'rejected': return 'cancel';
+              case 'reminder': return 'alarm';
+              default: return 'hourglass-empty';
+            }
+          };
+
+          // Get color for other transactions
+          const getColor = (status) => {
+            switch (status) {
+              case 'approved': return '#4CAF50';
+              case 'rejected': return '#F44336';
+              case 'reminder': return '#FFC107';
+              default: return '#FFC107';
+            }
+          };
+
+          let amount = 0;
+          let title = '';
+          let label = '';
+          let method = null;
+          let message = '';
+          let rejectionReason = details.rejectionReason || 'No reason provided';
+
+          switch (type) {
+            case 'Deposits':
+              amount = Number(details.amountToBeDeposited || 0);
+              title = 'Deposit';
+              label = 'Deposit';
+              method = details.depositOption || null;
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'deposit', rejectionReason);
+              break;
+            case 'Loans':
+              amount = Number(details.loanAmount || 0);
+              title = 'Loan';
+              label = 'Loan';
+              message = getStatusMessage(status, `₱${Number(amount).toFixed(2)}`, 'loan', rejectionReason);
+              break;
+            case 'Withdrawals':
+              amount = Number(details.amountWithdrawn || 0);
+              title = 'Withdrawal';
+              label = 'Withdrawal';
+              method = details.withdrawOption || null;
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'withdrawal', rejectionReason);
+              break;
+            case 'Payments':
+              amount = Number(details.amountToBePaid || 0);
+              title = 'Payment';
+              label = 'Loan Payment';
+              method = details.paymentOption || null;
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'payment', rejectionReason);
+              break;
+            case 'Registrations':
+              amount = Number(details.amount || details.registrationFee || 0);
+              title = 'Registration';
+              label = 'Registration';
+              message = getStatusMessage(status, `₱${amount.toFixed(2)}`, 'registration', rejectionReason);
+              break;
+            default:
+              title = type;
+              label = type;
+              message = `${type} update`;
+          }
+
+          const standardMessage = {
+            id: `${type}-${transactionId}`,
+            title,
+            label,
+            type: title,
+            message,
+            timestamp,
+            displayDate,
+            email: details.email,
+            icon: getIcon(status),
+            color: getColor(status),
+            rejectionReason,
+            status,
+            amount,
+            paymentOption: details.paymentOption,
+            depositOption: details.depositOption,
+            withdrawOption: details.withdrawOption,
+            transactionId,
+            originalTransactionId: details.originalTransactionId || details.transactionId || transactionId,
+            dateApplied: details.dateApplied || null,
+            dateApproved: details.dateApproved || null,
+            dateRejected: details.dateRejected || null,
+          };
+
+          console.log(`Parsed ${type} message:`, standardMessage);
+          parsed.push(standardMessage);
+          
+        } catch (error) {
+          console.error(`Error parsing ${type} transaction ${transactionId}:`, error);
+          console.error('Transaction details that caused error:', details);
         }
       }
     }
-    return parsed;
-  };
+  }
+  
+  console.log('parseMessages - Total parsed messages:', parsed.length);
+  return parsed;
+};
 
   // NEW FUNCTION: Fetch actual loan reminders from LoanNotifications
   const fetchLoanReminders = async (userEmail) => {
