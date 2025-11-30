@@ -14,6 +14,7 @@ import {
   SafeAreaView,
   Image,
   Alert,
+  Platform
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
@@ -23,12 +24,13 @@ import { getDatabase, ref, get } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
+import CustomModal from '../components/CustomModal';
+import CustomConfirmModal from '../components/CustomConfirmModal';
 
 import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
 import LoanHistory from './HomePage/LoanHistory';
 import MarqueeData from './HomePage/MarqueeData';
-import CustomConfirmModal from '../components/CustomConfirmModal';
 
 const Tab = createBottomTabNavigator();
 
@@ -54,9 +56,12 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const previousInboxCount = useRef(0);
   const lastInboxCheckRef = useRef(null);
 
-  // Logout states
-  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
-  const [isLoggingOut, setIsLoggingOut] = useState(false);
+    // ← ADD THESE NEW STATE VARIABLES FOR MODALS
+  const [logoutConfirmVisible, setLogoutConfirmVisible] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalType, setModalType] = useState('info');
 
   // --- new code: check for new transactions and show red dot on bell ---
   const checkForNewTransactions = async () => {
@@ -182,12 +187,16 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         const routeEmail = route.params?.email;
         let storedEmail = null;
         
-        // Try to get email from SecureStore (for biometric login)
-        try {
-          storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-        } catch (error) {
-          console.error('Error getting email from SecureStore:', error);
-        }
+
+    // Try to get email from SecureStore (for biometric login) - WITH PLATFORM CHECK
+    if (Platform.OS !== 'web') {
+      try {
+        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+      } catch (error) {
+        console.error('Error getting email from SecureStore:', error);
+      }
+    }
+
         
         console.log('AppHome - Loading user data with:', { 
           authEmail: user?.email, 
@@ -236,60 +245,61 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   }, [route.params, email]);
 
   // Check if biometric setup should be prompted
-  useEffect(() => {
-    const checkBiometricSetup = async () => {
-      if (biometricPromptShown) return;
-      
-      // Get parameters from route
-      const shouldPromptBiometric = route.params?.shouldPromptBiometric;
-      const password = route.params?.password;
-      
-      // Always check if we should show the prompt, even if no password is provided
-      // We'll handle the password input in the BiometricSetupScreen
-      if (!shouldPromptBiometric) return;
-      
-      try {
-        // Check if biometrics are already set up for this user
-        const credentials = await SecureStore.getItemAsync('biometricCredentials');
-        if (credentials) {
-          const storedData = JSON.parse(credentials);
-          if (storedData.email === email) {
-            // Biometrics already set up for this user, skip prompt
-            return;
-          }
+useEffect(() => {
+  const checkBiometricSetup = async () => {
+    // Don't run biometric checks on web
+    if (Platform.OS === 'web') return;
+    
+    if (biometricPromptShown) return;
+    
+    // Get parameters from route
+    const shouldPromptBiometric = route.params?.shouldPromptBiometric;
+    const password = route.params?.password;
+    
+    if (!shouldPromptBiometric) return;
+    
+    try {
+      // Check if biometrics are already set up for this user
+      const credentials = await SecureStore.getItemAsync('biometricCredentials');
+      if (credentials) {
+        const storedData = JSON.parse(credentials);
+        if (storedData.email === email) {
+          // Biometrics already set up for this user, skip prompt
+          return;
         }
-        
-        console.log('Showing biometric setup prompt');
-        
-        // Show biometric setup prompt
-        Alert.alert(
-          'Enable Fingerprint Login?',
-          'Do you want to enable fingerprint authentication for faster login next time?',
-          [
-            {
-              text: 'Not Now',
-              style: 'cancel',
-            },
-            {
-              text: 'Enable',
-              onPress: () => navigation.navigate('BiometricSetup', { email, password }),
-            },
-          ]
-        );
-        
-        setBiometricPromptShown(true);
-      } catch (error) {
-        console.error('Biometric check error:', error);
       }
-    };
-    
-    // Wait a bit before showing the prompt to ensure the home screen is fully loaded
-    const timer = setTimeout(() => {
-      checkBiometricSetup();
-    }, 1000);
-    
-    return () => clearTimeout(timer);
-  }, [route.params, email, navigation, biometricPromptShown]);
+      
+      console.log('Showing biometric setup prompt');
+      
+      // Show biometric setup prompt
+      Alert.alert(
+        'Enable Fingerprint Login?',
+        'Do you want to enable fingerprint authentication for faster login next time?',
+        [
+          {
+            text: 'Not Now',
+            style: 'cancel',
+          },
+          {
+            text: 'Enable',
+            onPress: () => navigation.navigate('BiometricSetup', { email, password }),
+          },
+        ]
+      );
+      
+      setBiometricPromptShown(true);
+    } catch (error) {
+      console.error('Biometric check error:', error);
+    }
+  };
+  
+  // Wait a bit before showing the prompt to ensure the home screen is fully loaded
+  const timer = setTimeout(() => {
+    checkBiometricSetup();
+  }, 1000);
+  
+  return () => clearTimeout(timer);
+}, [route.params, email, navigation, biometricPromptShown]);
 
   useEffect(() => {
     const backAction = () => {
@@ -311,12 +321,14 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
       const routeEmail = route.params?.email;
       let storedEmail = null;
       
-      // Try to get email from SecureStore (for biometric login)
+   // Try to get email from SecureStore (for biometric login) - WITH PLATFORM CHECK
+    if (Platform.OS !== 'web') {
       try {
         storedEmail = await SecureStore.getItemAsync('currentUserEmail');
       } catch (error) {
         console.error('Error getting email from SecureStore during refresh:', error);
       }
+    }
       
       console.log('AppHome - Refreshing user data with:', { 
         authEmail: user?.email, 
@@ -382,30 +394,50 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     navigation.navigate('InboxTab');
   };
 
-  const handleLogout = async () => {
-    setIsLoggingOut(true);
-    try {
-      // Clear SecureStore data
+const handleLogoutFallback = () => {
+  setLogoutConfirmVisible(true);
+};
+
+  // Enhanced logout function with confirmation modal
+const handleLogout = () => {
+  setLogoutConfirmVisible(true);
+};
+
+// Actual logout logic
+const performLogout = async () => {
+  setLogoutConfirmVisible(false);
+  setLogoutLoading(true);
+
+  try {
+    // Clear SecureStore data - WITH PLATFORM CHECK
+    if (Platform.OS !== 'web') {
       await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
       await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
-      
-      // Sign out from Firebase
-      await auth.signOut();
-      
-      // Navigate to login screen
-      navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-    } catch (e) {
-      console.error('Logout error:', e);
-      Alert.alert('Logout Error', 'There was an error during logout. Please try again.');
-    } finally {
-      setIsLoggingOut(false);
-      setLogoutModalVisible(false);
     }
-  };
+    
+    // Sign out from Firebase
+    await auth.signOut();
+    
+    // Navigate to login screen
+    navigation.reset({ 
+      index: 0, 
+      routes: [{ name: 'Login' }] 
+    });
+    
+  } catch (error) {
+    console.error('Logout error:', error);
+    setModalMessage('There was an error during logout. Please try again.');
+    setModalType('error');
+    setModalVisible(true);
+  } finally {
+    setLogoutLoading(false);
+  }
+};
 
-  const showLogoutConfirmation = () => {
-    setLogoutModalVisible(true);
-  };
+// Cancel logout
+const cancelLogout = () => {
+  setLogoutConfirmVisible(false);
+};
 
   return (
     <SafeAreaView style={styles.container}>
@@ -636,6 +668,8 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
               
               <Text style={styles.fallbackProfileName}>{firstName}</Text>
               <Text style={styles.fallbackProfileEmail}>{email}</Text>
+              
+
             </View>
 
             {/* Navigation Items */}
@@ -717,18 +751,11 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
             <View style={styles.fallbackLogoutContainer}>
               <TouchableOpacity 
                 style={styles.fallbackLogoutButton} 
-                onPress={showLogoutConfirmation}
+                onPress={handleLogoutFallback}
                 activeOpacity={0.8}
-                disabled={isLoggingOut}
               >
-                {isLoggingOut ? (
-                  <ActivityIndicator size="small" color="white" />
-                ) : (
-                  <>
-                    <MaterialIcons name="logout" size={20} color="white" />
-                    <Text style={styles.fallbackLogoutText}>Logout</Text>
-                  </>
-                )}
+                <MaterialIcons name="logout" size={20} color="white" />
+                <Text style={styles.fallbackLogoutText}>Logout</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -786,24 +813,35 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
         </View>
       )}
 
-      {/* Logout Confirmation Modal */}
+            {/* ← ADD THESE MODAL COMPONENTS BEFORE THE CLOSING </SafeAreaView> TAG */}
+
+      {/* Logout Confirmation Modal - Same as Settings Screen */}
       <CustomConfirmModal
-        visible={logoutModalVisible}
+        visible={logoutConfirmVisible}
+        onClose={cancelLogout}
         title="Confirm Logout"
-        message="Are you sure you want to logout?"
-        confirmText="Logout"
-        cancelText="Cancel"
-        onConfirm={handleLogout}
-        onCancel={() => setLogoutModalVisible(false)}
+        message="Are you sure you want to logout? You'll need to sign in again to access your account."
         type="warning"
+        cancelText="Cancel"
+        confirmText="Logout"
+        onCancel={cancelLogout}
+        onConfirm={performLogout}
       />
 
-      {/* Logout Loading Overlay */}
-      {isLoggingOut && (
+      {/* Success/Error Modal */}
+      <CustomModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        message={modalMessage}
+        type={modalType}
+      />
+
+      {/* Logout Loading Overlay - Same as Settings Screen */}
+      {logoutLoading && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#1E3A5F" />
-            <Text style={styles.loadingText}>Logging out...</Text>
+            <ActivityIndicator size="large" color="#4FE7AF" />
+            <Text style={styles.loadingText}>Logging Out...</Text>
           </View>
         </View>
       )}
@@ -825,6 +863,8 @@ export default function AppHome() {
       setEmail(routeEmail);
     }
   }, [route.params, email]);
+
+
 
   const navigation = useNavigation();
 
@@ -1483,35 +1523,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  // Loading Overlay for Logout
-  loadingOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 9999,
-  },
-  loadingBox: {
-    backgroundColor: 'white',
-    padding: 30,
-    borderRadius: 12,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#1E3A5F',
-  },
+
 
   // Floating AI Button styles
   floatingAIButton: {
@@ -1536,5 +1548,30 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: 29,
     backgroundColor: '#2D5783',
+  },
+   // Loading Overlay - Same as Settings Screen
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 99999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 20,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2C5282',
   },
 });
