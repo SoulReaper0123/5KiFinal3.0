@@ -2761,20 +2761,34 @@ app.post('/rejectMembershipWithdrawal', async (req, res) => {
 // ==============================================
 // LOAN REMINDER
 // ==============================================
-
 app.post('/send-loan-reminder', async (req, res) => {
   console.log('[NOTIFICATION] Initiating loan reminder email', req.body);
+  
+  // Extract ALL fields with defaults and validation
   const { 
     email, 
     firstName, 
     lastName, 
     dueDate,
-    loanAmount,
-    outstandingBalance,
-    memberId,
-    transactionId,
-    websiteLink,
-    facebookLink
+    loanAmount = 0,
+    outstandingBalance = 0,
+    memberId = 'N/A',
+    transactionId = 'N/A',
+    term = 'N/A',
+    interest = 0,
+    totalInterest = 0,
+    monthlyPayment = 0,
+    totalMonthlyPayment = 0,
+    totalTermPayment = 0,
+    releaseAmount = 0,
+    processingFee = 0,
+    penalty = 0,
+    newTotalAmortization = 0,
+    interestRate = 'N/A',
+    dateApproved = 'N/A',
+    accountName = 'N/A',
+    accountNumber = 'N/A',
+    disbursement = 'N/A'
   } = req.body;
 
   // Validate required fields
@@ -2794,6 +2808,36 @@ app.post('/send-loan-reminder', async (req, res) => {
     });
   }
 
+  // VALIDATE AND SANITIZE ALL NUMERIC FIELDS
+  const sanitizedData = {
+    loanAmount: Math.max(0, Number(loanAmount) || 0),
+    outstandingBalance: Math.max(0, Number(outstandingBalance) || 0),
+    interest: Math.max(0, Number(interest) || 0),
+    totalInterest: Math.max(0, Number(totalInterest) || 0),
+    monthlyPayment: Math.max(0, Number(monthlyPayment) || 0),
+    totalMonthlyPayment: Math.max(0, Number(totalMonthlyPayment) || 0),
+    totalTermPayment: Math.max(0, Number(totalTermPayment) || 0),
+    releaseAmount: Math.max(0, Number(releaseAmount) || 0),
+    processingFee: Math.max(0, Number(processingFee) || 0),
+    penalty: Math.max(0, Number(penalty) || 0),
+    // Ensure newTotalAmortization is never undefined - use calculation if missing
+    newTotalAmortization: Math.max(0, Number(newTotalAmortization) || (Number(totalMonthlyPayment) + Number(penalty)) || 0)
+  };
+
+  // Log the received and sanitized data for debugging
+  console.log('[NOTIFICATION] Received data:', {
+    received: {
+      totalMonthlyPayment: totalMonthlyPayment,
+      penalty: penalty,
+      newTotalAmortization: newTotalAmortization
+    },
+    sanitized: {
+      totalMonthlyPayment: sanitizedData.totalMonthlyPayment,
+      penalty: sanitizedData.penalty,
+      newTotalAmortization: sanitizedData.newTotalAmortization
+    }
+  });
+
   try {
     const formattedDueDate = formatDisplayDate(dueDate);
     const daysUntilDue = Math.ceil((new Date(dueDate) - new Date()) / (1000 * 60 * 60 * 24));
@@ -2806,10 +2850,16 @@ app.post('/send-loan-reminder', async (req, res) => {
       ? `URGENT: Loan Payment Due in ${daysUntilDue} Day${daysUntilDue === 1 ? '' : 's'}!` 
       : `Reminder: Loan Payment Due in ${daysUntilDue} Day${daysUntilDue === 1 ? '' : 's'}`;
 
-    console.log('[NOTIFICATION] Sending loan reminder to user');
-    
-    // FIX: Always use the correct website link with "app"
-    const paymentWebsiteLink = WEBSITE_LINK; // This will always be 'https://fivekiapp.onrender.com'
+    console.log('[NOTIFICATION] Sending loan reminder with complete data:', {
+      totalMonthlyPayment: sanitizedData.totalMonthlyPayment,
+      penalty: sanitizedData.penalty,
+      newTotalAmortization: sanitizedData.newTotalAmortization,
+      calculation: `₱${formatAmount(sanitizedData.totalMonthlyPayment)} + ₱${formatAmount(sanitizedData.penalty)} = ₱${formatAmount(sanitizedData.newTotalAmortization)}`,
+      daysUntilDue: daysUntilDue,
+      urgencyLevel: urgencyLevel
+    });
+
+    const paymentWebsiteLink = WEBSITE_LINK;
     
     const mailOptions = {
       to: email,
@@ -2832,19 +2882,52 @@ app.post('/send-loan-reminder', async (req, res) => {
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Member ID</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${memberId || 'N/A'}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${memberId}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Reference</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">${transactionId || 'N/A'}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${transactionId}</td>
             </tr>
             <tr>
-              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Original Amount</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(loanAmount)}</td>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Loan Amount</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.loanAmount)}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Outstanding Balance</td>
-              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(outstandingBalance)}</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.outstandingBalance)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Term</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${term}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Interest Rate</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">${interestRate}%</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Principal</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.monthlyPayment)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Monthly Interest</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.interest)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Interest</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.totalInterest)}</td>
+            </tr>
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Total Monthly Amortization</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.totalMonthlyPayment)}</td>
+            </tr>
+
+            <tr>
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Penalty</td>
+              <td style="padding: 8px; border: 1px solid #ddd;">₱${formatAmount(sanitizedData.penalty)}</td>
+            </tr>
+            <tr style="background-color: #f8f9fa; font-weight: bold;">
+              <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">New Total Amortization</td>
+              <td style="padding: 8px; border: 1px solid #ddd; color: #e74c3c;">₱${formatAmount(sanitizedData.newTotalAmortization)}</td>
             </tr>
             <tr>
               <td style="padding: 8px; border: 1px solid #ddd; font-weight: bold;">Due Date</td>
@@ -2852,19 +2935,11 @@ app.post('/send-loan-reminder', async (req, res) => {
             </tr>
           </table>
           
-          <div style="background-color: #f8f9fa; padding: 15px; border-radius: 4px; margin: 20px 0;">
-            <h3 style="color: #2c3e50; margin-top: 0;">Payment Options:</h3>
-            <ol>
-              <li>Online payment through our website</li>
-              <li>Bank transfer to our official accounts</li>
-              <li>Cash payment at our office</li>
-            </ol>
-          </div>
-          
           <p>
             <a href="${paymentWebsiteLink}" 
                style="display: inline-block; background-color: #3498db; color: white; 
-                      padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
+                      padding: 12px 24px; text-decoration: none; border-radius: 4px; margin: 15px 0; 
+                      font-weight: bold; font-size: 16px;">
               Make Payment Now
             </a>
           </p>
@@ -2872,44 +2947,101 @@ app.post('/send-loan-reminder', async (req, res) => {
           ${urgencyLevel === 'high' ? `
           <div style="background-color: #fdedec; padding: 15px; border-left: 4px solid #e74c3c; margin: 20px 0;">
             <h3 style="color: #e74c3c; margin-top: 0;">Important Notice:</h3>
-            <p>Failure to make payment by the due date may result in late fees and affect your credit standing with 5KI Financial Services.</p>
+            <p>Failure to make payment by the due date may result in additional late fees and affect your credit standing with 5KI Financial Services.</p>
+            <p><strong>Current penalty has been applied to your total due amount.</strong></p>
           </div>
           ` : ''}
           
-          <p>For any questions about your payment, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
+          ${sanitizedData.penalty > 0 ? `
+          <div style="background-color: #fff8e1; padding: 15px; border-left: 4px solid #f39c12; margin: 20px 0;">
+            <h3 style="color: #f39c12; margin-top: 0;">Penalty Applied:</h3>
+            <p>A penalty of ₱${formatAmount(sanitizedData.penalty)} has been applied to your account due to overdue payment.</p>
+            <p>This amount will be added to your regular monthly amortization until the overdue balance is cleared.</p>
+          </div>
+          ` : ''}
+          
+          <p>For any questions about your payment or to discuss payment arrangements, please contact us at <a href="mailto:${GMAIL_OWNER}" style="color: #3498db;">${GMAIL_OWNER}</a>.</p>
           
           <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
             Best regards,<br>
             <strong>5KI Financial Services Team</strong>
           </p>
+          
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #ecf0f1; color: #95a5a6; font-size: 0.8em;">
+            <p>This is an automated reminder. Please do not reply to this email.</p>
+            <p>Transaction ID: ${transactionId} | Member ID: ${memberId}</p>
+          </div>
         </div>
       `
     };
 
     const result = await sendEmailWithRetry(mailOptions);
 
-    console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully');
-    console.log(`[DEBUG] Payment link used: ${paymentWebsiteLink}`);
+    console.log('[NOTIFICATION SUCCESS] Loan reminder email sent successfully', {
+      email: email,
+      memberId: memberId,
+      transactionId: transactionId,
+      daysUntilDue: daysUntilDue,
+      totalAmount: sanitizedData.newTotalAmortization,
+      penaltyApplied: sanitizedData.penalty
+    });
+
     res.status(200).json({ 
       success: true,
       message: 'Loan reminder email sent successfully',
       data: {
         emailSent: email,
+        memberId: memberId,
+        transactionId: transactionId,
         daysUntilDue: daysUntilDue,
+        urgencyLevel: urgencyLevel,
         paymentLink: paymentWebsiteLink,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        financialSummary: {
+          loanAmount: sanitizedData.loanAmount,
+          outstandingBalance: sanitizedData.outstandingBalance,
+          totalMonthlyPayment: sanitizedData.totalMonthlyPayment,
+          penalty: sanitizedData.penalty,
+          newTotalAmortization: sanitizedData.newTotalAmortization,
+          calculation: `₱${formatAmount(sanitizedData.totalMonthlyPayment)} + ₱${formatAmount(sanitizedData.penalty)} = ₱${formatAmount(sanitizedData.newTotalAmortization)}`
+        }
       }
     });
+
   } catch (error) {
     console.error('[NOTIFICATION ERROR] Error sending loan reminder email:', error);
+    
+    // Log detailed error information
+    console.error('[NOTIFICATION ERROR DETAILS]', {
+      errorMessage: error.message,
+      errorStack: error.stack,
+      receivedData: {
+        email: email,
+        memberId: memberId,
+        transactionId: transactionId,
+        totalMonthlyPayment: totalMonthlyPayment,
+        penalty: penalty,
+        newTotalAmortization: newTotalAmortization
+      },
+      sanitizedData: {
+        totalMonthlyPayment: sanitizedData.totalMonthlyPayment,
+        penalty: sanitizedData.penalty,
+        newTotalAmortization: sanitizedData.newTotalAmortization
+      }
+    });
+
     res.status(500).json({ 
       success: false,
       message: 'Failed to send loan reminder email',
       error: error.message,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+      details: {
+        receivedData: req.body,
+        sanitizedData: sanitizedData
+      }
     });
   }
 });
+
 
 // ==============================================
 // CO-ADMIN EMAILS
