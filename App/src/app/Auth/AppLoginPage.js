@@ -156,26 +156,27 @@ export default function AppLoginPage() {
             return;
           }
           
-          // We can't modify auth.currentUser directly, so we'll use SecureStore
-          // to store the current user email for the session
-          try {
-            // Store the current user email in SecureStore for the session
-            await SecureStore.setItemAsync('currentUserEmail', email);
-            console.log('Stored current user email in SecureStore:', email);
-          } catch (error) {
-            console.error('Error storing current user email:', error);
-          }
+          // Store current user email for session management
+          await SecureStore.setItemAsync('currentUserEmail', email);
+          console.log('Stored current user email for biometric login:', email);
           
+          // Navigate directly to TwoFactorEmail with proper parameters
           navigation.navigate('TwoFactorEmail', { 
             email,
             password,
             fromBiometric: true 
           });
-          setEmail('');
-          setPassword('');
         }
+      } else {
+        showModal(
+          'Authentication Failed',
+          'Biometric authentication was cancelled or failed.',
+          'error',
+          'OK'
+        );
       }
     } catch (error) {
+      console.error('Biometric login error:', error);
       showModal(
         'Authentication Failed',
         'Biometric authentication failed. Please try again or use email/password.',
@@ -202,7 +203,7 @@ export default function AppLoginPage() {
         const [memberId, memberData] = memberEntry;
         return {
           found: true,
-          status: memberData.status || 'active', // Default to active if status not set
+          status: memberData.status || 'active',
           role: memberData.role || 'member',
           id: memberId
         };
@@ -316,39 +317,33 @@ export default function AppLoginPage() {
         return;
       }
       
+      // Store current user email for session
+      await SecureStore.setItemAsync('currentUserEmail', email);
+      
       navigation.navigate('TwoFactorEmail', { 
         email,
         password,
         fromBiometric: false 
       });
-      setEmail('');
-      setPassword('');
+      
     } catch (error) {
       console.log('=== FIREBASE LOGIN ERROR DEBUG ===');
       console.log('Error code:', error.code);
       console.log('Error message:', error.message);
-      console.log('Error name:', error.name);
-      console.log('Full error object:', JSON.stringify(error, null, 2));
-      console.log('Error keys:', Object.keys(error));
-      console.log('=====================================');
       
       let title = '';
       let message = '';
       let buttonText = 'OK';
       let action = null;
 
-      // Check if error message contains credential-related keywords
       const errorMessage = error.message?.toLowerCase() || '';
       const isCredentialError = errorMessage.includes('credential') || 
                                errorMessage.includes('password') || 
                                errorMessage.includes('invalid') ||
                                errorMessage.includes('wrong');
 
-      // Special handling for network errors that might actually be auth errors
       if (error.code === 'auth/network-request-failed') {
-        // If user entered credentials, it's likely an auth issue disguised as network issue
         if (email && password) {
-          console.log('Network error with credentials - treating as auth error');
           title = 'Invalid Email or Password';
           message = 'Please check your email and password and try again.';
         } else {
@@ -360,14 +355,10 @@ export default function AppLoginPage() {
           case 'auth/wrong-password':
           case 'auth/invalid-credential':
           case 'auth/invalid-login-credentials':
-          case 'auth/invalid-user-token':
-          case 'auth/user-token-expired':
             title = 'Invalid Password';
             message = 'The password you entered is incorrect. Please try again.';
-            // Show two-button confirm modal for invalid password
             setInvalidPwdMessage('The password you entered is incorrect. Please try again.');
             setInvalidPwdVisible(true);
-            // Prevent the single-button modal for this case
             buttonText = null;
             action = null;
             break;
@@ -396,13 +387,7 @@ export default function AppLoginPage() {
             message = 'This account has been deactivated. Please contact support for assistance.';
             break;
 
-          case 'auth/weak-password':
-            title = 'Invalid Password';
-            message = 'The password you entered is incorrect. Please try again.';
-            break;
-
           default:
-            // Check if it's a credential-related error based on message content
             if (isCredentialError || (error.code && error.code.startsWith('auth/'))) {
               title = 'Invalid Email or Password';
               message = 'Please check your email and password and try again.';
@@ -413,7 +398,9 @@ export default function AppLoginPage() {
         }
       }
 
-      showModal(title, message, 'error', buttonText, action);
+      if (buttonText) {
+        showModal(title, message, 'error', buttonText, action);
+      }
     } finally {
       setLoading(false);
     }
@@ -524,7 +511,8 @@ export default function AppLoginPage() {
                 onPress={handleBiometricLogin}
                 disabled={loading}
               >
-              <MaterialIcons name="fingerprint" size={24} color="white" />
+                <MaterialIcons name="fingerprint" size={24} color="white" />
+                <Text style={styles.biometricButtonText}>Use Fingerprint</Text>
               </TouchableOpacity>
             )}
 
@@ -559,7 +547,7 @@ export default function AppLoginPage() {
         onButtonPress={handleModalButtonPress}
       />
 
-      {/* Invalid Password Confirm Modal (Close + Reset Password) */}
+      {/* Invalid Password Confirm Modal */}
       <CustomConfirmModal
         visible={invalidPwdVisible}
         onClose={() => setInvalidPwdVisible(false)}
@@ -569,7 +557,10 @@ export default function AppLoginPage() {
         cancelText="Close"
         confirmText="Reset Password"
         onCancel={() => setInvalidPwdVisible(false)}
-        onConfirm={() => { setInvalidPwdVisible(false); navigation.navigate('ForgotPassword', { email }); }}
+        onConfirm={() => { 
+          setInvalidPwdVisible(false); 
+          navigation.navigate('ForgotPassword', { email }); 
+        }}
       />
 
       {/* Exit Confirmation Modal */}
@@ -605,13 +596,21 @@ const styles = StyleSheet.create({
     marginBottom: 40, 
   },
   biometricButton: {
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4FE7AF',
-    width: 50,
-    height: 50,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
     borderRadius: 25,
     marginVertical: 10,
+    width: '60%',
+  },
+  biometricButtonText: {
+    color: '#0C2C4A',
+    fontSize: 16,
+    fontWeight: '700',
+    marginLeft: 8,
   },
   title: {
     fontSize: 30,
@@ -633,7 +632,6 @@ const styles = StyleSheet.create({
     color: 'white',
     marginBottom: 5,
   },
-  // UPDATED: Input container with explicit border styling
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -643,7 +641,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FAFF',
     marginBottom: 12,
     width: '90%',
-    // Platform-specific shadow handling
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -655,13 +652,11 @@ const styles = StyleSheet.create({
         elevation: 2,
       },
       web: {
-        // For web, use boxShadow and ensure border is visible
         boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.06)',
-        borderStyle: 'solid', // Explicitly set border style for web
+        borderStyle: 'solid',
       },
     }),
   },
-  // UPDATED: Password container with same improvements
   passwordContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -671,7 +666,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F7FAFF',
     marginBottom: 12,
     width: '90%',
-    // Platform-specific shadow handling
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -684,7 +678,7 @@ const styles = StyleSheet.create({
       },
       web: {
         boxShadow: '0px 4px 8px rgba(0, 0, 0, 0.06)',
-        borderStyle: 'solid', // Explicitly set border style for web
+        borderStyle: 'solid',
       },
     }),
   },
@@ -693,11 +687,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#333',
-    // Add platform-specific styles for web
     ...Platform.select({
       web: {
-        outlineStyle: 'none', // Remove default web focus outline
-        borderWidth: 0, // Ensure no internal borders
+        outlineStyle: 'none',
+        borderWidth: 0,
       },
     }),
   },
@@ -706,11 +699,10 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 16,
     color: '#333',
-    // Add platform-specific styles for web
     ...Platform.select({
       web: {
-        outlineStyle: 'none', // Remove default web focus outline
-        borderWidth: 0, // Ensure no internal borders
+        outlineStyle: 'none',
+        borderWidth: 0,
       },
     }),
   },
