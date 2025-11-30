@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { Pie, Bar, Line } from 'react-chartjs-2';
 import { Chart, ArcElement, CategoryScale, LinearScale, BarElement, LineElement, PointElement, Title, Tooltip, Legend } from 'chart.js';
-import { SendLoanReminder } from '../../../../../Server/api';
 import { FaTimes, FaCheckCircle, FaExclamationCircle, FaSpinner, FaChartLine, FaMoneyBillWave, FaUsers, FaCreditCard, FaExchangeAlt, FaShieldAlt, FaSearch, FaCalendarAlt, FaFilter, FaPiggyBank, FaBusinessTime, FaPercentage, FaFileContract, FaInfoCircle, FaPhone, FaCalendarPlus } from 'react-icons/fa';
+import { SendDividendEmail } from '../../../../../Server/api';
 
 // Register Chart.js components
 Chart.register(
@@ -38,9 +38,6 @@ const Dashboard = () => {
   const [loanData, setLoanData] = useState([]);
   const [earningsData, setEarningsData] = useState([]);
   const [dividendsData, setDividendsData] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showResendConfirmation, setShowResendConfirmation] = useState(false);
-  const [selectedLoan, setSelectedLoan] = useState(null);
   const [transactionBreakdownModal, setTransactionBreakdownModal] = useState(false);
   const [selectedMonthTransactions, setSelectedMonthTransactions] = useState({
     member: null,
@@ -48,7 +45,6 @@ const Dashboard = () => {
     year: null,
     transactions: []
   });
-  const [successMessageModalVisible, setSuccessMessageModalVisible] = useState(false);
   const [errorModalVisible, setErrorModalVisible] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -56,198 +52,21 @@ const Dashboard = () => {
   const [dividendsLoading, setDividendsLoading] = useState(false);
   // Dividends distribution modal and flow
   const [showDividendsModal, setShowDividendsModal] = useState(false);
-  const [distributionMembers, setDistributionMembers] = useState([]); // { memberId, name, investment, savings, dividend }
-  const [distributionProcessing, setDistributionProcessing] = useState(false);
+  const [distributionMembers, setDistributionMembers] = useState([]); 
+   // ADD THIS MISSING STATE VARIABLE
   const [distributionConfirmVisible, setDistributionConfirmVisible] = useState(false);
-  const [distributionSuccessVisible, setDistributionSuccessVisible] = useState(false);
+  const [distributionProcessing, setDistributionProcessing] = useState(false);
+  
+const [pendingApiCall, setPendingApiCall] = useState(null);
+const [successModalVisible, setSuccessModalVisible] = useState(false);
+const [isProcessing, setIsProcessing] = useState(false);
   const [dividendsDistributionHistory, setDividendsDistributionHistory] = useState({});
-  const [memberInvestmentData, setMemberInvestmentData] = useState({}); // Store member investment data for advanced view
+  const [memberInvestmentData, setMemberInvestmentData] = useState({}); 
 
-  const checkDueDates = async () => {
-    try {
-      console.log('Checking due dates for loan reminders...');
-      const now = new Date();
-      
-      // Fetch reminder window (days) from Settings
-      const settingsSnap = await database.ref('Settings/LoanReminderDays').once('value');
-      const reminderDays = parseInt(settingsSnap.val() ?? 7, 10);
-      const windowMs = Math.max(0, reminderDays) * 24 * 60 * 60 * 1000;
-      const reminderWindowDate = new Date(now.getTime() + windowMs);
-      
-      // Format dates for logging
-      const formattedNow = now.toISOString();
-      const formattedWindow = reminderWindowDate.toISOString();
-      console.log(`Current date: ${formattedNow}`);
-      console.log(`Reminder window end (+${reminderDays}d): ${formattedWindow}`);
-      
-      const loansRef = database.ref('Loans/CurrentLoans');
-      const loansSnapshot = await loansRef.once('value');
-      const loansData = loansSnapshot.val() || {};
-      
-      const approvedLoansRef = database.ref('Loans/ApprovedLoans');
-      const approvedLoansSnapshot = await approvedLoansRef.once('value');
-      const approvedLoansData = approvedLoansSnapshot.val() || {};
-      
-      const membersRef = database.ref('Members');
-      const membersSnapshot = await membersRef.once('value');
-      const membersData = membersSnapshot.val() || {};
-
-      const notificationsRef = database.ref('LoanNotifications');
-      const notificationsSnapshot = await notificationsRef.once('value');
-      const notificationsData = notificationsSnapshot.val() || {};
-
-      console.log(`Found ${Object.keys(loansData).length} members with loans`);
-      
-      let remindersSent = 0;
-      let loansChecked = 0;
-
-      for (const [memberId, loans] of Object.entries(loansData)) {
-        for (const [transactionId, currentLoan] of Object.entries(loans)) {
-          loansChecked++;
-          
-          if (!currentLoan.dueDate) {
-            console.log(`Loan ${transactionId} for member ${memberId} has no due date`);
-            continue;
-          }
-          
-          // Parse the due date properly
-          const dueDate = new Date(currentLoan.dueDate);
-          
-          // Log the due date for debugging
-          console.log(`Loan ${transactionId} for member ${memberId} has due date: ${dueDate.toISOString()}`);
-          
-          // Check if the due date is within the configured reminder window
-          const isWithinWindow = dueDate <= reminderWindowDate && dueDate > now;
-          console.log(`Is within reminder window: ${isWithinWindow}`);
-          
-          if (isWithinWindow) {
-            const notificationKey = `${memberId}_${transactionId}`;
-            const hasBeenNotified = notificationsData && notificationsData[notificationKey];
-            
-            console.log(`Notification status for ${notificationKey}: ${hasBeenNotified ? 'Already sent' : 'Not sent yet'}`);
-            
-            // Only send if no notification has been sent yet
-            if (!hasBeenNotified) {
-              const member = membersData[memberId];
-              const approvedLoan = approvedLoansData[memberId]?.[transactionId];
-              
-              if (member && member.email) {
-                try {
-                  console.log(`Sending reminder to ${member.email} for loan ${transactionId}`);
-                  
-                  let outstandingBalance = parseFloat(currentLoan.loanAmount) || 0;
-                  const originalAmount = approvedLoan 
-                    ? parseFloat(approvedLoan.loanAmount) || 0 
-                    : outstandingBalance;
-
-                  await SendLoanReminder({
-                    memberId,
-                    transactionId,
-                    dueDate: currentLoan.dueDate,
-                    email: member.email,
-                    firstName: member.firstName,
-                    lastName: member.lastName,
-                    loanAmount: originalAmount,
-                    outstandingBalance: outstandingBalance
-                  });
-
-                  // Record that we've sent a notification
-                  await notificationsRef.child(notificationKey).set({
-                    sentAt: new Date().toISOString(),
-                    dueDate: currentLoan.dueDate
-                  });
-                  
-                  remindersSent++;
-                  console.log(`Successfully sent reminder for loan ${transactionId}`);
-                } catch (error) {
-                  console.error(`Failed to send reminder for ${memberId}/${transactionId}:`, error);
-                }
-              } else {
-                console.log(`Member ${memberId} has no email or member data not found`);
-              }
-            }
-          }
-        }
-      }
-      
-      console.log(`Checked ${loansChecked} loans, sent ${remindersSent} reminders`);
-    } catch (error) {
-      console.error('Error checking due dates:', error);
-    }
+    // ADD THIS MISSING FUNCTION
+  const toggleAdvancedView = () => {
+    setIsAdvancedView(prev => !prev);
   };
-
-  const handleResendClick = (loan) => {
-    setSelectedLoan(loan);
-    setShowResendConfirmation(true);
-  };
-
-  const confirmResendReminder = async () => {
-    setShowResendConfirmation(false);
-    setActionInProgress(true);
-    
-    try {
-      const membersRef = database.ref(`Members/${selectedLoan.memberId}`);
-      const membersSnapshot = await membersRef.once('value');
-      const member = membersSnapshot.val();
-
-      if (member && member.email) {
-        await SendLoanReminder({
-          memberId: selectedLoan.memberId,
-          transactionId: selectedLoan.transactionId,
-          dueDate: selectedLoan.dueDate,
-          email: member.email,
-          firstName: member.firstName,
-          lastName: member.lastName,
-          loanAmount: selectedLoan.loanAmount,
-          outstandingBalance: selectedLoan.outstandingBalance
-        });
-
-        const notificationKey = `${selectedLoan.memberId}_${selectedLoan.transactionId}`;
-        const updates = {
-          resentAt: new Date().toISOString()
-        };
-        
-        if (database.ServerValue && database.ServerValue.increment) {
-          updates.resendCount = database.ServerValue.increment(1);
-        } else {
-          const notificationRef = database.ref(`LoanNotifications/${notificationKey}`);
-          const notificationSnap = await notificationRef.once('value');
-          const currentCount = notificationSnap.val()?.resendCount || 0;
-          updates.resendCount = currentCount + 1;
-        }
-
-        await database.ref(`LoanNotifications/${notificationKey}`).update(updates);
-        
-        setSuccessMessage('Reminder resent successfully!');
-        setSuccessMessageModalVisible(true);
-      } else {
-        setErrorMessage('Member email not found');
-        setErrorModalVisible(true);
-      }
-    } catch (error) {
-      console.error('Error resending reminder:', error);
-      setErrorMessage('Failed to resend reminder');
-      setErrorModalVisible(true);
-    } finally {
-      setActionInProgress(false);
-    }
-  };
-
-  useEffect(() => {
-    console.log('Setting up loan reminder check system...');
-    // Run immediately when component mounts
-    checkDueDates();
-    
-    // During development, check every 5 minutes instead of once per day
-    // This makes it easier to test and debug
-    const checkInterval = setInterval(checkDueDates, 5 * 60 * 1000); // 5 minutes
-    
-    // Clean up interval when component unmounts
-    return () => {
-      console.log('Clearing loan reminder check interval');
-      clearInterval(checkInterval);
-    };
-  }, []);
 
   useEffect(() => {
     fetchDashboardData();
@@ -374,25 +193,6 @@ const Dashboard = () => {
     }
   };
 
-  const getOverdueDays = (dueDate) => {
-    if (!dueDate) return 0;
-    let due = typeof dueDate === 'string' ? new Date(dueDate) : new Date(dueDate);
-    if (isNaN(due.getTime())) return 0;
-    const today = startOfDay(new Date());
-    const dueStart = startOfDay(due);
-    if (today <= dueStart) return 0;
-    const ms = today.getTime() - dueStart.getTime();
-    return Math.ceil(ms / (1000 * 60 * 60 * 24));
-  };
-
-  const computePenaltyAndNewTotal = (loan) => {
-    const overdueDays = getOverdueDays(loan.dueDate || loan.nextDueDate);
-    const interest = parseFloat(loan.interest) || 0;
-    const penalty = overdueDays > 0 ? (interest * (overdueDays / 30)) : 0; // match PayLoan.js logic
-    const monthly = parseFloat(loan.totalMonthlyPayment) || 0;
-    const newTotalMonthly = monthly + penalty;
-    return { overdueDays, penalty, newTotalMonthly };
-  };
 
   const calculateAdvancedActiveMonths = (registrationDate, targetYear) => {
     if (!registrationDate) return 12;
@@ -447,482 +247,537 @@ const Dashboard = () => {
       return Math.max(0, 12 - regMonthIdx);
     }
   };
+const fetchDashboardData = async (options = {}) => {
+  const { lightweight = false } = options;
+  try {
+    if (!lightweight) setLoading(true);
+    
+    const targetYear = isAdvancedView ? advancedYear : selectedYear;
+    console.log('🔍 Fetching data for year:', targetYear, 'Advanced view:', isAdvancedView);
 
-  const fetchDashboardData = async (options = {}) => {
-    const { lightweight = false } = options;
-    try {
-      if (!lightweight) setLoading(true);
-      
-      const targetYear = isAdvancedView ? advancedYear : selectedYear;
-      
-      const [
-        fundsSnapshot,
-        savingsSnapshot,
-        yieldsSnapshot,
-        savingsHistorySnapshot,
-        fundsHistorySnapshot,
-        yieldsHistorySnapshot,
-        membersSnapshot,
-        currentLoansSnapshot,
-        approvedLoansSnapshot,
-        paymentsSnapshot,
-        settingsSnapshot,
-        dividendsHistorySnapshot,
-        dividendsTransactionsSnapshot
-      ] = await Promise.all([
-        database.ref('Settings/Funds').once('value'),
-        database.ref('Settings/Savings').once('value'),
-        database.ref('Settings/Yields').once('value'),
-        database.ref('Settings/SavingsHistory').once('value'),
-        database.ref('Settings/FundsHistory').once('value'),
-        database.ref('Settings/YieldsHistory').once('value'),
-        database.ref('Members').once('value'),
-        database.ref('Loans/CurrentLoans').once('value'),
-        database.ref('Loans/ApprovedLoans').once('value'),
-        database.ref('Payments/ApprovedPayments').once('value'),
-        database.ref('Settings').once('value'),
-        database.ref('DividendsDistributionHistory').once('value'),
-        database.ref('Transactions/Dividends').once('value')
-      ]);
+    const [
+      fundsSnapshot,
+      savingsSnapshot,
+      yieldsSnapshot,
+      savingsHistorySnapshot,
+      fundsHistorySnapshot,
+      yieldsHistorySnapshot,
+      membersSnapshot,
+      currentLoansSnapshot,
+      approvedLoansSnapshot,
+      paymentsSnapshot,
+      settingsSnapshot,
+      dividendsHistorySnapshot,
+      dividendsTransactionsSnapshot
+    ] = await Promise.all([
+      database.ref('Settings/Funds').once('value'),
+      database.ref('Settings/Savings').once('value'),
+      database.ref('Settings/Yields').once('value'),
+      database.ref('Settings/SavingsHistory').once('value'),
+      database.ref('Settings/FundsHistory').once('value'),
+      database.ref('Settings/YieldsHistory').once('value'),
+      database.ref('Members').once('value'),
+      database.ref('Loans/CurrentLoans').once('value'),
+      database.ref('Loans/ApprovedLoans').once('value'),
+      database.ref('Payments/ApprovedPayments').once('value'),
+      database.ref('Settings').once('value'),
+      database.ref('DividendsDistributionHistory').once('value'),
+      database.ref('Transactions/Dividends').once('value')
+    ]);
 
-      const availableFunds = fundsSnapshot.val() || 0;
-      const fiveKISavings = savingsSnapshot.val() || 0;
-      const totalYields = yieldsSnapshot.val() || 0;
-      const savingsHistory = Object.entries(savingsHistorySnapshot.val() || {}).map(([date, amount]) => ({
-        date,
-        amount: parseFloat(amount) || 0
-      }));
-      const fundsHistory = Object.entries(fundsHistorySnapshot.val() || {}).map(([date, amount]) => ({
-        date,
-        amount: parseFloat(amount) || 0
-      }));
-      const yieldsHistory = Object.entries(yieldsHistorySnapshot.val() || {}).map(([date, amount]) => ({
-        date,
-        amount: parseFloat(amount) || 0
-      }));
-      const membersData = membersSnapshot.val() || {};
-      const totalMembers = Object.keys(membersData).length;
-      const currentLoansData = currentLoansSnapshot.val() || {};
-      const approvedLoansData = approvedLoansSnapshot.val() || {};
-      const paymentsData = paymentsSnapshot.val() || {};
-      const settingsData = settingsSnapshot.val() || {};
-      const dividendsHistoryData = dividendsHistorySnapshot.val() || {};
-      const dividendsTransactionsData = dividendsTransactionsSnapshot.val() || {};
-      
-      // Update dividends distribution history state
-      setDividendsDistributionHistory(dividendsHistoryData);
-      
-      // Extract percentage settings
-      const investmentSharePercentage = parseFloat(settingsData.InvestmentSharePercentage || 0) / 100;
-      const patronageSharePercentage = parseFloat(settingsData.PatronageSharePercentage || 0) / 100;
-      const activeMonthsPercentage = parseFloat(settingsData.ActiveMonthsPercentage || 0) / 100;
-      const membersDividendPercentage = parseFloat(settingsData.MembersDividendPercentage || 0) / 100;
-      const fiveKiEarningsPercentage = parseFloat(settingsData.FiveKiEarningsPercentage || 0) / 100;
-      // Save dividend date for due indicator
-      window.__dividendSettingsDate = settingsData.DividendDate || '';
-      
-      let totalLoans = 0;
-      let totalReceivables = 0;
-      let activeBorrowers = 0;
-      const loanItems = [];
-      const borrowerSet = new Set();
-      const monthlyFunds = Array(12).fill(0);
+    const availableFunds = fundsSnapshot.val() || 0;
+    const fiveKISavings = savingsSnapshot.val() || 0;
+    const totalYields = yieldsSnapshot.val() || 0;
+    const savingsHistory = Object.entries(savingsHistorySnapshot.val() || {}).map(([date, amount]) => ({
+      date,
+      amount: parseFloat(amount) || 0
+    }));
+    const fundsHistory = Object.entries(fundsHistorySnapshot.val() || {}).map(([date, amount]) => ({
+      date,
+      amount: parseFloat(amount) || 0
+    }));
+    const yieldsHistory = Object.entries(yieldsHistorySnapshot.val() || {}).map(([date, amount]) => ({
+      date,
+      amount: parseFloat(amount) || 0
+    }));
+    const membersData = membersSnapshot.val() || {};
+    const totalMembers = Object.keys(membersData).length;
+    const currentLoansData = currentLoansSnapshot.val() || {};
+    const approvedLoansData = approvedLoansSnapshot.val() || {};
+    const paymentsData = paymentsSnapshot.val() || {};
+    const settingsData = settingsSnapshot.val() || {};
+    const dividendsHistoryData = dividendsHistorySnapshot.val() || {};
+    const dividendsTransactionsData = dividendsTransactionsSnapshot.val() || {};
+    
+    console.log('👥 Total members found:', Object.keys(membersData).length);
+    
+    // Log member details for debugging
+    Object.entries(membersData).forEach(([memberId, member]) => {
+      console.log(`Member ${memberId}:`, {
+        name: `${member.firstName} ${member.lastName}`,
+        role: member.role,
+        status: member.status,
+        registrationDate: member.registrationDate,
+        dateApproved: member.dateApproved
+      });
+    });
 
-      Object.entries(currentLoansData).forEach(([memberId, loans]) => {
-        Object.entries(loans).forEach(([transactionId, loan]) => {
-          const outstandingBalance = parseFloat(loan.remainingBalance) || 0;
-          const originalLoan = approvedLoansData[memberId]?.[transactionId];
-          const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
-          
-          const term = loan.term || 'N/A';
-          const interest = parseFloat(loan.interest) || 0;
-          const monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
-          const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
-          const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
-          const dueDate = loan.dueDate || 'N/A';
-          const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
-          const isOverdue = dueDateObj && new Date() > dueDateObj;
-          
-          totalLoans += originalAmount;
-          totalReceivables += outstandingBalance;
-          borrowerSet.add(memberId);
-          
-          loanItems.push({
-            memberId,
-            transactionId,
-            loanAmount: originalAmount,
-            outstandingBalance,
-            term,
-            interest,
-            monthlyPayment,
-            totalMonthlyPayment,
-            totalTermPayment,
-            dueDate,
-            isOverdue
-          });
+    // Update dividends distribution history state
+    setDividendsDistributionHistory(dividendsHistoryData);
+    
+    // Extract percentage settings
+    const investmentSharePercentage = parseFloat(settingsData.InvestmentSharePercentage || 0) / 100;
+    const patronageSharePercentage = parseFloat(settingsData.PatronageSharePercentage || 0) / 100;
+    const activeMonthsPercentage = parseFloat(settingsData.ActiveMonthsPercentage || 0) / 100;
+    const membersDividendPercentage = parseFloat(settingsData.MembersDividendPercentage || 0) / 100;
+    const fiveKiEarningsPercentage = parseFloat(settingsData.FiveKiEarningsPercentage || 0) / 100;
+    // Save dividend date for due indicator
+    window.__dividendSettingsDate = settingsData.DividendDate || '';
+    
+    let totalLoans = 0;
+    let totalReceivables = 0;
+    let activeBorrowers = 0;
+    const loanItems = [];
+    const borrowerSet = new Set();
+    const monthlyFunds = Array(12).fill(0);
+
+    Object.entries(currentLoansData).forEach(([memberId, loans]) => {
+      Object.entries(loans).forEach(([transactionId, loan]) => {
+        const outstandingBalance = parseFloat(loan.remainingBalance) || 0;
+        const originalLoan = approvedLoansData[memberId]?.[transactionId];
+        const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
+        
+        const term = loan.term || 'N/A';
+        const interest = parseFloat(loan.interest) || 0;
+        const monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
+        const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
+        const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
+        const dueDate = loan.dueDate || 'N/A';
+        const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
+        const isOverdue = dueDateObj && new Date() > dueDateObj;
+        
+        totalLoans += originalAmount;
+        totalReceivables += outstandingBalance;
+        borrowerSet.add(memberId);
+        
+        loanItems.push({
+          memberId,
+          transactionId,
+          loanAmount: originalAmount,
+          outstandingBalance,
+          term,
+          interest,
+          monthlyPayment,
+          totalMonthlyPayment,
+          totalTermPayment,
+          dueDate,
+          isOverdue
         });
       });
+    });
 
-      activeBorrowers = borrowerSet.size;
+    activeBorrowers = borrowerSet.size;
 
-      // Process funds history data for the selected year
-      fundsHistory.forEach(item => {
-        const date = new Date(item.date);
-        if (date.getFullYear() === parseInt(targetYear)) {
-          const month = date.getMonth();
-          // Get the latest funds amount for each month (or sum if multiple entries)
-          monthlyFunds[month] = Math.max(monthlyFunds[month], item.amount);
-        }
-      });
-
-      // If no funds history data, use current available funds for current month
-      if (monthlyFunds.every(amount => amount === 0) && parseInt(targetYear) === new Date().getFullYear()) {
-        const currentMonth = new Date().getMonth();
-        monthlyFunds[currentMonth] = availableFunds;
+    // Process funds history data for the selected year
+    fundsHistory.forEach(item => {
+      const date = new Date(item.date);
+      if (date.getFullYear() === parseInt(targetYear)) {
+        const month = date.getMonth();
+        // Get the latest funds amount for each month (or sum if multiple entries)
+        monthlyFunds[month] = Math.max(monthlyFunds[month], item.amount);
       }
+    });
 
-      const formattedFunds = [
-        { month: 'Jan', funds: monthlyFunds[0] },
-        { month: 'Feb', funds: monthlyFunds[1] },
-        { month: 'Mar', funds: monthlyFunds[2] },
-        { month: 'Apr', funds: monthlyFunds[3] },
-        { month: 'May', funds: monthlyFunds[4] },
-        { month: 'Jun', funds: monthlyFunds[5] },
-        { month: 'Jul', funds: monthlyFunds[6] },
-        { month: 'Aug', funds: monthlyFunds[7] },
-        { month: 'Sep', funds: monthlyFunds[8] },
-        { month: 'Oct', funds: monthlyFunds[9] },
-        { month: 'Nov', funds: monthlyFunds[10] },
-        { month: 'Dec', funds: monthlyFunds[11] },
-      ];
+    // If no funds history data, use current available funds for current month
+    if (monthlyFunds.every(amount => amount === 0) && parseInt(targetYear) === new Date().getFullYear()) {
+      const currentMonth = new Date().getMonth();
+      monthlyFunds[currentMonth] = availableFunds;
+    }
 
-      setFundsData({
-        availableFunds,
-        totalYields,
-        totalLoans,
-        totalReceivables,
-        fiveKISavings,
-        activeBorrowers,
-        totalMembers,
-        savingsHistory,
-        fundsHistory,
-        yieldsHistory,
-        investmentSharePercentage,
-        patronageSharePercentage,
-        activeMonthsPercentage,
-        membersDividendPercentage,
-        fiveKiEarningsPercentage
-      });
+    const formattedFunds = [
+      { month: 'Jan', funds: monthlyFunds[0] },
+      { month: 'Feb', funds: monthlyFunds[1] },
+      { month: 'Mar', funds: monthlyFunds[2] },
+      { month: 'Apr', funds: monthlyFunds[3] },
+      { month: 'May', funds: monthlyFunds[4] },
+      { month: 'Jun', funds: monthlyFunds[5] },
+      { month: 'Jul', funds: monthlyFunds[6] },
+      { month: 'Aug', funds: monthlyFunds[7] },
+      { month: 'Sep', funds: monthlyFunds[8] },
+      { month: 'Oct', funds: monthlyFunds[9] },
+      { month: 'Nov', funds: monthlyFunds[10] },
+      { month: 'Dec', funds: monthlyFunds[11] },
+    ];
 
-      // Preserve settings snapshot for distribution
-      window.__dividendSettings = {
-        investmentSharePercentage,
-        patronageSharePercentage,
-        activeMonthsPercentage,
-        membersDividendPercentage,
-        fiveKiEarningsPercentage,
-        availableFunds,
-        fiveKISavings
-      };
+    setFundsData({
+      availableFunds,
+      totalYields,
+      totalLoans,
+      totalReceivables,
+      fiveKISavings,
+      activeBorrowers,
+      totalMembers,
+      savingsHistory,
+      fundsHistory,
+      yieldsHistory,
+      investmentSharePercentage,
+      patronageSharePercentage,
+      activeMonthsPercentage,
+      membersDividendPercentage,
+      fiveKiEarningsPercentage
+    });
 
-      // Expose a display-only snapshot for the AI (no DB access by AI)
-      window.__visibleDashboard = {
-        timestamp: new Date().toISOString(),
-        availableFunds,
-        totalYields,
-        totalLoans,
-        totalReceivables,
-        fiveKISavings,
-        activeBorrowers,
-        totalMembers,
-      };
-      
-      setLoanData(loanItems);
-      setEarningsData(formattedFunds);
-      
-      // Process dividends data - INCLUDE ALL MEMBERS except admin/coadmin roles
-      const dividendsItems = [];
-      
-      // Fetch all transaction types
-      const transactionTypes = ['Registrations', 'Deposits', 'Loans', 'Payments', 'Withdrawals'];
-      const allTransactions = {};
-      
-      const transactionPromises = transactionTypes.map(async (transactionType) => {
-        try {
-          const transactionSnapshot = await database.ref(`Transactions/${transactionType}`).once('value');
-          if (transactionSnapshot.exists()) {
-            const transactionData = transactionSnapshot.val();
-            Object.entries(transactionData).forEach(([memberId, memberTransactions]) => {
-              if (!allTransactions[memberId]) {
-                allTransactions[memberId] = [];
-              }
-              Object.entries(memberTransactions).forEach(([transactionId, transaction]) => {
-                allTransactions[memberId].push({
-                  ...transaction,
-                  type: transactionType,
-                  transactionId
-                });
+    // Preserve settings snapshot for distribution
+    window.__dividendSettings = {
+      investmentSharePercentage,
+      patronageSharePercentage,
+      activeMonthsPercentage,
+      membersDividendPercentage,
+      fiveKiEarningsPercentage,
+      availableFunds,
+      fiveKISavings
+    };
+
+    // Expose a display-only snapshot for the AI (no DB access by AI)
+    window.__visibleDashboard = {
+      timestamp: new Date().toISOString(),
+      availableFunds,
+      totalYields,
+      totalLoans,
+      totalReceivables,
+      fiveKISavings,
+      activeBorrowers,
+      totalMembers,
+    };
+    
+    setLoanData(loanItems);
+    setEarningsData(formattedFunds);
+    
+    // Process dividends data - INCLUDE ALL MEMBERS except admin/coadmin roles
+    const dividendsItems = [];
+    
+    // Fetch all transaction types
+    const transactionTypes = ['Registrations', 'Deposits', 'Loans', 'Payments', 'Withdrawals'];
+    const allTransactions = {};
+    
+    const transactionPromises = transactionTypes.map(async (transactionType) => {
+      try {
+        const transactionSnapshot = await database.ref(`Transactions/${transactionType}`).once('value');
+        if (transactionSnapshot.exists()) {
+          const transactionData = transactionSnapshot.val();
+          Object.entries(transactionData).forEach(([memberId, memberTransactions]) => {
+            if (!allTransactions[memberId]) {
+              allTransactions[memberId] = [];
+            }
+            Object.entries(memberTransactions).forEach(([transactionId, transaction]) => {
+              allTransactions[memberId].push({
+                ...transaction,
+                type: transactionType,
+                transactionId
               });
+            });
+          });
+        }
+      } catch (error) {
+        console.error(`Error fetching ${transactionType} transactions:`, error);
+      }
+    });
+
+    // Wait for all transaction types to be fetched
+    await Promise.all(transactionPromises);
+    
+const memberProcessingPromises = Object.entries(membersData).map(async ([memberId, member]) => {
+  // Skip members that are inactive (e.g., those who permanently withdrew)
+  const status = (member?.status || '').toLowerCase();
+  if (status === 'inactive') {
+    console.log(`🚫 Skipping inactive member: ${memberId}`);
+    return null;
+  }
+
+  // Check if member is admin/coadmin
+  const role = (member?.role || '').toLowerCase();
+  const isAdmin = role === 'admin' || role === 'coadmin';
+  
+  // Calculate investment first to check if admin/coadmin should be included
+let totalInvestment = 0;
+
+if (isAdvancedView) {
+  // In advanced view, use the projected investment from memberInvestmentData
+  const advancedData = memberInvestmentData[memberId];
+  totalInvestment = advancedData ? (parseFloat(advancedData.investment) || 0) : (parseFloat(member.investment) || 0);
+  
+  // Also include any projected dividends from previous years
+  if (dividendsTransactionsData[memberId]) {
+    Object.values(dividendsTransactionsData[memberId]).forEach(dividend => {
+      if (dividend.status === 'distributed') {
+        totalInvestment += parseFloat(dividend.amount) || 0;
+      }
+    });
+  }
+} else {
+    // Current year view - calculate investment from transactions as before
+    try {
+      // Sum registration amount(s) within selected year
+      const regsSnapForInvestment = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
+      if (regsSnapForInvestment.exists()) {
+        Object.values(regsSnapForInvestment.val()).forEach(reg => {
+          const d = parseTransactionDate(reg.dateApproved || reg.date);
+          if (d && d.getFullYear() === parseInt(targetYear)) {
+            const amt = parseFloat(reg.amount) || 0;
+            totalInvestment += amt;
+          }
+        });
+      }
+    } catch (e) {
+      console.error(`Error computing registration part of investment for member ${memberId}:`, e);
+    }
+    
+    try {
+      // Sum approved deposit amounts within selected year
+      const depsSnapForInvestment = await database.ref(`Transactions/Deposits/${memberId}`).once('value');
+      if (depsSnapForInvestment.exists()) {
+        Object.values(depsSnapForInvestment.val()).forEach(dep => {
+          const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
+          if (d && d.getFullYear() === parseInt(targetYear)) {
+            // Only consider deposits that were approved/completed if such a field exists
+            const status = (dep.status || '').toLowerCase();
+            if (!status || status === 'approved' || status === 'completed') {
+              const amt = parseFloat(dep.amountToBeDeposited || dep.amount) || 0;
+              totalInvestment += amt;
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
+    }
+
+    try {
+      const withdrawalsSnap = await database.ref(`Transactions/Withdrawals/${memberId}`).once('value');
+      if (withdrawalsSnap.exists()) {
+        Object.values(withdrawalsSnap.val()).forEach(withdrawal => {
+          const d = parseTransactionDate(withdrawal.dateApproved || withdrawal.date);
+          if (d && d.getFullYear() === parseInt(targetYear)) {
+            const status = (withdrawal.status || '').toLowerCase();
+            if (status === 'approved' || status === 'distributed') {
+              const amt = parseFloat(withdrawal.amountWithdrawn || withdrawal.amount) || 0;
+              totalInvestment -= amt; // Subtract withdrawals
+            }
+          }
+        });
+      }
+    } catch (e) {
+      console.error(`Error computing withdrawal part of investment for member ${memberId}:`, e);
+    }
+  }
+
+  // NEW LOGIC: Exclude admin/coadmin ONLY if investment <= 0
+  if (isAdmin && totalInvestment <= 0) {
+    console.log(`🚫 Skipping admin/coadmin with zero investment: ${memberId}`, {
+      investment: totalInvestment,
+      role: role
+    });
+    return null;
+  }
+
+  console.log(`✅ Processing member for dividends: ${memberId}`, {
+    name: `${member.firstName} ${member.lastName}`,
+    role: role,
+    status: status,
+    investment: totalInvestment,
+    isAdmin: isAdmin,
+    meetsCriteria: !isAdmin || (isAdmin && totalInvestment > 0)
+  });
+
+  // Continue with the rest of member processing...
+  const memberTransactions = allTransactions[memberId] || [];
+  const monthlyDividends = Array(12).fill(0);
+  const monthlyTransactions = Array(12).fill(null).map(() => []);
+      
+      // Filter transactions by selected year and process them
+      if (!isAdvancedView) {
+        console.log(`📅 Processing transactions for year: ${targetYear} for member ${memberId}`);
+        
+        // Only process transactions for current year view
+        memberTransactions.forEach(transaction => {
+          // EXCLUDE WITHDRAWALS FROM MONTHLY DIVIDENDS CALCULATION
+          if (transaction.type === 'Withdrawals') {
+            return; // Skip withdrawals entirely
+          }
+          
+          const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
+          
+          if (transactionDate) {
+            const transactionYear = transactionDate.getFullYear();
+            const month = transactionDate.getMonth();
+            
+            console.log(`Transaction for ${memberId}:`, {
+              type: transaction.type,
+              date: transactionDate,
+              year: transactionYear,
+              targetYear: parseInt(targetYear),
+              matches: transactionYear === parseInt(targetYear)
+            });
+
+            if (transactionYear === parseInt(targetYear)) {
+              // Only include approved transactions for dividends (ignore any 'paid' status)
+              const status = (transaction.status || '').toLowerCase();
+              if (status !== 'approved' && status !== 'completed') {
+                console.log(`Skipping transaction with status: ${status}`);
+                return; // skip non-approved or missing status
+              }
+              
+              // Extract amount using correct field name for each transaction type
+              // Exclude Deposits from monthly table (Jan-Dec)
+              if (transaction.type === 'Deposits') {
+                return; // skip counting deposits in monthly breakdown
+              }
+              
+              let amount = 0;
+              switch (transaction.type) {
+                case 'Registrations':
+                  // Registrations don't have monetary amounts, skip them
+                  return;
+                case 'Loans':
+                  amount = parseFloat(transaction.loanAmount) || 0;
+                  break;
+                case 'Payments':
+                  amount = parseFloat(transaction.principalPaid) || 0;
+                  break;
+                default:
+                  // Fallback to generic amount field
+                  amount = parseFloat(transaction.amount) || 0;
+              }
+              
+              // Determine if transaction is positive or negative
+              let adjustedAmount = amount;
+              if (transaction.type === 'Loans') {
+                adjustedAmount = -amount; // Loans are negative (money going out)
+              } else {
+                adjustedAmount = amount; // Payments are positive (money coming in)
+              }
+              
+              console.log(`Adding transaction: ${transaction.type} ${adjustedAmount} for month ${month}`);
+              
+              monthlyDividends[month] += adjustedAmount;
+              
+              // Store the actual transaction with processed amount
+              monthlyTransactions[month].push({
+                ...transaction,
+                adjustedAmount,
+                originalAmount: amount,
+                transactionDate: transactionDate,
+                formattedDate: transactionDate.toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric'
+                })
+              });
+            }
+          } else {
+            console.log('Could not parse transaction date:', transaction.dateApproved || transaction.dateAdded || transaction.date);
+          }
+        });
+      }
+      
+      const totalDividends = monthlyDividends.reduce((sum, dividend) => sum + dividend, 0);
+      
+      // Count approved loans and calculate total loan amount for this member from Transactions/Loans
+      let approvedLoansCount = 0;
+      let totalLoanAmount = 0;
+
+      if (!isAdvancedView) {
+        // Only count loans for current year view
+        try {
+          const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
+          if (memberLoansSnapshot.exists()) {
+            const memberLoans = memberLoansSnapshot.val();
+            // Count transactions with dateApproved field and sum loan amounts
+            Object.values(memberLoans).forEach(loan => {
+              if (loan.dateApproved && loan.status === 'approved') { // ADD STATUS CHECK
+                // Check if the loan was approved in the selected year
+                const approvedDate = parseTransactionDate(loan.dateApproved);
+                if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
+                  approvedLoansCount++;
+                  // Add the loan amount to the total
+                  const loanAmount = parseFloat(loan.loanAmount) || 0;
+                  totalLoanAmount += loanAmount;
+                }
+              }
             });
           }
         } catch (error) {
-          console.error(`Error fetching ${transactionType} transactions:`, error);
+          console.error(`Error fetching approved loans count for member ${memberId}:`, error);
         }
-      });
+      }
 
-      // Wait for all transaction types to be fetched
-      await Promise.all(transactionPromises);
+      // Determine Active Months based on registration data from Members table only
+      let registrationDate = null;
+
+      // FIRST PRIORITY: Use dateApproved from Members table (set when registration was approved)
+      if (member.dateApproved) {
+        registrationDate = parseTransactionDate(member.dateApproved);
+      }
+
+      // SECOND PRIORITY: Use dateAdded from Members table (alternative date field)
+      if (!registrationDate && member.dateAdded) {
+        registrationDate = parseTransactionDate(member.dateAdded);
+      }
+
+      // THIRD PRIORITY: Fallback to registrationDate from Members table
+      if (!registrationDate && member.registrationDate) {
+        registrationDate = new Date(member.registrationDate);
+      }
+
+      // If no registration date found at all, use current date as fallback
+      if (!registrationDate) {
+        console.warn(`No registration date found for member ${memberId}, using current date`);
+        registrationDate = new Date();
+      }
+              
+      const activeMonthsCount = calculateActiveMonths(registrationDate, targetYear, isAdvancedView, dividendsHistoryData);
       
-      // Process ALL MEMBERS except admin/coadmin roles
-      const memberProcessingPromises = Object.entries(membersData).map(async ([memberId, member]) => {
-        // Skip members that are inactive (e.g., those who permanently withdrew)
-        const status = (member?.status || '').toLowerCase();
-        if (status === 'inactive') {
-          return null;
-        }
-
-        // EXCLUDE ADMIN AND COADMIN ROLES FROM DIVIDENDS
-        const role = (member?.role || '').toLowerCase();
-        if (role === 'admin' || role === 'coadmin') {
-          return null;
-        }
-
-        const memberTransactions = allTransactions[memberId] || [];
-        const monthlyDividends = Array(12).fill(0);
-        const monthlyTransactions = Array(12).fill(null).map(() => []); // Store actual transactions for each month
-        
-        // Compute Investment from Transactions within the selected year
-        let totalInvestment = 0;
-        
-        if (isAdvancedView) {
-          // In advanced view, use the member's current investment from their profile
-          // This carries over their investment to the next year
-          totalInvestment = parseFloat(member.investment) || 0;
-          
-          // Also include any projected dividends from previous years
-          if (dividendsTransactionsData[memberId]) {
-            Object.values(dividendsTransactionsData[memberId]).forEach(dividend => {
-              if (dividend.status === 'distributed') {
-                totalInvestment += parseFloat(dividend.amount) || 0;
-              }
-            });
-          }
-        } else {
-          // Current year view - calculate investment from transactions as before
-          try {
-            // Sum registration amount(s) within selected year
-            const regsSnapForInvestment = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
-            if (regsSnapForInvestment.exists()) {
-              Object.values(regsSnapForInvestment.val()).forEach(reg => {
-                const d = parseTransactionDate(reg.dateApproved || reg.date);
-                if (d && d.getFullYear() === parseInt(targetYear)) {
-                  const amt = parseFloat(reg.amount) || 0;
-                  totalInvestment += amt;
-                }
-              });
-            }
-          } catch (e) {
-            console.error(`Error computing registration part of investment for member ${memberId}:`, e);
-          }
-          
-          try {
-            // Sum approved deposit amounts within selected year
-            const depsSnapForInvestment = await database.ref(`Transactions/Deposits/${memberId}`).once('value');
-            if (depsSnapForInvestment.exists()) {
-              Object.values(depsSnapForInvestment.val()).forEach(dep => {
-                const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
-                if (d && d.getFullYear() === parseInt(targetYear)) {
-                  // Only consider deposits that were approved/completed if such a field exists
-                  const status = (dep.status || '').toLowerCase();
-                  if (!status || status === 'approved' || status === 'completed') {
-                    const amt = parseFloat(dep.amountToBeDeposited || dep.amount) || 0;
-                    totalInvestment += amt;
-                  }
-                }
-              });
-            }
-          } catch (e) {
-            console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
-          }
-
-          try {
-            const withdrawalsSnap = await database.ref(`Transactions/Withdrawals/${memberId}`).once('value');
-            if (withdrawalsSnap.exists()) {
-              Object.values(withdrawalsSnap.val()).forEach(withdrawal => {
-                const d = parseTransactionDate(withdrawal.dateApproved || withdrawal.date);
-                if (d && d.getFullYear() === parseInt(targetYear)) {
-                  const status = (withdrawal.status || '').toLowerCase();
-                  if (status === 'approved' || status === 'distributed') {
-                    const amt = parseFloat(withdrawal.amountWithdrawn || withdrawal.amount) || 0;
-                    totalInvestment -= amt; // Subtract withdrawals
-                  }
-                }
-              });
-            }
-          } catch (e) {
-            console.error(`Error computing withdrawal part of investment for member ${memberId}:`, e);
-          }
-        }
-        
-// Filter transactions by selected year and process them
-if (!isAdvancedView) {
-  // Only process transactions for current year view
-  memberTransactions.forEach(transaction => {
-    // EXCLUDE WITHDRAWALS FROM MONTHLY DIVIDENDS CALCULATION
-    if (transaction.type === 'Withdrawals') {
-      return; // Skip withdrawals entirely
-    }
+      // INCLUDE ALL ACTIVE MEMBERS (except admin/coadmin) regardless of transactions or investment
+      const memberResult = {
+        memberId,
+        memberName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
+        investment: totalInvestment,
+        monthlyDividends,
+        monthlyTransactions, // Include the actual transactions
+        totalDividends,
+        approvedLoansCount,
+        totalLoanAmount,
+        activeMonthsCount,
+        registrationDate,
+        hasTransactions: totalDividends !== 0 || totalInvestment > 0, // Flag to identify members with actual activity
+        role: role // Include role for reference
+      };
+      
+      console.log(`📊 Member result for ${memberId}:`, {
+        investment: memberResult.investment,
+        totalDividends: memberResult.totalDividends,
+        hasTransactions: memberResult.hasTransactions,
+        activeMonths: memberResult.activeMonthsCount
+      });
+      
+      return memberResult;
+    });
     
-    const transactionDate = parseTransactionDate(transaction.dateApproved || transaction.dateAdded || transaction.date);
-    if (transactionDate && transactionDate.getFullYear() === parseInt(targetYear)) {
-      const month = transactionDate.getMonth();
-
-      // Only include approved transactions for dividends (ignore any 'paid' status)
-      const status = (transaction.status || '').toLowerCase();
-      if (status !== 'approved') {
-        return; // skip non-approved or missing status
-      }
-      
-      // Extract amount using correct field name for each transaction type
-      // Exclude Deposits from monthly table (Jan-Dec)
-      if (transaction.type === 'Deposits') {
-        return; // skip counting deposits in monthly breakdown
-      }
-      
-      let amount = 0;
-      switch (transaction.type) {
-        case 'Registrations':
-          // Registrations don't have monetary amounts, skip them
-          return;
-        case 'Loans':s
-          amount = parseFloat(transaction.loanAmount) || 0;
-          break;
-        case 'Payments':
-          amount = parseFloat(transaction.amountToBePaid) || parseFloat(transaction.amount)|| 0;
-          break;
-        // REMOVED Withdrawals case since we're excluding them above
-        default:
-          // Fallback to generic amount field
-          amount = parseFloat(transaction.amount) || 0;
-      }
-      
-      // Determine if transaction is positive or negative
-      let adjustedAmount = amount;
-      if (transaction.type === 'Loans') { // REMOVED Withdrawals from negative transactions
-        adjustedAmount = -amount; // Loans are negative (money going out)
-      } else {
-        adjustedAmount = amount; // Payments are positive (money coming in)
-      }
-      
-      monthlyDividends[month] += adjustedAmount;
-      
-      // Store the actual transaction with processed amount
-      monthlyTransactions[month].push({
-        ...transaction,
-        adjustedAmount,
-        originalAmount: amount,
-        transactionDate: transactionDate,
-        formattedDate: transactionDate.toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        })
-      });
-    }
-  });
-}
-        
-        const totalDividends = monthlyDividends.reduce((sum, dividend) => sum + dividend, 0);
-        
- // Count approved loans and calculate total loan amount for this member from Transactions/Loans
-let approvedLoansCount = 0;
-let totalLoanAmount = 0;
-
-if (!isAdvancedView) {
-  // Only count loans for current year view
-  try {
-    const memberLoansSnapshot = await database.ref(`Transactions/Loans/${memberId}`).once('value');
-    if (memberLoansSnapshot.exists()) {
-      const memberLoans = memberLoansSnapshot.val();
-      // Count transactions with dateApproved field and sum loan amounts
-      Object.values(memberLoans).forEach(loan => {
-        if (loan.dateApproved && loan.status === 'approved') { // ADD STATUS CHECK
-          // Check if the loan was approved in the selected year
-          const approvedDate = parseTransactionDate(loan.dateApproved);
-          if (approvedDate && approvedDate.getFullYear() === parseInt(targetYear)) {
-            approvedLoansCount++;
-            // Add the loan amount to the total
-            const loanAmount = parseFloat(loan.loanAmount) || 0;
-            totalLoanAmount += loanAmount;
-          }
-        }
-      });
-    }
+    // Wait for all member processing to complete
+    const processedMembers = await Promise.all(memberProcessingPromises);
+    
+    // Filter out null values (inactive members and admin/coadmin roles)
+    const validMembers = processedMembers.filter(member => member !== null);
+    console.log(`🎯 Final members for dividends table:`, validMembers.length);
+    console.log('📋 Members details:', validMembers);
+    
+    setDividendsData(validMembers);
+    if (!lightweight) setLoading(false);
   } catch (error) {
-    console.error(`Error fetching approved loans count for member ${memberId}:`, error);
+    console.error('❌ Error fetching dashboard data:', error);
+    if (!lightweight) setLoading(false);
   }
-}
-
-// Determine Active Months based on registration data from Members table only
-let registrationDate = null;
-
-// FIRST PRIORITY: Use dateApproved from Members table (set when registration was approved)
-if (member.dateApproved) {
-  registrationDate = parseTransactionDate(member.dateApproved);
-}
-
-// SECOND PRIORITY: Use dateAdded from Members table (alternative date field)
-if (!registrationDate && member.dateAdded) {
-  registrationDate = parseTransactionDate(member.dateAdded);
-}
-
-// THIRD PRIORITY: Fallback to registrationDate from Members table
-if (!registrationDate && member.registrationDate) {
-  registrationDate = new Date(member.registrationDate);
-}
-
-// If no registration date found at all, use current date as fallback
-if (!registrationDate) {
-  console.warn(`No registration date found for member ${memberId}, using current date`);
-  registrationDate = new Date();
-}
-        
-        const activeMonthsCount = calculateActiveMonths(registrationDate, targetYear, isAdvancedView, dividendsHistoryData);
-        
-        // INCLUDE ALL ACTIVE MEMBERS (except admin/coadmin) regardless of transactions or investment
-        return {
-          memberId,
-          memberName: `${member.firstName || ''} ${member.lastName || ''}`.trim(),
-          investment: totalInvestment,
-          monthlyDividends,
-          monthlyTransactions, // Include the actual transactions
-          totalDividends,
-          approvedLoansCount,
-          totalLoanAmount,
-          activeMonthsCount,
-          registrationDate,
-          hasTransactions: totalDividends !== 0 || totalInvestment > 0, // Flag to identify members with actual activity
-          role: role // Include role for reference
-        };
-      });
-      
-      // Wait for all member processing to complete
-      const processedMembers = await Promise.all(memberProcessingPromises);
-      
-      // Filter out null values (inactive members and admin/coadmin roles)
-      processedMembers.forEach(member => {
-        if (member) {
-          dividendsItems.push(member);
-        }
-      });
-      
-      setDividendsData(dividendsItems);
-      if (!lightweight) setLoading(false);
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      if (!lightweight) setLoading(false);
-    }
-  };
+};
 
   // Compute per-member dividends for the modal based on current table logic
   const computeMemberDividendShare = (member) => {
@@ -945,102 +800,257 @@ if (!registrationDate) {
     return totalShare;
   };
 
-  const openDividendsModal = async () => {
-    try {
-      setDistributionProcessing(true);
-      // Gather members with investment info already prepared in dividendsData
-      // Also fetch current savings from Members table for display
-      const membersSnap = await database.ref('Members').once('value');
-      const membersRaw = membersSnap.val() || {};
+  // Add this function to your Dashboard component
+const viewDividendTransactions = async (memberId) => {
+  try {
+    const transactionsSnap = await database.ref(`Transactions/Dividends/${memberId}`).once('value');
+    const transactions = transactionsSnap.val() || {};
+    
+    // Convert to array and sort by timestamp
+    const transactionsArray = Object.entries(transactions).map(([key, value]) => ({
+      id: key,
+      ...value
+    })).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    
+    // You can display this in a modal or separate section
+    console.log('Dividend transactions:', transactionsArray);
+    
+    // For now, just show an alert with the count
+    alert(`${transactionsArray.length} dividend transactions found for this member`);
+  } catch (error) {
+    console.error('Error fetching dividend transactions:', error);
+  }
+};
 
-      const rows = dividendsData.map(m => {
-        const memberRecord = membersRaw[m.memberId] || {};
-        const savings = parseFloat(memberRecord.balance) || 0;
-        const currentInvestment = parseFloat(memberRecord.investment) || 0; // display and increment source
-        const dividend = computeMemberDividendShare(m);
-        return {
-          memberId: m.memberId,
-          name: m.memberName,
-          // show current members investment like AllMembers
-          investment: currentInvestment,
-          savings,
-          dividend,
-          _calcContext: m // keep context for potential recalcs
-        };
-      });
-
-      setDistributionMembers(rows);
-      setShowDividendsModal(true);
-    } catch (e) {
-      console.error('Open dividends modal error:', e);
-      setErrorMessage('Failed to prepare dividends list');
-      setErrorModalVisible(true);
-    } finally {
-      setDistributionProcessing(false);
-    }
-  };
-
-  const confirmDistributeDividends = async () => {
-    setDistributionConfirmVisible(true);
-  };
-
-  const performDistributeDividends = async () => {
-    setDistributionConfirmVisible(false);
+const openDividendsModal = async () => {
+  try {
     setDistributionProcessing(true);
-    try {
-      const updates = {};
-      const now = new Date();
-      const approvedDate = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-      const approvedTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-      const year = now.getFullYear();
+    // Gather members with investment info already prepared in dividendsData
+    const membersSnap = await database.ref('Members').once('value');
+    const membersRaw = membersSnap.val() || {};
 
-      // For each member, add dividend to savings and log a transaction entry
-      distributionMembers.forEach(row => {
-        // Savings increment (balance)
+    const rows = dividendsData.map(m => {
+      const memberRecord = membersRaw[m.memberId] || {};
+      const savings = parseFloat(memberRecord.balance) || 0;
+      const currentInvestment = parseFloat(memberRecord.investment) || 0;
+      const email = memberRecord.email || ''; // Get member email
+      const dividend = computeMemberDividendShare(m);
+      return {
+        memberId: m.memberId,
+        name: m.memberName,
+        investment: currentInvestment,
+        savings,
+        dividend,
+        email: email, 
+        _calcContext: {
+          ...m,
+          email: email 
+        }
+      };
+    });
+
+    setDistributionMembers(rows);
+    setShowDividendsModal(true);
+  } catch (e) {
+    console.error('Open dividends modal error:', e);
+    setErrorMessage('Failed to prepare dividends list');
+    setErrorModalVisible(true);
+  } finally {
+    setDistributionProcessing(false);
+  }
+};
+
+const confirmDistributeDividends = () => {
+  setDistributionConfirmVisible(true);
+};  
+
+const processDividendsDistribution = async (distributionData) => {
+  try {
+    const updates = {};
+    const now = new Date();
+    const distributedDate = now.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const distributedTime = now.toLocaleTimeString('en-US', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    const year = now.getFullYear();
+
+    // ✅ CORRECTED CALCULATIONS:
+    const currentYields = parseFloat(fundsData.totalYields) || 0;
+    const currentFunds = parseFloat(fundsData.availableFunds) || 0;
+    
+    // Calculate 5KI earnings portion FIRST (from total yields)
+    const fiveKiEarningsPercentage = fundsData.fiveKiEarningsPercentage || 0;
+    const totalFiveKiEarnings = currentYields * fiveKiEarningsPercentage;
+    
+    // Calculate members dividend portion (from total yields)  
+    const membersDividendPercentage = fundsData.membersDividendPercentage || 0;
+    const totalMembersDividend = currentYields * membersDividendPercentage;
+
+    // ✅ ADD MEMBERS DIVIDEND TO SETTINGS/FUNDS (THIS IS THE KEY FIX)
+    const newFundsAmount = currentFunds + totalMembersDividend;
+    
+    // ✅ YIELDS SHOULD GO TO 0 AFTER FULL DISTRIBUTION
+    const newYieldsAmount = 0;
+    
+    // ✅ ADD 5KI EARNINGS TO SAVINGS
+    const currentFiveKiSavings = parseFloat(fundsData.fiveKISavings) || 0;
+    const newFiveKiSavings = currentFiveKiSavings + totalFiveKiEarnings;
+
+    // Update Funds, Yields and Savings in database
+    updates['Settings/Funds'] = parseFloat(newFundsAmount.toFixed(2));
+    updates['Settings/Yields'] = parseFloat(newYieldsAmount.toFixed(2));
+    updates['Settings/Savings'] = parseFloat(newFiveKiSavings.toFixed(2));
+    
+    // Record in History (LIKE REGISTRATIONS)
+    const fundsHistoryPath = `Settings/FundsHistory/${now.toISOString().split('T')[0]}`;
+    updates[fundsHistoryPath] = parseFloat(newFundsAmount.toFixed(2));
+    
+    const yieldsHistoryPath = `Settings/YieldsHistory/${now.toISOString().split('T')[0]}`;
+    updates[yieldsHistoryPath] = parseFloat(newYieldsAmount.toFixed(2));
+    
+    const savingsHistoryPath = `Settings/SavingsHistory/${now.toISOString().split('T')[0]}`;
+    updates[savingsHistoryPath] = parseFloat(newFiveKiSavings.toFixed(2));
+
+    // For each member, add dividend to savings AND investment AND create transaction record
+    distributionData.forEach(row => {
+      const dividendAmount = parseFloat(row.dividend) || 0;
+      
+      if (dividendAmount > 0) {
+        // Update member balance (savings)
         const newBalPath = `Members/${row.memberId}/balance`;
-        const newBalance = (parseFloat(row.savings) || 0) + (parseFloat(row.dividend) || 0);
+        const currentBalance = parseFloat(row.savings) || 0;
+        const newBalance = currentBalance + dividendAmount;
         updates[newBalPath] = parseFloat(newBalance.toFixed(2));
 
-        // Investment increment (align with Registrations approval behavior)
+        // Update member investment
         const newInvPath = `Members/${row.memberId}/investment`;
-        const newInvestment = (parseFloat(row.investment) || 0) + (parseFloat(row.dividend) || 0);
+        const currentInvestment = parseFloat(row.investment) || 0;
+        const newInvestment = currentInvestment + dividendAmount;
         updates[newInvPath] = parseFloat(newInvestment.toFixed(2));
 
-        // Log dividend transaction like other Transactions sections
+        // CREATE DIVIDEND TRANSACTION RECORD
         const txnId = `DIV-${Date.now()}-${row.memberId}`;
         const txnPath = `Transactions/Dividends/${row.memberId}/${txnId}`;
+        
+        updates[`${txnPath}/transactionId`] = txnId;
+        updates[`${txnPath}/memberId`] = row.memberId;
         updates[`${txnPath}/type`] = 'DividendDistribution';
-        updates[`${txnPath}/amount`] = parseFloat(row.dividend.toFixed(2));
-        updates[`${txnPath}/dateApproved`] = approvedDate;
-        updates[`${txnPath}/approvedTime`] = approvedTime;
+        updates[`${txnPath}/amount`] = parseFloat(dividendAmount.toFixed(2));
+        updates[`${txnPath}/dateApproved`] = distributedDate;
+        updates[`${txnPath}/approvedTime`] = distributedTime;
         updates[`${txnPath}/year`] = year;
         updates[`${txnPath}/status`] = 'distributed';
-      });
+        updates[`${txnPath}/timestamp`] = now.getTime();
+        updates[`${txnPath}/firstName`] = row.name.split(' ')[0];
+        updates[`${txnPath}/lastName`] = row.name.split(' ').slice(1).join(' ');
+        updates[`${txnPath}/email`] = row._calcContext?.email || '';
+        updates[`${txnPath}/addedToInvestment`] = true;
+        updates[`${txnPath}/addedToBalance`] = true;
+        
+        // Store email data for background processing
+        row._emailData = {
+          email: row._calcContext?.email || '',
+          firstName: row.name.split(' ')[0],
+          lastName: row.name.split(' ').slice(1).join(' '),
+          dividendAmount: dividendAmount,
+          totalInvestment: newInvestment,
+          newBalance: newBalance,
+          newInvestment: newInvestment,
+          distributedDate: distributedDate,
+          memberId: row.memberId,
+          transactionId: txnId
+        };
+      }
+    });
 
-      // Record dividends distribution in history
-      updates[`DividendsDistributionHistory/${year}`] = true;
+    // Record dividends distribution in history
+    updates[`DividendsDistributionHistory/${year}`] = true;
 
-      await database.ref().update(updates);
+    // Execute all database updates
+    await database.ref().update(updates);
 
-      // Update local state
-      setDividendsDistributionHistory(prev => ({
-        ...prev,
-        [year]: true
-      }));
+    return {
+      success: true,
+      distributionData: distributionData,
+      totalDividendsDistributed: totalMembersDividend,
+      totalFiveKiEarnings,
+      newYieldsAmount,
+      newFiveKiSavings,
+      newFundsAmount // Return the new funds amount
+    };
+  } catch (e) {
+    console.error('Database distribution error:', e);
+    throw new Error('Failed to distribute dividends in database: ' + (e.message || 'Unknown error'));
+  }
+};
 
-      setDistributionSuccessVisible(true);
-    } catch (e) {
-      console.error('Distribution error:', e);
-      setErrorMessage('Failed to distribute dividends');
-      setErrorModalVisible(true);
-    } finally {
-      setDistributionProcessing(false);
+const sendDividendEmails = async (distributionData) => {
+  console.log('📧 Sending dividend emails to', distributionData.length, 'members');
+  
+  // Send emails sequentially with proper error handling
+  for (let i = 0; i < distributionData.length; i++) {
+    const row = distributionData[i];
+    
+    if (row._emailData && row._emailData.dividendAmount > 0) {
+      try {
+        console.log(`📧 Sending email ${i + 1}/${distributionData.length} to ${row.memberId}`);
+        
+        // Add a small delay to prevent rate limiting
+        if (i > 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+        
+        // Send email and wait for completion
+        await SendDividendEmail(row._emailData);
+        
+        console.log(`✅ Email sent to ${row.memberId}`);
+        
+      } catch (error) {
+        console.error(`❌ Failed to send email to ${row.memberId}:`, error);
+        // Continue with next email even if one fails
+      }
     }
-  };
+  }
+  
+  console.log('🎉 All dividend emails completed');
+};
+const performDistributeDividends = async () => {
+  // STEP 1: Close confirmation modal
+  setDistributionConfirmVisible(false);
+  
+  // STEP 2: Show success modal immediately (NO database operations yet)
+  const totalDividends = distributionMembers.reduce((sum, row) => sum + (parseFloat(row.dividend) || 0), 0);
+  setSuccessMessage(`Dividends distribution ready! 
+    ₱${formatCurrency(totalDividends)} will be distributed to ${distributionMembers.length} members. 
+    Click OK to complete the process.`);
+  setSuccessModalVisible(true);
+};
 
-  const toggleAdvancedView = () => {
-    setIsAdvancedView(!isAdvancedView);
-  };
+const calculateAndAddCurrentYearDividends = () => {
+  // Calculate what the current year dividends would be for each member
+  const updatedMemberData = { ...memberInvestmentData };
+  
+  dividendsData.forEach(member => {
+    if (member.hasTransactions) {
+      const currentYearDividend = computeMemberDividendShare(member);
+      const currentInvestment = parseFloat(member.investment) || 0;
+      
+      // Store the projected investment including current year dividends
+      updatedMemberData[member.memberId] = {
+        ...updatedMemberData[member.memberId],
+        investment: currentInvestment + currentYearDividend,
+        currentYearDividend: currentYearDividend // Store for reference
+      };
+    }
+  });
+  
+  setMemberInvestmentData(updatedMemberData);
+};
 
   const healthStatus = fundsData.availableFunds > fundsData.totalLoans * 1.5 
     ? 'Excellent' 
@@ -1061,6 +1071,57 @@ if (!registrationDate) {
       maximumFractionDigits: 2
     });
   };
+
+const handleSuccessOk = async () => {
+  // STEP 1: Immediately close the success modal and show loading
+  setSuccessModalVisible(false);
+  setIsProcessing(true);
+
+  let distributionResult = null;
+
+  try {
+    // STEP 2: Process database operations
+    distributionResult = await processDividendsDistribution(distributionMembers);
+    
+    // STEP 3: Send emails
+    await sendDividendEmails(distributionResult.distributionData);
+    
+    // STEP 4: Update local state
+    if (distributionResult) {
+      setFundsData(prev => ({
+        ...prev,
+        totalYields: distributionResult.newYieldsAmount,
+        fiveKISavings: distributionResult.newFiveKiSavings
+      }));
+
+      setDividendsDistributionHistory(prev => ({
+        ...prev,
+        [new Date().getFullYear()]: true
+      }));
+    }
+
+    // STEP 5: Show final success message (ONLY ONCE) - REMOVED THIS PART
+    // Don't show success modal again here
+    
+    // STEP 6: Close all modals first
+    setShowDividendsModal(false);
+    setDistributionConfirmVisible(false);
+    
+    // STEP 7: Don't show success modal again - REMOVED THIS LINE
+
+  } catch (error) {
+    console.error('Error in dividend distribution:', error);
+    setErrorMessage('Failed to distribute dividends: ' + error.message);
+    setErrorModalVisible(true);
+  } finally {
+    // STEP 8: Clean up processing states
+    setIsProcessing(false);
+    setActionInProgress(false);
+    
+    // STEP 9: Refresh data
+    fetchDashboardData({ lightweight: true });
+  }
+};
 
   const handleMonthClick = (member, monthIndex) => {
     const monthTransactions = member.monthlyTransactions[monthIndex];
@@ -1508,33 +1569,6 @@ if (!registrationDate) {
       textAlign: 'left',
       fontSize: '14px'
     },
-    overdueDate: {
-      color: '#EF4444',
-      fontWeight: '600'
-    },
-    overdueBadge: {
-      display: 'inline-block',
-      marginLeft: '8px',
-      padding: '4px 8px',
-      borderRadius: '6px',
-      backgroundColor: '#FEF2F2',
-      color: '#DC2626',
-      fontSize: '12px',
-      fontWeight: '600',
-      border: '1px solid #FECACA'
-    },
-    resendButton: {
-      padding: '8px 16px',
-      backgroundColor: '#1e40af',
-      color: 'white',
-      border: 'none',
-      borderRadius: '8px',
-      cursor: 'pointer',
-      fontSize: '13px',
-      fontWeight: '600',
-      transition: 'all 0.3s ease',
-      boxShadow: '0 2px 4px rgba(30, 64, 175, 0.2)',
-    },
     // Modal styles matching Settings component
     centeredModal: {
       position: 'fixed',
@@ -1780,7 +1814,117 @@ if (!registrationDate) {
       padding: '12px 8px',
       borderBottom: '1px solid #f1f5f9',
       verticalAlign: 'middle'
+    },
+     centeredModal: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1000,
+    padding: '20px',
+    backdropFilter: 'blur(4px)'
+  },
+  modalCardSmall: {
+    width: '300px',
+    backgroundColor: 'white',
+    borderRadius: '14px',
+    padding: '20px',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmIcon: {
+    marginBottom: '14px',
+    fontSize: '28px'
+  },
+  modalText: {
+    fontSize: '14px',
+    marginBottom: '18px',
+    textAlign: 'center',
+    color: '#475569',
+    lineHeight: '1.5',
+    fontWeight: '500'
+  },
+  actionButton: {
+    padding: '0.75rem 2rem',
+    borderRadius: '8px',
+    border: 'none',
+    cursor: 'pointer',
+    fontWeight: '600',
+    fontSize: '0.875rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '0.5rem',
+    transition: 'all 0.2s ease',
+    minWidth: '140px'
+  },
+  primaryButton: {
+    background: 'linear-gradient(90deg, #1E3A5F 0%, #2D5783 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(37, 99, 235, 0.3)'
     }
+  },
+  secondaryButton: {
+    background: '#6b7280',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(107, 114, 128, 0.3)'
+    }
+  },
+  approveButton: {
+    background: 'linear-gradient(135deg, #059669 0%, #10b981 100%)',
+    color: 'white',
+    '&:hover': {
+      transform: 'translateY(-1px)',
+      boxShadow: '0 4px 12px rgba(5, 150, 105, 0.3)'
+    }
+  },
+  disabledButton: {
+    background: '#9ca3af',
+    cursor: 'not-allowed',
+    opacity: '0.7',
+    '&:hover': {
+      transform: 'none',
+      boxShadow: 'none'
+    }
+  },
+  loadingOverlay: {
+    position: 'fixed',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(15, 23, 42, 0.8)',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1500,
+    backdropFilter: 'blur(4px)',
+  },
+  loadingContent: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '14px',
+  },
+  loadingTextOverlay: {
+    color: 'white',
+    fontSize: '14px',
+    fontWeight: '500'
+  }
+    
   };
 
   // Add hover effects
@@ -2395,190 +2539,130 @@ if (loading) {
               </div>
 
               <div style={{maxHeight: '400px', overflowY: 'auto', border: '1px solid #e2e8f0', borderRadius: '8px'}}>
-                <table style={styles.compactTable}>
-                  <thead style={{backgroundColor: '#f8fafc', position: 'sticky', top: 0}}>
-                    <tr>
-                      <th style={styles.compactHeaderCell}>Member</th>
-                      <th style={styles.compactHeaderCell}>Investment</th>
-                      <th style={styles.compactHeaderCell}>Dividend</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {distributionMembers.map(r => (
-                      <tr key={r.memberId} style={styles.dividendsDataRow}>
-                        <td style={styles.compactDataCell}>
-                          <div style={styles.memberInfo}>
-                            <span style={styles.memberName}>{r.name}</span>
-                            <span style={styles.memberId}>ID: {r.memberId}</span>
-                          </div>
-                        </td>
-                        <td style={styles.compactDataCell}>
-                          ₱{formatCurrency(r.investment)}
-                        </td>
-                        <td style={styles.compactDataCell}>
-                          <strong style={{color: '#059669'}}>₱{formatCurrency(r.dividend)}</strong>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+<table style={styles.compactTable}>
+  <thead style={{backgroundColor: '#f8fafc', position: 'sticky', top: 0}}>
+    <tr>
+      <th style={styles.compactHeaderCell}>Member</th>
+      <th style={styles.compactHeaderCell}>Current Investment</th>
+      <th style={styles.compactHeaderCell}>New Investment</th>
+      <th style={styles.compactHeaderCell}>Dividend Amount</th>
+    </tr>
+  </thead>
+  <tbody>
+    {distributionMembers.map(r => {
+      const newInvestment = (parseFloat(r.investment) || 0) + (parseFloat(r.dividend) || 0);
+      return (
+        <tr key={r.memberId} style={styles.dividendsDataRow}>
+          <td style={styles.compactDataCell}>
+            <div style={styles.memberInfo}>
+              <span style={styles.memberName}>{r.name}</span>
+              <span style={styles.memberId}>ID: {r.memberId}</span>
+            </div>
+          </td>
+          <td style={styles.compactDataCell}>
+            ₱{formatCurrency(r.investment)}
+          </td>
+          <td style={styles.compactDataCell}>
+            <strong style={{color: '#2563EB'}}>
+              ₱{formatCurrency(newInvestment)}
+            </strong>
+          </td>
+          <td style={styles.compactDataCell}>
+            <strong style={{color: '#059669'}}>₱{formatCurrency(r.dividend)}</strong>
+          </td>
+        </tr>
+      );
+    })}
+  </tbody>
+</table>
               </div>
 
-              <div style={{...styles.modalActions, marginTop: '24px'}}>
-                <button 
-                  style={{...styles.actionButton, ...styles.secondaryActionButton}}
-                  onClick={() => setShowDividendsModal(false)}
-                  onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
-                  onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
-                >
-                  Cancel
-                </button>
-                <button 
-                  style={{...styles.actionButton, ...styles.primaryActionButton}}
-                  onClick={confirmDistributeDividends}
-                  disabled={distributionProcessing || distributionMembers.length === 0}
-                  onMouseEnter={(e) => !distributionProcessing && distributionMembers.length > 0 && addHoverEffect(e.currentTarget)}
-                  onMouseLeave={(e) => !distributionProcessing && distributionMembers.length > 0 && removeHoverEffect(e.currentTarget)}
-                >
-                  {distributionProcessing ? 'Processing...' : 'Distribute'}
-                </button>
-              </div>
+<div style={{...styles.modalActions, marginTop: '24px'}}>
+  <button 
+    style={{...styles.actionButton, ...styles.secondaryActionButton}}
+    onClick={() => setShowDividendsModal(false)}
+    disabled={actionInProgress}
+  >
+    Cancel
+  </button>
+  <button 
+    style={{
+      ...styles.actionButton, 
+      ...styles.primaryActionButton,
+      ...(actionInProgress ? styles.disabledButton : {})
+    }}
+    onClick={confirmDistributeDividends}
+    disabled={actionInProgress || distributionMembers.length === 0}
+  >
+    {actionInProgress ? (
+      <>
+        <FaSpinner style={{ animation: 'spin 1s linear infinite' }} />
+        <span>Processing...</span>
+      </>
+    ) : (
+      'Distribute'
+    )}
+  </button>
+</div>
             </div>
           </div>
         )}
 
-        {/* Confirm Distribution Modal */}
-        {distributionConfirmVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <button 
-                style={styles.closeButton} 
-                onClick={() => setDistributionConfirmVisible(false)}
-                aria-label="Close modal"
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                <FaTimes />
-              </button>
-              <FaExclamationCircle style={styles.confirmIcon} />
-              <p style={styles.modalText}>Are you sure you want to distribute dividends to all listed members?</p>
-              <div style={styles.modalActions}>
-                <button 
-                  style={{...styles.actionButton, ...styles.primaryActionButton}}
-                  onClick={performDistributeDividends}
-                  disabled={distributionProcessing}
-                  onMouseEnter={(e) => !distributionProcessing && addHoverEffect(e.currentTarget)}
-                  onMouseLeave={(e) => !distributionProcessing && removeHoverEffect(e.currentTarget)}
-                >
-                  {distributionProcessing ? 'Processing...' : 'Yes'}
-                </button>
-                <button 
-                  style={{...styles.actionButton, ...styles.secondaryActionButton}}
-                  onClick={() => setDistributionConfirmVisible(false)}
-                  onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
-                  onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
-                >
-                  No
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+{/* Confirm Distribution Modal */}
+{distributionConfirmVisible && (
+  <div style={styles.centeredModal}>
+    <div style={styles.modalCardSmall}>
+      <FaExclamationCircle style={styles.confirmIcon} />
+      <p style={styles.modalText}>Are you sure you want to distribute dividends to all listed members?</p>
+      <div style={styles.modalActions}>
+        <button 
+          style={{...styles.actionButton, ...styles.primaryButton}}
+          onClick={performDistributeDividends}
+        >
+          Yes, Distribute
+        </button>
+        <button 
+          style={{...styles.actionButton, ...styles.secondaryButton}}
+          onClick={() => setDistributionConfirmVisible(false)}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
-        {/* Success Modal */}
-        {distributionSuccessVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <button 
-                style={styles.closeButton} 
-                onClick={() => setDistributionSuccessVisible(false)}
-                aria-label="Close modal"
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                <FaTimes />
-              </button>
-              <FaCheckCircle style={{...styles.confirmIcon, color: '#10b981'}} />
-              <p style={styles.modalText}>Dividends distributed successfully!</p>
-              <button 
-                style={{...styles.actionButton, ...styles.primaryActionButton}}
-                onClick={() => {
-                  setDistributionSuccessVisible(false);
-                  setShowDividendsModal(false);
-                  fetchDashboardData({ lightweight: true });
-                }}
-                onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
-                onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
+{/* Success Modal */}
+{successModalVisible && (
+  <div style={styles.centeredModal}>
+    <div style={styles.modalCardSmall}>
+      <FaCheckCircle style={{ ...styles.confirmIcon, color: '#10b981' }} />
+      <p style={styles.modalText}>{successMessage}</p>
+      <button
+        style={{
+          ...styles.actionButton,
+          ...styles.primaryButton,
+          width: '100%'
+        }}
+        onClick={handleSuccessOk}
+      >
+        OK
+      </button>
+    </div>
+  </div>
+)}
 
-        {showResendConfirmation && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <button 
-                style={styles.closeButton} 
-                onClick={() => setShowResendConfirmation(false)}
-                aria-label="Close modal"
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                <FaTimes />
-              </button>
-              <FaExclamationCircle style={styles.confirmIcon} />
-              <p style={styles.modalText}>Are you sure you want to resend the payment reminder?</p>
-              <div style={styles.modalActions}>
-                <button 
-                  style={{...styles.actionButton, ...styles.primaryActionButton}}
-                  onClick={confirmResendReminder}
-                  disabled={actionInProgress}
-                  onMouseEnter={(e) => !actionInProgress && addHoverEffect(e.currentTarget)}
-                  onMouseLeave={(e) => !actionInProgress && removeHoverEffect(e.currentTarget)}
-                >
-                  {actionInProgress ? 'Processing...' : 'Yes'}
-                </button>
-                <button 
-                  style={{...styles.actionButton, ...styles.secondaryActionButton}}
-                  onClick={() => setShowResendConfirmation(false)}
-                  disabled={actionInProgress}
-                  onMouseEnter={(e) => !actionInProgress && addHoverEffect(e.currentTarget)}
-                  onMouseLeave={(e) => !actionInProgress && removeHoverEffect(e.currentTarget)}
-                >
-                  No
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {successMessageModalVisible && (
-          <div style={styles.centeredModal}>
-            <div style={styles.modalCardSmall}>
-              <button 
-                style={styles.closeButton} 
-                onClick={() => setSuccessMessageModalVisible(false)}
-                aria-label="Close modal"
-                onMouseEnter={(e) => e.target.style.backgroundColor = '#F1F5F9'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
-              >
-                <FaTimes />
-              </button>
-              <FaCheckCircle style={{...styles.confirmIcon, color: '#10b981'}} />
-              <p style={styles.modalText}>{successMessage}</p>
-              <button 
-                style={{...styles.actionButton, ...styles.primaryActionButton}}
-                onClick={() => setSuccessMessageModalVisible(false)}
-                onMouseEnter={(e) => addHoverEffect(e.currentTarget)}
-                onMouseLeave={(e) => removeHoverEffect(e.currentTarget)}
-              >
-                OK
-              </button>
-            </div>
-          </div>
-        )}
+{/* Loading Spinner */}
+{isProcessing && (
+  <div style={styles.loadingOverlay}>
+    <div style={styles.loadingContent}>
+      <div style={styles.spinner}></div>
+      <div style={styles.loadingTextOverlay}>
+        Processing dividends distribution...
+      </div>
+    </div>
+  </div>
+)}
 
         {errorModalVisible && (
           <div style={styles.centeredModal}>
