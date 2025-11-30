@@ -873,6 +873,7 @@ const PayLoans = () => {
   
   // New states for loan selection
   const [activeLoans, setActiveLoans] = useState([]);
+  
   const [selectedLoanId, setSelectedLoanId] = useState(null);
   const [currentLoan, setCurrentLoan] = useState(null);
   const [penaltyAmount, setPenaltyAmount] = useState(0);
@@ -1166,17 +1167,43 @@ const PayLoans = () => {
     }
   };
 
+  // Add this function to validate if submission should be allowed
+const canSubmitPayment = () => {
+  // Check if member has active loans
+  const hasActiveLoans = activeLoans.length > 0;
+  
+  // If no active loans, cannot submit
+  if (!hasActiveLoans) return false;
+  
+  // Check required fields
+  const hasRequiredFields = 
+    formData.memberId && 
+    formData.firstName && 
+    formData.lastName && 
+    formData.email && 
+    formData.paymentOption && 
+    formData.amount;
+  
+  // Check proof of payment for non-cash payments
+  const hasProofIfRequired = 
+    formData.paymentOption === 'Cash-on-Hand' ? true : proofOfPaymentFile;
+  
+  return hasRequiredFields && hasProofIfRequired;
+};
+
   // Fetch active loans for member
-  const fetchActiveLoans = async (memberId) => {
-    try {
-      const currentLoansRef = database.ref(`Loans/CurrentLoans/${memberId}`);
-      const snapshot = await currentLoansRef.once('value');
-      
-      const found = [];
-      if (snapshot.exists()) {
-        const loans = snapshot.val();
-        for (const loanId in loans) {
-          const loan = loans[loanId];
+const fetchActiveLoans = async (memberId) => {
+  try {
+    const currentLoansRef = database.ref(`Loans/CurrentLoans/${memberId}`);
+    const snapshot = await currentLoansRef.once('value');
+    
+    const found = [];
+    if (snapshot.exists()) {
+      const loans = snapshot.val();
+      for (const loanId in loans) {
+        const loan = loans[loanId];
+        // Only include active loans (not paid, not rejected)
+        if (loan.status !== 'paid' && loan.status !== 'rejected') {
           found.push({ 
             ...loan, 
             _loanId: loanId,
@@ -1195,26 +1222,27 @@ const PayLoans = () => {
           });
         }
       }
-
-      if (found.length > 0) {
-        setActiveLoans(found);
-        const first = found[0];
-        setSelectedLoanId(first._loanId);
-        setCurrentLoan(first);
-        calculatePenaltyAndTotal(first);
-      } else {
-        setActiveLoans([]);
-        setSelectedLoanId(null);
-        setCurrentLoan(null);
-        setPenaltyAmount(0);
-        setTotalAmountDue(0);
-        setOverdueDays(0);
-      }
-    } catch (error) {
-      console.error('Error fetching active loans:', error);
-      setActiveLoans([]);
     }
-  };
+
+    if (found.length > 0) {
+      setActiveLoans(found);
+      const first = found[0];
+      setSelectedLoanId(first._loanId);
+      setCurrentLoan(first);
+      calculatePenaltyAndTotal(first);
+    } else {
+      setActiveLoans([]);
+      setSelectedLoanId(null);
+      setCurrentLoan(null);
+      setPenaltyAmount(0);
+      setTotalAmountDue(0);
+      setOverdueDays(0);
+    }
+  } catch (error) {
+    console.error('Error fetching active loans:', error);
+    setActiveLoans([]);
+  }
+};
 
   // Calculate penalty and total amount due
   const calculatePenaltyAndTotal = (loan) => {
@@ -2333,49 +2361,54 @@ const confirmApprove = async () => {
     }
   };
 
-  const validateFields = () => {
-    if (!formData.memberId) {
-      setErrorMessage('Member ID is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (memberNotFound) {
-      setErrorMessage('Member not found. Please check the Member ID');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.firstName) {
-      setErrorMessage('First name is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.lastName) {
-      setErrorMessage('Last name is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.email) {
-      setErrorMessage('Email is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.paymentOption) {
-      setErrorMessage('Payment option is required');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (!formData.amount || isNaN(formData.amount) || parseFloat(formData.amount) <= 0) {
-      setErrorMessage('Please enter a valid amount');
-      setErrorModalVisible(true);
-      return false;
-    }
-    if (formData.paymentOption !== 'Cash-on-Hand' && !proofOfPaymentFile) {
-      setErrorMessage('Proof of payment is required for non-cash payments');
-      setErrorModalVisible(true);
-      return false;
-    }
-    return true;
-  };
+const validateFields = () => {
+  if (!formData.memberId) {
+    setErrorMessage('Member ID is required');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (memberNotFound) {
+    setErrorMessage('Member not found. Please check the Member ID');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (activeLoans.length === 0) { // Add this check
+    setErrorMessage('This member has no active loans. Loan payments can only be made for members with active loans.');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (!formData.firstName) {
+    setErrorMessage('First name is required');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (!formData.lastName) {
+    setErrorMessage('Last name is required');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (!formData.email) {
+    setErrorMessage('Email is required');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (!formData.paymentOption) {
+    setErrorMessage('Payment option is required');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (!formData.amount || isNaN(formData.amount) || parseFloat(formData.amount) <= 0) {
+    setErrorMessage('Please enter a valid amount');
+    setErrorModalVisible(true);
+    return false;
+  }
+  if (formData.paymentOption !== 'Cash-on-Hand' && !proofOfPaymentFile) {
+    setErrorMessage('Proof of payment is required for non-cash payments');
+    setErrorModalVisible(true);
+    return false;
+  }
+  return true;
+};
 
   const handleSubmitConfirmation = () => {
     if (!validateFields()) return;
@@ -2957,6 +2990,24 @@ const submitPayment = async () => {
                     )}
                   </div>
                 )}
+  {activeLoans.length === 0 && formData.memberId && !memberLoading && (
+  <div style={{
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    borderRadius: '8px',
+    padding: '16px',
+    marginBottom: '16px',
+    textAlign: 'center'
+  }}>
+    <FaExclamationCircle style={{color: '#dc2626', fontSize: '20px', marginBottom: '8px'}} />
+    <p style={{color: '#dc2626', margin: '0', fontWeight: '500'}}>
+      This member has no active loans to pay.
+    </p>
+    <p style={{color: '#991b1b', margin: '8px 0 0 0', fontSize: '14px'}}>
+      Loan payments can only be made for members with active loans.
+    </p>
+  </div>
+)}
 
                 {/* Proof of Payment Upload - Only show for non-Cash-on-Hand payments */}
                 {formData.paymentOption !== 'Cash-on-Hand' && (
@@ -3009,7 +3060,6 @@ const submitPayment = async () => {
                 )}
               </div>
 
- {/* In your modal actions section */}
 <div style={styles.modalActions}>
   <button
     style={{
@@ -3019,7 +3069,7 @@ const submitPayment = async () => {
     onMouseEnter={() => handleMouseEnter('cancelButton')}
     onMouseLeave={() => handleMouseLeave('cancelButton')}
     onClick={closeAddModal}
-     disabled={uploading || isProcessing} 
+    disabled={uploading || isProcessing}
   >
     Cancel
   </button>
@@ -3027,17 +3077,22 @@ const submitPayment = async () => {
     style={{
       ...styles.primaryButton,
       ...(isHovered.submitButton ? styles.primaryButtonHover : {}),
-      ...((uploading || isProcessing || memberNotFound || memberLoading) ? styles.disabledButton : {})
+      ...((uploading || isProcessing || memberNotFound || memberLoading || !canSubmitPayment()) ? styles.disabledButton : {})
     }}
     onMouseEnter={() => handleMouseEnter('submitButton')}
     onMouseLeave={() => handleMouseLeave('submitButton')}
-    onClick={handleApproveClick}  // Changed from direct submit
-    disabled={uploading || isProcessing || memberNotFound || memberLoading}
+    onClick={handleApproveClick}
+    disabled={uploading || isProcessing || memberNotFound || memberLoading || !canSubmitPayment()}
   >
     {uploading || isProcessing ? (
       <>
         <div style={{...styles.spinner, width: '16px', height: '16px', borderWidth: '2px'}}></div>
         <span>Processing...</span>
+      </>
+    ) : activeLoans.length === 0 ? ( // Add this condition
+      <>
+        <FaBan />
+        <span>No Active Loans</span>
       </>
     ) : (
       <>
@@ -3047,6 +3102,7 @@ const submitPayment = async () => {
     )}
   </button>
 </div>
+
             </div>
           </div>
         )}
