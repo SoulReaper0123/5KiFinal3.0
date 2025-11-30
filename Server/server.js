@@ -274,345 +274,6 @@ const maskPassword = (pwd) => {
   return `${first}${'*'.repeat(Math.max(1, pwd.length - 2))}${last}`;
 };
 
-// ==============================================
-// ENHANCED VALIDATION ENDPOINTS FOR REGISTRATIONS
-// ==============================================
-
-// Enhanced ID Validation
-app.post('/validate-id', async (req, res) => {
-  try {
-    const { imageUrl } = req.body;
-    
-    console.log('[VALIDATION] Processing ID validation for:', imageUrl);
-    
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-    }
-    
-    const imageBuffer = await imageResponse.buffer();
-    const result = await validateIDCard(imageBuffer);
-    
-    console.log('[VALIDATION] ID validation completed:', result.status);
-    
-    res.json({
-      success: true,
-      type: 'id',
-      result
-    });
-    
-  } catch (error) {
-    console.error('[VALIDATION] ID validation error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      type: 'id'
-    });
-  }
-});
-
-// Enhanced Face Validation
-app.post('/validate-face', async (req, res) => {
-  try {
-    const { imageUrl } = req.body;
-    
-    console.log('[VALIDATION] Processing face validation for:', imageUrl);
-    
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-    }
-    
-    const imageBuffer = await imageResponse.buffer();
-    const result = await validateFace(imageBuffer);
-    
-    console.log('[VALIDATION] Face validation completed:', result.status);
-    
-    res.json({
-      success: true,
-      type: 'face',
-      result
-    });
-    
-  } catch (error) {
-    console.error('[VALIDATION] Face validation error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      type: 'face'
-    });
-  }
-});
-
-// Enhanced Payment Proof Validation
-app.post('/validate-payment', async (req, res) => {
-  try {
-    const { imageUrl } = req.body;
-    
-    console.log('[VALIDATION] Processing payment validation for:', imageUrl);
-    
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-    
-    const imageResponse = await fetch(imageUrl);
-    if (!imageResponse.ok) {
-      throw new Error(`Failed to fetch image: ${imageResponse.status}`);
-    }
-    
-    const imageBuffer = await imageResponse.buffer();
-    const result = await validatePaymentProof(imageBuffer);
-    
-    console.log('[VALIDATION] Payment validation completed:', result.status);
-    
-    res.json({
-      success: true,
-      type: 'payment',
-      result
-    });
-    
-  } catch (error) {
-    console.error('[VALIDATION] Payment validation error:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-      type: 'payment'
-    });
-  }
-});
-
-// OPTIONS handlers for new endpoints
-app.options('/validate-id', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.status(200).end();
-});
-
-app.options('/validate-face', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.status(200).end();
-});
-
-app.options('/validate-payment', (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-  res.status(200).end();
-});
-
-
-
-// ID Card Processing with Tesseract.js
-async function processIDCard(imageBuffer) {
-  try {
-    console.log('[ID Processing] Starting ID card analysis with OCR');
-    
-    if (!ocrWorker) {
-      throw new Error('OCR worker not ready');
-    }
-    
-    // Preprocess image for better OCR
-    const processedImage = await sharp(imageBuffer)
-      .resize(1200)
-      .grayscale()
-      .normalize()
-      .sharpen()
-      .toBuffer();
-    
-    // Perform OCR with Tesseract.js
-    console.log('[ID Processing] Running OCR...');
-    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage);
-    
-    console.log('[ID Processing] OCR completed. Confidence:', confidence);
-    
-    // Extract name from text (simple pattern matching)
-    const extractedName = extractNameFromText(text);
-    const idType = detectIDType(text);
-    
-    return {
-      text: text || 'No text detected',
-      confidence: Math.round(confidence || 0),
-      extractedName: extractedName || 'Not found',
-      idType: idType || 'Unknown',
-      status: confidence > 50 ? 'valid' : 'low_confidence',
-      textLength: text ? text.length : 0
-    };
-    
-  } catch (error) {
-    console.error('[ID Processing] Error:', error);
-    return { 
-      error: 'ID processing failed', 
-      status: 'error'
-    };
-  }
-}
-
-// Payment Proof Processing with OCR
-async function processPaymentProof(imageBuffer) {
-  try {
-    console.log('[Payment Processing] Starting payment proof analysis');
-    
-    if (!ocrWorker) {
-      throw new Error('OCR worker not ready');
-    }
-    
-    // Preprocess for receipt text
-    const processedImage = await sharp(imageBuffer)
-      .resize(1000)
-      .grayscale()
-      .normalize()
-      .linear(1.3, 0)
-      .toBuffer();
-    
-    // OCR for payment details
-    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage);
-    
-    console.log('[Payment Processing] OCR completed');
-    
-    // Extract payment information
-    const paymentData = extractPaymentInfo(text);
-    
-    return {
-      text: text || 'No text detected',
-      confidence: Math.round(confidence || 0),
-      amount: paymentData.amount,
-      reference: paymentData.reference,
-      date: paymentData.date,
-      status: paymentData.amount ? 'valid' : 'manual_review'
-    };
-    
-  } catch (error) {
-    console.error('[Payment Processing] Error:', error);
-    return { 
-      error: 'Payment processing failed',
-      status: 'error'
-    };
-  }
-}
-
-// Simple Face Detection (no TensorFlow)
-async function processFaceDetection(imageBuffer) {
-  try {
-    console.log('[Face Processing] Starting face detection');
-    
-    // Simple image analysis without AI
-    const metadata = await sharp(imageBuffer).metadata();
-    
-    // Basic face detection heuristic
-    const hasFace = await detectFaceHeuristic(imageBuffer);
-    
-    return {
-      facesDetected: hasFace ? 1 : 0,
-      imageSize: `${metadata.width}x${metadata.height}`,
-      status: hasFace ? 'valid' : 'no_face',
-      details: {
-        method: 'Basic image analysis',
-        confidence: hasFace ? 'medium' : 'low'
-      }
-    };
-    
-  } catch (error) {
-    console.error('[Face Processing] Error:', error);
-    return { 
-      error: 'Face detection failed',
-      status: 'error'
-    };
-  }
-}
-
-// Helper function to extract name from OCR text
-function extractNameFromText(text) {
-  if (!text) return null;
-  
-  const lines = text.split('\n').filter(line => line.trim().length > 0);
-  
-  // Look for common name patterns
-  for (const line of lines) {
-    // Match "Lastname, Firstname" pattern
-    const nameMatch = line.match(/([A-Z][a-z]+),\s*([A-Z][a-z]+)/);
-    if (nameMatch) {
-      return `${nameMatch[2]} ${nameMatch[1]}`;
-    }
-    
-    // Match "Firstname Lastname" pattern
-    const simpleNameMatch = line.match(/([A-Z][a-z]+)\s+([A-Z][a-z]+)/);
-    if (simpleNameMatch && simpleNameMatch[1].length > 2 && simpleNameMatch[2].length > 2) {
-      return line.trim();
-    }
-  }
-  
-  return null;
-}
-
-// Helper function to detect ID type
-function detectIDType(text) {
-  if (!text) return 'Unknown';
-  
-  const upperText = text.toUpperCase();
-  
-  if (upperText.includes('DRIVER') && upperText.includes('LICENSE')) return "Driver's License";
-  if (upperText.includes('PASSPORT')) return 'Passport';
-  if (upperText.includes('NATIONAL ID')) return 'National ID';
-  if (upperText.includes('POSTAL ID')) return 'Postal ID';
-  if (upperText.includes('SSS')) return 'SSS ID';
-  if (upperText.includes('UMID')) return 'UMID';
-  if (upperText.includes('PHILHEALTH')) return 'PhilHealth';
-  
-  return 'Government ID';
-}
-
-// Helper function to extract payment information
-function extractPaymentInfo(text) {
-  if (!text) return { amount: null, reference: null, date: null };
-  
-  // Extract amount (look for PHP, ₱, Amount, etc.)
-  const amountRegex = /(?:PHP|₱|AMOUNT)[:\s]*([0-9,]+\.?[0-9]*)/i;
-  const amountMatch = text.match(amountRegex);
-  const amount = amountMatch ? amountMatch[1] : null;
-  
-  // Extract reference number (look for REF, Transaction, etc.)
-  const refRegex = /(?:REF|REFERENCE|TRANSACTION)[\s#:]*([A-Z0-9]{6,15})/i;
-  const refMatch = text.match(refRegex);
-  const reference = refMatch ? refMatch[1] : null;
-  
-  // Extract date (various date formats)
-  const dateRegex = /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})|([A-Z][a-z]{2,8}\s+\d{1,2},?\s+\d{4})/;
-  const dateMatch = text.match(dateRegex);
-  const date = dateMatch ? dateMatch[0] : null;
-  
-  return { amount, reference, date };
-}
-
-// Simple face detection using image characteristics
-async function detectFaceHeuristic(imageBuffer) {
-  try {
-    const metadata = await sharp(imageBuffer).metadata();
-    
-    // Basic heuristics for face detection
-    const aspectRatio = metadata.width / metadata.height;
-    const isPortrait = aspectRatio < 1.3 && aspectRatio > 0.7; // Common for selfies
-    const hasReasonableSize = metadata.width > 300 && metadata.height > 300;
-    
-    // If it's a portrait-oriented image of reasonable size, likely a face
-    return isPortrait && hasReasonableSize;
-  } catch (error) {
-    return false;
-  }
-}
-
-
-// ---------------------------------------------------------------------------------
 
 // Enhanced Health check endpoint
 // Enhanced Health check with activity tracking
@@ -3814,253 +3475,125 @@ app.post('/send-member-delete-data', async (req, res) => {
   }
 });
 
-// ==============================================
-// ENHANCED VALIDATION FUNCTIONS FOR REGISTRATIONS
-// ==============================================
+// Add to your existing email endpoints
+app.post('/send-dividend-email', async (req, res) => {
+  console.log('[NOTIFICATION] Initiating dividend distribution email', req.body);
+  const { 
+    email, 
+    firstName, 
+    lastName, 
+    dividendAmount,
+    totalInvestment,
+    distributedDate,
+    memberId,
+    websiteLink,
+    facebookLink
+  } = req.body;
 
-// Enhanced ID Card Validation
-async function validateIDCard(imageBuffer) {
-  try {
-    console.log('[ID VALIDATION] Starting enhanced ID validation');
-    
-    if (!ocrWorker) {
-      throw new Error('OCR worker not ready');
-    }
-    
-    // Enhanced preprocessing
-    const processedImage = await sharp(imageBuffer)
-      .resize(1200)
-      .grayscale()
-      .normalize()
-      .linear(1.3, 0)
-      .sharpen()
-      .toBuffer();
-    
-    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage, 'eng', {
-      tessedit_pageseg_mode: 6
+  // Validate required fields
+  if (!email || !firstName || !lastName || !dividendAmount || !distributedDate) {
+    console.log('[NOTIFICATION ERROR] Missing required fields for dividend email');
+    return res.status(400).json({ 
+      success: false,
+      message: 'Missing required fields: email, firstName, lastName, dividendAmount, and distributedDate are required'
     });
-    
-    // Enhanced name extraction for Philippine IDs
-    const name = extractNameFromIDTextEnhanced(text);
-    const idType = detectIDTypeEnhanced(text);
-    
-    // Calculate validation score
-    let validationScore = confidence;
-    if (name) validationScore += 20;
-    if (idType !== 'Unknown') validationScore += 15;
-    
-    const status = validationScore >= 70 ? 'valid' : 
-                  validationScore >= 50 ? 'manual' : 'invalid';
-    
-    return {
-      text: text || '',
-      confidence: Math.round(confidence),
-      name: name,
-      idType: idType,
-      validationScore: Math.min(100, validationScore),
-      status: status
-    };
-    
-  } catch (error) {
-    console.error('[ID VALIDATION] Error:', error);
-    return { 
-      error: 'ID validation failed',
-      status: 'error',
-      confidence: 0
-    };
   }
-}
 
-// Enhanced Face Validation
-async function validateFace(imageBuffer) {
   try {
-    console.log('[FACE VALIDATION] Starting face validation');
-    
-    const metadata = await sharp(imageBuffer).metadata();
-    
-    // Simple face detection using image characteristics
-    const aspectRatio = metadata.width / metadata.height;
-    const isPortrait = aspectRatio < 1.3 && aspectRatio > 0.7;
-    const hasGoodSize = metadata.width > 250 && metadata.height > 250;
-    
-    const faceCount = isPortrait && hasGoodSize ? 1 : 0;
-    const confidence = faceCount > 0 ? 75 : 25;
-    const status = faceCount > 0 ? 'valid' : 'invalid';
-    
-    return {
-      facesDetected: faceCount,
-      confidence: confidence,
-      status: status,
-      imageSize: `${metadata.width}x${metadata.height}`,
-      details: {
-        isPortrait: isPortrait,
-        hasGoodResolution: metadata.width >= 300 && metadata.height >= 300
+    console.log('[NOTIFICATION] Sending dividend notification to member');
+    const mailOptions = {
+      to: email,
+      subject: 'Dividend Distribution - 5KI Financial Services',
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333;">
+          <h2 style="color: #2c3e50; border-bottom: 2px solid #10B981; padding-bottom: 10px;">
+            Dividend Distribution Notification
+          </h2>
+          
+          <p>Dear ${firstName},</p>
+          
+          <div style="background-color: #ECFDF5; padding: 20px; border-left: 4px solid #10B981; margin: 20px 0;">
+            <p style="font-weight: bold; color: #065F46; margin: 0; font-size: 18px;">
+              We are pleased to inform you that your dividend has been distributed!
+            </p>
+          </div>
+          
+          <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Dividend Details:</h3>
+          <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold; width: 40%;">Dividend Amount</td>
+              <td style="padding: 10px; border: 1px solid #ddd; color: #059669; font-weight: bold;">
+                ₱${formatAmount(dividendAmount)}
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Date Distributed</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${formatDisplayDate(distributedDate)}</td>
+            </tr>
+            ${totalInvestment ? `
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Your Total Investment</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">₱${formatAmount(totalInvestment)}</td>
+            </tr>
+            ` : ''}
+            ${memberId ? `
+            <tr>
+              <td style="padding: 10px; border: 1px solid #ddd; font-weight: bold;">Member ID</td>
+              <td style="padding: 10px; border: 1px solid #ddd;">${memberId}</td>
+            </tr>
+            ` : ''}
+          </table>
+          
+          <div style="background-color: #FFFBEB; padding: 15px; border-left: 4px solid #F59E0B; margin: 20px 0;">
+            <h4 style="color: #B45309; margin-top: 0;">Important Information:</h4>
+            <ul style="margin-bottom: 0;">
+              <li>Your dividend has been automatically added to your savings balance</li>
+              <li>This amount is also reflected in your total investment</li>
+              <li>You can view your updated balance by logging into your account</li>
+            </ul>
+          </div>
+          
+          <p>
+            <a href="${websiteLink || WEBSITE_LINK}" 
+               style="display: inline-block; background-color: #1e40af; color: white; 
+                      padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 15px 0;">
+              View Your Account
+            </a>
+          </p>
+          
+          <p>Thank you for being a valued member of 5KI Financial Services.</p>
+          
+          <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
+            Best regards,<br>
+            <strong>5KI Financial Services Team</strong>
+          </p>
+        </div>
+      `
+    };
+
+    const result = await sendEmailWithRetry(mailOptions);
+
+    console.log('[NOTIFICATION SUCCESS] Dividend email sent successfully');
+    res.status(200).json({ 
+      success: true,
+      message: 'Dividend email sent successfully',
+      data: {
+        emailSent: email,
+        memberId: memberId,
+        dividendAmount: dividendAmount,
+        timestamp: new Date().toISOString()
       }
-    };
-    
-  } catch (error) {
-    console.error('[FACE VALIDATION] Error:', error);
-    return { 
-      error: 'Face validation failed',
-      status: 'error',
-      facesDetected: 0,
-      confidence: 0
-    };
-  }
-}
-
-// Enhanced Payment Proof Validation
-async function validatePaymentProof(imageBuffer) {
-  try {
-    console.log('[PAYMENT VALIDATION] Starting payment validation');
-    
-    if (!ocrWorker) {
-      throw new Error('OCR worker not ready');
-    }
-    
-    const processedImage = await sharp(imageBuffer)
-      .resize(1200)
-      .grayscale()
-      .normalize()
-      .linear(1.4, 0)
-      .sharpen()
-      .toBuffer();
-    
-    const { data: { text, confidence } } = await ocrWorker.recognize(processedImage, 'eng', {
-      tessedit_pageseg_mode: 6
     });
-    
-    // Enhanced payment data extraction
-    const paymentData = extractPaymentDataEnhanced(text);
-    let validationScore = confidence;
-    
-    if (paymentData.amount) validationScore += 20;
-    if (paymentData.reference) validationScore += 15;
-    if (paymentData.date) validationScore += 10;
-    
-    const status = validationScore >= 70 ? 'valid' : 
-                  validationScore >= 50 ? 'manual' : 'invalid';
-    
-    return {
-      text: text || '',
-      confidence: Math.round(confidence),
-      ...paymentData,
-      validationScore: Math.min(100, validationScore),
-      status: status
-    };
-    
   } catch (error) {
-    console.error('[PAYMENT VALIDATION] Error:', error);
-    return { 
-      error: 'Payment validation failed',
-      status: 'error',
-      confidence: 0
-    };
+    console.error('[NOTIFICATION ERROR] Error sending dividend email:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to send dividend email',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
-}
-
-// Enhanced name extraction for Philippine IDs
-function extractNameFromIDTextEnhanced(text) {
-  if (!text) return null;
-  
-  const upperText = text.toUpperCase();
-  
-  // Philippine ID specific patterns
-  const patterns = [
-    // Pattern 1: Philippine ID format
-    /(?:LAST NAME|APELYIDO)[^\n]*\n([A-Z][A-Z\s,'-]+)\n(?:FIRST NAME|MGA PANGALAN)[^\n]*\n([A-Z][A-Z\s,'-]+)(?:\n(?:MIDDLE NAME|GITNANG PANGALAN)[^\n]*\n([A-Z][A-Z\s,'-]+))?/i,
-    
-    // Pattern 2: Standard format
-    /^([A-Z][A-Za-z\s,'-]+),\s*([A-Z][A-Za-z\s'-]+)(?:\s+([A-Z][A-Za-z\s'-]+))?$/,
-    
-    // Pattern 3: Driver's License
-    /(?:LICENSEE|NAME)[^\n]*\n([^\n]+)/i
-  ];
-  
-  for (const pattern of patterns) {
-    const match = upperText.match(pattern);
-    if (match) {
-      let name = '';
-      
-      if (pattern.toString().includes('APELYIDO')) {
-        const lastName = match[1]?.trim();
-        const firstName = match[2]?.trim();
-        const middleName = match[3]?.trim();
-        name = `${firstName} ${middleName || ''} ${lastName}`.trim();
-      } else if (match[1] && match[2]) {
-        name = `${match[2]} ${match[1]}`.trim();
-        if (match[3]) name = `${match[2]} ${match[3]} ${match[1]}`.trim();
-      } else if (match[1]) {
-        name = match[1].trim();
-      }
-      
-      // Clean name
-      name = name.replace(/[^A-Za-z\s,'-]/g, ' ').replace(/\s+/g, ' ').trim();
-      
-      if (name.length >= 6 && name.split(' ').length >= 2) {
-        return name;
-      }
-    }
-  }
-  
-  return null;
-}
-
-// Enhanced payment data extraction
-function extractPaymentDataEnhanced(text) {
-  if (!text) return { amount: null, reference: null, date: null, paymentMethod: null };
-  
-  const normalized = text.replace(/\s+/g, ' ').trim();
-  
-  // Amount patterns
-  const amountPatterns = [
-    /(?:AMOUNT|AMT|TOTAL|PAID)\s*[:\-]?\s*(?:PHP|₱)?\s*([\d,]+\.?\d*)/i,
-    /(?:PHP|₱)\s*([\d,]+\.?\d*)/i
-  ];
-  
-  let amount = null;
-  for (const re of amountPatterns) {
-    const m = normalized.match(re);
-    if (m && m[1]) {
-      amount = m[1].replace(/[\s,]/g, '');
-      break;
-    }
-  }
-  
-  // Reference patterns
-  const refPatterns = [
-    /(REF(?:ERENCE)?\s*(?:NO\.?|#|NUMBER)?)[^A-Za-z0-9]*([0-9]{3,6}(?:\s+[0-9]{3,6}){1,5})/i,
-    /(REF(?:ERENCE)?\s*(?:NO\.?|#)?)\s*[:\-]?\s*([A-Z0-9\-]{6,})/i
-  ];
-  
-  let reference = null;
-  for (const re of refPatterns) {
-    const m = normalized.match(re);
-    if (m) {
-      reference = (m[2] || m[1] || '').toString().trim();
-      break;
-    }
-  }
-  
-  // Date patterns
-  const datePatterns = [
-    /\b(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)[A-Z]*\s+\d{1,2},?\s+\d{4}\b/i,
-    /\b\d{4}-\d{2}-\d{2}\b/,
-    /\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/
-  ];
-  
-  let date = null;
-  for (const re of datePatterns) {
-    const m = normalized.match(re);
-    if (m) { 
-      date = m[0]; 
-      break;
-    }
-  }
-  
-  return { amount, reference, date, paymentMethod: null };
-}
-
+});
 
 
 // ==============================================
