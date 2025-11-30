@@ -20,7 +20,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute, DrawerActions } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { getDatabase, ref, get } from 'firebase/database';
+import { getDatabase, ref, get, onValue } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
 import CustomModal from '../components/CustomModal';
@@ -63,7 +63,76 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   const [modalMessage, setModalMessage] = useState('');
   const [modalType, setModalType] = useState('info');
 
-  // --- new code: check for new transactions and show red dot on bell ---
+  
+
+
+  // Real-time user data listener
+const setupRealTimeUserListener = (userEmail) => {
+  if (!userEmail) return () => {}; // Return empty cleanup function
+  
+  console.log('Setting up real-time user listener for:', userEmail);
+  
+  const db = getDatabase();
+  const membersRef = ref(db, 'Members');
+  
+  // This listener automatically updates when user data changes in Firebase
+  const unsubscribe = onValue(membersRef, (snapshot) => {
+    console.log('Real-time user data update received');
+    
+    if (snapshot.exists()) {
+      const members = snapshot.val();
+      const foundUser = Object.values(members).find(
+        (member) => member.email === userEmail
+      );
+      
+      if (foundUser) {
+        console.log('Real-time update - User data changed:', {
+          firstName: foundUser.firstName,
+          balance: foundUser.balance,
+          investment: foundUser.investment
+        });
+        
+        // Update all user data in real-time
+        setFirstName(foundUser.firstName || 'Guest');
+        setBalance(foundUser.balance || 0);
+        setInvestment(foundUser.investment || foundUser.investments || 0);
+        setEmail(foundUser.email || userEmail);
+        setSelfie(foundUser.selfie || null);
+        
+        // Also update memberId if needed
+        if (foundUser.id && foundUser.id !== memberId) {
+          setMemberId(foundUser.id);
+        }
+      } else {
+        console.log('Real-time update - User not found in members');
+      }
+    }
+  }, (error) => {
+    console.error('Real-time user listener error:', error);
+  });
+  
+  return unsubscribe;
+};
+
+// Real-time user data listener setup
+useEffect(() => {
+  let unsubscribe = () => {};
+  
+  // Determine which email to use for real-time listening
+  const userEmail = email || route.params?.user?.email || route.params?.email;
+  
+  if (userEmail) {
+    console.log('HomeTab - Initializing real-time listener for:', userEmail);
+    unsubscribe = setupRealTimeUserListener(userEmail);
+  }
+  
+  // Cleanup function - removes the listener when component unmounts or email changes
+  return () => {
+    console.log('HomeTab - Cleaning up real-time user listener');
+    unsubscribe();
+  };
+}, [email, route.params?.user?.email, route.params?.email]); // Re-run when email sources change
+
   const checkForNewTransactions = async () => {
     try {
       if (!email) return;
@@ -153,93 +222,80 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
     })}`;
   };
 
-  const fetchUserData = async (userEmail) => {
-    const db = getDatabase();
-    const dbRef = ref(db, 'Members');
-    try {
-      const snapshot = await get(dbRef);
-      if (snapshot.exists()) {
-        const members = snapshot.val();
-        const foundUser = Object.values(members).find(
-          (member) => member.email === userEmail
-        );
-        if (foundUser) {
-          setFirstName(foundUser.firstName || 'Guest');
-          setBalance(foundUser.balance || 0);
-          setInvestment(foundUser.investment || foundUser.investments || 0);
-          setEmail(foundUser.email || 'No email provided');
-          setSelfie(foundUser.selfie || null);
+const fetchUserData = async (userEmail) => {
+  const db = getDatabase();
+  const dbRef = ref(db, 'Members');
+  try {
+    const snapshot = await get(dbRef);
+    if (snapshot.exists()) {
+      const members = snapshot.val();
+      const foundUser = Object.values(members).find(
+        (member) => member.email === userEmail
+      );
+      if (foundUser) {
+        // Real-time listener will handle these updates, but we set initial values
+        // This prevents flickering during initial load
+        setFirstName(foundUser.firstName || 'Guest');
+        setBalance(foundUser.balance || 0);
+        setInvestment(foundUser.investment || foundUser.investments || 0);
+        setEmail(foundUser.email || 'No email provided');
+        setSelfie(foundUser.selfie || null);
+        
+        // Update memberId for parent component
+        if (foundUser.id && setMemberId) {
+          setMemberId(foundUser.id);
         }
       }
-    } catch (error) {
-      console.error('Error fetching user data:', error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
     }
-  };
+  } catch (error) {
+    console.error('Error fetching user data:', error);
+  } finally {
+    setLoading(false);
+    setRefreshing(false);
+  }
+};
 
-  useEffect(() => {
-const loadUserData = async () => {
-  try {
-    const user = auth.currentUser;
-    const paramEmail = route.params?.user?.email;
-    const routeEmail = route.params?.email;
-    let storedEmail = null;
-    
-    // Try to get email from storage - WORKS ON ALL PLATFORMS
+useEffect(() => {
+  const loadUserData = async () => {
     try {
-      storedEmail = await Storage.getItem('currentUserEmail');
-    } catch (error) {
-      console.error('Error getting email from storage:', error);
-    }
-
-        
-        console.log('AppHome - Loading user data with:', { 
-          authEmail: user?.email, 
-          paramEmail, 
-          routeEmail,
-          storedEmail,
-          email
-        });
-        
-        // First try to use the email passed directly to this component
-        if (email) {
-          console.log('Using email prop:', email);
-          fetchUserData(email);
-        }
-        // Then try the email from SecureStore (for biometric login)
-        else if (storedEmail) {
-          console.log('Using email from SecureStore:', storedEmail);
-          fetchUserData(storedEmail);
-        }
-        // Then try the email from Firebase auth
-        else if (user?.email) {
-          console.log('Using Firebase auth email:', user.email);
-          fetchUserData(user.email);
-        }
-        // Then try the email from route params (user object)
-        else if (paramEmail) {
-          console.log('Using param email from user object:', paramEmail);
-          fetchUserData(paramEmail);
-        }
-        // Finally try the direct email from route params (used in biometric login)
-        else if (routeEmail) {
-          console.log('Using direct route email:', routeEmail);
-          fetchUserData(routeEmail);
-        }
-        else {
-          console.log('No email found, setting loading to false');
-          setLoading(false);
-        }
+      const user = auth.currentUser;
+      const paramEmail = route.params?.user?.email;
+      const routeEmail = route.params?.email;
+      let storedEmail = null;
+      
+      // Try to get email from storage - WORKS ON ALL PLATFORMS
+      try {
+        storedEmail = await Storage.getItem('currentUserEmail');
       } catch (error) {
-        console.error('Error in loadUserData:', error);
+        console.error('Error getting email from storage:', error);
+      }
+      
+      console.log('AppHome - Loading user data with:', { 
+        authEmail: user?.email, 
+        paramEmail, 
+        routeEmail,
+        storedEmail,
+        email
+      });
+      
+      // Determine which email to use for initial load
+      const loadEmail = email || storedEmail || user?.email || paramEmail || routeEmail;
+      
+      if (loadEmail) {
+        console.log('Initial load with email:', loadEmail);
+        await fetchUserData(loadEmail);
+      } else {
+        console.log('No email found, setting loading to false');
         setLoading(false);
       }
-    };
-    
-    loadUserData();
-  }, [route.params, email]);
+    } catch (error) {
+      console.error('Error in loadUserData:', error);
+      setLoading(false);
+    }
+  };
+  
+  loadUserData();
+}, [route.params, email]);
 
   // Check if biometric setup should be prompted
 useEffect(() => {
@@ -310,15 +366,15 @@ useEffect(() => {
     return () => backHandler.remove();
   }, [navigation]);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    try {
-      const user = auth.currentUser;
-      const paramEmail = route.params?.user?.email;
-      const routeEmail = route.params?.email;
-      let storedEmail = null;
-      
-   // Try to get email from SecureStore (for biometric login) - WITH PLATFORM CHECK
+const onRefresh = async () => {
+  setRefreshing(true);
+  try {
+    const user = auth.currentUser;
+    const paramEmail = route.params?.user?.email;
+    const routeEmail = route.params?.email;
+    let storedEmail = null;
+    
+    // Try to get email from SecureStore (for biometric login) - WITH PLATFORM CHECK
     if (Platform.OS !== 'web') {
       try {
         storedEmail = await SecureStore.getItemAsync('currentUserEmail');
@@ -326,45 +382,22 @@ useEffect(() => {
         console.error('Error getting email from SecureStore during refresh:', error);
       }
     }
-      
-      console.log('AppHome - Refreshing user data with:', { 
-        authEmail: user?.email, 
-        paramEmail, 
-        routeEmail,
-        storedEmail,
-        email
-      });
-      
-      // Use the same priority order as initial load
-      if (email) {
-        console.log('Refreshing with email prop:', email);
-        fetchUserData(email);
-      }
-      else if (storedEmail) {
-        console.log('Refreshing with email from SecureStore:', storedEmail);
-        fetchUserData(storedEmail);
-      }
-      else if (user?.email) {
-        console.log('Refreshing with Firebase auth email:', user.email);
-        fetchUserData(user.email);
-      }
-      else if (paramEmail) {
-        console.log('Refreshing with param email from user object:', paramEmail);
-        fetchUserData(paramEmail);
-      }
-      else if (routeEmail) {
-        console.log('Refreshing with direct route email:', routeEmail);
-        fetchUserData(routeEmail);
-      }
-      else {
-        console.log('No email found during refresh, stopping refresh');
-        setRefreshing(false);
-      }
-    } catch (error) {
-      console.error('Error in onRefresh:', error);
+    
+    // Use the same priority order as initial load
+    const refreshEmail = email || storedEmail || user?.email || paramEmail || routeEmail;
+    
+    if (refreshEmail) {
+      console.log('Manual refresh with email:', refreshEmail);
+      await fetchUserData(refreshEmail);
+    } else {
+      console.log('No email found during refresh, stopping refresh');
       setRefreshing(false);
     }
-  };
+  } catch (error) {
+    console.error('Error in onRefresh:', error);
+    setRefreshing(false);
+  }
+};
 
   // Fallback drawer state and handlers when Drawer navigator isn't available
   const [fallbackDrawerVisible, setFallbackDrawerVisible] = useState(false);
@@ -858,8 +891,6 @@ export default function AppHome() {
       setEmail(routeEmail);
     }
   }, [route.params, email]);
-
-
 
   const navigation = useNavigation();
 
