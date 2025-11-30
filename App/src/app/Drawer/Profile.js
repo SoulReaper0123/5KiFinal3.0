@@ -10,21 +10,20 @@ import {
   TextInput,
   Modal,
   ActivityIndicator,
-  Switch,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { MaterialIcons, MaterialCommunityIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as ImagePicker from 'expo-image-picker';
 import { database, storage } from '../../firebaseConfig';
-import * as LocalAuthentication from 'expo-local-authentication';
+import { getDatabase, ref, get, update } from 'firebase/database';
 import * as SecureStore from 'expo-secure-store';
 
 const Profile = () => {
   const navigation = useNavigation();
   const route = useRoute();
-  const { email } = route.params;
+  const { email } = route.params || {};
   const [profilePic, setProfilePic] = useState(null);
   const [selfie, setSelfie] = useState(null);
   const [userDetails, setUserDetails] = useState({});
@@ -32,134 +31,66 @@ const Profile = () => {
   const [modalVisible, setModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [newDetails, setNewDetails] = useState({});
-  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
-  const [biometricsAvailable, setBiometricsAvailable] = useState(false);
+  const [currentEmail, setCurrentEmail] = useState(email);
 
-  // Check if biometrics are available and enabled
+  // If no email from params, try to get it from SecureStore
   useEffect(() => {
-    const checkBiometrics = async () => {
-      try {
-        // Check if device supports biometrics
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-        
-        setBiometricsAvailable(hasHardware && isEnrolled);
-        
-        // Check if biometrics are enabled for this user
-        const credentials = await SecureStore.getItemAsync('biometricCredentials');
-        if (credentials) {
-          const storedData = JSON.parse(credentials);
-          if (storedData.email === email) {
-            setBiometricsEnabled(true);
-          }
-        }
-      } catch (error) {
-        console.error('Biometric check error:', error);
-      }
-    };
-    
-    checkBiometrics();
-  }, [email]);
-
-  useEffect(() => {
-    const fetchUserData = async () => {
-      try {
-        const snapshot = await database.ref('Members').once('value');
-        if (snapshot.exists()) {
-          const members = snapshot.val();
-          let foundUser = null;
-
-          for (const memberId in members) {
-            if (members[memberId].email === email) {
-              foundUser = { id: memberId, ...members[memberId] };
-              break;
-            }
-          }
-
-          if (foundUser) {
-            setUserDetails(foundUser);
-            setSelfie(foundUser.selfie || null);
-            setNewDetails(foundUser);
+    const getEmail = async () => {
+      if (!email) {
+        try {
+          const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+          if (storedEmail) {
+            setCurrentEmail(storedEmail);
+            fetchUserData(storedEmail);
           } else {
-            Alert.alert('User not found', 'No user found with the provided email.');
+            setLoading(false);
+            Alert.alert('Error', 'No user email found. Please log in again.');
           }
-        } else {
-          Alert.alert('No data available', 'The members data is empty.');
+        } catch (error) {
+          console.error('Error getting email from SecureStore:', error);
+          setLoading(false);
         }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-        Alert.alert('Error', 'Could not fetch user data. Please try again later.');
-      } finally {
-        setLoading(false);
+      } else {
+        setCurrentEmail(email);
+        fetchUserData(email);
       }
     };
 
-    fetchUserData();
+    getEmail();
   }, [email]);
-  
-  // Function to enable biometrics
-  const enableBiometrics = async () => {
+
+  const fetchUserData = async (userEmail) => {
     try {
-      // Check if device supports biometrics
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+      const db = getDatabase();
+      const snapshot = await get(ref(db, 'Members'));
       
-      if (!hasHardware || !isEnrolled) {
-        Alert.alert(
-          'Biometrics Not Available', 
-          'Your device does not support biometric authentication or you have not set up fingerprints in your device settings.'
-        );
-        return;
+      if (snapshot.exists()) {
+        const members = snapshot.val();
+        let foundUser = null;
+
+        for (const memberId in members) {
+          if (members[memberId].email === userEmail) {
+            foundUser = { id: memberId, ...members[memberId] };
+            break;
+          }
+        }
+
+        if (foundUser) {
+          setUserDetails(foundUser);
+          setSelfie(foundUser.selfie || null);
+          setNewDetails(foundUser);
+          console.log('Profile - User data fetched:', foundUser);
+        } else {
+          Alert.alert('User not found', 'No user found with the provided email.');
+        }
+      } else {
+        Alert.alert('No data available', 'The members data is empty.');
       }
-      
-      // Use a modal to get the password instead of Alert.prompt (which is iOS-only)
-      Alert.alert(
-        'Enable Fingerprint Login',
-        'To enable fingerprint login, please enter your password in the next screen',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Continue',
-            onPress: () => {
-              // Navigate to BiometricSetup screen with email
-              navigation.navigate('BiometricSetup', { email });
-            },
-          },
-        ]
-      );
     } catch (error) {
-      console.error('Enable biometrics error:', error);
-      Alert.alert('Error', 'Could not enable biometric login');
-    }
-  };
-  
-  // Function to disable biometrics
-  const disableBiometrics = async () => {
-    try {
-      Alert.alert(
-        'Disable Biometric Login',
-        'Are you sure you want to disable biometric login?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel',
-          },
-          {
-            text: 'Disable',
-            onPress: async () => {
-              await SecureStore.deleteItemAsync('biometricCredentials');
-              setBiometricsEnabled(false);
-              Alert.alert('Success', 'Biometric login has been disabled');
-            },
-          },
-        ]
-      );
-    } catch (error) {
-      console.error('Disable biometrics error:', error);
-      Alert.alert('Error', 'Could not disable biometric login');
+      console.error('Error fetching user data:', error);
+      Alert.alert('Error', 'Could not fetch user data. Please try again later.');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -210,9 +141,11 @@ const Profile = () => {
       const downloadURL = await fileRef.getDownloadURL();
       
       // Update user profile in database
-      const userRef = database.ref('Members/' + userDetails.id);
-      await userRef.update({ selfie: downloadURL });
+      const db = getDatabase();
+      const userRef = ref(db, 'Members/' + userDetails.id);
+      await update(userRef, { selfie: downloadURL });
       setSelfie(downloadURL);
+      Alert.alert('Success', 'Profile picture updated successfully!');
     } catch (error) {
       console.error('Upload failed', error);
       Alert.alert('Upload failed', 'Could not upload the image. Please try again.');
@@ -225,8 +158,9 @@ const Profile = () => {
 
   const handleSaveDetails = async () => {
     try {
-      const userRef = database.ref('Members/' + userDetails.id);
-      await userRef.update(newDetails);
+      const db = getDatabase();
+      const userRef = ref(db, 'Members/' + userDetails.id);
+      await update(userRef, newDetails);
       Alert.alert('Success', 'Profile updated successfully!');
       setModalVisible(false);
       setUserDetails(newDetails);
@@ -253,7 +187,7 @@ const Profile = () => {
             if (parent && parent.openDrawer) {
               parent.openDrawer();
             } else {
-              navigation.replace('AppHome', { openDrawer: true });
+              navigation.goBack();
             }
           }} style={styles.backButton}>
             <MaterialIcons name="arrow-back" size={30} color="white" />
@@ -295,7 +229,7 @@ const Profile = () => {
             </View>
 
             <View style={styles.infoRow}>
-              <Text style={styles.infoRowLabel}>Birthday</Text>
+              <Text style={styles.infoRowLabel}>Birthdate</Text>
               <Text style={styles.infoRowValue}>{userDetails.dateOfBirth || 'N/A'}</Text>
             </View>
 
@@ -315,13 +249,6 @@ const Profile = () => {
               <TouchableOpacity onPress={handleEditDetails} style={[styles.actionButton, styles.editButton]}>
                 <Text style={styles.editButtonText}>Edit Profile</Text>
               </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => navigation.navigate('ChangePassword', { email })}
-                style={[styles.actionButton, styles.changePwButton]}
-              >
-                <Text style={styles.changePwText}>Change Password</Text>
-              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -329,64 +256,62 @@ const Profile = () => {
 
       {/* Edit Modal */}
       <Modal
-  animationType="slide"
-  transparent={true}
-  visible={modalVisible}
-  onRequestClose={() => setModalVisible(false)}
->
-  <KeyboardAvoidingView
-    behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    style={styles.modalContainer}
-  >
-    <View style={styles.modalCard}>
-      <View style={styles.modalHeaderRow}>
-        <Text style={styles.modalTitleLarge}>Edit Profile</Text>
-        <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
-          <MaterialIcons name="close" size={22} color="#2D5783" />
-        </TouchableOpacity>
-      </View>
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.modalContainer}
+        >
+          <View style={styles.modalCard}>
+            <View style={styles.modalHeaderRow}>
+              <Text style={styles.modalTitleLarge}>Edit Profile</Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)} style={styles.modalCloseBtn}>
+                <MaterialIcons name="close" size={22} color="#2D5783" />
+              </TouchableOpacity>
+            </View>
 
-      <ScrollView contentContainerStyle={styles.modalInner} keyboardShouldPersistTaps="handled">
-        <Text style={styles.modalSubtitle}>Update your personal information. Fields marked with <Text style={styles.requiredStar}>*</Text> are required.</Text>
+            <ScrollView contentContainerStyle={styles.modalInner} keyboardShouldPersistTaps="handled">
+              <Text style={styles.modalSubtitle}>Update your personal information. Fields marked with <Text style={styles.requiredStar}>*</Text> are required.</Text>
 
-        {[
-          { field: 'firstName', label: 'First Name', required: true },
-          { field: 'middleName', label: 'Middle Name', required: false },
-          { field: 'lastName', label: 'Last Name', required: true },
-          { field: 'address', label: 'Address', required: true },
-          { field: 'dateOfBirth', label: 'Birthday', required: true },
-          { field: 'phoneNumber', label: 'Contact Number', required: true },
-          { field: 'gender', label: 'Gender', required: true },
-          { field: 'placeOfBirth', label: 'Place of Birth', required: true },
-          { field: 'civilStatus', label: 'Civil Status', required: true }
-        ].map(({ field, label, required }) => (
-          <View key={field} style={styles.fieldRow}>
-            <Text style={styles.inputLabel}>
-              {label} {required && <Text style={styles.requiredStar}>*</Text>}
-            </Text>
-            <TextInput
-              style={styles.inputField}
-              placeholder={label}
-              value={newDetails[field]}
-              onChangeText={(text) => setNewDetails({ ...newDetails, [field]: text })}
-              returnKeyType="next"
-            />
+              {[
+                { field: 'firstName', label: 'First Name', required: true },
+                { field: 'middleName', label: 'Middle Name', required: false },
+                { field: 'lastName', label: 'Last Name', required: true },
+                { field: 'address', label: 'Address', required: true },
+                { field: 'dateOfBirth', label: 'Birthday', required: true },
+                { field: 'phoneNumber', label: 'Contact Number', required: true },
+                { field: 'placeOfBirth', label: 'Place of Birth', required: true },
+              ].map(({ field, label, required }) => (
+                <View key={field} style={styles.fieldRow}>
+                  <Text style={styles.inputLabel}>
+                    {label} {required && <Text style={styles.requiredStar}>*</Text>}
+                  </Text>
+                  <TextInput
+                    style={styles.inputField}
+                    placeholder={label}
+                    value={newDetails[field] || ''}
+                    onChangeText={(text) => setNewDetails({ ...newDetails, [field]: text })}
+                    returnKeyType="next"
+                  />
+                </View>
+              ))}
+
+              <View style={styles.buttonRow}>
+                <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.modalActionButton, styles.cancelButton]}>
+                  <Text style={styles.modalActionText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={handleSaveDetails} style={[styles.modalActionButton, styles.saveButton]}>
+                  <Text style={styles.modalActionText}>Save Changes</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
-        ))}
-
-        <View style={styles.buttonRow}>
-          <TouchableOpacity onPress={() => setModalVisible(false)} style={[styles.modalActionButton, styles.cancelButton]}>
-            <Text style={styles.modalActionText}>Cancel</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity onPress={handleSaveDetails} style={[styles.modalActionButton, styles.saveButton]}>
-            <Text style={styles.modalActionText}>Save Changes</Text>
-          </TouchableOpacity>
-        </View>
-      </ScrollView>
-    </View>
-  </KeyboardAvoidingView>
-</Modal>
+        </KeyboardAvoidingView>
+      </Modal>
 
       {/* Full Image Modal */}
       <Modal
@@ -405,15 +330,6 @@ const Profile = () => {
     </View>
   );
 };
-
-const DetailRow = ({ label, detail }) => (
-  <View style={styles.detailRow}>
-    <Text style={styles.detailLabel}>{label}</Text>
-    <Text style={styles.detailValue}>{detail}</Text>
-  </View>
-);
-
-const capitalizeFirstLetter = (string) => string.charAt(0).toUpperCase() + string.slice(1);
 
 const styles = StyleSheet.create({
   container: {
@@ -537,9 +453,6 @@ const styles = StyleSheet.create({
   editButton: {
     backgroundColor: '#4FE7AF',
   },
-  changePwButton: {
-    backgroundColor: '#6C63FF',
-  },
   editButtonText: {
     color: 'white',
     fontWeight: 'bold',
@@ -655,50 +568,8 @@ const styles = StyleSheet.create({
   closeImageModalButtonText: {
     fontWeight: 'bold',
   },
-  biometricSection: {
-    marginTop: 20,
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-    paddingTop: 15,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 15,
-    color: '#2D5783',
-  },
-  biometricRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  biometricInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  biometricText: {
-    marginLeft: 10,
-    fontSize: 16,
-  },
-  biometricButton: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 5,
-  },
-  biometricButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
-  biometricUnavailable: {
-    color: '#999',
-    fontStyle: 'italic',
-  },
-  biometricNote: {
-    marginTop: 5,
-    color: '#666',
-    fontSize: 12,
-    fontStyle: 'italic',
+  requiredStar: {
+    color: 'red',
   },
 });
 
