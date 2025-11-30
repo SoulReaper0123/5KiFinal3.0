@@ -23,9 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getDatabase, ref, get } from 'firebase/database';
 import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
-import * as SecureStore from 'expo-secure-store';
 import CustomModal from '../components/CustomModal';
 import CustomConfirmModal from '../components/CustomConfirmModal';
+import { Storage, isMobileBrowser } from '../utils/platformUtils';
 
 import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
@@ -180,21 +180,18 @@ const HomeTab = ({ setMemberId, setEmail, memberId, email }) => {
   };
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        const user = auth.currentUser;
-        const paramEmail = route.params?.user?.email;
-        const routeEmail = route.params?.email;
-        let storedEmail = null;
-        
-
-    // Try to get email from SecureStore (for biometric login) - WITH PLATFORM CHECK
-    if (Platform.OS !== 'web') {
-      try {
-        storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-      } catch (error) {
-        console.error('Error getting email from SecureStore:', error);
-      }
+const loadUserData = async () => {
+  try {
+    const user = auth.currentUser;
+    const paramEmail = route.params?.user?.email;
+    const routeEmail = route.params?.email;
+    let storedEmail = null;
+    
+    // Try to get email from storage - WORKS ON ALL PLATFORMS
+    try {
+      storedEmail = await Storage.getItem('currentUserEmail');
+    } catch (error) {
+      console.error('Error getting email from storage:', error);
     }
 
         
@@ -409,11 +406,9 @@ const performLogout = async () => {
   setLogoutLoading(true);
 
   try {
-    // Clear SecureStore data - WITH PLATFORM CHECK
-    if (Platform.OS !== 'web') {
-      await SecureStore.deleteItemAsync('currentUserEmail').catch(() => {});
-      await SecureStore.deleteItemAsync('biometricEnabled').catch(() => {});
-    }
+    // Clear storage data - WORKS ON ALL PLATFORMS
+    await Storage.deleteItem('currentUserEmail');
+    await Storage.deleteItem('biometricEnabled');
     
     // Sign out from Firebase
     await auth.signOut();
