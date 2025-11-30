@@ -48,7 +48,13 @@ const Settings = () => {
 
   // Add this useEffect to listen for navigation params
 useEffect(() => {
-  const checkBiometricsOnFocus = async () => {
+ const checkBiometricsOnFocus = async () => {
+    // Don't run on web
+    if (Platform.OS === 'web') {
+      setBiometricsEnabled(false);
+      return;
+    }
+
     try {
       // Check if biometrics are enabled for this user
       const credentials = await SecureStore.getItemAsync('biometricCredentials');
@@ -83,14 +89,17 @@ useEffect(() => {
   return unsubscribe;
 }, [navigation, currentEmail, route.params]);
 
-  // If no email from params, try to get it from SecureStore
+  // ← UPDATE the getEmail function to add platform check:
   useEffect(() => {
     const getEmail = async () => {
       if (!email) {
         try {
-          const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
-          if (storedEmail) {
-            setCurrentEmail(storedEmail);
+          // Only use SecureStore on native platforms
+          if (Platform.OS !== 'web') {
+            const storedEmail = await SecureStore.getItemAsync('currentUserEmail');
+            if (storedEmail) {
+              setCurrentEmail(storedEmail);
+            }
           }
         } catch (error) {
           console.error('Error getting email from SecureStore:', error);
@@ -103,9 +112,15 @@ useEffect(() => {
     getEmail();
   }, [email]);
 
-  // Check if biometrics are available and enabled
   useEffect(() => {
     const checkBiometrics = async () => {
+      // Disable biometric features on web
+      if (Platform.OS === 'web') {
+        setBiometricsAvailable(false);
+        setBiometricsEnabled(false);
+        return;
+      }
+
       try {
         // Check if device supports biometrics
         const hasHardware = await LocalAuthentication.hasHardwareAsync();
@@ -135,10 +150,16 @@ useEffect(() => {
     }
   }, [currentEmail]);
 
-  // Function to enable biometrics
-  const enableBiometrics = async () => {
+   const enableBiometrics = async () => {
+    // Don't run on web
+    if (Platform.OS === 'web') {
+      setModalMessage('Fingerprint login is not available on web browser');
+      setModalType('error');
+      setModalVisible(true);
+      return;
+    }
+
     try {
-      // Check if device supports biometrics
       const hasHardware = await LocalAuthentication.hasHardwareAsync();
       const isEnrolled = await LocalAuthentication.isEnrolledAsync();
       
@@ -149,7 +170,6 @@ useEffect(() => {
         return;
       }
       
-      // Navigate to BiometricSetup screen with email
       navigation.navigate('BiometricSetup', { 
         email: currentEmail,
         fromHome: false 
@@ -162,9 +182,17 @@ useEffect(() => {
       setModalVisible(true);
     }
   };
-  
-  // Function to disable biometrics
+
+  // ← UPDATE disableBiometrics function:
   const disableBiometrics = async () => {
+    // Don't run on web
+    if (Platform.OS === 'web') {
+      setModalMessage('Fingerprint login is not available on web browser');
+      setModalType('error');
+      setModalVisible(true);
+      return;
+    }
+
     try {
       await SecureStore.deleteItemAsync('biometricCredentials');
       setBiometricsEnabled(false);
@@ -179,17 +207,16 @@ useEffect(() => {
     }
   };
 
-  // Toggle fingerprint login
-  const toggleFingerprint = async (value) => {
-    if (value) {
-      await enableBiometrics();
-    } else {
-      await disableBiometrics();
-    }
-  };
-
-  // Test fingerprint authentication
+  // ← UPDATE testFingerprint function:
   const testFingerprint = async () => {
+    // Don't run on web
+    if (Platform.OS === 'web') {
+      setModalMessage('Fingerprint testing is not available on web browser');
+      setModalType('error');
+      setModalVisible(true);
+      return;
+    }
+
     try {
       const result = await LocalAuthentication.authenticateAsync({
         promptMessage: 'Test your fingerprint',
@@ -210,6 +237,15 @@ useEffect(() => {
       setModalMessage('Could not test fingerprint authentication');
       setModalType('error');
       setModalVisible(true);
+    }
+  };
+
+  // Toggle fingerprint login
+  const toggleFingerprint = async (value) => {
+    if (value) {
+      await enableBiometrics();
+    } else {
+      await disableBiometrics();
     }
   };
 
