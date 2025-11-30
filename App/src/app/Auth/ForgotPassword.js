@@ -1,47 +1,82 @@
 import React, { useState, useEffect } from 'react';
-import { Text, TextInput, View, TouchableOpacity, StyleSheet, Dimensions, Alert, Image, BackHandler } from 'react-native';
+import { Text, TextInput, View, TouchableOpacity, StyleSheet, Dimensions, BackHandler } from 'react-native';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { sendPasswordResetEmail } from 'firebase/auth'; // Import the Firebase function
-import { auth } from '../../firebaseConfig'; // Import Firebase configuration
+import { sendPasswordResetEmail } from 'firebase/auth';
+import { auth } from '../../firebaseConfig';
 import { MaterialIcons } from '@expo/vector-icons';
+import CustomModal from '../../components/CustomModal';
 
 const { width } = Dimensions.get('window');
 
 const ForgotPassword = ({ navigation }) => {
   const [email, setEmail] = useState('');
+  const [successModalVisible, setSuccessModalVisible] = useState(false);
+  const [errorModalVisible, setErrorModalVisible] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(false);
 
   // Handle the Android back button press
   useEffect(() => {
     const backAction = () => {
-      navigation.goBack(); // Navigate back to the login page when the back button is pressed
-      return true; // Returning true prevents the default behavior (exiting the app)
+      navigation.goBack();
+      return true;
     };
 
     const backHandler = BackHandler.addEventListener('hardwareBackPress', backAction);
 
-    return () => backHandler.remove(); // Clean up the event listener
+    return () => backHandler.remove();
   }, [navigation]);
 
   const handleResetPassword = async () => {
-  if (!email) {
-    Alert.alert('Missing Email', 'Please enter your email address to reset your password.');
-    return;
-  }
+    if (!email) {
+      setErrorMessage('Please enter your email address to reset your password.');
+      setErrorModalVisible(true);
+      return;
+    }
 
-  // Basic email format check
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRegex.test(email)) {
-    Alert.alert('Invalid Email', 'Please enter a valid email address in the format email@domain.com.');
-    return;
-  }
+    // Basic email format check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      setErrorMessage('Please enter a valid email address in the format email@domain.com.');
+      setErrorModalVisible(true);
+      return;
+    }
+
+    setLoading(true);
 
     try {
-      await sendPasswordResetEmail(auth, email); // Send reset password email using Firebase
-      Alert.alert('Success', 'Password reset instructions have been sent to your email.');
-      navigation.navigate('Login'); // Navigate back to the login page after successful reset
+      await sendPasswordResetEmail(auth, email);
+      setSuccessModalVisible(true);
     } catch (error) {
-      Alert.alert('Error', error.message);
+      console.error('Password reset error:', error);
+      
+      // Handle specific Firebase auth errors
+      let errorMsg = 'Failed to send reset email. Please try again.';
+      
+      if (error.code === 'auth/user-not-found') {
+        errorMsg = 'No account found with this email address.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMsg = 'The email address is not valid.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMsg = 'Network error. Please check your internet connection and try again.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMsg = 'Too many attempts. Please try again later.';
+      }
+      
+      setErrorMessage(errorMsg);
+      setErrorModalVisible(true);
+    } finally {
+      setLoading(false);
     }
+  };
+
+  const handleSuccessOk = () => {
+    setSuccessModalVisible(false);
+    navigation.navigate('Login');
+  };
+
+  const handleErrorOk = () => {
+    setErrorModalVisible(false);
   };
 
   return (
@@ -67,14 +102,47 @@ const ForgotPassword = ({ navigation }) => {
               style={styles.input}
               keyboardType="email-address"
               autoCapitalize="none"
+              editable={!loading}
             />
           </View>
 
-          <TouchableOpacity style={styles.primaryButton} onPress={handleResetPassword}>
-            <Text style={styles.primaryButtonText}>Send Link</Text>
+          <TouchableOpacity 
+            style={[styles.primaryButton, loading && styles.disabledButton]} 
+            onPress={handleResetPassword}
+            disabled={loading}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? 'Sending...' : 'Send Link'}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Success Modal */}
+      <CustomModal
+        visible={successModalVisible}
+        onClose={handleSuccessOk}
+        message="Password reset instructions have been sent to your email. Please check your inbox and follow the link to reset your password."
+        type="success"
+      />
+
+      {/* Error Modal */}
+      <CustomModal
+        visible={errorModalVisible}
+        onClose={handleErrorOk}
+        message={errorMessage}
+        type="error"
+      />
+
+      {/* Loading Overlay */}
+      {loading && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingBox}>
+            <MaterialIcons name="lock-clock" size={40} color="#1E3A5F" />
+            <Text style={styles.loadingText}>Sending reset link...</Text>
+          </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -144,6 +212,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  disabledButton: {
+    backgroundColor: '#9CA3AF',
+    opacity: 0.7,
+  },
   primaryButtonText: {
     color: 'white',
     fontSize: 16,
@@ -153,7 +225,33 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
   },
+  // Loading Overlay
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 9999,
+  },
+  loadingBox: {
+    backgroundColor: 'white',
+    padding: 30,
+    borderRadius: 12,
+    alignItems: 'center',
+    elevation: 20,
+    minWidth: 200,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#1E3A5F',
+    textAlign: 'center',
+  },
 });
-
 
 export default ForgotPassword;
