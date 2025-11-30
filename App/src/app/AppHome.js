@@ -25,7 +25,7 @@ import { auth } from '../firebaseConfig';
 import * as LocalAuthentication from 'expo-local-authentication';
 import CustomModal from '../components/CustomModal';
 import CustomConfirmModal from '../components/CustomConfirmModal';
-import { Storage, isMobileBrowser } from '../utils/platformUtils';
+import { Storage, isMobileBrowser } from './Auth/utils/platformUtils';
 
 import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
