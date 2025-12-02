@@ -115,6 +115,18 @@ const ApplyLoan = () => {
   const [interestRatesByType, setInterestRatesByType] = useState({});
   const [availableTerms, setAvailableTerms] = useState([]); // [{ key, label, interestRate }]
 
+const [qrCodeImage, setQrCodeImage] = useState(null);
+const [showQrSourceOptions, setShowQrSourceOptions] = useState(false);
+
+// Handle QR Code selection
+const handleQrCodePress = () => {
+  showSourceSelection(setQrCodeImage, 'qrCode');
+};
+
+// Remove QR Code image
+const removeQrCodeImage = () => {
+  setQrCodeImage(null);
+};
   const disbursementOptions = [
     { key: 'GCash', label: 'GCash' },
     { key: 'Bank', label: 'Bank' },
@@ -174,38 +186,41 @@ const ApplyLoan = () => {
     }
   };
 
-  // FIXED: Upload multiple images with better error handling
-  const uploadMultipleImages = async (imageUris, folder, userId) => {
-    if (!imageUris || imageUris.length === 0) {
-      return [];
+// FIXED: Upload all images including QR code
+const uploadAllImages = async (imageData) => {
+  try {
+    console.log('Starting upload of all images');
+    
+    const uploadedUrls = {};
+    
+    // Upload collateral images if any
+    if (imageData.collateralImages && imageData.collateralImages.length > 0) {
+      console.log(`Uploading ${imageData.collateralImages.length} collateral images`);
+      uploadedUrls.collateralUrls = await uploadMultipleImages(
+        imageData.collateralImages, 
+        'collateral', 
+        userId
+      );
     }
-
-    try {
-      console.log(`Starting upload of ${imageUris.length} images for ${folder} for user ${userId}`);
-      
-      // Upload images sequentially to avoid overwhelming the connection
-      const uploadedUrls = [];
-      for (let i = 0; i < imageUris.length; i++) {
-        try {
-          console.log(`Uploading image ${i + 1} of ${imageUris.length}`);
-          const url = await uploadImageToFirebase(imageUris[i], folder, userId);
-          uploadedUrls.push(url);
-          console.log(`Successfully uploaded image ${i + 1}: ${url}`);
-        } catch (error) {
-          console.error(`Failed to upload image ${i + 1}:`, error);
-          throw error; // Stop the process if any image fails
-        }
-      }
-      
-      console.log('Image upload process completed. URLs:', uploadedUrls);
-      return uploadedUrls;
-    } catch (error) {
-      console.error('Failed to upload multiple images:', error);
-      throw error;
+    
+    // Upload QR code image if exists
+    if (imageData.qrCodeImage) {
+      console.log('Uploading QR code image');
+      uploadedUrls.qrCodeUrl = await uploadImageToFirebase(
+        imageData.qrCodeImage, 
+        'qr_code', 
+        userId
+      );
     }
-  };
+    
+    console.log('All images uploaded successfully:', uploadedUrls);
+    return uploadedUrls;
+  } catch (error) {
+    console.error('Failed to upload images:', error);
+    throw error;
+  }
+};
 
-  // IMAGE HANDLING FUNCTIONS
 
   // Show source selection options
   const showSourceSelection = (setImageFunction, imageType) => {
@@ -1235,12 +1250,12 @@ const ApplyLoan = () => {
       if (cleanAccountNumber.length === 0) return '';
       if (cleanAccountNumber.length < 11) return 'GCash number must be 11 digits';
       if (cleanAccountNumber.length > 11) return 'GCash number cannot exceed 11 digits';
-      return 'Valid GCash number';
+      return;
     } else if (disbursement === 'Bank') {
       if (cleanAccountNumber.length === 0) return '';
       if (cleanAccountNumber.length < 8) return 'Bank account must be at least 8 digits';
       if (cleanAccountNumber.length > 16) return 'Bank account cannot exceed 16 digits';
-      return 'Valid bank account number';
+      return;
     }
     
     return '';
@@ -1686,92 +1701,96 @@ const ApplyLoan = () => {
     return true;
   };
 
-  // FIXED: Submit loan application with working image uploads - COMPLETELY REWRITTEN
-  const submitLoanApplication = async () => {
-    if (!validateForm()) {
-      setErrorModalVisible(true);
-      return;
-    }
+// FIXED: Submit loan application with QR code
+const submitLoanApplication = async () => {
+  if (!validateForm()) {
+    setErrorModalVisible(true);
+    return;
+  }
 
-    try {
-      setLoading(true);
+  try {
+    setLoading(true);
 
-      const loanAmountNum = parseFloat(loanAmount);
-      
-      // Upload collateral images to Firebase Storage if provided
-      let proofOfCollateralUrls = [];
-      if (requiresCollateral && proofOfCollateral.length > 0) {
-        try {
-          console.log('Starting collateral image uploads...');
-          
-          // Upload images to Firebase Storage
-          proofOfCollateralUrls = await uploadMultipleImages(proofOfCollateral, 'collateral', userId);
-          console.log('All collateral images uploaded successfully:', proofOfCollateralUrls);
-        } catch (uploadError) {
-          console.error('Failed to upload collateral images:', uploadError);
-          setErrorMessage(uploadError.message || 'Failed to upload collateral images. Please try again.');
-          setErrorModalVisible(true);
-          setLoading(false);
-          return;
-        }
-      }
-      
-      // Prepare application data with ALL fields including collateral image URLs
-      const applicationData = {
-        loanAmount: loanAmountNum,
-        term,
-        disbursement,
-        accountName,
-        accountNumber,
-        bankType: disbursement === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
-        interestRate: Number(interestRatesByType?.[loanType]?.[term]) || 0,
-        firstName,
-        lastName,
-        email,
-        userId,
-        loanType,
-        requiresCollateral,
-        processingFee: processingFee,
-        // Include collateral data if required
-        ...(requiresCollateral && {
-          collateralType,
-          collateralValue,
-          collateralDescription,
-          proofOfCollateralUrls // This contains the actual Firebase Storage URLs
-        })
-      };
-
-      console.log('Starting database operation with complete data:', applicationData);
-      const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
-      
-      if (!storedSuccessfully) {
+    const loanAmountNum = parseFloat(loanAmount);
+    
+    // Upload all images (collateral + QR code)
+    let uploadedImageUrls = {};
+    if ((requiresCollateral && proofOfCollateral.length > 0) || qrCodeImage) {
+      try {
+        console.log('Starting image uploads...');
+        
+        uploadedImageUrls = await uploadAllImages({
+          collateralImages: requiresCollateral ? proofOfCollateral : [],
+          qrCodeImage: qrCodeImage
+        });
+        
+        console.log('All images uploaded successfully:', uploadedImageUrls);
+      } catch (uploadError) {
+        console.error('Failed to upload images:', uploadError);
+        setErrorMessage(uploadError.message || 'Failed to upload images. Please try again.');
+        setErrorModalVisible(true);
         setLoading(false);
         return;
       }
-
-      console.log('Database operation completed successfully');
-
-      const loanData = {
-        email,
-        firstName,
-        lastName,
-        amount: loanAmountNum,
-        term,
-        date: new Date().toISOString(),
-      };
-
-      setPendingApiData(loanData);
-
-      setSuccessModalVisible(true);
-      
-    } catch (error) {
-      console.error('Error during loan submission:', error?.message || error || 'Unknown error');
-      setErrorMessage('An unexpected error occurred. Please try again later.');
-      setErrorModalVisible(true);
-    } finally {
-      setLoading(false);
     }
-  };
+    
+    // Prepare application data
+    const applicationData = {
+      loanAmount: loanAmountNum,
+      term,
+      disbursement,
+      accountName,
+      accountNumber,
+      bankType: disbursement === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
+      interestRate: Number(interestRatesByType?.[loanType]?.[term]) || 0,
+      firstName,
+      lastName,
+      email,
+      userId,
+      loanType,
+      requiresCollateral,
+      processingFee: processingFee,
+      qrCodeUrl: uploadedImageUrls.qrCodeUrl || null, // Add QR code URL
+      // Include collateral data if required
+      ...(requiresCollateral && {
+        collateralType,
+        collateralValue,
+        collateralDescription,
+        proofOfCollateralUrls: uploadedImageUrls.collateralUrls || []
+      })
+    };
+
+    console.log('Starting database operation with complete data:', applicationData);
+    const storedSuccessfully = await storeLoanApplicationInDatabase(applicationData);
+    
+    if (!storedSuccessfully) {
+      setLoading(false);
+      return;
+    }
+
+    console.log('Database operation completed successfully');
+
+    const loanData = {
+      email,
+      firstName,
+      lastName,
+      amount: loanAmountNum,
+      term,
+      date: new Date().toISOString(),
+      qrCodeUrl: uploadedImageUrls.qrCodeUrl // Add to API data
+    };
+
+    setPendingApiData(loanData);
+    setSuccessModalVisible(true);
+    
+  } catch (error) {
+    console.error('Error during loan submission:', error);
+    setErrorMessage('An unexpected error occurred. Please try again later.');
+    setErrorModalVisible(true);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSuccessOk = () => {
     setSuccessModalVisible(false);
@@ -2088,6 +2107,49 @@ const ApplyLoan = () => {
                 </Text>
               )}
 
+{/* QR Code Upload - Optional for GCash and Bank */}
+{(disbursement === 'GCash' || disbursement === 'Bank') && (
+  <>
+    <View style={{ marginTop: 10, marginBottom: 15 }}>
+      <Text style={styles.label}>
+        <Text style={{ color: '#666', fontSize: 14 }}>QR Code (Optional)</Text>
+      </Text>
+      <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+        Upload a QR code for easier fund transfer reference
+      </Text>
+      
+      {/* QR Code Image Preview */}
+      {qrCodeImage ? (
+        <View style={styles.qrCodeContainer}>
+          <Image source={getImageSource(qrCodeImage)} style={styles.qrCodeImage} />
+          <TouchableOpacity 
+            style={styles.removeQrButton}
+            onPress={removeQrCodeImage}
+          >
+            <MaterialIcons name="close" size={20} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.changeQrButton}
+            onPress={handleQrCodePress}
+          >
+            <Text style={styles.changeQrText}>Change QR Code</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          style={styles.qrUploadButton}
+          onPress={handleQrCodePress}
+        >
+          <View style={styles.qrIconContainer}>
+            <MaterialIcons name="qr-code-scanner" size={30} color="#1E3A5F" />
+            <Text style={styles.qrUploadText}>Upload QR Code</Text>
+            <Text style={styles.qrUploadSubText}>Optional - For easy reference</Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
+  </>
+)}
               {disbursement === 'Bank' && (
                 <>
                   <Text style={styles.label}><RequiredField>Type of Bank</RequiredField></Text>
@@ -2958,6 +3020,72 @@ const styles = StyleSheet.create({
     color: '#DC2626',
     fontWeight: '600',
   },
+  // QR Code Styles
+qrCodeContainer: {
+  position: 'relative',
+  marginBottom: 10,
+},
+qrCodeImage: {
+  width: 150,
+  height: 150,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: '#ddd',
+  alignSelf: 'center',
+},
+removeQrButton: {
+  position: 'absolute',
+  top: -8,
+  right: -8,
+  backgroundColor: '#dc2626',
+  borderRadius: 12,
+  width: 24,
+  height: 24,
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+changeQrButton: {
+  marginTop: 8,
+  padding: 8,
+  backgroundColor: '#f8f9fa',
+  borderWidth: 1,
+  borderColor: '#dee2e6',
+  borderRadius: 6,
+  alignSelf: 'center',
+},
+changeQrText: {
+  fontSize: 12,
+  color: '#495057',
+  textAlign: 'center',
+},
+qrUploadButton: {
+  width: '100%',
+  height: 100,
+  backgroundColor: '#F8FAFC',
+  borderWidth: 1,
+  borderColor: '#E2E8F0',
+  borderStyle: 'dashed',
+  borderRadius: 12,
+  justifyContent: 'center',
+  alignItems: 'center',
+  marginBottom: 10,
+},
+qrIconContainer: {
+  justifyContent: 'center',
+  alignItems: 'center',
+},
+qrUploadText: {
+  marginTop: 8,
+  fontSize: 14,
+  color: '#1E3A5F',
+  fontWeight: '600',
+},
+qrUploadSubText: {
+  fontSize: 12,
+  color: '#94A3B8',
+  textAlign: 'center',
+  marginTop: 2,
+},
 });
 
 export default ApplyLoan;
