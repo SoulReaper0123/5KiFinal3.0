@@ -134,6 +134,10 @@ const SystemSettings = () => {
   
   const [adminData, setAdminData] = useState(null);
 
+  // Add these near your existing state variables (around line 100-150)
+const [deleteTermModalVisible, setDeleteTermModalVisible] = useState(false);
+const [loanTypeForTermDelete, setLoanTypeForTermDelete] = useState('');
+
   const db = getDatabase();
   const storage = getStorage();
 
@@ -472,35 +476,75 @@ const SystemSettings = () => {
     setAddModalVisible(true);
   };
 
-  const requestDeleteTerm = (term) => {
-    setTermToDelete(term);
-    setDeleteModalVisible(true);
-  };
+const requestDeleteTerm = (term) => {
+  const lt = editingOriginalLoanType || wizardLoanTypeName || '';
+  if (!lt) {
+    showMessage('Error', 'Please select a loan type first.', true);
+    return;
+  }
+  setTermToDelete(term);
+  setDeleteModalVisible(true); // This triggers the existing modal
+};
 
-  const confirmDeleteTerm = () => {
-    const t = String(termToDelete);
-    const lt = editingOriginalLoanType || wizardLoanTypeName || '';
-    if (!lt) {
-      showMessage('Error', 'Please select a loan type first.', true);
-      return;
-    }
+// Replace your current confirmDeleteTerm function with this:
+const confirmDeleteTerm = () => {
+  const t = String(termToDelete);
+  const lt = editingOriginalLoanType || wizardLoanTypeName || '';
+  if (!lt) {
+    showMessage('Error', 'Please select a loan type first.', true);
+    return;
+  }
 
-    const updatedByType = { ...(settings.InterestRateByType || {}) };
-    const typeMap = { ...(updatedByType[lt] || {}) };
-    delete typeMap[t];
-    updatedByType[lt] = typeMap;
+  const updatedByType = { ...(settings.InterestRateByType || {}) };
+  const typeMap = { ...(updatedByType[lt] || {}) };
+  delete typeMap[t];
+  updatedByType[lt] = typeMap;
 
-    setSettings((prev) => ({
-      ...prev,
-      InterestRateByType: updatedByType,
-    }));
-    setDeleteModalVisible(false);
-    showSuccessMessage(`Deleted ${t} month term for ${lt} only.`);
-  };
+  setSettings((prev) => ({
+    ...prev,
+    InterestRateByType: updatedByType,
+  }));
+  setDeleteModalVisible(false);
+  setTermToDelete('');
+  showSuccessMessage(`Deleted ${t} month term for ${lt} only.`);
+};
 
   // Loan Types management functions
   const addWizardRow = () => setWizardRows((rows) => [...rows, { term: '', rate: '' }]);
-  const removeWizardRow = (idx) => setWizardRows((rows) => rows.filter((_, i) => i !== idx));
+ 
+  
+  // Replace the current removeWizardRow function with this:
+const removeWizardRow = (idx) => {
+  const termToDelete = wizardRows[idx].term;
+  if (termToDelete) {
+    // Show confirmation modal
+    setTermToDelete(termToDelete);
+    setLoanTypeForTermDelete(wizardLoanTypeName);
+    setDeleteTermModalVisible(true);
+  } else {
+    // If term is empty, just remove the row without confirmation
+    setWizardRows((rows) => rows.filter((_, i) => i !== idx));
+  }
+};
+
+const confirmDeleteTermFromWizard = () => {
+  // Find the index of the row with the term to delete
+  const rowIndex = wizardRows.findIndex(row => row.term === termToDelete);
+  
+  if (rowIndex !== -1) {
+    // Remove the row
+    setWizardRows((rows) => rows.filter((_, i) => i !== rowIndex));
+    
+    // Show success message
+    showSuccessMessage(`Term ${termToDelete} months removed from ${wizardLoanTypeName}`);
+  }
+  
+  // Close the modal and reset state
+  setDeleteTermModalVisible(false);
+  setTermToDelete(null);
+  setLoanTypeForTermDelete('');
+};
+
   const updateWizardRow = (idx, key, value) => setWizardRows((rows) => rows.map((r, i) => i === idx ? { ...r, [key]: value } : r));
   const resetWizard = () => {
     setWizardLoanTypeName('');
@@ -1473,6 +1517,24 @@ const handleSavingsWithdraw = async () => {
                 </div>
               </div>
             </div>
+{/* Term Deletion Confirmation Modal */}
+{deleteTermModalVisible && (
+  <div style={styles.confirmationModal}> {/* CHANGED from centeredModal to confirmationModal */}
+    <ConfirmModal
+      visible={deleteTermModalVisible}
+      message={`Are you sure you want to delete the ${termToDelete} month term from "${loanTypeForTermDelete}"?`}
+      confirmLabel="Yes, Delete"
+      cancelLabel="Cancel"
+      iconColor="#ef4444"
+      onConfirm={confirmDeleteTermFromWizard}
+      onCancel={() => {
+        setDeleteTermModalVisible(false);
+        setTermToDelete(null);
+        setLoanTypeForTermDelete('');
+      }}
+    />
+  </div>
+)}
 
             {/* Loan Types Section */}
             <div style={styles.card}>
@@ -2283,17 +2345,46 @@ const handleSavingsWithdraw = async () => {
       )}
 
       {/* Delete Interest Term Modal */}
-      {deleteModalVisible && (
-        <ConfirmModal
-          visible={deleteModalVisible}
-          message={`Delete the ${termToDelete} month term for ${(editingOriginalLoanType || wizardLoanTypeName)} only? Other loan types will keep this term.`}
-          confirmLabel="Yes"
-          cancelLabel="No"
-          iconColor="#3B82F6"
-          onConfirm={confirmDeleteTerm}
-          onCancel={() => setDeleteModalVisible(false)}
-        />
-      )}
+{deleteModalVisible && (
+  <div style={styles.confirmationModal}> {/* CHANGED HERE */}
+    <ConfirmModal
+      visible={deleteModalVisible}
+      message={`Delete the ${termToDelete} month term for ${(editingOriginalLoanType || wizardLoanTypeName)} only? Other loan types will keep this term.`}
+      confirmLabel="Yes"
+      cancelLabel="No"
+      iconColor="#3B82F6"
+      onConfirm={confirmDeleteTerm}
+      onCancel={() => setDeleteModalVisible(false)}
+    />
+  </div>
+)}
+
+{addLoanTypeModalVisible && (
+  <div style={styles.confirmationModal}> {/* CHANGED HERE */}
+    <ConfirmModal
+      visible={addLoanTypeModalVisible}
+      message={`Add "${newLoanType}" as a new loan type?`}
+      confirmLabel="Yes"
+      cancelLabel="No"
+      iconColor="#3B82F6"
+      onConfirm={confirmAddLoanType}
+      onCancel={() => setAddLoanTypeModalVisible(false)}
+    />
+  </div>
+)}
+{addModalVisible && (
+  <div style={styles.confirmationModal}> {/* CHANGED HERE */}
+    <ConfirmModal
+      visible={addModalVisible}
+      message={`Add ${newTerm} months at ${newRate}% interest?`}
+      confirmLabel="Yes"
+      cancelLabel="No"
+      iconColor="#3B82F6"
+      onConfirm={confirmAddTerm}
+      onCancel={() => setAddModalVisible(false)}
+    />
+  </div>
+)}
 
       {/* Funds Action Modal */}
       {fundsActionModal && (
@@ -2387,16 +2478,16 @@ const handleSavingsWithdraw = async () => {
                     </div>
                   </div>
                   
-                  {/* Remove Button */}
-                  <div style={styles.removeButtonContainer}>
-                    <button
-                      style={styles.removeButton}
-                      onClick={() => removeWizardRow(idx)}
-                      disabled={wizardRows.length === 1}
-                    >
-                      Remove
-                    </button>
-                  </div>
+{/* Remove Button */}
+<div style={styles.removeButtonContainer}>
+  <button
+    style={styles.removeButton}
+    onClick={() => removeWizardRow(idx)}
+    disabled={wizardRows.length === 1}
+  >
+    Remove
+  </button>
+</div>
                 </div>
               ))}
               
@@ -2446,18 +2537,19 @@ const handleSavingsWithdraw = async () => {
         />
       )}
 
-      {/* Delete Loan Type Modal */}
-      {deleteLoanTypeModalVisible && (
-        <ConfirmModal
-          visible={deleteLoanTypeModalVisible}
-          message={`Are you sure you want to delete "${loanTypeToDelete}" loan type?`}
-          confirmLabel="Yes"
-          cancelLabel="No"
-          iconColor="#3B82F6"
-          onConfirm={confirmDeleteLoanType}
-          onCancel={() => setDeleteLoanTypeModalVisible(false)}
-        />
-      )}
+{deleteLoanTypeModalVisible && (
+  <div style={styles.confirmationModal}> {/* CHANGED HERE */}
+    <ConfirmModal
+      visible={deleteLoanTypeModalVisible}
+      message={`Are you sure you want to delete "${loanTypeToDelete}" loan type?`}
+      confirmLabel="Yes"
+      cancelLabel="No"
+      iconColor="#3B82F6"
+      onConfirm={confirmDeleteLoanType}
+      onCancel={() => setDeleteLoanTypeModalVisible(false)}
+    />
+  </div>
+)}
 
       {/* Message Modal */}
       {messageModal.visible && (
@@ -3351,6 +3443,18 @@ const styles = {
     alignItems: 'center',
     zIndex: 1000
   },
+  confirmationModal: {
+  position: 'fixed',
+  top: 0,
+  left: 0,
+  right: 0,
+  bottom: 0,
+  backgroundColor: 'rgba(0, 0, 0, 0.7)', // Slightly darker for emphasis
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  zIndex: 2000, // Higher than other modals
+},
   smallModalCard: {
     backgroundColor: 'white',
     borderRadius: '16px',
