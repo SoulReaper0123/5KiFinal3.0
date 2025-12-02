@@ -791,7 +791,7 @@ app.post('/send-admin-email', async (req, res) => {
           </ul>
           
           <p>
-            <a href="${websiteLink || WEBSITE_LINK}" 
+            <a href="${DASHBOARD_LINK}" 
                style="display: inline-block; background-color: #3498db; color: white; 
                       padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
               Login to your account
@@ -3102,7 +3102,7 @@ app.post('/send-coadmin-email', async (req, res) => {
           </table>
           <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Quick Links:</h3>
           <ul style="padding-left: 20px;">
-            <li><a href="${websiteLink || WEBSITE_LINK}" style="color: #3498db;">Website</a></li>
+            <li><a href="${DASHBOARD_LINK}" style="color: #3498db;">Website</a></li>
           </ul>
           <p style="margin-top: 30px; color: #7f8c8d; font-size: 0.9em;">
             5KI Financial Services &copy; ${new Date().getFullYear()}
