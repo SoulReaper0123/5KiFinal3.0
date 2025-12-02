@@ -350,14 +350,14 @@ const CreatePasswordPage = () => {
               I agree to the{' '}
               <Text 
                 style={styles.link} 
-                onPress={() => navigation.navigate('Terms', { from: 'CreatePassword' })}
+                onPress={() => navigation.navigate('Terms and Conditions', { from: 'CreatePassword' })}
               >
                 Terms and Conditions
               </Text>{' '}
               and{' '}
               <Text 
                 style={styles.link} 
-                onPress={() => navigation.navigate('Privacy', { from: 'CreatePassword' })}
+                onPress={() => navigation.navigate('Privacy Policy', { from: 'CreatePassword' })}
               >
                 Privacy Policy
               </Text>.
