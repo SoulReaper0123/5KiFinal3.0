@@ -793,73 +793,99 @@ const CoAdmins = () => {
     return isValid;
   };
 
-  const handleAddAdmin = async () => {
-    setConfirmAddVisible(false);
-    setIsProcessing(true);
+const handleAddAdmin = async () => {
+  setConfirmAddVisible(false);
+  setIsProcessing(true);
 
+  try {
+    const password = generateRandomPassword();
+    const newId = await getNextId();
+    const now = new Date();
+    const dateAdded = formatDate(now);
+    const timeAdded = formatTime(now);
+
+    // Create Firebase user
+    const userCredential = await auth.createUserWithEmailAndPassword(email, password);
+    
+    const displayName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim();
+    await userCredential.user.updateProfile({
+      displayName
+    });
+
+    await auth.currentUser.updatePassword(password);
+
+    // Save to database
+    await database.ref(`Users/CoAdmin/${newId}`).set({
+      id: newId,
+      firstName,
+      middleName: middleName || '',
+      lastName,
+      email,
+      contactNumber,
+      dateAdded,
+      timeAdded,
+      role: 'coadmin',
+      uid: userCredential.user.uid,
+      initialPassword: password
+    });
+
+    await database.ref(`Members/${newId}`).set({
+      id: newId,
+      firstName,
+      middleName: middleName || '',
+      lastName,
+      email,
+      contactNumber,
+      dateAdded,
+      timeAdded,
+      role: 'coadmin',
+      status: 'active',
+      uid: userCredential.user.uid
+    });
+
+    // ✅ CRITICAL FIX: Send email IMMEDIATELY after successful creation
     try {
-      const password = generateRandomPassword();
-      const newId = await getNextId();
-      const now = new Date();
-      const dateAdded = formatDate(now);
-      const timeAdded = formatTime(now);
-
-      const userCredential = await auth.createUserWithEmailAndPassword(email, password);
-      
-      const displayName = `${firstName}${middleName ? ' ' + middleName : ''} ${lastName}`.trim();
-      await userCredential.user.updateProfile({
-        displayName
-      });
-
-      await auth.currentUser.updatePassword(password);
-
-      await database.ref(`Users/CoAdmin/${newId}`).set({
-        id: newId,
-        firstName,
+      await sendCoAdminCredentialsEmail({
+        email: email,
+        password: password,
+        firstName: firstName,
         middleName: middleName || '',
-        lastName,
-        email,
-        contactNumber,
-        dateAdded,
-        timeAdded,
-        role: 'coadmin',
-        uid: userCredential.user.uid,
-        initialPassword: password
+        lastName: lastName
       });
-
-      await database.ref(`Members/${newId}`).set({
-        id: newId,
-        firstName,
-        middleName: middleName || '',
-        lastName,
-        email,
-        contactNumber,
-        dateAdded,
-        timeAdded,
-        role: 'coadmin',
-        status: 'active',
-        uid: userCredential.user.uid
-      });
-
-      setPendingAdd({
-        firstName,
-        middleName,
-        lastName,
-        email,
-        contactNumber,
-        password
-      });
-
-      setSuccessMessage(`Co-Admin account created successfully!`);
-      setSuccessModalVisible(true);
-    } catch (error) {
-      console.error('Error adding admin:', error);
-      setErrorMessage(error.message || 'Failed to add admin');
-      setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
+      console.log('✅ Co-admin email sent successfully');
+    } catch (emailError) {
+      console.error('⚠️ Email sending failed but admin was created:', emailError);
+      // Don't fail the whole operation if email fails
     }
-  };
+
+    // Set pending data for success modal
+    setPendingAdd({
+      firstName,
+      middleName,
+      lastName,
+      email,
+      contactNumber,
+      password
+    });
+
+    setSuccessMessage(`Co-Admin account created successfully! Email sent to ${email}`);
+    setSuccessModalVisible(true);
+
+    // Reset form
+    setFirstName('');
+    setMiddleName('');
+    setLastName('');
+    setEmail('');
+    setContactNumber('');
+
+  } catch (error) {
+    console.error('Error adding co-admin:', error);
+    setErrorMessage(error.message || 'Failed to add co-admin');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false);
+  }
+};
 
   const handleDeleteAdmin = async () => {
     setConfirmDeleteVisible(false);
@@ -1165,59 +1191,54 @@ const CoAdmins = () => {
     }
   };
 
-  const handleSuccessOk = () => {
-    setSuccessModalVisible(false);
+const handleSuccessOk = () => {
+  setSuccessModalVisible(false);
   
-    if (pendingAdd) {
-      sendCoAdminCredentialsEmail({
-        email: pendingAdd.email,
-        password: pendingAdd.password,
-        firstName: pendingAdd.firstName,
-        middleName: pendingAdd.middleName,
-        lastName: pendingAdd.lastName
-      }).catch(error => console.error('Error sending co-admin credentials email:', error));
-      
-      // Reset form
-      setFirstName('');
-      setMiddleName('');
-      setLastName('');
-      setEmail('');
-      setContactNumber('');
-      setAddModalVisible(false);
-    } 
-    else if (pendingDelete) {
-      sendCoAdminDeleteData({
-        email: pendingDelete.email,
-        firstName: pendingDelete.firstName || '',
-        middleName: pendingDelete.middleName || '',
-        lastName: pendingDelete.lastName || ''
-      }).catch(error => console.error('Error sending co-admin delete notification:', error));
+  // Close the admin details modal if it's open (after delete action)
+  if (pendingDelete) {
+    setAdminModalVisible(false);
+    setSelectedAdmin(null);
+  }
+
+  // For delete action, send deletion email
+  if (pendingDelete) {
+    sendCoAdminDeleteData({
+      email: pendingDelete.email,
+      firstName: pendingDelete.firstName || '',
+      middleName: pendingDelete.middleName || '',
+      lastName: pendingDelete.lastName || ''
+    }).catch(error => {
+      console.error('Error sending co-admin delete notification:', error);
+      // Show error but don't prevent modal close
+      setErrorMessage('Account deleted but email notification failed');
+      setErrorModalVisible(true);
+    });
+  }
+
+  setPendingAdd(null);
+  setPendingDelete(null);
+  
+  // Refresh the list
+  const fetchAdmins = async () => {
+    try {
+      const snapshot = await database.ref('Users/CoAdmin').once('value');
+      const data = snapshot.val() || {};
+      const adminList = Object.entries(data).map(([id, admin]) => ({
+        id,
+        ...admin,
+        name: admin.firstName 
+          ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
+          : admin.name || ''
+      }));
+      setAdmins(adminList);
+      setFilteredData(adminList);
+    } catch (error) {
+      console.error('Error refreshing admin data:', error);
     }
-
-    setPendingAdd(null);
-    setPendingDelete(null);
-    
-    // Refresh the list
-    const fetchAdmins = async () => {
-      try {
-        const snapshot = await database.ref('Users/CoAdmin').once('value');
-        const data = snapshot.val() || {};
-        const adminList = Object.entries(data).map(([id, admin]) => ({
-          id,
-          ...admin,
-          name: admin.firstName 
-            ? `${admin.firstName}${admin.middleName ? ' ' + admin.middleName : ''} ${admin.lastName}`.trim()
-            : admin.name || ''
-        }));
-        setAdmins(adminList);
-        setFilteredData(adminList);
-      } catch (error) {
-        console.error('Error refreshing admin data:', error);
-      }
-    };
-
-    fetchAdmins();
   };
+
+  fetchAdmins();
+};
 
   const handleSubmitConfirmation = () => {
     if (!validateFields()) return;
