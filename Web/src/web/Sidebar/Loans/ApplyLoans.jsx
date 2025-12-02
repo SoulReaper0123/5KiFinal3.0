@@ -19,7 +19,8 @@ import {
   FaFileInvoiceDollar,
   FaHandHoldingUsd,
   FaClock,
-  FaPercentage
+  FaPercentage,
+  FaQrcode 
 } from 'react-icons/fa';
 
 const styles = {
@@ -1555,7 +1556,15 @@ const openImageViewer = (url, label, index) => {
   
   const images = [];
   
-  // Add all collateral images from proofOfCollateralUrls array
+  // Add QR code first if exists
+  if (selectedLoan.qrCodeUrl) {
+    images.push({ 
+      url: selectedLoan.qrCodeUrl, 
+      label: 'QR Code' 
+    });
+  }
+  
+  // Add all collateral images
   if (selectedLoan.proofOfCollateralUrls && selectedLoan.proofOfCollateralUrls.length > 0) {
     selectedLoan.proofOfCollateralUrls.forEach((imgUrl, idx) => {
       images.push({ 
@@ -1565,29 +1574,22 @@ const openImageViewer = (url, label, index) => {
     });
   }
   
-  // Also include individual proof images if they exist
-  if (selectedLoan.proofOfIncomeUrl) {
-    images.push({ 
-      url: selectedLoan.proofOfIncomeUrl, 
-      label: 'Proof of Income' 
-    });
+  // Find the index of the clicked image
+  let initialIndex = 0;
+  if (label === 'QR Code') {
+    initialIndex = 0; // QR code is first
+  } else if (label.startsWith('Collateral Image')) {
+    // Find which collateral image was clicked
+    const match = label.match(/Collateral Image (\d+)/);
+    if (match) {
+      const imageNum = parseInt(match[1]) - 1;
+      initialIndex = selectedLoan.qrCodeUrl ? 1 + imageNum : imageNum;
+    }
   }
-  if (selectedLoan.proofOfIdentityUrl) {
-    images.push({ 
-      url: selectedLoan.proofOfIdentityUrl, 
-      label: 'Proof of Identity' 
-    });
-  }
-  if (selectedLoan.proofOfCollateralUrl) {
-    images.push({ 
-      url: selectedLoan.proofOfCollateralUrl, 
-      label: 'Proof of Collateral' 
-    });
-  }
-
+  
   setAvailableImages(images);
-  setCurrentImage({ url, label });
-  setCurrentImageIndex(index);
+  setCurrentImageIndex(initialIndex);
+  setCurrentImage(images[initialIndex] || images[0]);
   setImageViewerVisible(true);
 };
 
@@ -1615,7 +1617,8 @@ const hasDocuments = (loan) => {
   return loan.proofOfIncomeUrl || 
          loan.proofOfIdentityUrl || 
          loan.proofOfCollateralUrl || 
-         (loan.proofOfCollateralUrls && loan.proofOfCollateralUrls.length > 0);
+         (loan.proofOfCollateralUrls && loan.proofOfCollateralUrls.length > 0) ||
+         loan.qrCodeUrl; // Add QR code check
 };
 
   if (!loans.length) return (
@@ -1769,7 +1772,7 @@ const hasDocuments = (loan) => {
                   </div>
                 </div>
 
-                {/* Right Column - Financial & Documents */}
+                 {/* Right Column - Financial & Documents */}
                 <div style={styles.column}>
                   <div style={styles.financialCard}>
                     <h3 style={styles.sectionTitle}>
@@ -1784,10 +1787,46 @@ const hasDocuments = (loan) => {
                       <span style={styles.fieldLabel}>Account Number:</span>
                       <span style={styles.fieldValue}>{selectedLoan.accountNumber || 'N/A'}</span>
                     </div>
-                                      <div style={styles.fieldGroup}>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>Type of Bank:</span>
                       <span style={styles.fieldValue}>{selectedLoan.bankType || 'N/A'}</span>
                     </div>
+                    
+                    {/* QR Code Display - Added Here */}
+                    {selectedLoan.qrCodeUrl && (
+                      <div style={{ marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid #e2e8f0' }}>
+                        <div style={styles.fieldGroup}>
+                          <span style={styles.fieldLabel}>
+                            <FaQrcode style={{ marginRight: '5px' }} />
+                            QR Code:
+                          </span>
+                          <span style={styles.fieldValue}>
+                            <div style={{ textAlign: 'right' }}>
+                              <img
+                                src={selectedLoan.qrCodeUrl}
+                                alt="QR Code"
+                                style={{
+                                  width: '80px',
+                                  height: '80px',
+                                  borderRadius: '6px',
+                                  border: '1px solid #e2e8f0',
+                                  cursor: 'pointer',
+                                  marginLeft: 'auto'
+                                }}
+                                onClick={() => openImageViewer(selectedLoan.qrCodeUrl, 'QR Code')}
+                              />
+                              <div style={{
+                                fontSize: '0.75rem',
+                                color: '#64748b',
+                                marginTop: '4px'
+                              }}>
+                           
+                              </div>
+                            </div>
+                          </span>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Collateral Information */}
@@ -1845,39 +1884,39 @@ const hasDocuments = (loan) => {
                     )}
                   </div>
 
-                  {/* Documents Section */}
-{/* Collateral Images Section */}
-{selectedLoan.requiresCollateral && selectedLoan.proofOfCollateralUrls && selectedLoan.proofOfCollateralUrls.length > 0 && (
-  <div style={styles.section}>
-    <h3 style={styles.sectionTitle}>
-      <FaIdCard />
-      Collateral Images
-    </h3>
-    <div style={styles.documentsGrid}>
-      {selectedLoan.proofOfCollateralUrls.map((url, index) => (
-        <div 
-          key={index}
-          style={styles.documentCard}
-          onClick={() => openImageViewer(url, `Collateral Image ${index + 1}`, index)}
-        >
-          <img
-            src={url}
-            alt={`Collateral ${index + 1}`}
-            style={styles.documentImage}
-            onError={(e) => {
-              console.error('Failed to load collateral image:', url);
-              e.target.style.display = 'none';
-            }}
-          />
-          <div style={styles.documentLabel}>Collateral Image {index + 1}</div>
-        </div>
-      ))}
-    </div>
-  </div>
-)}
+                  {/* Collateral Images Section */}
+                  {selectedLoan.requiresCollateral && selectedLoan.proofOfCollateralUrls && selectedLoan.proofOfCollateralUrls.length > 0 && (
+                    <div style={styles.section}>
+                      <h3 style={styles.sectionTitle}>
+                        <FaIdCard />
+                        Collateral Images
+                      </h3>
+                      <div style={styles.documentsGrid}>
+                        {selectedLoan.proofOfCollateralUrls.map((url, index) => (
+                          <div 
+                            key={index}
+                            style={styles.documentCard}
+                            onClick={() => openImageViewer(url, `Collateral Image ${index + 1}`, index)}
+                          >
+                            <img
+                              src={url}
+                              alt={`Collateral ${index + 1}`}
+                              style={styles.documentImage}
+                              onError={(e) => {
+                                console.error('Failed to load collateral image:', url);
+                                e.target.style.display = 'none';
+                              }}
+                            />
+                            <div style={styles.documentLabel}>Collateral Image {index + 1}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
+
 
             {selectedLoan.status !== 'approved' && selectedLoan.status !== 'rejected' && (
               <div style={styles.modalActions}>
