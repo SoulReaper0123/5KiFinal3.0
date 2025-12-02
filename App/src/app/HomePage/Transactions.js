@@ -8,7 +8,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   BackHandler,
-  Modal,
 } from 'react-native';
 import { ref, get } from 'firebase/database';
 import { database } from '../../firebaseConfig';
@@ -22,8 +21,6 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [selectedTransaction, setSelectedTransaction] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
   
   // Get email from multiple sources for better compatibility
   const getEmailFromSources = () => {
@@ -32,6 +29,89 @@ const Transactions = () => {
   };
   
   const email = getEmailFromSources();
+
+  // Function to fetch proof of transaction URL from various paths
+  const fetchProofOfTransaction = async (memberId, transactionId, type) => {
+    try {
+      let proofUrl = null;
+      let additionalData = {};
+      
+      switch (type) {
+        case 'Loans':
+          // Check multiple paths for loan transactions
+          const loanPaths = [
+            `Loans/ApprovedLoans/${memberId}/${transactionId}`,
+            `Loans/CurrentLoans/${memberId}/${transactionId}`,
+            `Transactions/Loans/${memberId}/${transactionId}`
+          ];
+          
+          for (const path of loanPaths) {
+            const refPath = ref(database, path);
+            const snapshot = await get(refPath);
+            if (snapshot.exists()) {
+              const data = snapshot.val();
+              if (data.proofOfTransactionUrl) {
+                proofUrl = data.proofOfTransactionUrl;
+                additionalData = {
+                  loanType: data.loanType,
+                  term: data.term,
+                  interestRate: data.interestRate,
+                  dueDate: data.dueDate,
+                  totalMonthlyPayment: data.totalMonthlyPayment,
+                  borrowedFromSavings: data.borrowedFromSavings,
+                  totalTermPayment: data.totalTermPayment
+                };
+                break;
+              }
+            }
+          }
+          break;
+          
+        case 'Withdrawals':
+          // Check multiple paths for withdrawal transactions
+          const withdrawalPaths = [
+            `Withdrawals/ApprovedWithdrawals/${memberId}/${transactionId}`,
+            `Transactions/Withdrawals/${memberId}/${transactionId}`
+          ];
+          
+          for (const path of withdrawalPaths) {
+            const refPath = ref(database, path);
+            const snapshot = await get(refPath);
+            if (snapshot.exists()) {
+              const data = snapshot.val();
+              if (data.proofOfTransactionUrl) {
+                proofUrl = data.proofOfTransactionUrl;
+                additionalData = {
+                  bankType: data.bankType,
+                  accountName: data.accountName,
+                  accountNumber: data.accountNumber,
+                  deductionBreakdown: data.deductionBreakdown
+                };
+                break;
+              }
+            }
+          }
+          break;
+          
+        case 'Deposits':
+          const depositRef = ref(database, `Transactions/Deposits/${memberId}/${transactionId}`);
+          const depositSnap = await get(depositRef);
+          if (depositSnap.exists()) {
+            const data = depositSnap.val();
+            proofUrl = data.proofOfTransactionUrl;
+          }
+          break;
+          
+        default:
+          break;
+      }
+      
+      return { proofUrl, additionalData };
+    } catch (error) {
+      console.error(`Error fetching proof for ${transactionId}:`, error);
+      return { proofUrl: null, additionalData: {} };
+    }
+  };
 
   const fetchTransactions = async () => {
     setLoading(true);
@@ -43,7 +123,9 @@ const Transactions = () => {
         const data = snapshot.val();
         const parsedTransactions = parseTransactions(data);
 
-        const filteredTransactions = parsedTransactions.filter(transaction => (transaction.email || '').toLowerCase() === (email || '').toLowerCase());
+        const filteredTransactions = parsedTransactions.filter(transaction => 
+          (transaction.email || '').toLowerCase() === (email || '').toLowerCase()
+        );
 
         // Sort by timestamp in descending order (newest first)
         filteredTransactions.sort((a, b) => b.timestamp - a.timestamp);
@@ -60,16 +142,16 @@ const Transactions = () => {
     }
   };
 
-    useEffect(() => {
-      const backHandler = BackHandler.addEventListener(
-        'hardwareBackPress',
-        () => {
-          navigation.navigate('AppHome');
-          return true;
-        }
-      );
-      return () => backHandler.remove();
-    }, [navigation]);
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        navigation.navigate('AppHome');
+        return true;
+      }
+    );
+    return () => backHandler.remove();
+  }, [navigation]);
 
   const onRefresh = () => {
     setRefreshing(true);
@@ -131,12 +213,14 @@ const Transactions = () => {
             amount: 0,
             label: '',
             status: details.status,
+            // Include all original details for reference
+            ...details
           };
 
           switch (type) {
             case 'Loans':
               transactionData.amount = parseFloat(details.loanAmount).toFixed(2) * -1;
-              transactionData.label = 'Loan Applied';
+              transactionData.label = 'Loan';
               transactionData.disbursement = details.disbursement;
               break;
             case 'Deposits':
@@ -151,7 +235,7 @@ const Transactions = () => {
               break;
             case 'Withdrawals':
               transactionData.amount = parseFloat(details.amountWithdrawn).toFixed(2) * -1;
-              transactionData.label = 'Withdraw';
+              transactionData.label = 'Withdrawal';
               transactionData.withdrawOption = details.withdrawOption;
               break;
             case 'Registrations':
@@ -172,18 +256,55 @@ const Transactions = () => {
     return parsed;
   };
 
-  const handleTransactionPress = (transaction) => {
-    // Navigate to GCASH-like details screen
-    const approvedAt = transaction.dateApproved || transaction.dateApplied || null;
-    const timeApproved = transaction.timeApproved || (typeof transaction.timestamp === 'number' ? new Date(transaction.timestamp).toISOString() : null);
-    navigation.navigate('TransactionDetails', { item: {
-      ...transaction,
-      label: transaction.label,
-      type: transaction.label,
-      approvedAt,
-      timeApproved,
-      timestamp: transaction.timestamp,
-    }});
+  const handleTransactionPress = async (transaction) => {
+    // Show loading
+    setLoading(true);
+    
+    try {
+      // Fetch proof URL and additional data for this transaction
+      const { proofUrl, additionalData } = await fetchProofOfTransaction(
+        transaction.memberId, 
+        transaction.transactionId, 
+        transaction.type
+      );
+      
+      // Navigate to details screen with all data
+      const approvedAt = transaction.dateApproved || transaction.dateApplied || null;
+      const timeApproved = transaction.timeApproved || (typeof transaction.timestamp === 'number' ? new Date(transaction.timestamp).toISOString() : null);
+      
+      navigation.navigate('TransactionDetails', { 
+        item: {
+          ...transaction,
+          label: transaction.label,
+          type: transaction.label,
+          approvedAt,
+          timeApproved,
+          timestamp: transaction.timestamp,
+          proofOfTransactionUrl: proofUrl,
+          // Pass additional data specific to transaction type
+          ...additionalData
+        }
+      });
+    } catch (error) {
+      console.error('Error fetching proof:', error);
+      // Navigate anyway without proof
+      const approvedAt = transaction.dateApproved || transaction.dateApplied || null;
+      const timeApproved = transaction.timeApproved || (typeof transaction.timestamp === 'number' ? new Date(transaction.timestamp).toISOString() : null);
+      
+      navigation.navigate('TransactionDetails', { 
+        item: {
+          ...transaction,
+          label: transaction.label,
+          type: transaction.label,
+          approvedAt,
+          timeApproved,
+          timestamp: transaction.timestamp,
+          proofOfTransactionUrl: null,
+        }
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   const formatDate = (dateString) => {
@@ -224,6 +345,7 @@ const Transactions = () => {
     if (dayStart === yesterdayStart) return 'Yesterday';
     return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
+  
   const getTimeStr = (transaction) => {
     const base = typeof transaction.timestamp === 'number' ? new Date(transaction.timestamp)
       : (transaction.dateApproved || transaction.dateApplied ? new Date(transaction.dateApproved || transaction.dateApplied) : null);
@@ -275,9 +397,6 @@ const Transactions = () => {
     );
   };
 
-  // Modal no longer needed; we navigate to details screen.
-  const renderTransactionModal = () => null;
-
   return (
     <View style={styles.container}>
       <View style={styles.headerBar}>
@@ -302,8 +421,6 @@ const Transactions = () => {
           )}
         </ScrollView>
       )}
-
-      {renderTransactionModal()}
     </View>
   );
 };
@@ -396,54 +513,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     color: '#666',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContainer: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    width: '90%',
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  modalContent: {
-    padding: 20,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
-  },
-  detailLabel: {
-    fontSize: 14,
-    color: '#666',
-    fontWeight: '500',
-    flex: 1,
-  },
-  detailValue: {
-    fontSize: 14,
-    color: '#333',
-    textAlign: 'right',
-    flex: 1,
   },
 });
 
