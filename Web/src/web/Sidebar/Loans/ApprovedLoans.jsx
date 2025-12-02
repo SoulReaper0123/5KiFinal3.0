@@ -16,7 +16,8 @@ import {
   FaPercent,
   FaCalendarDay,
   FaUniversity,
-  FaExchangeAlt
+  FaExchangeAlt,
+  FaFileContract
 } from 'react-icons/fa';
 import { database } from '../../../../../Database/firebaseConfig';
 import { SendLoanReminder } from '../../../../../Server/api';
@@ -776,75 +777,82 @@ const checkDueDates = async () => {
   }
 };
 
-  const fetchActiveLoansData = async () => {
-    try {
-      setLoading(true);
-      const [currentLoansSnapshot, approvedLoansSnapshot, membersSnapshot] = await Promise.all([
-        database.ref('Loans/CurrentLoans').once('value'),
-        database.ref('Loans/ApprovedLoans').once('value'),
-        database.ref('Members').once('value')
-      ]);
+const fetchActiveLoansData = async () => {
+  try {
+    setLoading(true);
+    
+    // Fetch data from multiple paths
+    const [currentLoansSnapshot, approvedLoansSnapshot, membersSnapshot] = await Promise.all([
+      database.ref('Loans/CurrentLoans').once('value'),
+      database.ref('Loans/ApprovedLoans').once('value'),
+      database.ref('Members').once('value')
+    ]);
 
-      const currentLoansData = currentLoansSnapshot.val() || {};
-      const approvedLoansData = approvedLoansSnapshot.val() || {};
-      const membersData = membersSnapshot.val() || {};
-      
-      const loanItems = [];
+    const currentLoansData = currentLoansSnapshot.val() || {};
+    const approvedLoansData = approvedLoansSnapshot.val() || {};
+    const membersData = membersSnapshot.val() || {};
+    
+    const loanItems = [];
 
-      Object.entries(currentLoansData).forEach(([memberId, loans]) => {
-        Object.entries(loans).forEach(([transactionId, loan]) => {
-          const outstandingBalance = parseFloat(loan.remainingBalance) || 0;
-          const originalLoan = approvedLoansData[memberId]?.[transactionId];
-          const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
-          const member = membersData[memberId] || {};
-          
-          const term = loan.term || 'N/A';
-          const interest = parseFloat(loan.interest) || 0;
-          const monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
-          const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
-          const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
-          const dueDate = loan.dueDate || 'N/A';
-          const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
-          const isOverdue = dueDateObj && new Date() > dueDateObj;
-          
-          loanItems.push({
-            memberId,
-            transactionId,
-            firstName: member.firstName || 'N/A',
-            lastName: member.lastName || 'N/A',
-            email: member.email || 'N/A',
-            phoneNumber: member.phoneNumber || 'N/A',
-            loanAmount: originalAmount,
-            outstandingBalance,
-            term,
-            interest,
-            monthlyPayment,
-            totalMonthlyPayment,
-            totalTermPayment,
-            dueDate,
-            isOverdue,
-            // Include approved loan details for modal
-            dateApproved: originalLoan?.dateApproved || 'N/A',
-            interestRate: originalLoan?.interestRate || 'N/A',
-            releaseAmount: originalLoan?.releaseAmount || 'N/A',
-            processingFee: originalLoan?.processingFee || 0,
-            totalInterest: originalLoan?.totalInterest || 0,
-            accountName: originalLoan?.accountName || 'N/A',
-            accountNumber: originalLoan?.accountNumber || 'N/A',
-            disbursement: originalLoan?.disbursement || 'N/A',
-            proofOfIncomeUrl: originalLoan?.proofOfIncomeUrl || '',
-            proofOfIdentityUrl: originalLoan?.proofOfIdentityUrl || ''
-          });
+    Object.entries(currentLoansData).forEach(([memberId, loans]) => {
+      Object.entries(loans).forEach(([transactionId, loan]) => {
+        const outstandingBalance = parseFloat(loan.remainingBalance) || 0;
+        const originalLoan = approvedLoansData[memberId]?.[transactionId];
+        const originalAmount = originalLoan ? parseFloat(originalLoan.loanAmount) || 0 : outstandingBalance;
+        const member = membersData[memberId] || {};
+        
+        const term = loan.term || 'N/A';
+        const interest = parseFloat(loan.interest) || 0;
+        const monthlyPayment = parseFloat(loan.monthlyPayment) || 0;
+        const totalMonthlyPayment = parseFloat(loan.totalMonthlyPayment) || 0;
+        const totalTermPayment = parseFloat(loan.totalTermPayment) || 0;
+        const dueDate = loan.dueDate || 'N/A';
+        const dueDateObj = dueDate !== 'N/A' ? new Date(dueDate) : null;
+        const isOverdue = dueDateObj && new Date() > dueDateObj;
+        
+        // Add proof of transaction URL from approved loan data
+        const proofOfTransactionUrl = originalLoan?.proofOfTransactionUrl || '';
+        
+        loanItems.push({
+          memberId,
+          transactionId,
+          firstName: member.firstName || 'N/A',
+          lastName: member.lastName || 'N/A',
+          email: member.email || 'N/A',
+          phoneNumber: member.phoneNumber || 'N/A',
+          loanAmount: originalAmount,
+          outstandingBalance,
+          term,
+          interest,
+          monthlyPayment,
+          totalMonthlyPayment,
+          totalTermPayment,
+          dueDate,
+          isOverdue,
+          // Include approved loan details for modal
+          dateApproved: originalLoan?.dateApproved || 'N/A',
+          interestRate: originalLoan?.interestRate || 'N/A',
+          releaseAmount: originalLoan?.releaseAmount || 'N/A',
+          processingFee: originalLoan?.processingFee || 0,
+          totalInterest: originalLoan?.totalInterest || 0,
+          accountName: originalLoan?.accountName || 'N/A',
+          accountNumber: originalLoan?.accountNumber || 'N/A',
+          disbursement: originalLoan?.disbursement || 'N/A',
+          proofOfIncomeUrl: originalLoan?.proofOfIncomeUrl || '',
+          proofOfIdentityUrl: originalLoan?.proofOfIdentityUrl || '',
+          // ADD THIS LINE: Include proof of transaction URL
+          proofOfTransactionUrl: proofOfTransactionUrl || ''
         });
       });
+    });
 
-      setActiveLoansData(loanItems);
-    } catch (error) {
-      console.error('Error fetching active loans data:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    setActiveLoansData(loanItems);
+  } catch (error) {
+    console.error('Error fetching active loans data:', error);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const formatCurrency = (amount) => {
     const num = typeof amount === 'string' ? parseFloat(amount) : amount;
@@ -947,23 +955,45 @@ const validateFinancialData = (loan) => {
     setErrorModalVisible(false);
     setSuccessMessageModalVisible(false);
   };
+const openImageViewer = (url, label, index) => {
+  const images = [];
+  
+  // Add proof of transaction if it exists
+  if (selectedLoan?.proofOfTransactionUrl && !selectedLoan.proofOfTransactionUrl.toLowerCase().endsWith('.pdf')) {
+    images.push({ 
+      url: selectedLoan.proofOfTransactionUrl, 
+      label: 'Proof of Transaction' 
+    });
+  }
+  
+  // Add other document images
+  if (selectedLoan?.proofOfIncomeUrl) {
+    images.push({ 
+      url: selectedLoan.proofOfIncomeUrl, 
+      label: 'Proof of Income' 
+    });
+  }
+  
+  if (selectedLoan?.proofOfIdentityUrl) {
+    images.push({ 
+      url: selectedLoan.proofOfIdentityUrl, 
+      label: 'Proof of Identity' 
+    });
+  }
 
-  const openImageViewer = (url, label, index) => {
-    const images = [];
-    
-    if (url) {
-      images.push({ 
-        url, 
-        label 
-      });
+  // Find the clicked image
+  let initialIndex = 0;
+  images.forEach((img, idx) => {
+    if (img.url === url && img.label === label) {
+      initialIndex = idx;
     }
+  });
 
-    setAvailableImages(images);
-    setCurrentImage({ url, label });
-    setCurrentImageIndex(index);
-    setImageViewerVisible(true);
-  };
-
+  setAvailableImages(images);
+  setCurrentImage(images[initialIndex] || images[0]);
+  setCurrentImageIndex(initialIndex);
+  setImageViewerVisible(true);
+};
   const closeImageViewer = () => {
     setImageViewerVisible(false);
     setCurrentImage({ url: '', label: '' });
@@ -1422,9 +1452,86 @@ const confirmResendReminder = async () => {
                       )}
                     </div>
                   </div>
+
+                    {selectedLoan.proofOfTransactionUrl && (
+    <div style={styles.section}>
+      <h3 style={styles.sectionTitle}>
+        <FaFileContract /> {/* You need to import this at the top */}
+        Proof of Transaction
+      </h3>
+      <div style={styles.documentsGrid}>
+        <div 
+          style={styles.documentCard}
+          onClick={() => {
+            // Check if it's a PDF or image
+            const isPDF = selectedLoan.proofOfTransactionUrl.toLowerCase().endsWith('.pdf');
+            
+            if (isPDF) {
+              // Open PDF in new tab
+              window.open(selectedLoan.proofOfTransactionUrl, '_blank');
+            } else {
+              // Open image in viewer
+              openImageViewer(selectedLoan.proofOfTransactionUrl, 'Proof of Transaction', 2);
+            }
+          }}
+        >
+          {selectedLoan.proofOfTransactionUrl.toLowerCase().endsWith('.pdf') ? (
+            <div style={{
+              width: '100%',
+              height: '120px',
+              backgroundColor: '#f0f4f8',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'center',
+              alignItems: 'center',
+              borderRadius: '6px',
+              marginBottom: '0.5rem'
+            }}>
+              <FaFileContract style={{ fontSize: '48px', color: '#ef4444', marginBottom: '8px' }} />
+              <span style={{ fontSize: '12px', color: '#374151' }}>PDF Document</span>
+            </div>
+          ) : (
+            <img
+              src={selectedLoan.proofOfTransactionUrl}
+              alt="Proof of Transaction"
+              style={styles.documentImage}
+              onError={(e) => {
+                console.error('Failed to load proof of transaction:', selectedLoan.proofOfTransactionUrl);
+                e.target.style.display = 'none';
+                // Show fallback
+                const parent = e.target.parentElement;
+                const fallbackDiv = document.createElement('div');
+                fallbackDiv.style.cssText = `
+                  width: 100%;
+                  height: 120px;
+                  background-color: #f0f4f8;
+                  display: flex;
+                  flexDirection: column;
+                  justify-content: center;
+                  align-items: center;
+                  border-radius: 6px;
+                  margin-bottom: 0.5rem;
+                `;
+                fallbackDiv.innerHTML = `
+                  <div style="font-size: 48px; color: #3b82f6; margin-bottom: 8px;">📄</div>
+                  <span style="font-size: 12px; color: #374151;">Proof of Transaction</span>
+                `;
+                parent.insertBefore(fallbackDiv, e.target.nextSibling);
+              }}
+            />
+          )}
+
+        </div>
+      </div>
+    </div>
+  )}
                 </div>
               </div>
             </div>
+
+            
+
+            
 
             <div style={styles.modalActions}>
               <button
