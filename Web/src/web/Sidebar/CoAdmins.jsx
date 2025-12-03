@@ -21,6 +21,7 @@ import { database, auth, storage } from '../../../../Database/firebaseConfig';
 import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { sendCoAdminCredentialsEmail, sendCoAdminDeleteData } from '../../../../Server/api';
 import { ConfirmModal, SuccessModal, ErrorModal } from '../components/Modals';
+import logoImage from '../../../../assets/logo.png'; 
 
 const generateRandomPassword = () => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -609,6 +610,7 @@ const styles = {
 
 const CoAdmins = () => {
   const [admins, setAdmins] = useState([]);
+  const [adminData, setAdminData] = useState(null);
   const [filteredData, setFilteredData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -681,6 +683,30 @@ const CoAdmins = () => {
     return () => {
       document.head.removeChild(styleElement);
     };
+  }, []);
+
+    useEffect(() => {
+    const fetchAdminData = async () => {
+      try {
+        const adminId = localStorage.getItem('adminId');
+        if (!adminId) return;
+
+        const role = localStorage.getItem('userRole') || 'admin';
+        const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                    role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+        
+        const adminRef = database.ref(`${node}/${adminId}`);
+        const snapshot = await adminRef.once('value');
+        
+        if (snapshot.exists()) {
+          setAdminData(snapshot.val());
+        }
+      } catch (error) {
+        console.error('Error fetching admin data:', error);
+      }
+    };
+
+    fetchAdminData();
   }, []);
 
   useEffect(() => {
@@ -907,240 +933,462 @@ const handleAddAdmin = async () => {
       setIsProcessing(false);
     }
   };
+const handlePrint = async (format = 'print') => {
+  setPrinting(true);
+  
+  try {
+    const sectionTitle = 'Co-Admins Report';
 
-  const handlePrint = (format = 'print') => {
-    setPrinting(true);
-    
-    try {
-      const sectionTitle = 'Co-Admins Report';
+    // Get the data that's currently displayed in the table (paginated)
+    const displayedData = paginatedData;
 
-      // Get the data that's currently displayed in the table (paginated)
-      const displayedData = paginatedData;
+    // If format is 'excel', handle it separately
+    if (format === 'excel') {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet(sectionTitle);
 
-      const printContent = document.createElement('div');
-      printContent.className = 'print-content';
-      printContent.style.padding = '20px';
-      printContent.style.fontFamily = 'Arial, sans-serif';
-
-      // Header
-      const header = document.createElement('div');
-      header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '10px';
-      header.style.marginBottom = '20px';
-      
-      const title = document.createElement('h1');
-      title.textContent = `${sectionTitle}`;
-      title.style.margin = '0';
-      title.style.color = '#333';
-      
-      const date = document.createElement('p');
-      date.textContent = `Generated on: ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString()}`;
-      date.style.margin = '5px 0 0 0';
-      date.style.color = '#666';
-      
-      const count = document.createElement('p');
-      count.textContent = `Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})`;
-      count.style.margin = '5px 0 0 0';
-      count.style.color = '#666';
-      
-      header.appendChild(title);
-      header.appendChild(date);
-      header.appendChild(count);
-      printContent.appendChild(header);
-
-      // Table
       if (displayedData.length > 0) {
-        const table = document.createElement('table');
-        table.style.width = '100%';
-        table.style.borderCollapse = 'collapse';
-        table.style.marginTop = '20px';
+        // Define headers for Excel
+        const excelHeaders = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added'];
 
-        // Table Header
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        headerRow.style.backgroundColor = '#f8f9fa';
-        
-        const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added'];
-        
-        // Create header cells
-        headers.forEach(headerText => {
-          const th = document.createElement('th');
-          th.textContent = headerText;
-          th.style.padding = '12px 8px';
-          th.style.border = '1px solid #ddd';
-          th.style.textAlign = 'left';
-          th.style.fontWeight = 'bold';
-          th.style.backgroundColor = '#e9ecef';
-          headerRow.appendChild(th);
+        worksheet.addRow(excelHeaders);
+
+        displayedData.forEach(admin => {
+          const row = [
+            admin.id,
+            admin.firstName || '',
+            admin.middleName || '',
+            admin.lastName || '',
+            admin.email,
+            admin.contactNumber || '',
+            admin.dateAdded || ''
+          ];
+          worksheet.addRow(row);
         });
-        
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        // Table Body
-        const tbody = document.createElement('tbody');
-        displayedData.forEach((admin, index) => {
-          const row = document.createElement('tr');
-          row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
-          
-          // ID
-          const tdId = document.createElement('td');
-          tdId.textContent = admin.id;
-          tdId.style.padding = '10px 8px';
-          tdId.style.border = '1px solid #ddd';
-          tdId.style.fontSize = '12px';
-          row.appendChild(tdId);
-
-          // First Name
-          const tdFirstName = document.createElement('td');
-          tdFirstName.textContent = admin.firstName || 'N/A';
-          tdFirstName.style.padding = '10px 8px';
-          tdFirstName.style.border = '1px solid #ddd';
-          tdFirstName.style.fontSize = '12px';
-          row.appendChild(tdFirstName);
-
-          // Middle Name
-          const tdMiddleName = document.createElement('td');
-          tdMiddleName.textContent = admin.middleName || 'N/A';
-          tdMiddleName.style.padding = '10px 8px';
-          tdMiddleName.style.border = '1px solid #ddd';
-          tdMiddleName.style.fontSize = '12px';
-          row.appendChild(tdMiddleName);
-
-          // Last Name
-          const tdLastName = document.createElement('td');
-          tdLastName.textContent = admin.lastName || 'N/A';
-          tdLastName.style.padding = '10px 8px';
-          tdLastName.style.border = '1px solid #ddd';
-          tdLastName.style.fontSize = '12px';
-          row.appendChild(tdLastName);
-
-          // Email
-          const tdEmail = document.createElement('td');
-          tdEmail.textContent = admin.email;
-          tdEmail.style.padding = '10px 8px';
-          tdEmail.style.border = '1px solid #ddd';
-          tdEmail.style.fontSize = '12px';
-          row.appendChild(tdEmail);
-
-          // Contact Number
-          const tdContact = document.createElement('td');
-          tdContact.textContent = admin.contactNumber || 'N/A';
-          tdContact.style.padding = '10px 8px';
-          tdContact.style.border = '1px solid #ddd';
-          tdContact.style.fontSize = '12px';
-          row.appendChild(tdContact);
-
-          // Date Added
-          const tdDate = document.createElement('td');
-          tdDate.textContent = admin.dateAdded || 'N/A';
-          tdDate.style.padding = '10px 8px';
-          tdDate.style.border = '1px solid #ddd';
-          tdDate.style.fontSize = '12px';
-          row.appendChild(tdDate);
-          
-          tbody.appendChild(row);
-        });
-        
-        table.appendChild(tbody);
-        printContent.appendChild(table);
-      } else {
-        const noData = document.createElement('p');
-        noData.textContent = 'No data available';
-        noData.style.textAlign = 'center';
-        noData.style.color = '#666';
-        noData.style.fontStyle = 'italic';
-        printContent.appendChild(noData);
       }
 
-      if (format === 'pdf') {
-        // For PDF, we'll use browser's print to PDF functionality
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
-      } else if (format === 'word') {
-        // For Word, create a simple HTML file that can be opened in Word
-        const htmlContent = `
-          <html>
-            <head>
-              <title>${sectionTitle}</title>
-              <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-                th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                th { background-color: #f2f2f2; font-weight: bold; }
-                h1 { color: #333; }
-              </style>
-            </head>
-            <body>
-              ${printContent.innerHTML}
-            </body>
-          </html>
-        `;
-        
-        const blob = new Blob([htmlContent], { type: 'application/msword' });
-        const url = URL.createObjectURL(blob);
+      workbook.xlsx.writeBuffer().then(buffer => {
+        const blob = new Blob([buffer], { 
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+        });
+        const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.doc`;
+        link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
-        URL.revokeObjectURL(url);
-      } else if (format === 'excel') {
-        // Export to Excel
-        const workbook = new ExcelJS.Workbook();
-        const worksheet = workbook.addWorksheet(sectionTitle);
-
-        if (displayedData.length > 0) {
-          // Define headers for Excel
-          const excelHeaders = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added'];
-
-          worksheet.addRow(excelHeaders);
-
-          displayedData.forEach(admin => {
-            const row = [
-              admin.id,
-              admin.firstName || '',
-              admin.middleName || '',
-              admin.lastName || '',
-              admin.email,
-              admin.contactNumber || '',
-              admin.dateAdded || ''
-            ];
-            worksheet.addRow(row);
-          });
-        }
-
-        workbook.xlsx.writeBuffer().then(buffer => {
-          const blob = new Blob([buffer], { 
-            type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-          });
-          const url = window.URL.createObjectURL(blob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          window.URL.revokeObjectURL(url);
-        });
-      } else {
-        // Direct print
-        document.body.appendChild(printContent);
-        window.print();
-        document.body.removeChild(printContent);
-      }
-
-      setPrintModalVisible(false);
-    } catch (error) {
-      console.error('Error printing data:', error);
-      setErrorMessage('Failed to print data');
-      setErrorModalVisible(true);
-    } finally {
-      setPrinting(false);
+        window.URL.revokeObjectURL(url);
+        
+        setPrinting(false);
+        setPrintModalVisible(false);
+      }).catch(error => {
+        console.error('Excel export error:', error);
+        setErrorMessage('Failed to export to Excel');
+        setErrorModalVisible(true);
+        setPrinting(false);
+      });
+      
+      return;
     }
-  };
+
+    // For print and pdf formats, create the print content
+    const printContent = document.createElement('div');
+    printContent.className = 'print-content';
+    printContent.style.padding = '20px';
+    printContent.style.fontFamily = 'Arial, sans-serif';
+    printContent.style.boxSizing = 'border-box';
+    printContent.style.margin = '0';
+    printContent.style.display = 'flex';
+    printContent.style.flexDirection = 'column';
+    printContent.style.minHeight = '100vh';
+
+    // Main content container
+    const mainContent = document.createElement('div');
+    mainContent.style.flex = '1';
+
+    // ========== HEADER SECTION ==========
+    const header = document.createElement('div');
+    header.className = 'print-header';
+    header.style.paddingBottom = '15px';
+    header.style.marginBottom = '20px';
+    header.style.boxSizing = 'border-box';
+
+    // Logo and Report Title (Centered)
+    const logoSection = document.createElement('div');
+    logoSection.style.textAlign = 'center';
+    logoSection.style.marginBottom = '15px';
+
+    // Add logo image
+    const logoImg = document.createElement('img');
+    logoImg.src = logoImage;
+    logoImg.style.width = '80px';
+    logoImg.style.height = '80px';
+    logoImg.style.marginBottom = '5px';
+    logoImg.style.display = 'block';
+    logoImg.style.marginLeft = 'auto';
+    logoImg.style.marginRight = 'auto';
+
+    const logo = document.createElement('div');
+    logo.textContent = '5Ki Financial Services';
+    logo.style.fontSize = '24px';
+    logo.style.fontWeight = 'bold';
+    logo.style.color = '#1e40af';
+    logo.style.marginBottom = '5px';
+
+    const reportTitle = document.createElement('div');
+    reportTitle.textContent = `${sectionTitle} Report`;
+    reportTitle.style.fontSize = '20px';
+    reportTitle.style.fontWeight = 'bold';
+    reportTitle.style.marginBottom = '15px';
+
+    logoSection.appendChild(logoImg);
+    logoSection.appendChild(logo);
+    logoSection.appendChild(reportTitle);
+
+    // Report Details
+    const reportDetails = document.createElement('div');
+    reportDetails.style.textAlign = 'center';
+    reportDetails.style.marginBottom = '15px';
+    reportDetails.style.fontSize = '14px';
+    reportDetails.style.color = '#666';
+    reportDetails.innerHTML = `
+      <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
+    `;
+
+    header.appendChild(logoSection);
+    header.appendChild(reportDetails);
+    mainContent.appendChild(header);
+
+    // ========== TABLE SECTION ==========
+    if (displayedData.length > 0) {
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.marginTop = '20px';
+      table.style.boxSizing = 'border-box';
+
+      // Table Header
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.backgroundColor = '#f8f9fa';
+      
+      const headers = ['ID', 'First Name', 'Middle Name', 'Last Name', 'Email', 'Contact Number', 'Date Added'];
+      
+      // Create header cells
+      headers.forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText;
+        th.style.padding = '12px 8px';
+        th.style.border = '1px solid #ddd';
+        th.style.textAlign = 'left';
+        th.style.fontWeight = 'bold';
+        th.style.backgroundColor = '#e9ecef';
+        th.style.boxSizing = 'border-box';
+        headerRow.appendChild(th);
+      });
+      
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Table Body
+      const tbody = document.createElement('tbody');
+      displayedData.forEach((admin, index) => {
+        const row = document.createElement('tr');
+        row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+        
+        // ID
+        const tdId = document.createElement('td');
+        tdId.textContent = admin.id;
+        tdId.style.padding = '10px 8px';
+        tdId.style.border = '1px solid #ddd';
+        tdId.style.fontSize = '12px';
+        row.appendChild(tdId);
+
+        // First Name
+        const tdFirstName = document.createElement('td');
+        tdFirstName.textContent = admin.firstName || 'N/A';
+        tdFirstName.style.padding = '10px 8px';
+        tdFirstName.style.border = '1px solid #ddd';
+        tdFirstName.style.fontSize = '12px';
+        row.appendChild(tdFirstName);
+
+        // Middle Name
+        const tdMiddleName = document.createElement('td');
+        tdMiddleName.textContent = admin.middleName || 'N/A';
+        tdMiddleName.style.padding = '10px 8px';
+        tdMiddleName.style.border = '1px solid #ddd';
+        tdMiddleName.style.fontSize = '12px';
+        row.appendChild(tdMiddleName);
+
+        // Last Name
+        const tdLastName = document.createElement('td');
+        tdLastName.textContent = admin.lastName || 'N/A';
+        tdLastName.style.padding = '10px 8px';
+        tdLastName.style.border = '1px solid #ddd';
+        tdLastName.style.fontSize = '12px';
+        row.appendChild(tdLastName);
+
+        // Email
+        const tdEmail = document.createElement('td');
+        tdEmail.textContent = admin.email;
+        tdEmail.style.padding = '10px 8px';
+        tdEmail.style.border = '1px solid #ddd';
+        tdEmail.style.fontSize = '12px';
+        row.appendChild(tdEmail);
+
+        // Contact Number
+        const tdContact = document.createElement('td');
+        tdContact.textContent = admin.contactNumber || 'N/A';
+        tdContact.style.padding = '10px 8px';
+        tdContact.style.border = '1px solid #ddd';
+        tdContact.style.fontSize = '12px';
+        row.appendChild(tdContact);
+
+        // Date Added
+        const tdDate = document.createElement('td');
+        tdDate.textContent = admin.dateAdded || 'N/A';
+        tdDate.style.padding = '10px 8px';
+        tdDate.style.border = '1px solid #ddd';
+        tdDate.style.fontSize = '12px';
+        row.appendChild(tdDate);
+        
+        tbody.appendChild(row);
+      });
+      
+      table.appendChild(tbody);
+      mainContent.appendChild(table);
+    } else {
+      const noData = document.createElement('p');
+      noData.textContent = 'No data available';
+      noData.style.textAlign = 'center';
+      noData.style.color = '#666';
+      noData.style.fontStyle = 'italic';
+      noData.style.marginTop = '40px';
+      mainContent.appendChild(noData);
+    }
+
+    // Add main content to printContent
+    printContent.appendChild(mainContent);
+
+    // ========== FOOTER SECTION ==========
+    const footer = document.createElement('div');
+    footer.style.marginTop = 'auto';
+    footer.style.paddingTop = '30px';
+    footer.style.borderTop = '1px solid #ddd';
+    footer.style.fontSize = '12px';
+    footer.style.color = '#666';
+
+    // Footer content container
+    const footerContent = document.createElement('div');
+    footerContent.style.display = 'flex';
+    footerContent.style.justifyContent = 'space-between';
+    footerContent.style.alignItems = 'flex-start';
+    footerContent.style.boxSizing = 'border-box';
+
+    // Left side - Generated Date
+    const generatedDate = document.createElement('div');
+    generatedDate.style.textAlign = 'left';
+    generatedDate.style.flex = '1';
+    generatedDate.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Generated as of:</strong></div>
+      <div>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+    `;
+
+    // Right side - Prepared By - CORRECTED VERSION
+    const preparedBy = document.createElement('div');
+    preparedBy.style.textAlign = 'right';
+    preparedBy.style.flex = '1';
+    
+    // Get admin data for prepared by section
+    let adminFirstName = 'Admin';
+    let adminRole = 'Administrator';
+    
+    try {
+      // Try to get from adminData state first
+      if (adminData) {
+        adminFirstName = adminData.firstName || 'Admin';
+      } else {
+        // Fallback: try to get from localStorage
+        const adminId = localStorage.getItem('adminId');
+        if (adminId) {
+          // Try quick fetch from Firebase
+          try {
+            const role = localStorage.getItem('userRole') || 'admin';
+            const node = role === 'superadmin' ? 'Users/SuperAdmin' : 
+                        role === 'coadmin' ? 'Users/CoAdmin' : 'Users/Admin';
+            
+            const adminRef = database.ref(`${node}/${adminId}`);
+            const snapshot = await adminRef.once('value');
+            if (snapshot.exists()) {
+              const data = snapshot.val();
+              adminFirstName = data.firstName || 'Admin';
+              setAdminData(data); // Store for future use
+            }
+          } catch (error) {
+            console.log('Quick fetch failed, using default:', error);
+          }
+        }
+      }
+      
+      // Get role from localStorage
+      const role = localStorage.getItem('userRole') || 'admin';
+      adminRole = role === 'superadmin' ? 'Super Admin' : 
+                  role === 'coadmin' ? 'Co-Admin' : 
+                  'Admin';
+      
+    } catch (error) {
+      console.log('Error getting admin data for print:', error);
+    }
+    
+    preparedBy.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Prepared by:</strong></div>
+      <div style="font-weight: bold;">${adminFirstName}</div>
+      <div style="font-style: italic;">${adminRole}</div>
+    `;
+
+    footerContent.appendChild(generatedDate);
+    footerContent.appendChild(preparedBy);
+    footer.appendChild(footerContent);
+    printContent.appendChild(footer);
+
+    // Create a hidden iframe for printing to avoid browser headers
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.style.visibility = 'hidden';
+    
+    document.body.appendChild(printFrame);
+    
+    let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+    if (printDocument.document) {
+      printDocument = printDocument.document;
+    }
+
+    // Write the print content to the iframe with CSS to remove headers/footers
+    printDocument.open();
+    printDocument.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${sectionTitle} Report</title>
+          <style>
+            /* Reset all margins and remove browser headers/footers */
+            @page {
+              margin: 0.5in !important;
+              size: auto;
+              margin-header: 0 !important;
+              margin-footer: 0 !important;
+            }
+            
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+              font-family: Arial, sans-serif;
+              -webkit-print-color-adjust: exact;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
+            }
+            
+            .print-content {
+              margin: 0 !important;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
+            }
+            
+            /* Hide any potential browser elements */
+            header, footer, .header, .footer {
+              display: none !important;
+            }
+            
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+            
+            /* Logo styling for print */
+            img {
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printDocument.close();
+
+    // Wait for content to load then print
+    const waitForPrint = async () => {
+      try {
+        // Wait a bit for the iframe to load
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        if (format === 'pdf') {
+          // For PDF, we trigger the browser's print dialog
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+        } else {
+          // Direct print
+          printFrame.contentWindow.focus();
+          printFrame.contentWindow.print();
+        }
+        
+        // Clean up after printing
+        setTimeout(() => {
+          try {
+            document.body.removeChild(printFrame);
+          } catch (e) {
+            console.log('Error removing print frame:', e);
+          }
+          setPrintModalVisible(false);
+          setPrinting(false);
+        }, 1000);
+        
+      } catch (error) {
+        console.error('Print error:', error);
+        try {
+          document.body.removeChild(printFrame);
+        } catch (e) {
+          console.log('Error removing print frame after error:', e);
+        }
+        setErrorMessage('Failed to print document');
+        setErrorModalVisible(true);
+        setPrinting(false);
+      }
+    };
+
+    // Start the print process
+    waitForPrint();
+
+  } catch (error) {
+    console.error('Error in handlePrint:', error);
+    setErrorMessage('Failed to generate print document: ' + error.message);
+    setErrorModalVisible(true);
+    setPrinting(false);
+  }
+};
 
   const handleDownload = async () => {
     try {
@@ -1467,69 +1715,54 @@ const handleSuccessOk = () => {
                   Choose how you want to export the currently displayed {paginatedData.length} records:
                 </p>
 
-                <button
-                  style={{
-                    ...styles.printOption,
-                    ...(isHovered.printDirect ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printDirect')}
-                  onMouseLeave={() => handleMouseLeave('printDirect')}
-                  onClick={() => handlePrint('print')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Print Directly</p>
-                  <p style={styles.printOptionDescription}>
-                    Send directly to your printer
-                  </p>
-                </button>
+{/* In your print modal JSX - only show these 3 buttons */}
+<button
+  style={{
+    ...styles.printOption,
+    ...(isHovered.printDirect ? styles.printOptionHover : {})
+  }}
+  onMouseEnter={() => handleMouseEnter('printDirect')}
+  onMouseLeave={() => handleMouseLeave('printDirect')}
+  onClick={() => handlePrint('print')}
+  disabled={printing}
+>
+  <p style={styles.printOptionText}>Print Directly</p>
+  <p style={styles.printOptionDescription}>
+    Send directly to your printer
+  </p>
+</button>
 
-                <button
-                  style={{
-                    ...styles.printOption,
-                    ...(isHovered.printPDF ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printPDF')}
-                  onMouseLeave={() => handleMouseLeave('printPDF')}
-                  onClick={() => handlePrint('pdf')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Save as PDF</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as PDF file
-                  </p>
-                </button>
+<button
+  style={{
+    ...styles.printOption,
+    ...(isHovered.printPDF ? styles.printOptionHover : {})
+  }}
+  onMouseEnter={() => handleMouseEnter('printPDF')}
+  onMouseLeave={() => handleMouseLeave('printPDF')}
+  onClick={() => handlePrint('pdf')}
+  disabled={printing}
+>
+  <p style={styles.printOptionText}>Save as PDF</p>
+  <p style={styles.printOptionDescription}>
+    Download as PDF file
+  </p>
+</button>
 
-                <button
-                  style={{
-                    ...styles.printOption,
-                    ...(isHovered.printWord ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printWord')}
-                  onMouseLeave={() => handleMouseLeave('printWord')}
-                  onClick={() => handlePrint('word')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Export to Word</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as Word document
-                  </p>
-                </button>
-
-                <button
-                  style={{
-                    ...styles.printOption,
-                    ...(isHovered.printExcel ? styles.printOptionHover : {})
-                  }}
-                  onMouseEnter={() => handleMouseEnter('printExcel')}
-                  onMouseLeave={() => handleMouseLeave('printExcel')}
-                  onClick={() => handlePrint('excel')}
-                  disabled={printing}
-                >
-                  <p style={styles.printOptionText}>Export to Excel</p>
-                  <p style={styles.printOptionDescription}>
-                    Download as Excel spreadsheet
-                  </p>
-                </button>
+<button
+  style={{
+    ...styles.printOption,
+    ...(isHovered.printExcel ? styles.printOptionHover : {})
+  }}
+  onMouseEnter={() => handleMouseEnter('printExcel')}
+  onMouseLeave={() => handleMouseLeave('printExcel')}
+  onClick={() => handlePrint('excel')}
+  disabled={printing}
+>
+  <p style={styles.printOptionText}>Export to Excel</p>
+  <p style={styles.printOptionDescription}>
+    Download as Excel spreadsheet
+  </p>
+</button>
               </div>
             </div>
           </div>
