@@ -965,416 +965,439 @@ const Withdraws = () => {
     }
   };
 
-  const handlePrint = (format = 'print') => {
-    setPrinting(true);
-    
-    try {
-      const sectionTitle = 
-        activeSection === 'withdrawApplications' ? 'Pending Withdrawals' :
-        activeSection === 'approvedWithdraws' ? 'Approved Withdrawals' :
-        'Rejected Withdrawals';
+const handlePrint = (format = 'print') => {
+  setPrinting(true);
+  
+  try {
+    const sectionTitle = 
+      activeSection === 'withdrawApplications' ? 'Pending Withdrawals' :
+      activeSection === 'approvedWithdraws' ? 'Approved Withdrawals' :
+      'Rejected Withdrawals';
 
-      // Get the data that's currently displayed in the table (paginated)
-      const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
+    // Get the data that's currently displayed in the table (paginated)
+    const displayedData = filteredData.slice(currentPage * pageSize, (currentPage + 1) * pageSize);
 
-      const printContent = document.createElement('div');
-      printContent.className = 'print-content';
-      printContent.style.padding = '20px';
-      printContent.style.fontFamily = 'Arial, sans-serif';
-      printContent.style.boxSizing = 'border-box';
-      printContent.style.margin = '0';
+    const printContent = document.createElement('div');
+    printContent.className = 'print-content';
+    printContent.style.padding = '20px';
+    printContent.style.fontFamily = 'Arial, sans-serif';
+    printContent.style.boxSizing = 'border-box';
+    printContent.style.margin = '0';
+    printContent.style.display = 'flex';
+    printContent.style.flexDirection = 'column';
+    printContent.style.minHeight = '100vh';
 
-      // Create your custom header
-      const header = document.createElement('div');
-      header.className = 'print-header';
-      header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '15px';
-      header.style.marginBottom = '20px';
-      header.style.boxSizing = 'border-box';
+    // Main content container
+    const mainContent = document.createElement('div');
+    mainContent.style.flex = '1';
 
-      // Logo and Report Title (Centered)
-      const logoSection = document.createElement('div');
-      logoSection.style.textAlign = 'center';
-      logoSection.style.marginBottom = '15px';
+    // ========== HEADER SECTION ==========
+    const header = document.createElement('div');
+    header.className = 'print-header';
+    header.style.paddingBottom = '15px';
+    header.style.marginBottom = '20px';
+    header.style.boxSizing = 'border-box';
 
-      // Add logo image
-      const logoImg = document.createElement('img');
-      logoImg.src = logoImage;
-      logoImg.style.width = '80px';
-      logoImg.style.height = '80px';
-      logoImg.style.marginBottom = '5px';
-      logoImg.style.display = 'block';
-      logoImg.style.marginLeft = 'auto';
-      logoImg.style.marginRight = 'auto';
+    // Logo and Report Title (Centered)
+    const logoSection = document.createElement('div');
+    logoSection.style.textAlign = 'center';
+    logoSection.style.marginBottom = '15px';
 
-      const logo = document.createElement('div');
-      logo.textContent = '5Ki Financial Services';
-      logo.style.fontSize = '24px';
-      logo.style.fontWeight = 'bold';
-      logo.style.color = '#1e40af';
-      logo.style.marginBottom = '5px';
+    // Add logo image
+    const logoImg = document.createElement('img');
+    logoImg.src = logoImage;
+    logoImg.style.width = '80px';
+    logoImg.style.height = '80px';
+    logoImg.style.marginBottom = '5px';
+    logoImg.style.display = 'block';
+    logoImg.style.marginLeft = 'auto';
+    logoImg.style.marginRight = 'auto';
 
-      const reportTitle = document.createElement('div');
-      reportTitle.textContent = `${sectionTitle} Report`;
-      reportTitle.style.fontSize = '20px';
-      reportTitle.style.fontWeight = 'bold';
-      reportTitle.style.marginBottom = '15px';
+    const logo = document.createElement('div');
+    logo.textContent = '5Ki Financial Services';
+    logo.style.fontSize = '24px';
+    logo.style.fontWeight = 'bold';
+    logo.style.color = '#1e40af';
+    logo.style.marginBottom = '5px';
 
-      logoSection.appendChild(logoImg);
-      logoSection.appendChild(logo);
-      logoSection.appendChild(reportTitle);
+    const reportTitle = document.createElement('div');
+    reportTitle.textContent = `${sectionTitle} Report`;
+    reportTitle.style.fontSize = '20px';
+    reportTitle.style.fontWeight = 'bold';
+    reportTitle.style.marginBottom = '15px';
 
-      // Info Row (Generated Date on left, Prepared By on right)
-      const infoRow = document.createElement('div');
-      infoRow.style.display = 'flex';
-      infoRow.style.justifyContent = 'space-between';
-      infoRow.style.alignItems = 'flex-start';
-      infoRow.style.fontSize = '14px';
-      infoRow.style.marginBottom = '10px';
-      infoRow.style.boxSizing = 'border-box';
+    logoSection.appendChild(logoImg);
+    logoSection.appendChild(logo);
+    logoSection.appendChild(reportTitle);
 
-      // Left side - Generated Date
-      const generatedDate = document.createElement('div');
-      generatedDate.style.textAlign = 'left';
-      generatedDate.style.flex = '1';
-      generatedDate.innerHTML = `
-        <strong>Generated as of:</strong><br>
-        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-      `;
+    // Report Details
+    const reportDetails = document.createElement('div');
+    reportDetails.style.textAlign = 'center';
+    reportDetails.style.marginBottom = '15px';
+    reportDetails.style.fontSize = '14px';
+    reportDetails.style.color = '#666';
+    reportDetails.innerHTML = `
+      <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
+    `;
 
-      // Right side - Prepared By
-      const preparedBy = document.createElement('div');
-      preparedBy.style.textAlign = 'right';
-      preparedBy.style.flex = '1';
-      const adminFirstName = adminData?.firstName || 'Admin';
-      const adminRole = localStorage.getItem('userRole') || 'Admin';
-      preparedBy.innerHTML = `
-        <strong>Prepared by:</strong><br>
-        <span style="font-weight: bold;">${adminFirstName}</span><br>
-        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
-      `;
+    header.appendChild(logoSection);
+    header.appendChild(reportDetails);
+    mainContent.appendChild(header);
 
-      infoRow.appendChild(generatedDate);
-      infoRow.appendChild(preparedBy);
+    // ========== TABLE SECTION ==========
+    if (displayedData.length > 0) {
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.marginTop = '20px';
+      table.style.boxSizing = 'border-box';
 
-      // Report Details
-      const reportDetails = document.createElement('div');
-      reportDetails.style.textAlign = 'center';
-      reportDetails.style.marginBottom = '15px';
-      reportDetails.style.fontSize = '14px';
-      reportDetails.style.color = '#666';
-      reportDetails.innerHTML = `
-        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredData.length / pageSize)})</strong>
-      `;
-
-      header.appendChild(logoSection);
-      header.appendChild(infoRow);
-      header.appendChild(reportDetails);
-      printContent.appendChild(header);
-
-      // Table
-      if (displayedData.length > 0) {
-        const table = document.createElement('table');
-        table.style.width = '100%';
-        table.style.borderCollapse = 'collapse';
-        table.style.marginTop = '20px';
-        table.style.boxSizing = 'border-box';
-
-        // Table Header - Define columns based on active section
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        headerRow.style.backgroundColor = '#f8f9fa';
-        
-        // Define columns for each section
-        let headers = [];
-        
-        switch(activeSection) {
-          case 'withdrawApplications':
-            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status', 'Date Applied'];
-            break;
-          case 'approvedWithdraws':
-            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved', 'Transaction ID'];
-            break;
-          case 'rejectedWithdraws':
-            headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason', 'Date Rejected'];
-            break;
-          default:
-            headers = [];
-        }
-
-        // Create header cells
-        headers.forEach(headerText => {
-          const th = document.createElement('th');
-          th.textContent = headerText;
-          th.style.padding = '12px 8px';
-          th.style.border = '1px solid #ddd';
-          th.style.textAlign = 'left';
-          th.style.fontWeight = 'bold';
-          th.style.backgroundColor = '#e9ecef';
-          th.style.boxSizing = 'border-box';
-          headerRow.appendChild(th);
-        });
-        
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        // Table Body
-        const tbody = document.createElement('tbody');
-        displayedData.forEach((item, index) => {
-          const row = document.createElement('tr');
-          row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
-          
-          headers.forEach(header => {
-            const td = document.createElement('td');
-            let cellValue = '';
-            
-            // Handle data extraction based on header and active section
-            switch(header) {
-              case 'Member ID':
-                cellValue = item.id || '';
-                break;
-              case 'Full Name':
-                cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                break;
-              case 'Withdrawal Amount':
-                cellValue = formatCurrency(item.amountWithdrawn || 0);
-                break;
-              case 'Disbursement':
-                cellValue = item.withdrawOption || '';
-                break;
-              case 'Status':
-                cellValue = item.status || 'pending';
-                break;
-              case 'Date Applied':
-                cellValue = item.dateApplied || '';
-                break;
-              case 'Date Approved':
-                cellValue = item.dateApproved || '';
-                break;
-              case 'Transaction ID':
-                cellValue = item.transactionId || '';
-                break;
-              case 'Rejection Reason':
-                cellValue = item.rejectionReason || '';
-                break;
-              case 'Date Rejected':
-                cellValue = item.dateRejected || '';
-                break;
-              default:
-                cellValue = item[header] || '';
-            }
-            
-            td.textContent = cellValue;
-            td.style.padding = '10px 8px';
-            td.style.border = '1px solid #ddd';
-            td.style.fontSize = '12px';
-            td.style.boxSizing = 'border-box';
-            row.appendChild(td);
-          });
-          
-          tbody.appendChild(row);
-        });
-        
-        table.appendChild(tbody);
-        printContent.appendChild(table);
-      } else {
-        const noData = document.createElement('p');
-        noData.textContent = 'No data available';
-        noData.style.textAlign = 'center';
-        noData.style.color = '#666';
-        noData.style.fontStyle = 'italic';
-        printContent.appendChild(noData);
+      // Table Header - Define columns based on active section
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.backgroundColor = '#f8f9fa';
+      
+      // Define columns for each section
+      let headers = [];
+      
+      switch(activeSection) {
+        case 'withdrawApplications':
+          headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status', 'Date Applied'];
+          break;
+        case 'approvedWithdraws':
+          headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved', 'Transaction ID'];
+          break;
+        case 'rejectedWithdraws':
+          headers = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason', 'Date Rejected'];
+          break;
+        default:
+          headers = [];
       }
 
-      // Create a hidden iframe for printing to avoid browser headers
-      const printFrame = document.createElement('iframe');
-      printFrame.style.position = 'fixed';
-      printFrame.style.right = '0';
-      printFrame.style.bottom = '0';
-      printFrame.style.width = '0';
-      printFrame.style.height = '0';
-      printFrame.style.border = '0';
-      printFrame.style.visibility = 'hidden';
+      // Create header cells
+      headers.forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText;
+        th.style.padding = '12px 8px';
+        th.style.border = '1px solid #ddd';
+        th.style.textAlign = 'left';
+        th.style.fontWeight = 'bold';
+        th.style.backgroundColor = '#e9ecef';
+        th.style.boxSizing = 'border-box';
+        headerRow.appendChild(th);
+      });
       
-      document.body.appendChild(printFrame);
-      
-      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
-      if (printDocument.document) {
-        printDocument = printDocument.document;
-      }
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
 
-      // Write the print content to the iframe with CSS to remove headers/footers
-      printDocument.open();
-      printDocument.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${sectionTitle} Report</title>
-            <style>
-              /* Reset all margins and remove browser headers/footers */
-              @page {
-                margin: 0.5in !important;
-                size: auto;
-                margin-header: 0 !important;
-                margin-footer: 0 !important;
-              }
-              
-              body {
-                margin: 0 !important;
-                padding: 0 !important;
-                font-family: Arial, sans-serif;
-                -webkit-print-color-adjust: exact;
-              }
-              
-              .print-content {
-                margin: 0 !important;
-                padding: 20px;
-              }
-              
-              /* Hide any potential browser elements */
-              header, footer, .header, .footer {
-                display: none !important;
-              }
-              
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-              }
-              
-              th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-              }
-              
-              th {
-                background-color: #f2f2f2;
-                font-weight: bold;
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-        </html>
-      `);
-      printDocument.close();
-
-      // Wait for content to load then print
-      printFrame.onload = function() {
-        try {
-          if (format === 'pdf') {
-            printFrame.contentWindow.print();
-
-            // Export to Excel
-            const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet(sectionTitle);
-
-            if (displayedData.length > 0) {
-              // Define headers for Excel based on active section
-              let excelHeaders = [];
-              
-              switch(activeSection) {
-                case 'withdrawApplications':
-                  excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status', 'Date Applied'];
-                  break;
-                case 'approvedWithdraws':
-                  excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved', 'Transaction ID'];
-                  break;
-                case 'rejectedWithdraws':
-                  excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason', 'Date Rejected'];
-                  break;
-                default:
-                  excelHeaders = [];
-              }
-
-              worksheet.addRow(excelHeaders);
-
-              displayedData.forEach(item => {
-                const row = [];
-                excelHeaders.forEach(header => {
-                  let cellValue = '';
-                  
-                  switch(header) {
-                    case 'Member ID':
-                      cellValue = item.id || '';
-                      break;
-                    case 'Full Name':
-                      cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
-                      break;
-                    case 'Withdrawal Amount':
-                      cellValue = parseFloat(item.amountWithdrawn) || 0;
-                      break;
-                    case 'Disbursement':
-                      cellValue = item.withdrawOption || '';
-                      break;
-                    case 'Status':
-                      cellValue = item.status || 'pending';
-                      break;
-                    case 'Date Applied':
-                      cellValue = item.dateApplied || '';
-                      break;
-                    case 'Date Approved':
-                      cellValue = item.dateApproved || '';
-                      break;
-                    case 'Transaction ID':
-                      cellValue = item.transactionId || '';
-                      break;
-                    case 'Rejection Reason':
-                      cellValue = item.rejectionReason || '';
-                      break;
-                    case 'Date Rejected':
-                      cellValue = item.dateRejected || '';
-                      break;
-                    default:
-                      cellValue = item[header] || '';
-                  }
-                  
-                  row.push(cellValue);
-                });
-                worksheet.addRow(row);
-              });
-            }
-
-            workbook.xlsx.writeBuffer().then(buffer => {
-              const blob = new Blob([buffer], { 
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-              });
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
-            });
-          } else {
-            // Direct print
-            printFrame.contentWindow.print();
+      // Table Body
+      const tbody = document.createElement('tbody');
+      displayedData.forEach((item, index) => {
+        const row = document.createElement('tr');
+        row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+        
+        headers.forEach(header => {
+          const td = document.createElement('td');
+          let cellValue = '';
+          
+          // Handle data extraction based on header and active section
+          switch(header) {
+            case 'Member ID':
+              cellValue = item.id || '';
+              break;
+            case 'Full Name':
+              cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+              break;
+            case 'Withdrawal Amount':
+              cellValue = formatCurrency(item.amountWithdrawn || 0);
+              break;
+            case 'Disbursement':
+              cellValue = item.withdrawOption || '';
+              break;
+            case 'Status':
+              cellValue = item.status || 'pending';
+              break;
+            case 'Date Applied':
+              cellValue = item.dateApplied || '';
+              break;
+            case 'Date Approved':
+              cellValue = item.dateApproved || '';
+              break;
+            case 'Transaction ID':
+              cellValue = item.transactionId || '';
+              break;
+            case 'Rejection Reason':
+              cellValue = item.rejectionReason || '';
+              break;
+            case 'Date Rejected':
+              cellValue = item.dateRejected || '';
+              break;
+            default:
+              cellValue = item[header] || '';
           }
           
-          // Clean up after printing
-          setTimeout(() => {
-            document.body.removeChild(printFrame);
-            setPrintModalVisible(false);
-            setPrinting(false);
-          }, 1000);
-        } catch (error) {
-          console.error('Print error:', error);
-          document.body.removeChild(printFrame);
-          setPrinting(false);
-        }
-      };
-
-    } catch (error) {
-      console.error('Error printing data:', error);
-      setErrorMessage('Failed to print data');
-      setErrorModalVisible(true);
-      setPrinting(false);
+          td.textContent = cellValue;
+          td.style.padding = '10px 8px';
+          td.style.border = '1px solid #ddd';
+          td.style.fontSize = '12px';
+          td.style.boxSizing = 'border-box';
+          row.appendChild(td);
+        });
+        
+        tbody.appendChild(row);
+      });
+      
+      table.appendChild(tbody);
+      mainContent.appendChild(table);
+    } else {
+      const noData = document.createElement('p');
+      noData.textContent = 'No data available';
+      noData.style.textAlign = 'center';
+      noData.style.color = '#666';
+      noData.style.fontStyle = 'italic';
+      noData.style.marginTop = '40px';
+      mainContent.appendChild(noData);
     }
-  };
+
+    // Add main content to printContent
+    printContent.appendChild(mainContent);
+
+    // ========== FOOTER SECTION ==========
+    const footer = document.createElement('div');
+    footer.style.marginTop = 'auto';
+    footer.style.paddingTop = '30px';
+    footer.style.borderTop = '1px solid #ddd';
+    footer.style.fontSize = '12px';
+    footer.style.color = '#666';
+
+    // Footer content container
+    const footerContent = document.createElement('div');
+    footerContent.style.display = 'flex';
+    footerContent.style.justifyContent = 'space-between';
+    footerContent.style.alignItems = 'flex-start';
+    footerContent.style.boxSizing = 'border-box';
+
+    // Left side - Generated Date
+    const generatedDate = document.createElement('div');
+    generatedDate.style.textAlign = 'left';
+    generatedDate.style.flex = '1';
+    generatedDate.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Generated as of:</strong></div>
+      <div>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+    `;
+
+    // Right side - Prepared By
+    const preparedBy = document.createElement('div');
+    preparedBy.style.textAlign = 'right';
+    preparedBy.style.flex = '1';
+    const adminFirstName = adminData?.firstName || 'Admin';
+    const adminRole = localStorage.getItem('userRole') || 'Admin';
+    preparedBy.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Prepared by:</strong></div>
+      <div style="font-weight: bold;">${adminFirstName}</div>
+      <div style="font-style: italic;">${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</div>
+    `;
+
+    footerContent.appendChild(generatedDate);
+    footerContent.appendChild(preparedBy);
+    footer.appendChild(footerContent);
+    printContent.appendChild(footer);
+
+    // Create a hidden iframe for printing to avoid browser headers
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.style.visibility = 'hidden';
+    
+    document.body.appendChild(printFrame);
+    
+    let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+    if (printDocument.document) {
+      printDocument = printDocument.document;
+    }
+
+    // Write the print content to the iframe with CSS to remove headers/footers
+    printDocument.open();
+    printDocument.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${sectionTitle} Report</title>
+          <style>
+            /* Reset all margins and remove browser headers/footers */
+            @page {
+              margin: 0.5in !important;
+              size: auto;
+              margin-header: 0 !important;
+              margin-footer: 0 !important;
+            }
+            
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+              font-family: Arial, sans-serif;
+              -webkit-print-color-adjust: exact;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
+            }
+            
+            .print-content {
+              margin: 0 !important;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
+            }
+            
+            /* Hide any potential browser elements */
+            header, footer, .header, .footer {
+              display: none !important;
+            }
+            
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printDocument.close();
+
+    // Wait for content to load then print
+    printFrame.onload = function() {
+      try {
+        if (format === 'pdf') {
+          printFrame.contentWindow.print();
+
+          // Export to Excel
+          const workbook = new ExcelJS.Workbook();
+          const worksheet = workbook.addWorksheet(sectionTitle);
+
+          if (displayedData.length > 0) {
+            // Define headers for Excel based on active section
+            let excelHeaders = [];
+            
+            switch(activeSection) {
+              case 'withdrawApplications':
+                excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Status', 'Date Applied'];
+                break;
+              case 'approvedWithdraws':
+                excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Date Approved', 'Transaction ID'];
+                break;
+              case 'rejectedWithdraws':
+                excelHeaders = ['Member ID', 'Full Name', 'Withdrawal Amount', 'Disbursement', 'Rejection Reason', 'Date Rejected'];
+                break;
+              default:
+                excelHeaders = [];
+            }
+
+            worksheet.addRow(excelHeaders);
+
+            displayedData.forEach(item => {
+              const row = [];
+              excelHeaders.forEach(header => {
+                let cellValue = '';
+                
+                switch(header) {
+                  case 'Member ID':
+                    cellValue = item.id || '';
+                    break;
+                  case 'Full Name':
+                    cellValue = `${item.firstName || ''} ${item.lastName || ''}`.trim();
+                    break;
+                  case 'Withdrawal Amount':
+                    cellValue = parseFloat(item.amountWithdrawn) || 0;
+                    break;
+                  case 'Disbursement':
+                    cellValue = item.withdrawOption || '';
+                    break;
+                  case 'Status':
+                    cellValue = item.status || 'pending';
+                    break;
+                  case 'Date Applied':
+                    cellValue = item.dateApplied || '';
+                    break;
+                  case 'Date Approved':
+                    cellValue = item.dateApproved || '';
+                    break;
+                  case 'Transaction ID':
+                    cellValue = item.transactionId || '';
+                    break;
+                  case 'Rejection Reason':
+                    cellValue = item.rejectionReason || '';
+                    break;
+                  case 'Date Rejected':
+                    cellValue = item.dateRejected || '';
+                    break;
+                  default:
+                    cellValue = item[header] || '';
+                }
+                
+                row.push(cellValue);
+              });
+              worksheet.addRow(row);
+            });
+          }
+
+          workbook.xlsx.writeBuffer().then(buffer => {
+            const blob = new Blob([buffer], { 
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          });
+        } else {
+          // Direct print
+          printFrame.contentWindow.print();
+        }
+        
+        // Clean up after printing
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+          setPrintModalVisible(false);
+          setPrinting(false);
+        }, 1000);
+      } catch (error) {
+        console.error('Print error:', error);
+        document.body.removeChild(printFrame);
+        setPrinting(false);
+      }
+    };
+
+  } catch (error) {
+    console.error('Error printing data:', error);
+    setErrorMessage('Failed to print data');
+    setErrorModalVisible(true);
+    setPrinting(false);
+  }
+};
 
   const handleTabSwitch = (section) => {
     setActiveSection(section);
