@@ -1107,450 +1107,473 @@ const Transactions = () => {
     }
   };
 
-  const handlePrint = (format = 'print') => {
-    setPrinting(true);
+const handlePrint = (format = 'print') => {
+  setPrinting(true);
+  
+  try {
+    const sectionTitle = 
+      activeTransactionFilter === 'all' ? 'All Transactions' :
+      activeTransactionFilter === 'deposits' ? 'Deposit Transactions' :
+      activeTransactionFilter === 'loans' ? 'Loan Transactions' :
+      activeTransactionFilter === 'payments' ? 'Payment Transactions' :
+      activeTransactionFilter === 'withdrawals' ? 'Withdrawal Transactions' :
+      'Registration Transactions';
+
+    // Get the data that's currently displayed in the table (paginated)
+    const displayedData = paginatedData;
+
+    const printContent = document.createElement('div');
+    printContent.className = 'print-content';
+    printContent.style.padding = '20px';
+    printContent.style.fontFamily = 'Arial, sans-serif';
+    printContent.style.boxSizing = 'border-box';
+    printContent.style.margin = '0';
+    printContent.style.display = 'flex';
+    printContent.style.flexDirection = 'column';
+    printContent.style.minHeight = '100vh';
+
+    // Main content container
+    const mainContent = document.createElement('div');
+    mainContent.style.flex = '1';
+
+    // ========== HEADER SECTION ==========
+    const header = document.createElement('div');
+    header.className = 'print-header';
+    header.style.paddingBottom = '15px';
+    header.style.marginBottom = '20px';
+    header.style.boxSizing = 'border-box';
+
+    // Logo and Report Title (Centered)
+    const logoSection = document.createElement('div');
+    logoSection.style.textAlign = 'center';
+    logoSection.style.marginBottom = '15px';
+
+    // Add logo image
+    const logoImg = document.createElement('img');
+    logoImg.src = logoImage;
+    logoImg.style.width = '80px';
+    logoImg.style.height = '80px';
+    logoImg.style.marginBottom = '5px';
+    logoImg.style.display = 'block';
+    logoImg.style.marginLeft = 'auto';
+    logoImg.style.marginRight = 'auto';
+
+    const logo = document.createElement('div');
+    logo.textContent = '5Ki Financial Services';
+    logo.style.fontSize = '24px';
+    logo.style.fontWeight = 'bold';
+    logo.style.color = '#1e40af';
+    logo.style.marginBottom = '5px';
+
+    const reportTitle = document.createElement('div');
+    reportTitle.textContent = `${sectionTitle} Report`;
+    reportTitle.style.fontSize = '20px';
+    reportTitle.style.fontWeight = 'bold';
+    reportTitle.style.marginBottom = '15px';
+
+    logoSection.appendChild(logoImg);
+    logoSection.appendChild(logo);
+    logoSection.appendChild(reportTitle);
+
+    // Report Details
+    const reportDetails = document.createElement('div');
+    reportDetails.style.textAlign = 'center';
+    reportDetails.style.marginBottom = '15px';
+    reportDetails.style.fontSize = '14px';
+    reportDetails.style.color = '#666';
+    reportDetails.innerHTML = `
+      <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredMembers.length / pageSize)})</strong>
+    `;
+
+    header.appendChild(logoSection);
+    header.appendChild(reportDetails);
+    mainContent.appendChild(header);
+
+    // ========== TABLE SECTION ==========
+    if (displayedData.length > 0) {
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.marginTop = '20px';
+      table.style.boxSizing = 'border-box';
+
+      // Table Header
+      const thead = document.createElement('thead');
+      const headerRow = document.createElement('tr');
+      headerRow.style.backgroundColor = '#f8f9fa';
+      
+      const headers = ['Member ID', 'Member Name', 'Email', 'Transaction Count', 'Latest Transaction Type', 'Latest Amount', 'Latest Date'];
+      
+      // Create header cells
+      headers.forEach(headerText => {
+        const th = document.createElement('th');
+        th.textContent = headerText;
+        th.style.padding = '12px 8px';
+        th.style.border = '1px solid #ddd';
+        th.style.textAlign = 'left';
+        th.style.fontWeight = 'bold';
+        th.style.backgroundColor = '#e9ecef';
+        th.style.boxSizing = 'border-box';
+        headerRow.appendChild(th);
+      });
+      
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      // Table Body
+      const tbody = document.createElement('tbody');
+      displayedData.forEach((memberId, index) => {
+        const member = members[memberId];
+        const memberTransactions = transactions[memberId] || [];
+        
+        // Filter transactions by active tab and date
+        const filteredTransactions = (activeTransactionFilter === 'all' 
+          ? memberTransactions 
+          : memberTransactions.filter(tx => {
+              const transactionType = tx.type.toLowerCase();
+              switch (activeTransactionFilter) {
+                case 'deposits': return transactionType === 'deposits';
+                case 'loans': return transactionType === 'loans';
+                case 'payments': return transactionType === 'payments';
+                case 'withdrawals': return transactionType === 'withdrawals';
+                case 'registrations': return transactionType === 'registrations';
+                default: return true;
+              }
+            }));
+
+        const dateFilteredTransactions = filterTransactionsByDate(filteredTransactions);
+        const latestTransaction = dateFilteredTransactions
+          .sort((a, b) => {
+            const dateA = a.dateApproved || a.dateApplied || '';
+            const dateB = b.dateApproved || b.dateApplied || '';
+            return dateB.localeCompare(dateA);
+          })[0];
+
+        const row = document.createElement('tr');
+        row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
+        
+        // Member ID
+        const tdId = document.createElement('td');
+        tdId.textContent = memberId;
+        tdId.style.padding = '10px 8px';
+        tdId.style.border = '1px solid #ddd';
+        tdId.style.fontSize = '12px';
+        row.appendChild(tdId);
+
+        // Member Name
+        const tdName = document.createElement('td');
+        tdName.textContent = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
+        tdName.style.padding = '10px 8px';
+        tdName.style.border = '1px solid #ddd';
+        tdName.style.fontSize = '12px';
+        row.appendChild(tdName);
+
+        // Email
+        const tdEmail = document.createElement('td');
+        tdEmail.textContent = member?.email || 'N/A';
+        tdEmail.style.padding = '10px 8px';
+        tdEmail.style.border = '1px solid #ddd';
+        tdEmail.style.fontSize = '12px';
+        row.appendChild(tdEmail);
+
+        // Transaction Count
+        const tdCount = document.createElement('td');
+        tdCount.textContent = dateFilteredTransactions.length;
+        tdCount.style.padding = '10px 8px';
+        tdCount.style.border = '1px solid #ddd';
+        tdCount.style.fontSize = '12px';
+        tdCount.style.textAlign = 'center';
+        row.appendChild(tdCount);
+
+        // Latest Transaction Type
+        const tdType = document.createElement('td');
+        tdType.textContent = latestTransaction?.type || 'N/A';
+        tdType.style.padding = '10px 8px';
+        tdType.style.border = '1px solid #ddd';
+        tdType.style.fontSize = '12px';
+        row.appendChild(tdType);
+
+        // Latest Amount
+        const tdAmount = document.createElement('td');
+        if (latestTransaction) {
+          const amount = latestTransaction.amountToBeDeposited || 
+                        latestTransaction.loanAmount || 
+                        latestTransaction.amount || 
+                        latestTransaction.amountWithdrawn || 
+                        latestTransaction.amountToBePaid ||
+                        latestTransaction.registrationFee;
+          tdAmount.textContent = formatCurrency(amount);
+        } else {
+          tdAmount.textContent = 'N/A';
+        }
+        tdAmount.style.padding = '10px 8px';
+        tdAmount.style.border = '1px solid #ddd';
+        tdAmount.style.fontSize = '12px';
+        row.appendChild(tdAmount);
+
+        // Latest Date
+        const tdDate = document.createElement('td');
+        tdDate.textContent = latestTransaction ? 
+          formatDate(latestTransaction.dateApproved || latestTransaction.dateApplied) : 
+          'N/A';
+        tdDate.style.padding = '10px 8px';
+        tdDate.style.border = '1px solid #ddd';
+        tdDate.style.fontSize = '12px';
+        row.appendChild(tdDate);
+        
+        tbody.appendChild(row);
+      });
+      
+      table.appendChild(tbody);
+      mainContent.appendChild(table);
+    } else {
+      const noData = document.createElement('p');
+      noData.textContent = 'No data available';
+      noData.style.textAlign = 'center';
+      noData.style.color = '#666';
+      noData.style.fontStyle = 'italic';
+      noData.style.marginTop = '40px';
+      mainContent.appendChild(noData);
+    }
+
+    // Add main content to printContent
+    printContent.appendChild(mainContent);
+
+    // ========== FOOTER SECTION ==========
+    const footer = document.createElement('div');
+    footer.style.marginTop = 'auto';
+    footer.style.paddingTop = '30px';
+    footer.style.borderTop = '1px solid #ddd';
+    footer.style.fontSize = '12px';
+    footer.style.color = '#666';
+
+    // Footer content container
+    const footerContent = document.createElement('div');
+    footerContent.style.display = 'flex';
+    footerContent.style.justifyContent = 'space-between';
+    footerContent.style.alignItems = 'flex-start';
+    footerContent.style.boxSizing = 'border-box';
+
+    // Left side - Generated Date
+    const generatedDate = document.createElement('div');
+    generatedDate.style.textAlign = 'left';
+    generatedDate.style.flex = '1';
+    generatedDate.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Generated as of:</strong></div>
+      <div>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+    `;
+
+    // Right side - Prepared By
+    const preparedBy = document.createElement('div');
+    preparedBy.style.textAlign = 'right';
+    preparedBy.style.flex = '1';
+    const adminFirstName = adminData?.firstName || 'Admin';
+    const adminRole = localStorage.getItem('userRole') || 'Admin';
+    preparedBy.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Prepared by:</strong></div>
+      <div style="font-weight: bold;">${adminFirstName}</div>
+      <div style="font-style: italic;">${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</div>
+    `;
+
+    footerContent.appendChild(generatedDate);
+    footerContent.appendChild(preparedBy);
+    footer.appendChild(footerContent);
+    printContent.appendChild(footer);
+
+    // Create a hidden iframe for printing to avoid browser headers
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    printFrame.style.visibility = 'hidden';
     
-    try {
-      const sectionTitle = 
-        activeTransactionFilter === 'all' ? 'All Transactions' :
-        activeTransactionFilter === 'deposits' ? 'Deposit Transactions' :
-        activeTransactionFilter === 'loans' ? 'Loan Transactions' :
-        activeTransactionFilter === 'payments' ? 'Payment Transactions' :
-        activeTransactionFilter === 'withdrawals' ? 'Withdrawal Transactions' :
-        'Registration Transactions';
+    document.body.appendChild(printFrame);
+    
+    let printDocument = printFrame.contentWindow || printFrame.contentDocument;
+    if (printDocument.document) {
+      printDocument = printDocument.document;
+    }
 
-      // Get the data that's currently displayed in the table (paginated)
-      const displayedData = paginatedData;
+    // Write the print content to the iframe with CSS to remove headers/footers
+    printDocument.open();
+    printDocument.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${sectionTitle} Report</title>
+          <style>
+            /* Reset all margins and remove browser headers/footers */
+            @page {
+              margin: 0.5in !important;
+              size: auto;
+              margin-header: 0 !important;
+              margin-footer: 0 !important;
+            }
+            
+            body {
+              margin: 0 !important;
+              padding: 0 !important;
+              font-family: Arial, sans-serif;
+              -webkit-print-color-adjust: exact;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
+            }
+            
+            .print-content {
+              margin: 0 !important;
+              padding: 20px;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
+            }
+            
+            /* Hide any potential browser elements */
+            header, footer, .header, .footer {
+              display: none !important;
+            }
+            
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              margin-top: 20px;
+            }
+            
+            th, td {
+              border: 1px solid #ddd;
+              padding: 8px;
+              text-align: left;
+            }
+            
+            th {
+              background-color: #f2f2f2;
+              font-weight: bold;
+            }
+          </style>
+        </head>
+        <body>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+    printDocument.close();
 
-      const printContent = document.createElement('div');
-      printContent.className = 'print-content';
-      printContent.style.padding = '20px';
-      printContent.style.fontFamily = 'Arial, sans-serif';
-      printContent.style.boxSizing = 'border-box';
-      printContent.style.margin = '0';
+    // Wait for content to load then print
+    printFrame.onload = function() {
+      try {
+        if (format === 'pdf') {
+          printFrame.contentWindow.print();
 
-      // Create your custom header
-      const header = document.createElement('div');
-      header.className = 'print-header';
-      header.style.borderBottom = '2px solid #333';
-      header.style.paddingBottom = '15px';
-      header.style.marginBottom = '20px';
-      header.style.boxSizing = 'border-box';
+          // Export to Excel
+          const workbook = new ExcelJS.Workbook();
+          const worksheet = workbook.addWorksheet(sectionTitle);
 
-      // Logo and Report Title (Centered)
-      const logoSection = document.createElement('div');
-      logoSection.style.textAlign = 'center';
-      logoSection.style.marginBottom = '15px';
+          if (displayedData.length > 0) {
+            // Define headers for Excel
+            const excelHeaders = [
+              'Member ID', 
+              'Member Name', 
+              'Email', 
+              'Transaction Count', 
+              'Latest Transaction Type', 
+              'Latest Amount', 
+              'Latest Date'
+            ];
 
-      // Add logo image
-      const logoImg = document.createElement('img');
-      logoImg.src = logoImage;
-      logoImg.style.width = '80px';
-      logoImg.style.height = '80px';
-      logoImg.style.marginBottom = '5px';
-      logoImg.style.display = 'block';
-      logoImg.style.marginLeft = 'auto';
-      logoImg.style.marginRight = 'auto';
+            worksheet.addRow(excelHeaders);
 
-      const logo = document.createElement('div');
-      logo.textContent = '5Ki Financial Services';
-      logo.style.fontSize = '24px';
-      logo.style.fontWeight = 'bold';
-      logo.style.color = '#1e40af';
-      logo.style.marginBottom = '5px';
-
-      const reportTitle = document.createElement('div');
-      reportTitle.textContent = `${sectionTitle} Report`;
-      reportTitle.style.fontSize = '20px';
-      reportTitle.style.fontWeight = 'bold';
-      reportTitle.style.marginBottom = '15px';
-
-      logoSection.appendChild(logoImg);
-      logoSection.appendChild(logo);
-      logoSection.appendChild(reportTitle);
-
-      // Info Row (Generated Date on left, Prepared By on right)
-      const infoRow = document.createElement('div');
-      infoRow.style.display = 'flex';
-      infoRow.style.justifyContent = 'space-between';
-      infoRow.style.alignItems = 'flex-start';
-      infoRow.style.fontSize = '14px';
-      infoRow.style.marginBottom = '10px';
-      infoRow.style.boxSizing = 'border-box';
-
-      // Left side - Generated Date
-      const generatedDate = document.createElement('div');
-      generatedDate.style.textAlign = 'left';
-      generatedDate.style.flex = '1';
-      generatedDate.innerHTML = `
-        <strong>Generated as of:</strong><br>
-        ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-      `;
-
-      // Right side - Prepared By
-      const preparedBy = document.createElement('div');
-      preparedBy.style.textAlign = 'right';
-      preparedBy.style.flex = '1';
-      const adminFirstName = adminData?.firstName || 'Admin';
-      const adminRole = localStorage.getItem('userRole') || 'Admin';
-      preparedBy.innerHTML = `
-        <strong>Prepared by:</strong><br>
-        <span style="font-weight: bold;">${adminFirstName}</span><br>
-        <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
-      `;
-
-      infoRow.appendChild(generatedDate);
-      infoRow.appendChild(preparedBy);
-
-      // Report Details
-      const reportDetails = document.createElement('div');
-      reportDetails.style.textAlign = 'center';
-      reportDetails.style.marginBottom = '15px';
-      reportDetails.style.fontSize = '14px';
-      reportDetails.style.color = '#666';
-      reportDetails.innerHTML = `
-        <strong>Displayed Records: ${displayedData.length} (Page ${currentPage + 1} of ${Math.ceil(filteredMembers.length / pageSize)})</strong>
-      `;
-
-      header.appendChild(logoSection);
-      header.appendChild(infoRow);
-      header.appendChild(reportDetails);
-      printContent.appendChild(header);
-
-      // Table
-      if (displayedData.length > 0) {
-        const table = document.createElement('table');
-        table.style.width = '100%';
-        table.style.borderCollapse = 'collapse';
-        table.style.marginTop = '20px';
-        table.style.boxSizing = 'border-box';
-
-        // Table Header
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        headerRow.style.backgroundColor = '#f8f9fa';
-        
-        const headers = ['Member ID', 'Member Name', 'Email', 'Transaction Count', 'Latest Transaction Type', 'Latest Amount', 'Latest Date'];
-        
-        // Create header cells
-        headers.forEach(headerText => {
-          const th = document.createElement('th');
-          th.textContent = headerText;
-          th.style.padding = '12px 8px';
-          th.style.border = '1px solid #ddd';
-          th.style.textAlign = 'left';
-          th.style.fontWeight = 'bold';
-          th.style.backgroundColor = '#e9ecef';
-          th.style.boxSizing = 'border-box';
-          headerRow.appendChild(th);
-        });
-        
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        // Table Body
-        const tbody = document.createElement('tbody');
-        displayedData.forEach((memberId, index) => {
-          const member = members[memberId];
-          const memberTransactions = transactions[memberId] || [];
-          
-          // Filter transactions by active tab and date
-          const filteredTransactions = (activeTransactionFilter === 'all' 
-            ? memberTransactions 
-            : memberTransactions.filter(tx => {
-                const transactionType = tx.type.toLowerCase();
-                switch (activeTransactionFilter) {
-                  case 'deposits': return transactionType === 'deposits';
-                  case 'loans': return transactionType === 'loans';
-                  case 'payments': return transactionType === 'payments';
-                  case 'withdrawals': return transactionType === 'withdrawals';
-                  case 'registrations': return transactionType === 'registrations';
-                  default: return true;
-                }
-              }));
-
-          const dateFilteredTransactions = filterTransactionsByDate(filteredTransactions);
-          const latestTransaction = dateFilteredTransactions
-            .sort((a, b) => {
-              const dateA = a.dateApproved || a.dateApplied || '';
-              const dateB = b.dateApproved || b.dateApplied || '';
-              return dateB.localeCompare(dateA);
-            })[0];
-
-          const row = document.createElement('tr');
-          row.style.backgroundColor = index % 2 === 0 ? '#fff' : '#f8f9fa';
-          
-          // Member ID
-          const tdId = document.createElement('td');
-          tdId.textContent = memberId;
-          tdId.style.padding = '10px 8px';
-          tdId.style.border = '1px solid #ddd';
-          tdId.style.fontSize = '12px';
-          row.appendChild(tdId);
-
-          // Member Name
-          const tdName = document.createElement('td');
-          tdName.textContent = member ? `${member.firstName} ${member.lastName}` : 'Unknown Member';
-          tdName.style.padding = '10px 8px';
-          tdName.style.border = '1px solid #ddd';
-          tdName.style.fontSize = '12px';
-          row.appendChild(tdName);
-
-          // Email
-          const tdEmail = document.createElement('td');
-          tdEmail.textContent = member?.email || 'N/A';
-          tdEmail.style.padding = '10px 8px';
-          tdEmail.style.border = '1px solid #ddd';
-          tdEmail.style.fontSize = '12px';
-          row.appendChild(tdEmail);
-
-          // Transaction Count
-          const tdCount = document.createElement('td');
-          tdCount.textContent = dateFilteredTransactions.length;
-          tdCount.style.padding = '10px 8px';
-          tdCount.style.border = '1px solid #ddd';
-          tdCount.style.fontSize = '12px';
-          tdCount.style.textAlign = 'center';
-          row.appendChild(tdCount);
-
-          // Latest Transaction Type
-          const tdType = document.createElement('td');
-          tdType.textContent = latestTransaction?.type || 'N/A';
-          tdType.style.padding = '10px 8px';
-          tdType.style.border = '1px solid #ddd';
-          tdType.style.fontSize = '12px';
-          row.appendChild(tdType);
-
-          // Latest Amount
-          const tdAmount = document.createElement('td');
-          if (latestTransaction) {
-            const amount = latestTransaction.amountToBeDeposited || 
-                          latestTransaction.loanAmount || 
-                          latestTransaction.amount || 
-                          latestTransaction.amountWithdrawn || 
-                          latestTransaction.amountToBePaid ||
-                          latestTransaction.registrationFee;
-            tdAmount.textContent = formatCurrency(amount);
-          } else {
-            tdAmount.textContent = 'N/A';
-          }
-          tdAmount.style.padding = '10px 8px';
-          tdAmount.style.border = '1px solid #ddd';
-          tdAmount.style.fontSize = '12px';
-          row.appendChild(tdAmount);
-
-          // Latest Date
-          const tdDate = document.createElement('td');
-          tdDate.textContent = latestTransaction ? 
-            formatDate(latestTransaction.dateApproved || latestTransaction.dateApplied) : 
-            'N/A';
-          tdDate.style.padding = '10px 8px';
-          tdDate.style.border = '1px solid #ddd';
-          tdDate.style.fontSize = '12px';
-          row.appendChild(tdDate);
-          
-          tbody.appendChild(row);
-        });
-        
-        table.appendChild(tbody);
-        printContent.appendChild(table);
-      } else {
-        const noData = document.createElement('p');
-        noData.textContent = 'No data available';
-        noData.style.textAlign = 'center';
-        noData.style.color = '#666';
-        noData.style.fontStyle = 'italic';
-        printContent.appendChild(noData);
-      }
-
-      // Create a hidden iframe for printing to avoid browser headers
-      const printFrame = document.createElement('iframe');
-      printFrame.style.position = 'fixed';
-      printFrame.style.right = '0';
-      printFrame.style.bottom = '0';
-      printFrame.style.width = '0';
-      printFrame.style.height = '0';
-      printFrame.style.border = '0';
-      printFrame.style.visibility = 'hidden';
-      
-      document.body.appendChild(printFrame);
-      
-      let printDocument = printFrame.contentWindow || printFrame.contentDocument;
-      if (printDocument.document) {
-        printDocument = printDocument.document;
-      }
-
-      // Write the print content to the iframe with CSS to remove headers/footers
-      printDocument.open();
-      printDocument.write(`
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <title>${sectionTitle} Report</title>
-            <style>
-              /* Reset all margins and remove browser headers/footers */
-              @page {
-                margin: 0.5in !important;
-                size: auto;
-                margin-header: 0 !important;
-                margin-footer: 0 !important;
-              }
+            displayedData.forEach(memberId => {
+              const member = members[memberId];
+              const memberTransactions = transactions[memberId] || [];
               
-              body {
-                margin: 0 !important;
-                padding: 0 !important;
-                font-family: Arial, sans-serif;
-                -webkit-print-color-adjust: exact;
-              }
-              
-              .print-content {
-                margin: 0 !important;
-                padding: 20px;
-              }
-              
-              /* Hide any potential browser elements */
-              header, footer, .header, .footer {
-                display: none !important;
-              }
-              
-              table {
-                width: 100%;
-                border-collapse: collapse;
-                margin-top: 20px;
-              }
-              
-              th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-              }
-              
-              th {
-                background-color: #f2f2f2;
-                font-weight: bold;
-              }
-            </style>
-          </head>
-          <body>
-            ${printContent.innerHTML}
-          </body>
-        </html>
-      `);
-      printDocument.close();
+              // Filter transactions by active tab and date
+              const filteredTransactions = (activeTransactionFilter === 'all' 
+                ? memberTransactions 
+                : memberTransactions.filter(tx => {
+                    const transactionType = tx.type.toLowerCase();
+                    switch (activeTransactionFilter) {
+                      case 'deposits': return transactionType === 'deposits';
+                      case 'loans': return transactionType === 'loans';
+                      case 'payments': return transactionType === 'payments';
+                      case 'withdrawals': return transactionType === 'withdrawals';
+                      case 'registrations': return transactionType === 'registrations';
+                      default: return true;
+                    }
+                  }));
 
-      // Wait for content to load then print
-      printFrame.onload = function() {
-        try {
-          if (format === 'pdf') {
-            printFrame.contentWindow.print();
+              const dateFilteredTransactions = filterTransactionsByDate(filteredTransactions);
+              const latestTransaction = dateFilteredTransactions
+                .sort((a, b) => {
+                  const dateA = a.dateApproved || a.dateApplied || '';
+                  const dateB = b.dateApproved || b.dateApplied || '';
+                  return dateB.localeCompare(dateA);
+                })[0];
 
-            // Export to Excel
-            const workbook = new ExcelJS.Workbook();
-            const worksheet = workbook.addWorksheet(sectionTitle);
-
-            if (displayedData.length > 0) {
-              // Define headers for Excel
-              const excelHeaders = [
-                'Member ID', 
-                'Member Name', 
-                'Email', 
-                'Transaction Count', 
-                'Latest Transaction Type', 
-                'Latest Amount', 
-                'Latest Date'
+              const row = [
+                memberId,
+                member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
+                member?.email || 'N/A',
+                dateFilteredTransactions.length,
+                latestTransaction?.type || 'N/A'
               ];
 
-              worksheet.addRow(excelHeaders);
+              if (latestTransaction) {
+                const amount = latestTransaction.amountToBeDeposited || 
+                              latestTransaction.loanAmount || 
+                              latestTransaction.amount || 
+                              latestTransaction.amountWithdrawn || 
+                              latestTransaction.amountToBePaid ||
+                              latestTransaction.registrationFee;
+                row.push(parseFloat(amount) || 0);
+                row.push(latestTransaction.dateApproved || latestTransaction.dateApplied || '');
+              } else {
+                row.push(0);
+                row.push('N/A');
+              }
 
-              displayedData.forEach(memberId => {
-                const member = members[memberId];
-                const memberTransactions = transactions[memberId] || [];
-                
-                // Filter transactions by active tab and date
-                const filteredTransactions = (activeTransactionFilter === 'all' 
-                  ? memberTransactions 
-                  : memberTransactions.filter(tx => {
-                      const transactionType = tx.type.toLowerCase();
-                      switch (activeTransactionFilter) {
-                        case 'deposits': return transactionType === 'deposits';
-                        case 'loans': return transactionType === 'loans';
-                        case 'payments': return transactionType === 'payments';
-                        case 'withdrawals': return transactionType === 'withdrawals';
-                        case 'registrations': return transactionType === 'registrations';
-                        default: return true;
-                      }
-                    }));
-
-                const dateFilteredTransactions = filterTransactionsByDate(filteredTransactions);
-                const latestTransaction = dateFilteredTransactions
-                  .sort((a, b) => {
-                    const dateA = a.dateApproved || a.dateApplied || '';
-                    const dateB = b.dateApproved || b.dateApplied || '';
-                    return dateB.localeCompare(dateA);
-                  })[0];
-
-                const row = [
-                  memberId,
-                  member ? `${member.firstName} ${member.lastName}` : 'Unknown Member',
-                  member?.email || 'N/A',
-                  dateFilteredTransactions.length,
-                  latestTransaction?.type || 'N/A'
-                ];
-
-                if (latestTransaction) {
-                  const amount = latestTransaction.amountToBeDeposited || 
-                                latestTransaction.loanAmount || 
-                                latestTransaction.amount || 
-                                latestTransaction.amountWithdrawn || 
-                                latestTransaction.amountToBePaid ||
-                                latestTransaction.registrationFee;
-                  row.push(parseFloat(amount) || 0);
-                  row.push(latestTransaction.dateApproved || latestTransaction.dateApplied || '');
-                } else {
-                  row.push(0);
-                  row.push('N/A');
-                }
-
-                worksheet.addRow(row);
-              });
-            }
-
-            workbook.xlsx.writeBuffer().then(buffer => {
-              const blob = new Blob([buffer], { 
-                type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-              });
-              const url = window.URL.createObjectURL(blob);
-              const link = document.createElement('a');
-              link.href = url;
-              link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
-              document.body.appendChild(link);
-              link.click();
-              document.body.removeChild(link);
-              window.URL.revokeObjectURL(url);
+              worksheet.addRow(row);
             });
-          } else {
-            // Direct print
-            printFrame.contentWindow.print();
           }
-          
-          // Clean up after printing
-          setTimeout(() => {
-            document.body.removeChild(printFrame);
-            setPrintModalVisible(false);
-            setPrinting(false);
-          }, 1000);
-        } catch (error) {
-          console.error('Print error:', error);
-          document.body.removeChild(printFrame);
-          setPrinting(false);
-        }
-      };
 
-    } catch (error) {
-      console.error('Error printing data:', error);
-      setPrinting(false);
-    }
-  };
+          workbook.xlsx.writeBuffer().then(buffer => {
+            const blob = new Blob([buffer], { 
+              type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+            });
+            const url = window.URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `${sectionTitle.replace(/\s+/g, '_')}_${new Date().getTime()}.xlsx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            window.URL.revokeObjectURL(url);
+          });
+        } else {
+          // Direct print
+          printFrame.contentWindow.print();
+        }
+        
+        // Clean up after printing
+        setTimeout(() => {
+          document.body.removeChild(printFrame);
+          setPrintModalVisible(false);
+          setPrinting(false);
+        }, 1000);
+      } catch (error) {
+        console.error('Print error:', error);
+        document.body.removeChild(printFrame);
+        setPrinting(false);
+      }
+    };
+
+  } catch (error) {
+    console.error('Error printing data:', error);
+    setPrinting(false);
+  }
+};
 
   const handleDownload = async () => {
     try {
