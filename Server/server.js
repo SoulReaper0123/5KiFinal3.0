@@ -2047,7 +2047,6 @@ app.post('/applyLoan', async (req, res) => {
     res.status(500).json({ message: 'Failed to send emails', error: error.message });
   }
 });
-
 app.post('/approveLoans', async (req, res) => {
   console.log('[NOTIFICATION] Initiating loan approval email', req.body);
   const { 
@@ -2061,13 +2060,13 @@ app.post('/approveLoans', async (req, res) => {
     interestRate,
     interest,
     totalInterest,
-    principal,
     monthlyPayment,
     totalMonthlyPayment,
     totalTermPayment,
     releaseAmount,
     processingFee,
-    dueDate
+    dueDate,
+    approvalAttachmentUrl  // This should now be properly passed
   } = req.body;
 
   if (!email || !firstName || !lastName || !amount || !term || !dateApproved || !timeApproved) {
@@ -2077,6 +2076,44 @@ app.post('/approveLoans', async (req, res) => {
 
   try {
     console.log('[NOTIFICATION] Sending loan approval to user');
+    console.log('[NOTIFICATION] Attachment URL:', approvalAttachmentUrl); // Add logging
+    
+    // Generate HTML for attachment section - IMPROVED VERSION
+    let attachmentHtml = '';
+    if (approvalAttachmentUrl) {
+      const fileType = approvalAttachmentUrl.toLowerCase().includes('.pdf') ? 'PDF' : 'Image';
+      
+      attachmentHtml = `
+        <div style="background-color: #e8f8f5; padding: 20px; border-left: 4px solid #2ecc71; margin: 25px 0; border-radius: 0 8px 8px 0;">
+          <h3 style="color: #2c3e50; margin-top: 0; display: flex; align-items: center; gap: 10px;">
+            📎 Approval Documents
+          </h3>
+          <p style="margin-bottom: 15px; color: #555;">Attached ${fileType.toLowerCase()} for your records:</p>
+          <div style="text-align: center; padding: 15px; background-color: white; border-radius: 8px; border: 1px solid #ddd;">
+            <div style="display: inline-block; text-align: left;">
+              <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                <div style="font-size: 36px;">
+                  ${fileType === 'PDF' ? '📄' : '🖼️'}
+                </div>
+                <div>
+                  <div style="font-weight: bold; color: #2c3e50;">${fileType} Document</div>
+                  <div style="font-size: 14px; color: #7f8c8d;">Attached approval document</div>
+                </div>
+              </div>
+              <a href="${approvalAttachmentUrl}" 
+                 target="_blank" 
+                 style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%); color: white; text-decoration: none; border-radius: 5px; font-weight: bold; transition: all 0.3s;">
+                👁️ View ${fileType}
+              </a>
+              <p style="font-size: 12px; color: #7f8c8d; margin-top: 10px; max-width: 300px;">
+                Click the button above to view the attached ${fileType.toLowerCase()} document
+              </p>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
     const mailOptions = {
       to: email,
       subject: 'Congratulations! Your Loan is Approved',
@@ -2093,6 +2130,8 @@ app.post('/approveLoans', async (req, res) => {
               We're pleased to inform you that your loan application has been approved on ${dateApproved}.
             </p>
           </div>
+
+          ${attachmentHtml} 
           
           <h3 style="color: #2c3e50; margin: 20px 0 10px 0;">Loan Details:</h3>
           <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -2162,6 +2201,10 @@ app.post('/approveLoans', async (req, res) => {
     const result = await sendEmailWithRetry(mailOptions);
 
     console.log('[NOTIFICATION SUCCESS] Loan approval email sent successfully');
+    if (approvalAttachmentUrl) {
+      console.log('[NOTIFICATION] Attachment included in email:', approvalAttachmentUrl);
+    }
+    
     res.status(200).json({ message: 'Email sent successfully' });
   } catch (error) {
     console.error('[NOTIFICATION ERROR] Error sending loan approval email:', error);
@@ -3147,7 +3190,7 @@ app.post('/send-coadmin-email', async (req, res) => {
             <li>Always log out after your session</li>
           </ul>
           <p>
-            <a href="${websiteLink || WEBSITE_LINK}" 
+            <a href="${DASHBOARD_LINK}" 
                style="display: inline-block; background-color: #3498db; color: white; 
                       padding: 10px 20px; text-decoration: none; border-radius: 4px; margin: 15px 0;">
               Login to your account
