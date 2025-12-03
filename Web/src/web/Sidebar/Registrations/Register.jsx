@@ -980,23 +980,27 @@ const handlePrint = (format = 'print') => {
     printContent.style.fontFamily = 'Arial, sans-serif';
     printContent.style.boxSizing = 'border-box';
     printContent.style.margin = '0';
+    printContent.style.display = 'flex';
+    printContent.style.flexDirection = 'column';
+    printContent.style.minHeight = '100vh';
 
-    // Create your custom header - MATCHING DEPOSITS STRUCTURE
+    // Main content container
+    const mainContent = document.createElement('div');
+    mainContent.style.flex = '1';
+
+    // Create your custom header - SIMPLIFIED VERSION
     const header = document.createElement('div');
     header.className = 'print-header';
-    header.style.borderBottom = '2px solid #333';
     header.style.paddingBottom = '15px';
     header.style.marginBottom = '20px';
     header.style.boxSizing = 'border-box';
 
-    // Logo and Report Title (Centered) - LIKE DEPOSITS
+    // Logo and Report Title (Centered)
     const logoSection = document.createElement('div');
     logoSection.style.textAlign = 'center';
     logoSection.style.marginBottom = '15px';
 
-    // Add logo image (using the same logoImage import as Deposits)
-    // If you don't have logoImage imported, add this at the top with other imports:
-    // import logoImage from '../../../../../assets/logo.png';
+    // Add logo image
     const logoImg = document.createElement('img');
     logoImg.src = logoImage;
     logoImg.style.width = '80px';
@@ -1023,39 +1027,6 @@ const handlePrint = (format = 'print') => {
     logoSection.appendChild(logo);
     logoSection.appendChild(reportTitle);
 
-    // Info Row (Generated Date on left, Prepared By on right) - LIKE DEPOSITS
-    const infoRow = document.createElement('div');
-    infoRow.style.display = 'flex';
-    infoRow.style.justifyContent = 'space-between';
-    infoRow.style.alignItems = 'flex-start';
-    infoRow.style.fontSize = '14px';
-    infoRow.style.marginBottom = '10px';
-    infoRow.style.boxSizing = 'border-box';
-
-    // Left side - Generated Date
-    const generatedDate = document.createElement('div');
-    generatedDate.style.textAlign = 'left';
-    generatedDate.style.flex = '1';
-    generatedDate.innerHTML = `
-      <strong>Generated as of:</strong><br>
-      ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-    `;
-
-    // Right side - Prepared By
-    const preparedBy = document.createElement('div');
-    preparedBy.style.textAlign = 'right';
-    preparedBy.style.flex = '1';
-    const adminFirstName = adminData?.firstName || 'Admin';
-    const adminRole = localStorage.getItem('userRole') || 'Admin';
-    preparedBy.innerHTML = `
-      <strong>Prepared by:</strong><br>
-      <span style="font-weight: bold;">${adminFirstName}</span><br>
-      <em>${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</em>
-    `;
-
-    infoRow.appendChild(generatedDate);
-    infoRow.appendChild(preparedBy);
-
     // Report Details
     const reportDetails = document.createElement('div');
     reportDetails.style.textAlign = 'center';
@@ -1067,11 +1038,10 @@ const handlePrint = (format = 'print') => {
     `;
 
     header.appendChild(logoSection);
-    header.appendChild(infoRow);
     header.appendChild(reportDetails);
-    printContent.appendChild(header);
+    mainContent.appendChild(header);
 
-    // Table creation code remains the same...
+    // Table creation
     if (displayedData.length > 0) {
       const table = document.createElement('table');
       table.style.width = '100%';
@@ -1198,17 +1168,62 @@ const handlePrint = (format = 'print') => {
       });
       
       table.appendChild(tbody);
-      printContent.appendChild(table);
+      mainContent.appendChild(table);
     } else {
       const noData = document.createElement('p');
       noData.textContent = 'No data available';
       noData.style.textAlign = 'center';
       noData.style.color = '#666';
       noData.style.fontStyle = 'italic';
-      printContent.appendChild(noData);
+      noData.style.marginTop = '40px';
+      mainContent.appendChild(noData);
     }
 
-    // Create a hidden iframe for printing to avoid browser headers - LIKE DEPOSITS
+    // Add main content to printContent
+    printContent.appendChild(mainContent);
+
+    // FOOTER SECTION - NEW
+    const footer = document.createElement('div');
+    footer.style.marginTop = 'auto';
+    footer.style.paddingTop = '30px';
+    footer.style.borderTop = '1px solid #ddd';
+    footer.style.fontSize = '12px';
+    footer.style.color = '#666';
+
+    // Footer content container
+    const footerContent = document.createElement('div');
+    footerContent.style.display = 'flex';
+    footerContent.style.justifyContent = 'space-between';
+    footerContent.style.alignItems = 'flex-start';
+    footerContent.style.boxSizing = 'border-box';
+
+    // Left side - Generated Date
+    const generatedDate = document.createElement('div');
+    generatedDate.style.textAlign = 'left';
+    generatedDate.style.flex = '1';
+    generatedDate.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Generated as of:</strong></div>
+      <div>${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+    `;
+
+    // Right side - Prepared By
+    const preparedBy = document.createElement('div');
+    preparedBy.style.textAlign = 'right';
+    preparedBy.style.flex = '1';
+    const adminFirstName = adminData?.firstName || 'Admin';
+    const adminRole = localStorage.getItem('userRole') || 'Admin';
+    preparedBy.innerHTML = `
+      <div style="margin-bottom: 5px;"><strong>Prepared by:</strong></div>
+      <div style="font-weight: bold;">${adminFirstName}</div>
+      <div style="font-style: italic;">${adminRole.charAt(0).toUpperCase() + adminRole.slice(1)}</div>
+    `;
+
+    footerContent.appendChild(generatedDate);
+    footerContent.appendChild(preparedBy);
+    footer.appendChild(footerContent);
+    printContent.appendChild(footer);
+
+    // Create a hidden iframe for printing to avoid browser headers
     const printFrame = document.createElement('iframe');
     printFrame.style.position = 'fixed';
     printFrame.style.right = '0';
@@ -1246,11 +1261,17 @@ const handlePrint = (format = 'print') => {
               padding: 0 !important;
               font-family: Arial, sans-serif;
               -webkit-print-color-adjust: exact;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
             }
             
             .print-content {
               margin: 0 !important;
               padding: 20px;
+              display: flex;
+              flex-direction: column;
+              min-height: 100vh;
             }
             
             /* Hide any potential browser elements */
@@ -1274,6 +1295,21 @@ const handlePrint = (format = 'print') => {
               background-color: #f2f2f2;
               font-weight: bold;
             }
+            
+            .print-footer {
+              margin-top: auto;
+              padding-top: 30px;
+              border-top: 1px solid #ddd;
+              font-size: 12px;
+              color: #666;
+            }
+            
+            .footer-content {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              box-sizing: border-box;
+            }
           </style>
         </head>
         <body>
@@ -1289,7 +1325,7 @@ const handlePrint = (format = 'print') => {
         if (format === 'pdf') {
           printFrame.contentWindow.print();
 
-          // Export to Excel - LIKE DEPOSITS (REMOVED WORD OPTION)
+          // Export to Excel
           const workbook = new ExcelJS.Workbook();
           const worksheet = workbook.addWorksheet(sectionTitle);
 
