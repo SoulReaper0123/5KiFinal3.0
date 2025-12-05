@@ -1139,57 +1139,129 @@ const bankTypeOptions = [
     return collateralType && collateralValue && collateralDescription && proofOfCollateral;
   };
 
-  const fetchLoansDataForSection = async (sectionKey = activeSection, options = {}) => {
-    const { silent = false } = options;
-    if (!silent) setLoading(true);
-    try {
-      const [applySnap, approvedSnap, rejectedSnap, paidSnap] = await Promise.all([
-        database.ref('Loans/LoanApplications').once('value'),
-        database.ref('Loans/ApprovedLoans').once('value'),
-        database.ref('Loans/RejectedLoans').once('value'),
-        database.ref('Loans/PaidLoans').once('value'),
-      ]);
+const fetchLoansDataForSection = async (sectionKey = activeSection, options = {}) => {
+  const { silent = false } = options;
+  if (!silent) setLoading(true);
+  try {
+    // Fetch all necessary data
+    const [applySnap, approvedSnap, rejectedSnap, paidSnap, currentSnap] = await Promise.all([
+      database.ref('Loans/LoanApplications').once('value'),
+      database.ref('Loans/ApprovedLoans').once('value'),
+      database.ref('Loans/RejectedLoans').once('value'),
+      database.ref('Loans/PaidLoans').once('value'),
+      database.ref('Loans/CurrentLoans').once('value') // ADD THIS LINE
+    ]);
 
-      const flatten = (val) => {
-        const all = [];
-        Object.entries(val || {}).forEach(([uid, record]) => {
-          if (record && typeof record === 'object' && !record.hasOwnProperty('loanAmount')) {
-            Object.entries(record).forEach(([txId, inner]) => {
-              all.push({ id: uid, transactionId: txId, ...inner });
-            });
-          } else {
-            all.push({ id: uid, ...record });
+    // Fetch members data separately
+    const membersSnap = await database.ref('Members').once('value');
+    const membersData = membersSnap.val() || {};
+
+    const flatten = (val, isApprovedSection = false) => {
+      const all = [];
+      Object.entries(val || {}).forEach(([uid, record]) => {
+        if (record && typeof record === 'object' && !record.hasOwnProperty('loanAmount')) {
+          // Nested structure (memberId -> transactionId -> loanData)
+          Object.entries(record).forEach(([txId, inner]) => {
+            const item = { 
+              id: uid, 
+              memberId: uid,
+              transactionId: txId, 
+              ...inner
+            };
+            
+            // Attach member data for approved loans
+            if (isApprovedSection) {
+              item.firstName = membersData[uid]?.firstName || '';
+              item.lastName = membersData[uid]?.lastName || '';
+              item.email = membersData[uid]?.email || '';
+            }
+            all.push(item);
+          });
+        } else {
+          // Flat structure
+          const item = { 
+            id: uid, 
+            memberId: uid,
+            ...record 
+          };
+          
+          // Attach member data for approved loans
+          if (isApprovedSection) {
+            item.firstName = membersData[uid]?.firstName || '';
+            item.lastName = membersData[uid]?.lastName || '';
+            item.email = membersData[uid]?.email || '';
           }
-        });
-        return all;
-      };
+          all.push(item);
+        }
+      });
+      return all;
+    };
 
-      const apply = flatten(applySnap.val());
-      const approved = flatten(approvedSnap.val());
-      const rejected = flatten(rejectedSnap.val());
-      const paid = flatten(paidSnap.val());
-
-      setPendingLoans(apply);
-      setApprovedLoans(approved);
-      setRejectedLoans(rejected);
-      setPaidLoans(paid);
-
-      const base = 
-        sectionKey === 'applyLoans' ? apply : 
-        sectionKey === 'approvedLoans' ? approved : 
-        sectionKey === 'rejectedLoans' ? rejected : 
-        paid;
+    const apply = flatten(applySnap.val());
+    const rejected = flatten(rejectedSnap.val());
+    const paid = flatten(paidSnap.val());
+    
+    // SPECIAL HANDLING FOR APPROVED LOANS - MERGE WITH CURRENT LOANS
+    const approved = flatten(approvedSnap.val(), true);
+    const currentLoans = currentSnap.val() || {};
+    
+    // Merge approved loans with current loans data
+    const approvedWithCurrentData = approved.map(loan => {
+      const currentLoan = currentLoans[loan.memberId]?.[loan.transactionId];
       
-      setFilteredData(base);
-      setNoMatch(base.length === 0);
-    } catch (err) {
-      console.error('Loan fetch error:', err);
-      setErrorMessage('Failed to fetch loan data');
-      setErrorModalVisible(true);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  };
+      // If we have current loan data, merge it
+      if (currentLoan) {
+        return {
+          ...loan,
+          // Get outstanding balance from CurrentLoans (remainingBalance)
+          outstandingBalance: parseFloat(currentLoan.remainingBalance) || 
+                            parseFloat(currentLoan.loanAmount) || 0,
+          // Get due date from CurrentLoans
+          dueDate: currentLoan.dueDate || '',
+          // Check if overdue
+          isOverdue: currentLoan.dueDate ? 
+            new Date() > new Date(currentLoan.dueDate) : false,
+          // Include other current loan data
+          paymentsMade: currentLoan.paymentsMade || 0,
+          amountPaid: currentLoan.amountPaid || 0,
+          // Also include the original loan amount
+          loanAmount: parseFloat(loan.loanAmount) || 0
+        };
+      }
+      
+      // If no current loan data, use approved loan data
+      return {
+        ...loan,
+        outstandingBalance: parseFloat(loan.loanAmount) || 0,
+        dueDate: loan.dueDate || '',
+        isOverdue: false,
+        paymentsMade: 0,
+        amountPaid: 0,
+        loanAmount: parseFloat(loan.loanAmount) || 0
+      };
+    });
+
+    setPendingLoans(apply);
+    setApprovedLoans(approvedWithCurrentData); // Use the merged data
+    setRejectedLoans(rejected);
+    setPaidLoans(paid);
+
+    const base = 
+      sectionKey === 'applyLoans' ? apply : 
+      sectionKey === 'approvedLoans' ? approvedWithCurrentData : // Use merged data here
+      sectionKey === 'rejectedLoans' ? rejected : 
+      paid;
+    
+    setFilteredData(base);
+    setNoMatch(base.length === 0);
+  } catch (err) {
+    console.error('Loan fetch error:', err);
+    setErrorMessage('Failed to fetch loan data');
+    setErrorModalVisible(true);
+  } finally {
+    if (!silent) setLoading(false);
+  }
+};
 
   // Initial load
   useEffect(() => {
@@ -1217,24 +1289,39 @@ const bankTypeOptions = [
     setNoMatch(false);
   }, [activeSection, pendingLoans, approvedLoans, rejectedLoans, paidLoans]);
 
-  const handleSearch = (text) => {
-    setSearchQuery(text);
-    setCurrentPage(0);
-    const base =
-      activeSection === 'applyLoans' ? pendingLoans :
-      activeSection === 'approvedLoans' ? approvedLoans :
-      activeSection === 'rejectedLoans' ? rejectedLoans :
-      paidLoans;
+// In Loans.js - Update the handleSearch function:
 
-    const filtered = base.filter(item =>
-      `${item.firstName ?? ''} ${item.lastName ?? ''}`.toLowerCase().includes(text.toLowerCase()) ||
-      (item.id && item.id.toString().includes(text)) ||
-      (item.transactionId && item.transactionId.toString().includes(text))
+const handleSearch = (text) => {
+  setSearchQuery(text);
+  setCurrentPage(0);
+  const base =
+    activeSection === 'applyLoans' ? pendingLoans :
+    activeSection === 'approvedLoans' ? approvedLoans :
+    activeSection === 'rejectedLoans' ? rejectedLoans :
+    paidLoans;
+
+  const filtered = base.filter(item => {
+    const searchText = text.toLowerCase();
+    
+    // Create searchable text from all fields
+    const fullName = `${item.firstName || ''} ${item.lastName || ''}`.toLowerCase();
+    const memberIdStr = item.memberId ? item.memberId.toString().toLowerCase() : '';
+    const idStr = item.id ? item.id.toString().toLowerCase() : '';
+    const transactionStr = item.transactionId ? item.transactionId.toString().toLowerCase() : '';
+    const emailStr = item.email ? item.email.toLowerCase() : '';
+    
+    return (
+      fullName.includes(searchText) ||
+      memberIdStr.includes(searchText) ||
+      idStr.includes(searchText) ||
+      transactionStr.includes(searchText) ||
+      emailStr.includes(searchText)
     );
+  });
 
-    setNoMatch(filtered.length === 0);
-    setFilteredData(filtered);
-  };
+  setNoMatch(filtered.length === 0);
+  setFilteredData(filtered);
+};
 
 const handlePrint = (format = 'print') => {
   setPrinting(true);
@@ -2382,15 +2469,15 @@ const handleAddApprovedLoan = async () => {
                   refreshData={() => fetchLoansDataForSection('applyLoans')}
                 />
               )}
-              {activeSection === 'approvedLoans' && (
-                <ApprovedLoans 
-                  loans={paginatedData} 
-                  currentPage={currentPage}
-                  totalPages={totalPages}
-                  onPageChange={setCurrentPage}
-                  refreshData={() => fetchLoansDataForSection('approvedLoans')}
-                />
-              )}
+                {activeSection === 'approvedLoans' && (
+                  <ApprovedLoans 
+                    loans={paginatedData} 
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    refreshData={() => fetchLoansDataForSection('approvedLoans')}
+                  />
+                )}
               {activeSection === 'rejectedLoans' && (
                 <RejectedLoans 
                   loans={paginatedData} 
