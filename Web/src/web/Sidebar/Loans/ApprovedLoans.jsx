@@ -549,7 +549,7 @@ viewButton: {
   }
 };
 
-const ApprovedLoans = ({ currentPage, totalPages, onPageChange }) => {
+const ApprovedLoans = ({ loans, currentPage, totalPages, onPageChange, refreshData  }) => {
   const [selectedLoan, setSelectedLoan] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [imageViewerVisible, setImageViewerVisible] = useState(false);
@@ -562,8 +562,8 @@ const ApprovedLoans = ({ currentPage, totalPages, onPageChange }) => {
   const [successMessage, setSuccessMessage] = useState('');
   const [actionInProgress, setActionInProgress] = useState(false);
   const [showResendConfirmation, setShowResendConfirmation] = useState(false);
-  const [activeLoansData, setActiveLoansData] = useState([]);
-  const [loading, setLoading] = useState(true);
+
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     const styleElement = document.createElement('style');
@@ -580,9 +580,7 @@ const ApprovedLoans = ({ currentPage, totalPages, onPageChange }) => {
     };
   }, []);
 
-  useEffect(() => {
-    fetchActiveLoansData();
-    
+  useEffect(() => {    
     // Set up automatic loan reminder checking
     console.log('Setting up automatic loan reminder system...');
     
@@ -854,13 +852,29 @@ const fetchActiveLoansData = async () => {
   }
 };
 
-  const formatCurrency = (amount) => {
-    const num = typeof amount === 'string' ? parseFloat(amount) : amount;
-    return num.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    });
-  };
+const formatCurrency = (amount) => {
+  // Handle undefined, null, or empty values
+  if (amount === undefined || amount === null) {
+    return '0.00';
+  }
+  
+  // Handle string values like 'N/A' or empty strings
+  if (typeof amount === 'string' && !amount.trim()) {
+    return '0.00';
+  }
+  
+  const num = typeof amount === 'string' ? parseFloat(amount) : amount;
+  
+  // Handle NaN after parsing
+  if (isNaN(num)) {
+    return '0.00';
+  }
+  
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
+};
 
   const formatDisplayDate = (dateInput) => {
     try {
@@ -1135,23 +1149,14 @@ const confirmResendReminder = async () => {
   }
 };
 
-  if (loading) {
-    return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner}></div>
-        <div>Loading active loans...</div>
-      </div>
-    );
-  }
-
-  if (!activeLoansData || activeLoansData.length === 0) {
-    return (
-      <div style={styles.noDataContainer}>
-        <FaMoneyBillWave style={styles.noDataIcon} />
-        <div>No active loans available</div>
-      </div>
-    );
-  }
+if (!loans || loans.length === 0) {
+  return (
+    <div style={styles.noDataContainer}>
+      <FaMoneyBillWave style={styles.noDataIcon} />
+      <div>No active loans available</div>
+    </div>
+  );
+}
 
   return (
     <div style={styles.container}>
@@ -1170,7 +1175,7 @@ const confirmResendReminder = async () => {
             </tr>
           </thead>
           <tbody>
-            {activeLoansData.map((loan, index) => {
+            {loans.map((loan, index) => {
               const { penalty, newTotalMonthly } = computePenaltyAndNewTotal(loan);
               
               return (
