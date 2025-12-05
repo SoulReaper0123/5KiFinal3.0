@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { database } from '../../../../../Database/firebaseConfig';
 import { ApproveLoans, RejectLoans } from '../../../../../Server/api';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { 
   FaTimes, 
   FaCheckCircle, 
@@ -20,7 +21,9 @@ import {
   FaHandHoldingUsd,
   FaClock,
   FaPercentage,
-  FaQrcode 
+  FaQrcode, 
+  FaPlus,
+  FaFileContract
 } from 'react-icons/fa';
 
 const styles = {
@@ -676,7 +679,278 @@ viewButton: {
     fontSize: '13px',
     color: '#856404',
     lineHeight: '1.5'
+  },
+  enhancedConfirmationModal: {
+  backgroundColor: 'white',
+  borderRadius: '16px',
+  padding: '32px',
+  width: '500px',
+  maxWidth: '90%',
+  boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+  textAlign: 'center',
+  border: '1px solid #F1F5F9'
+},
+confirmationTitle: {
+  fontSize: '20px',
+  fontWeight: '700',
+  color: '#1e3a8a',
+  marginBottom: '16px'
+},
+confirmationText: {
+  fontSize: '16px',
+  color: '#374151',
+  marginBottom: '24px',
+  lineHeight: '1.5'
+},
+confirmationButtons: {
+  display: 'flex',
+  gap: '12px',
+  justifyContent: 'center'
+},
+attachmentSection: {
+  margin: '20px 0',
+  textAlign: 'left'
+},
+attachmentLabel: {
+  fontWeight: '600',
+  display: 'block',
+  marginBottom: '4px',
+  color: '#374151'
+},
+attachmentDescription: {
+  fontSize: '14px',
+  color: '#6b7280',
+  marginBottom: '16px'
+},
+fileUploadArea: {
+  border: '2px dashed #d1d5db',
+  borderRadius: '12px',
+  padding: '32px',
+  textAlign: 'center',
+  transition: 'all 0.3s ease',
+  cursor: 'pointer',
+  backgroundColor: '#fafafa',
+  minHeight: '120px',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  gap: '8px',
+  '&:hover': {
+    borderColor: '#3b82f6',
+    backgroundColor: '#f0f9ff'
   }
+},
+fileInput: {
+  display: 'none'
+},
+uploadText: {
+  fontSize: '16px',
+  color: '#374151',
+  fontWeight: '500',
+  margin: 0
+},
+fileTypes: {
+  fontSize: '14px',
+  color: '#6b7280',
+  margin: 0
+},
+filePreview: {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  backgroundColor: '#f8fafc',
+  padding: '16px',
+  borderRadius: '12px',
+  border: '1px solid #e2e8f0'
+},
+fileInfo: {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '12px'
+},
+fileDetails: {
+  display: 'flex',
+  flexDirection: 'column'
+},
+fileName: {
+  fontSize: '14px',
+  fontWeight: '600',
+  color: '#374151',
+  margin: 0
+},
+fileSize: {
+  fontSize: '12px',
+  color: '#6b7280',
+  margin: 0
+},
+removeFileButton: {
+  backgroundColor: '#fef2f2',
+  border: '1px solid #fecaca',
+  color: '#dc2626',
+  borderRadius: '8px',
+  padding: '8px',
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  transition: 'all 0.3s ease',
+  '&:hover': {
+    backgroundColor: '#fee2e2'
+  }
+},
+uploadingIndicator: {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: '12px',
+  marginTop: '12px',
+  padding: '12px',
+  backgroundColor: '#f0f9ff',
+  borderRadius: '8px',
+  border: '1px solid #dbeafe'
+},
+uploadingText: {
+  fontSize: '14px',
+  color: '#1e40af',
+  fontWeight: '500'
+},
+  // Add these new styles:
+  enhancedConfirmationModal: {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '32px',
+    width: '500px',
+    maxWidth: '90%',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmationTitle: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#1e3a8a',
+    marginBottom: '16px'
+  },
+  confirmationText: {
+    fontSize: '16px',
+    color: '#374151',
+    marginBottom: '24px',
+    lineHeight: '1.5'
+  },
+  confirmationButtons: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center'
+  },
+  attachmentSection: {
+    margin: '20px 0',
+    textAlign: 'left'
+  },
+  attachmentLabel: {
+    fontWeight: '600',
+    display: 'block',
+    marginBottom: '4px',
+    color: '#374151'
+  },
+  attachmentDescription: {
+    fontSize: '14px',
+    color: '#6b7280',
+    marginBottom: '16px'
+  },
+  fileUploadArea: {
+    border: '2px dashed #d1d5db',
+    borderRadius: '12px',
+    padding: '32px',
+    textAlign: 'center',
+    transition: 'all 0.3s ease',
+    cursor: 'pointer',
+    backgroundColor: '#fafafa',
+    minHeight: '120px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '8px',
+    '&:hover': {
+      borderColor: '#3b82f6',
+      backgroundColor: '#f0f9ff'
+    }
+  },
+  fileInput: {
+    display: 'none'
+  },
+  uploadText: {
+    fontSize: '16px',
+    color: '#374151',
+    fontWeight: '500',
+    margin: 0
+  },
+  fileTypes: {
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: 0
+  },
+  filePreview: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: '16px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0'
+  },
+  fileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  fileDetails: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  fileName: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151',
+    margin: 0
+  },
+  fileSize: {
+    fontSize: '12px',
+    color: '#6b7280',
+    margin: 0
+  },
+  removeFileButton: {
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    borderRadius: '8px',
+    padding: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      backgroundColor: '#fee2e2'
+    }
+  },
+  uploadingIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    marginTop: '12px',
+    padding: '12px',
+    backgroundColor: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #dbeafe'
+  },
+  uploadingText: {
+    fontSize: '14px',
+    color: '#1e40af',
+    fontWeight: '500'
+  },
 };
 
 // Add keyframes for spinner animation
@@ -739,6 +1013,73 @@ const ApplyLoans = ({
   const [showSavingsConfirmModal, setShowSavingsConfirmModal] = useState(false);
   const [savingsShortfall, setSavingsShortfall] = useState({ needed: 0, available: 0, remaining: 0 });
   const [pendingLoanForSavings, setPendingLoanForSavings] = useState(null);
+
+// Add these to your existing state declarations
+const [approvalAttachmentFile, setApprovalAttachmentFile] = useState(null);
+const [approvalAttachmentUrl, setApprovalAttachmentUrl] = useState('');
+const [attachmentUploading, setAttachmentUploading] = useState(false);
+
+// Add these functions after your existing handlers
+
+// Handle file selection
+const handleFileSelect = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('File size must be less than 5MB');
+      setErrorModalVisible(true);
+      return;
+    }
+    
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMessage('Only JPG, PNG, and PDF files are allowed');
+      setErrorModalVisible(true);
+      return;
+    }
+    
+    setApprovalAttachmentFile(file);
+  }
+};
+
+// Remove selected file
+const removeApprovalAttachment = () => {
+  setApprovalAttachmentFile(null);
+  setApprovalAttachmentUrl('');
+};
+
+// Add this function to upload files
+const uploadApprovalAttachment = async (file, loanId, transactionId) => {
+  try {
+    setAttachmentUploading(true);
+    
+    // Generate unique filename
+    const timestamp = new Date().getTime();
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `loan_approval_attachments/${loanId}_${transactionId}_${timestamp}.${fileExtension}`;
+    
+    // Create storage reference
+    const storage = getStorage();
+    const fileRef = storageRef(storage, fileName);
+    
+    // Upload file
+    const snapshot = await uploadBytes(fileRef, file);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    setApprovalAttachmentUrl(downloadURL);
+    setAttachmentUploading(false);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading approval attachment:', error);
+    setAttachmentUploading(false);
+    throw new Error('Failed to upload attachment: ' + error.message);
+  }
+};
 
   const formatCurrency = (amount) =>
     new Intl.NumberFormat('en-PH', {
@@ -823,10 +1164,12 @@ const ApplyLoans = ({
     setShowRejectionModal(true);
   };
 
-  const confirmApprove = async () => {
-    setShowApproveConfirmation(false);
-    await processAction(selectedLoan, 'approve');
-  };
+const confirmApprove = async (attachmentUrl = '') => {
+  setShowApproveConfirmation(false);
+  // Use the passed URL or fallback to state
+  const urlToUse = attachmentUrl || approvalAttachmentUrl;
+  await processAction(selectedLoan, 'approve', '', urlToUse); 
+};
 
   const handleReasonSelect = (reason) => {
     setSelectedReason(reason);
@@ -867,23 +1210,27 @@ const handleSavingsConfirm = async () => {
   const approveData = {
     ...pendingLoanForSavings,
     dateApproved: formatDate(new Date()),
-    timeApproved: formatTime(new Date())
+    timeApproved: formatTime(new Date()),
+    // Ensure attachment URL is included
+    ...(approvalAttachmentUrl && { proofOfTransactionUrl: approvalAttachmentUrl })
   };
 
   setSelectedLoan(prev => ({
     ...prev,
     dateApproved: approveData.dateApproved,
     timeApproved: approveData.timeApproved,
-    status: 'approved'
+    status: 'approved',
+    ...(approvalAttachmentUrl && { proofOfTransactionUrl: approvalAttachmentUrl })
   }));
 
-  // CORRECTED: Pass deductBalance and deductFunds to the database function
+  // CORRECTED: Include attachmentUrl in pendingApiCall
   setPendingApiCall({
     type: 'approve_with_savings',
     data: approveData,
     savingsAmount: savingsShortfall.needed,
-    deductBalance: savingsShortfall.deductFromBalance, // ₱5,000
-    deductFunds: savingsShortfall.deductFromFunds      // ₱5,000
+    deductBalance: savingsShortfall.deductFromBalance,
+    deductFunds: savingsShortfall.deductFromFunds,
+    attachmentUrl: approvalAttachmentUrl || ''  // This is important!
   });
 
   setSuccessMessageModalVisible(true);
@@ -891,14 +1238,13 @@ const handleSavingsConfirm = async () => {
   setPendingLoanForSavings(null);
   setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
 };
-
   const handleSavingsCancel = () => {
     setShowSavingsConfirmModal(false);
     setPendingLoanForSavings(null);
     setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
   };
 
-const processAction = async (loan, action, rejectionReason = '') => {
+const processAction = async (loan, action, rejectionReason = '', attachmentUrl = '') => {
   // Show loading immediately
   setActionInProgress(true);
   setIsProcessing(true);
@@ -946,14 +1292,16 @@ const processAction = async (loan, action, rejectionReason = '') => {
         const approveData = {
           ...loan,
           dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date())
+          timeApproved: formatTime(new Date()),
+            ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl }) 
         };
 
         setSelectedLoan(prev => ({
           ...prev,
           dateApproved: approveData.dateApproved,
           timeApproved: approveData.timeApproved,
-          status: 'approved'
+          status: 'approved',
+            ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl }) 
         }));
 
         setPendingApiCall({
@@ -961,7 +1309,8 @@ const processAction = async (loan, action, rejectionReason = '') => {
           data: approveData,
           deductBalance,
           deductFunds,
-          savingsAmount: 0
+          savingsAmount: 0,
+          attachmentUrl: attachmentUrl || '' 
         });
 
         // Show success modal immediately (database operations deferred to OK button)
@@ -1033,9 +1382,16 @@ const processAction = async (loan, action, rejectionReason = '') => {
   }
 };
 
-const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsAmount) => {
+const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsAmount, attachmentUrl = '') => {
   try {
-      const { id, transactionId, term, loanAmount } = loan;
+
+      console.log('🚀 DEBUG: Starting database approval');
+    console.log('📎 DEBUG: Received attachmentUrl:', attachmentUrl);
+    console.log('📎 DEBUG: attachmentUrl type:', typeof attachmentUrl);
+    console.log('📎 DEBUG: attachmentUrl exists:', !!attachmentUrl);
+    console.log('📎 DEBUG: attachmentUrl value:', attachmentUrl);
+    
+    const { id, transactionId, term, loanAmount } = loan;
 
       const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
       const memberBalanceRef = database.ref(`Members/${id}/balance`);
@@ -1128,7 +1484,8 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
         paymentsMade: 0,
         amountPaid: 0,
         remainingBalance: Math.round(totalTermPayment * 100) / 100,
-      borrowedFromSavings: Math.round(savingsAmount * 100) / 100
+        borrowedFromSavings: Math.round(savingsAmount * 100) / 100,
+        proofOfTransactionUrl: attachmentUrl || null
       };
 
       await approvedRef.set(approvedData);
@@ -1181,7 +1538,7 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
 
 
 // CORRECTED: Function to handle approval with savings deduction
-const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBalance, deductFunds) => {
+const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBalance, deductFunds, attachmentUrl = '') => {
   try {
     const { id, transactionId, term, loanAmount } = loan;
 
@@ -1276,7 +1633,8 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBala
       paymentsMade: 0,
       amountPaid: 0,
       remainingBalance: Math.round(totalTermPayment * 100) / 100,
-      borrowedFromSavings: Math.round(savingsAmount * 100) / 100
+      borrowedFromSavings: Math.round(savingsAmount * 100) / 100,
+      proofOfTransactionUrl: attachmentUrl || null 
     };
 
     await approvedRef.set(approvedData);
@@ -1366,7 +1724,7 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBala
     }
   };
 
-  const callApiApprove = async (loan) => {
+const callApiApprove = async (loan, attachmentUrl = '') => {
     try {
       const now = new Date();
 
@@ -1447,7 +1805,8 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBala
         totalTermPayment: totalTermPayment.toFixed(2),
         releaseAmount: releaseAmount.toFixed(2),
         processingFee: processingFee.toFixed(2),
-        dueDate: formatDate(dueDate)
+        dueDate: formatDate(dueDate),
+          proofOfTransactionUrl: attachmentUrl || null 
       });
 
       if (!response.ok) {
@@ -1522,17 +1881,23 @@ const handleSuccessOk = async () => {
 
   try {
     if (pendingApiCall.type === 'approve') {
-      await processDatabaseApprove(pendingApiCall.data, pendingApiCall.deductBalance, pendingApiCall.deductFunds, pendingApiCall.savingsAmount);
-      callApiApprove(pendingApiCall.data);
+      await processDatabaseApprove(
+        pendingApiCall.data, 
+        pendingApiCall.deductBalance, 
+        pendingApiCall.deductFunds, 
+        pendingApiCall.savingsAmount,
+        pendingApiCall.attachmentUrl || ''  // Make sure this is passed
+      );
+      callApiApprove(pendingApiCall.data, pendingApiCall.attachmentUrl || '');
     } else if (pendingApiCall.type === 'approve_with_savings') {
-      // CORRECTED: Pass all required parameters
       await processDatabaseApproveWithSavings(
         pendingApiCall.data, 
         pendingApiCall.savingsAmount,
-        pendingApiCall.deductBalance,  // ₱5,000
-        pendingApiCall.deductFunds     // ₱5,000
+        pendingApiCall.deductBalance, 
+        pendingApiCall.deductFunds,
+        pendingApiCall.attachmentUrl || ''  // Make sure this is passed
       );
-      callApiApprove(pendingApiCall.data);
+      callApiApprove(pendingApiCall.data, pendingApiCall.attachmentUrl || '');
     } else if (pendingApiCall.type === 'reject') {
       await processDatabaseReject(pendingApiCall.data, pendingApiCall.data.rejectionReason);
       callApiReject(pendingApiCall.data);
@@ -1542,6 +1907,8 @@ const handleSuccessOk = async () => {
     setErrorMessage(error.message || 'An error occurred during final processing.');
     setErrorModalVisible(true);
   } finally {
+    setApprovalAttachmentFile(null);
+    setApprovalAttachmentUrl('');
     setIsProcessing(false);
     setActionInProgress(false);
     setPendingApiCall(null);
@@ -1948,35 +2315,122 @@ const hasDocuments = (loan) => {
         </div>
       )}
 
-{/* Approve Confirmation Modal */}
+{/* Enhanced Approve Confirmation Modal */}
 {showApproveConfirmation && (
   <div style={styles.modalOverlay}>
-    <div style={styles.modalCardSmall}>
-      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-      <p style={styles.modalText}>Are you sure you want to approve this loan?</p>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button 
-          style={{
-            ...styles.actionButton,
-            ...styles.primaryButton,
-            ...(actionInProgress ? styles.disabledButton : {})
-          }} 
-          onClick={confirmApprove}
-          disabled={actionInProgress}
-        >
-          {actionInProgress ? 'Processing...' : 'Yes'}
-        </button>
-        <button 
-          style={{
-            ...styles.actionButton,
-            ...styles.secondaryButton
-          }} 
-          onClick={() => setShowApproveConfirmation(false)}
-          disabled={actionInProgress}
-        >
-          No
-        </button>
+    <div style={styles.enhancedConfirmationModal}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a', fontSize: '48px' }} />
+      <h3 style={styles.confirmationTitle}>Approve Loan Application</h3>
+      
+      {/* Attachment Section - ADD THIS */}
+      <div style={styles.attachmentSection}>
+        <label style={styles.attachmentLabel}>Proof of Transaction:</label>
+        
+        {!approvalAttachmentFile ? (
+          <div 
+            style={styles.fileUploadArea}
+            onClick={() => document.getElementById('approvalAttachment').click()}
+          >
+            <FaPlus style={{ fontSize: '24px', color: '#6b7280', marginBottom: '12px' }} />
+            <p style={styles.uploadText}>Click to upload file</p>
+            <p style={styles.fileTypes}>Supported: JPG, PNG, PDF (Max 5MB)</p>
+            <input
+              id="approvalAttachment"
+              type="file"
+              style={styles.fileInput}
+              onChange={handleFileSelect}
+              accept="image/*,.pdf"
+            />
+          </div>
+        ) : (
+          <div style={styles.filePreview}>
+            <div style={styles.fileInfo}>
+              <FaFileContract style={{ fontSize: '24px', color: '#3b82f6' }} />
+              <div style={styles.fileDetails}>
+                <p style={styles.fileName}>{approvalAttachmentFile.name}</p>
+                <p style={styles.fileSize}>
+                  {(approvalAttachmentFile.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+            </div>
+            <button
+              style={styles.removeFileButton}
+              onClick={removeApprovalAttachment}
+              disabled={attachmentUploading}
+            >
+              <FaTimes />
+            </button>
+          </div>
+        )}
+        
+        {attachmentUploading && (
+          <div style={styles.uploadingIndicator}>
+            <div style={styles.spinner}></div>
+            <span style={styles.uploadingText}>Uploading file...</span>
+          </div>
+        )}
       </div>
+      
+      <p style={styles.confirmationText}>
+        Are you sure you want to approve this loan?
+        {approvalAttachmentFile && (
+          <span style={{ display: 'block', marginTop: '8px', color: '#059669', fontWeight: '600' }}>
+            ✅ Attachment will be included in approval email
+          </span>
+        )}
+      </p>
+      
+<div style={styles.confirmationButtons}>
+  <button 
+    style={{
+      ...styles.actionButton,
+      ...styles.primaryButton,
+      ...(actionInProgress || attachmentUploading ? styles.disabledButton : {})
+    }} 
+    onClick={async () => {
+      // If file is attached, upload it first
+      if (approvalAttachmentFile) {
+        try {
+          setActionInProgress(true);
+          const downloadURL = await uploadApprovalAttachment(
+            approvalAttachmentFile,
+            selectedLoan.id,
+            selectedLoan.transactionId
+          );
+          // Store the URL in state AND pass it directly to confirmApprove
+          setApprovalAttachmentUrl(downloadURL);
+          // Call confirmApprove with the URL directly (don't wait for state update)
+          await confirmApprove(downloadURL);
+        } catch (error) {
+          setErrorMessage('Failed to upload attachment: ' + error.message);
+          setErrorModalVisible(true);
+          setActionInProgress(false);
+          return;
+        }
+      } else {
+        // No attachment, proceed normally
+        confirmApprove();
+      }
+    }}
+    disabled={actionInProgress || attachmentUploading}
+  >
+    {actionInProgress ? 'Processing...' : 
+     approvalAttachmentFile ? 'Approve with Attachment' : 'Approve'}
+  </button>
+  <button 
+    style={{
+      ...styles.actionButton,
+      ...styles.secondaryButton
+    }} 
+    onClick={() => {
+      setShowApproveConfirmation(false);
+      removeApprovalAttachment(); // Clear any selected file
+    }}
+    disabled={actionInProgress || attachmentUploading}
+  >
+    Cancel
+  </button>
+</div>
     </div>
   </div>
 )}
