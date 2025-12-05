@@ -46,6 +46,21 @@ const toTime = (raw) => {
 
 const peso = (n) => `₱${Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
+const formatDate = (rawDate) => {
+  if (!rawDate) return '';
+  try {
+    const d = new Date(rawDate);
+    if (isNaN(d.getTime())) return String(rawDate);
+    return d.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  } catch {
+    return String(rawDate);
+  }
+};
+
 export default function InboxDetails() {
   const navigation = useNavigation();
   const route = useRoute();
@@ -72,7 +87,7 @@ export default function InboxDetails() {
     })();
   }, []);
 
-  // Compose sentence - FIXED VERSION
+  // Compose sentence - FIXED VERSION with separate Loan and Payment messages
   const sentence = useMemo(() => {
     const status = (item?.status || '').toLowerCase();
     const originalRef = item?.originalTransactionId || item?.transactionId || 'N/A';
@@ -88,56 +103,40 @@ export default function InboxDetails() {
     const newRef = item?.transactionId || item?.originalTransactionId || cleanDbId(item?.id) || originalRef;
 
     const approvedDate = item?.dateApproved || item?.approvedAt || item?.dateApplied || '';
-    const dateStr = (() => {
-      try {
-        const d = new Date(approvedDate);
-        return isNaN(d.getTime()) ? String(approvedDate) : d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
-      } catch { return String(approvedDate); }
-    })();
+    const dateStr = formatDate(approvedDate);
 
     const type = (item?.type || title || '').toLowerCase();
     const amount = item?.amount || 0;
+    const formattedAmount = peso(amount);
 
     // Handle Loan Payment Reminder specific message
     if (type.includes('loan payment reminder') || item?.isReminder) {
-      return `Reminder: ${item?.message || 'Your loan payment is due soon.'}\nRef No. ${newRef}`;
+      return `🔔 Payment Reminder\n\nYour monthly loan payment of ${formattedAmount} is due soon.\n\nTransaction ID: ${newRef}`;
     }
 
     // ========== DIVIDEND SPECIFIC MESSAGE ==========
     if (type.includes('dividend')) {
       if (status === 'approved' || status === 'distributed') {
-        let message = `Your dividend of ${peso(amount)} has been distributed on ${dateStr}.`;
+        let message = `💰 Dividend Distribution\n\nYour dividend of ${formattedAmount} has been successfully distributed on ${dateStr}.`;
         
         // Add investment/balance details if available
         if (item?.addedToInvestment) {
-          message += '\n• Added to your investment';
+          message += '\n• Added to your investment portfolio';
         }
         if (item?.addedToBalance) {
-          message += '\n• Added to your balance';
+          message += '\n• Added to your available balance';
         }
         
-        message += `\nRef No. ${newRef}`;
+        message += `\n\nTransaction ID: ${newRef}`;
         return message;
       } else if (status === 'pending') {
-        return `Your dividend of ${peso(amount)} is pending distribution.\nRef No. ${newRef}`;
+        return `⏳ Dividend Pending\n\nYour dividend of ${formattedAmount} is scheduled for distribution.\n\nTransaction ID: ${newRef}`;
       } else {
-        return `Dividend: ${peso(amount)} - Status: ${status}\nRef No. ${newRef}`;
+        return `Dividend Update\n\nAmount: ${formattedAmount}\nStatus: ${status}\nTransaction ID: ${newRef}`;
       }
     }
 
-    // Handle Membership Withdrawal specific message
-    if (type.includes('membership withdrawal')) {
-      const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
-      const base = `Your membership withdrawal application${descRef} with the amount of ${peso(amount)} on ${dateStr} has been ${status}.`;
-      const ref2 = `\nRef No. ${newRef}`;
-      
-      // Add withdrawal reason if available
-      const reasonText = item?.reason ? `\nReason: ${item.reason}` : '';
-      
-      return `${base}${reasonText}${ref2}`;
-    }
-
-    // ========== FIXED: Use proper wording for each transaction type ==========
+    // ========== SEPARATE MESSAGES FOR DIFFERENT TRANSACTION TYPES ==========
     const method = type.includes('deposit')
       ? (item?.depositOption || item?.paymentOption || item?.withdrawOption)
       : type.includes('payment')
@@ -146,32 +145,110 @@ export default function InboxDetails() {
       ? (item?.withdrawOption || item?.paymentOption || item?.depositOption)
       : (item?.paymentOption || item?.depositOption || item?.withdrawOption);
 
-    const descRef = originalRef !== newRef ? ` of Ref No. ${originalRef}` : '';
+    const descRef = originalRef !== newRef ? ` (Reference: ${originalRef})` : '';
     
-    // Use appropriate wording based on transaction type
     let baseMessage = '';
     
-    if (type.includes('deposit')) {
-      baseMessage = `Your deposit${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` via ${method}` : ''}.`;
-    } else if (type.includes('withdrawal')) {
-      baseMessage = `Your withdrawal${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` via ${method}` : ''}.`;
-    } else if (type.includes('loan')) {
-      baseMessage = `Your loan${descRef} of ${peso(amount)} on ${dateStr} has been ${status}.`;
-    } else if (type.includes('payment')) {
-      baseMessage = `Your payment${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` via ${method}` : ''}.`;
-    } else if (type.includes('registration')) {
-      baseMessage = `Your registration${descRef} with fee of ${peso(amount)} on ${dateStr} has been ${status}.`;
-    } else {
-      // Fallback for unknown types
-      baseMessage = `Your ${type}${descRef} of ${peso(amount)} on ${dateStr} has been ${status}${method ? ` using ${method}` : ''}.`;
+    // ========== LOAN MESSAGES ==========
+    if (type.includes('loan') && !type.includes('payment')) {
+      if (status === 'approved') {
+        baseMessage = `✅ Loan Application Approved\n\nCongratulations! Your loan application${descRef} for ${formattedAmount} has been approved on ${dateStr}.\n\nThe loan amount will be disbursed to your account shortly.`;
+      } else if (status === 'rejected') {
+        baseMessage = `❌ Loan Application Not Approved\n\nWe regret to inform you that your loan application${descRef} for ${formattedAmount} was not approved on ${dateStr}.`;
+      } else {
+        baseMessage = `⏳ Loan Application Under Review\n\nYour loan application${descRef} for ${formattedAmount} is currently being evaluated by our credit team.\n\nWe will notify you once a decision has been made.`;
+      }
+    }
+    
+    // ========== PAYMENT MESSAGES ==========
+    else if (type.includes('payment')) {
+      if (status === 'approved') {
+        baseMessage = `✅ Loan Payment Received\n\nThank you! Your loan payment${descRef} of ${formattedAmount} has been successfully processed on ${dateStr}.`;
+        if (method) {
+          baseMessage += `\nPayment Method: ${method}`;
+        }
+        baseMessage += `\n\nYour payment has been applied to your loan balance.`;
+      } else if (status === 'rejected') {
+        baseMessage = `❌ Payment Not Accepted\n\nYour loan payment${descRef} of ${formattedAmount} was not accepted on ${dateStr}.`;
+        if (method) {
+          baseMessage += `\nPayment Method: ${method}`;
+        }
+      } else {
+        baseMessage = `⏳ Payment Being Processed\n\nYour loan payment${descRef} of ${formattedAmount} is being confirmed and will be processed soon.`;
+        if (method) {
+          baseMessage += `\nPayment Method: ${method}`;
+        }
+      }
+    }
+    
+    // ========== DEPOSIT MESSAGES ==========
+    else if (type.includes('deposit')) {
+      if (status === 'approved') {
+        baseMessage = `✅ Deposit Successful\n\nYour deposit${descRef} of ${formattedAmount} has been processed and credited to your account on ${dateStr}.`;
+        if (method) {
+          baseMessage += `\nDeposit Method: ${method}`;
+        }
+      } else if (status === 'rejected') {
+        baseMessage = `❌ Deposit Declined\n\nYour deposit${descRef} of ${formattedAmount} was not accepted on ${dateStr}.`;
+        if (method) {
+          baseMessage += `\nDeposit Method: ${method}`;
+        }
+      } else {
+        baseMessage = `⏳ Deposit Under Review\n\nYour deposit${descRef} of ${formattedAmount} is being verified and will be processed soon.`;
+        if (method) {
+          baseMessage += `\nDeposit Method: ${method}`;
+        }
+      }
+    }
+    
+    // ========== WITHDRAWAL MESSAGES ==========
+    else if (type.includes('withdrawal')) {
+      if (status === 'approved') {
+        baseMessage = `✅ Withdrawal Authorized\n\nYour withdrawal${descRef} of ${formattedAmount} has been approved and will be processed on ${dateStr}.`;
+        if (method) {
+          baseMessage += `\nWithdrawal Method: ${method}`;
+        }
+      } else if (status === 'rejected') {
+        baseMessage = `❌ Withdrawal Not Approved\n\nYour withdrawal${descRef} of ${formattedAmount} was not authorized on ${dateStr}.`;
+        if (method) {
+          baseMessage += `\nWithdrawal Method: ${method}`;
+        }
+      } else {
+        baseMessage = `⏳ Withdrawal Pending\n\nYour withdrawal${descRef} of ${formattedAmount} is undergoing approval and will be processed soon.`;
+        if (method) {
+          baseMessage += `\nWithdrawal Method: ${method}`;
+        }
+      }
+    }
+    
+    // ========== REGISTRATION MESSAGES ==========
+    else if (type.includes('registration')) {
+      if (status === 'approved') {
+        baseMessage = `✅ Registration Confirmed\n\nWelcome! Your registration${descRef} with fee of ${formattedAmount} has been confirmed on ${dateStr}.\n\nYour account is now active.`;
+      } else if (status === 'rejected') {
+        baseMessage = `❌ Registration Not Approved\n\nYour registration${descRef} with fee of ${formattedAmount} was not approved on ${dateStr}.`;
+      } else {
+        baseMessage = `⏳ Registration Pending\n\nYour registration${descRef} with fee of ${formattedAmount} is awaiting confirmation.\n\nWe will notify you once your registration is processed.`;
+      }
+    }
+    
+    // ========== FALLBACK FOR UNKNOWN TYPES ==========
+    else {
+      if (status === 'approved') {
+        baseMessage = `✅ ${title} Approved\n\nYour ${type}${descRef} of ${formattedAmount} has been successfully processed on ${dateStr}.`;
+      } else if (status === 'rejected') {
+        baseMessage = `❌ ${title} Not Approved\n\nYour ${type}${descRef} of ${formattedAmount} was not approved on ${dateStr}.`;
+      } else {
+        baseMessage = `⏳ ${title} Pending\n\nYour ${type}${descRef} of ${formattedAmount} is currently under review.`;
+      }
     }
 
     // Add rejection reason if applicable
     const rejectionText = status === 'rejected' && item?.rejectionReason 
-      ? `\nReason: ${item.rejectionReason}` 
+      ? `\n\nReason for rejection: ${item.rejectionReason}` 
       : '';
 
-    return `${baseMessage}${rejectionText}\nRef No. ${newRef}`;
+    return `${baseMessage}${rejectionText}\n\nTransaction ID: ${newRef}`;
   }, [item, title]);
 
   const icon = iconByType(title);
@@ -183,7 +260,7 @@ export default function InboxDetails() {
         <TouchableOpacity style={styles.headerIconButton} onPress={() => navigation.goBack()}>
           <MaterialIcons name="arrow-back" size={22} color="#1E3A5F" />
         </TouchableOpacity>
-        <Text style={styles.headerTitleText}>Inbox Details</Text>
+        <Text style={styles.headerTitleText}>Transaction Details</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -209,20 +286,81 @@ export default function InboxDetails() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F8FAFC', paddingTop: 30 },
-  headerBar: {
-    marginHorizontal: 16, marginTop: 10, marginBottom: 12,
-    paddingHorizontal: 12, paddingVertical: 12,
-    backgroundColor: '#E8F1FB', borderRadius: 14,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+  container: { 
+    flex: 1, 
+    backgroundColor: '#F8FAFC', 
+    paddingTop: 30 
   },
-  headerIconButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center' },
-  headerTitleText: { fontSize: 18, fontWeight: '700', color: '#1E3A5F' },
-  iconWrap: { alignItems: 'center', marginTop: 16 },
-  iconCircle: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#FFFFFF', borderWidth: 2, borderColor: '#1E3A5F', alignItems: 'center', justifyContent: 'center' },
-  timeText: { marginTop: 10, fontSize: 14, color: '#64748B', textAlign: 'center' },
-  titleText: { marginTop: 8, fontSize: 18, fontWeight: '700', color: '#1E3A5F', textAlign: 'center' },
-  divider: { height: 1, backgroundColor: '#E2E8F0', marginHorizontal: 16, marginTop: 12 },
-  messageCard: { backgroundColor: '#FFFFFF', marginHorizontal: 16, marginTop: 12, borderRadius: 12, padding: 16, borderWidth: 1, borderColor: '#E2E8F0' },
-  messageText: { color: '#0F172A', fontSize: 14, lineHeight: 20 },
+  headerBar: {
+    marginHorizontal: 16, 
+    marginTop: 10, 
+    marginBottom: 12,
+    paddingHorizontal: 12, 
+    paddingVertical: 12,
+    backgroundColor: '#E8F1FB', 
+    borderRadius: 14,
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between',
+  },
+  headerIconButton: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    backgroundColor: '#fff', 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  headerTitleText: { 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1E3A5F' 
+  },
+  iconWrap: { 
+    alignItems: 'center', 
+    marginTop: 16 
+  },
+  iconCircle: { 
+    width: 80, 
+    height: 80, 
+    borderRadius: 40, 
+    backgroundColor: '#FFFFFF', 
+    borderWidth: 2, 
+    borderColor: '#1E3A5F', 
+    alignItems: 'center', 
+    justifyContent: 'center' 
+  },
+  timeText: { 
+    marginTop: 10, 
+    fontSize: 14, 
+    color: '#64748B', 
+    textAlign: 'center' 
+  },
+  titleText: { 
+    marginTop: 8, 
+    fontSize: 18, 
+    fontWeight: '700', 
+    color: '#1E3A5F', 
+    textAlign: 'center' 
+  },
+  divider: { 
+    height: 1, 
+    backgroundColor: '#E2E8F0', 
+    marginHorizontal: 16, 
+    marginTop: 12 
+  },
+  messageCard: { 
+    backgroundColor: '#FFFFFF', 
+    marginHorizontal: 16, 
+    marginTop: 12, 
+    borderRadius: 12, 
+    padding: 16, 
+    borderWidth: 1, 
+    borderColor: '#E2E8F0' 
+  },
+  messageText: { 
+    color: '#0F172A', 
+    fontSize: 14, 
+    lineHeight: 22 
+  },
 });
