@@ -1262,34 +1262,54 @@ const uploadAllImages = async (imageData) => {
   };
 
   // Check if all required fields are filled
-  const isFormValid = () => {
-    const disb = disbursement;
-    let accountsOk = false;
+// Update the isFormValid() function:
 
-    if (disb === 'Cash') {
-      accountsOk = true;
-    } else if (disb === 'Bank') {
-      accountsOk = accountName && accountNumber && bankType && (bankType !== 'Others' || customBankName) && isAccountNumberValid();
+const isFormValid = () => {
+  // Basic required fields
+  if (!loanAmount || !term || !disbursement) {
+    return false;
+  }
+
+  // Handle disbursement-specific validation
+  if (disbursement !== 'Cash') {
+    const hasQrCode = !!qrCodeImage;
+    
+    if (!hasQrCode) {
+      // Without QR code: Account Name and Number are REQUIRED
+      if (!accountName || !accountNumber) {
+        return false;
+      }
+      
+      // Validate account number format
+      if (!isAccountNumberValid()) {
+        return false;
+      }
     } else {
-      accountsOk = accountName && accountNumber && isAccountNumberValid();
+      // With QR code: Account Name and Number are OPTIONAL
+      // But if account number is provided, it must be valid
+      if (accountNumber && !isAccountNumberValid()) {
+        return false;
+      }
     }
-
-    const basicFieldsValid =
-      loanAmount &&
-      term &&
-      disbursement &&
-      accountsOk;
-
-    if (requiresCollateral) {
-      return basicFieldsValid &&
-        collateralType &&
-        collateralValue &&
-        collateralDescription &&
-        proofOfCollateral.length > 0;
+    
+    // Bank type is always required for Bank disbursement
+    if (disbursement === 'Bank') {
+      if (!bankType) {
+        return false;
+      }
+      if (bankType === 'Others' && !customBankName) {
+        return false;
+      }
     }
+  }
 
-    return basicFieldsValid;
-  };
+  // Collateral validation if required
+  if (requiresCollateral) {
+    return isCollateralValid();
+  }
+
+  return true;
+};
 
   const logTransactionApplication = async (memberId, transactionId, payload) => {
     try {
@@ -1679,28 +1699,70 @@ const uploadAllImages = async (imageData) => {
     }
   };
 
-  const validateForm = () => {
-    if (!isFormValid()) {
-      let message = 'All required fields must be filled';
-      
-      // Check account number validation
-      if (disbursement !== 'Cash' && !isAccountNumberValid()) {
+// Inside the validateForm() function, update it to:
+
+const validateForm = () => {
+  // Basic validation - check if loan amount, term, and disbursement are filled
+  if (!loanAmount || !term || !disbursement) {
+    setErrorMessage('Please fill in all required fields: Loan Amount, Term, and Disbursement');
+    return false;
+  }
+
+  // Handle different disbursement types
+  if (disbursement !== 'Cash') {
+    // Check if QR code is uploaded
+    const hasQrCode = !!qrCodeImage;
+    
+    if (hasQrCode) {
+      // If QR code is uploaded, Account Name and Number are OPTIONAL
+      // But we still need to validate if they're provided (partial validation)
+      if (accountNumber && !isAccountNumberValid()) {
         if (disbursement === 'GCash') {
-          message = 'GCash account number must be exactly 11 digits';
+          setErrorMessage('GCash account number must be exactly 11 digits if provided');
         } else if (disbursement === 'Bank') {
-          message = 'Bank account number must be between 8-16 digits';
+          setErrorMessage('Bank account number must be between 8-16 digits if provided');
         }
-      } else if (requiresCollateral && !isCollateralValid()) {
-        message = 'Please complete all collateral details including uploading at least one proof of collateral image';
+        return false;
+      }
+    } else {
+      // If NO QR code is uploaded, Account Name and Number are REQUIRED
+      if (!accountName || !accountNumber) {
+        setErrorMessage('Account Name and Account Number are required when no QR code is uploaded');
+        return false;
       }
       
-      setErrorMessage(message);
-      return false;
+      // Validate account number format
+      if (!isAccountNumberValid()) {
+        if (disbursement === 'GCash') {
+          setErrorMessage('GCash account number must be exactly 11 digits');
+        } else if (disbursement === 'Bank') {
+          setErrorMessage('Bank account number must be between 8-16 digits');
+        }
+        return false;
+      }
     }
+    
+    // For Bank disbursement, bank type is always required (regardless of QR code)
+    if (disbursement === 'Bank') {
+      if (!bankType) {
+        setErrorMessage('Bank type is required');
+        return false;
+      }
+      if (bankType === 'Others' && !customBankName) {
+        setErrorMessage('Please specify the bank name');
+        return false;
+      }
+    }
+  }
 
-    return true;
-  };
+  // Collateral validation (if required)
+  if (requiresCollateral && !isCollateralValid()) {
+    setErrorMessage('Please complete all collateral details including uploading at least one proof of collateral image');
+    return false;
+  }
 
+  return true;
+};
 // FIXED: Submit loan application with QR code
 const submitLoanApplication = async () => {
   if (!validateForm()) {
@@ -2072,82 +2134,102 @@ const submitLoanApplication = async () => {
             </TouchableOpacity>
           </ModalSelector>
 
-          {disbursement !== 'Cash' && (
-            <>
-              <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
-              <TextInput
-                value={accountName}
-                onChangeText={setAccountName}
-                style={styles.input}
-                placeholder="Enter account name"
-              />
-
-              <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
-              <TextInput
-                value={accountNumber}
-                onChangeText={handleAccountNumberChange}
-                style={styles.input}
-                keyboardType="numeric"
-                ref={accountNumberInput}
-                placeholder={
-                  disbursement === 'GCash' 
-                    ? 'Enter 11-digit GCash number' 
-                    : 'Enter 8-16 digit bank account number'
-                }
-                maxLength={disbursement === 'GCash' ? 11 : 16}
-              />
-              
-              {/* Account Number Validation Message */}
-              {accountNumber.length > 0 && (
-                <Text style={[
-                  styles.validationText,
-                  isAccountNumberValid() ? styles.validText : styles.invalidText
-                ]}>
-                  {getAccountNumberValidationMessage()}
-                </Text>
-              )}
-
-{/* QR Code Upload - Optional for GCash and Bank */}
-{(disbursement === 'GCash' || disbursement === 'Bank') && (
+{disbursement !== 'Cash' && (
   <>
-    <View style={{ marginTop: 10, marginBottom: 15 }}>
-      <Text style={styles.label}>
-        <Text style={{ color: '#666', fontSize: 14 }}>QR Code (Optional)</Text>
+    <Text style={styles.label}>
+      Account Name
+      {!qrCodeImage && <Text style={{color: 'red'}}>*</Text>}
+      <Text style={{fontSize: 12, color: '#666'}}>
+        {qrCodeImage ? '' : ''}
       </Text>
-      <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-        Upload a QR code for easier fund transfer reference
+    </Text>
+    <TextInput
+      value={accountName}
+      onChangeText={setAccountName}
+      style={styles.input}
+      placeholder={
+        qrCodeImage 
+          ? "Enter account name" 
+          : "Enter account name "
+      }
+    />
+
+    <Text style={styles.label}>
+      Account Number
+      {!qrCodeImage && <Text style={{color: 'red'}}>*</Text>}
+      <Text style={{fontSize: 12, color: '#666'}}>
+        {qrCodeImage ? '' : ''}
       </Text>
-      
-      {/* QR Code Image Preview */}
-      {qrCodeImage ? (
-        <View style={styles.qrCodeContainer}>
-          <Image source={getImageSource(qrCodeImage)} style={styles.qrCodeImage} />
-          <TouchableOpacity 
-            style={styles.removeQrButton}
-            onPress={removeQrCodeImage}
-          >
-            <MaterialIcons name="close" size={20} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={styles.changeQrButton}
-            onPress={handleQrCodePress}
-          >
-            <Text style={styles.changeQrText}>Change QR Code</Text>
-          </TouchableOpacity>
+    </Text>
+    <TextInput
+      value={accountNumber}
+      onChangeText={handleAccountNumberChange}
+      style={styles.input}
+      keyboardType="numeric"
+      ref={accountNumberInput}
+      placeholder={
+        disbursement === 'GCash' 
+          ? qrCodeImage 
+            ? 'Enter 11-digit GCash number' 
+            : 'Enter 11-digit GCash number '
+          : qrCodeImage 
+            ? 'Enter 8-16 digit bank account number (optional with QR code)' 
+            : 'Enter 8-16 digit bank account number'
+      }
+      maxLength={disbursement === 'GCash' ? 11 : 16}
+    />
+    
+    {/* Account Number Validation Message */}
+    {accountNumber.length > 0 && (
+      <Text style={[
+        styles.validationText,
+        isAccountNumberValid() ? styles.validText : styles.invalidText
+      ]}>
+        {getAccountNumberValidationMessage()}
+      </Text>
+    )}
+
+    {/* QR Code Upload */}
+    {(disbursement === 'GCash' || disbursement === 'Bank') && (
+      <>
+        <View style={{ marginTop: 10, marginBottom: 15 }}>
+          <Text style={styles.label}>
+            <Text style={{ color: '#1E3A5F', fontSize: 16, fontWeight: '600' }}>
+              QR Code Upload
+            </Text>
+          </Text>
+          
+          {/* QR Code Image Preview */}
+          {qrCodeImage ? (
+            <View style={styles.qrCodeContainer}>
+              <Image source={getImageSource(qrCodeImage)} style={styles.qrCodeImage} />
+              <TouchableOpacity 
+                style={styles.removeQrButton}
+                onPress={removeQrCodeImage}
+              >
+                <MaterialIcons name="close" size={20} color="white" />
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.changeQrButton}
+                onPress={handleQrCodePress}
+              >
+                <Text style={styles.changeQrText}>Change QR Code</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              style={styles.qrUploadButton}
+              onPress={handleQrCodePress}
+            >
+              <View style={styles.qrIconContainer}>
+                <MaterialIcons name="qr-code-scanner" size={30} color="#1E3A5F" />
+                <Text style={styles.qrUploadText}>Upload QR Code</Text>
+  
+              </View>
+            </TouchableOpacity>
+          )}
+          
         </View>
-      ) : (
-        <TouchableOpacity 
-          style={styles.qrUploadButton}
-          onPress={handleQrCodePress}
-        >
-          <View style={styles.qrIconContainer}>
-            <MaterialIcons name="qr-code-scanner" size={30} color="#1E3A5F" />
-            <Text style={styles.qrUploadText}>Upload QR Code</Text>
-            <Text style={styles.qrUploadSubText}>Optional - For easy reference</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-    </View>
   </>
 )}
               {disbursement === 'Bank' && (
