@@ -236,7 +236,6 @@ const CoAdminHome = () => {
 
   const renderSection = () => {
     switch (activeSection) {
-      case 'dashboard': return <Dashboard key={`dashboard-${sectionReloadCounter}`} />;
       case 'deposits': return <Deposits key={`deposits-${sectionReloadCounter}`} />;
       case 'applyLoans': return <Loans key={`loans-${sectionReloadCounter}`} />;
       case 'payLoans': return <PayLoans key={`payloans-${sectionReloadCounter}`} />;
@@ -448,7 +447,7 @@ const CoAdminHome = () => {
     },
     sidebar: {
       width: `${sidebarWidth}px`,
-      background: 'linear-gradient(180deg, #1E3A8A 0%, #2D5783 100%)',
+      background: 'linear-gradient(180deg, #1E3A5F 0%, #2D5783 100%)',
       padding: '16px 0',
       transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       overflow: 'hidden',
