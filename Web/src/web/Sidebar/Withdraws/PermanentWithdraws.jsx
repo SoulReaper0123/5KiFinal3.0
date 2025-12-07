@@ -16,8 +16,10 @@ import {
   FaMapMarkerAlt,
   FaReceipt,
   FaBan,
-  FaSignOutAlt
+  FaSignOutAlt,
+   FaPlus, FaFileContract 
 } from 'react-icons/fa';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 const styles = {
   container: {
@@ -496,7 +498,143 @@ const styles = {
     fontSize: '1rem',
     fontWeight: '600',
     color: '#065f46'
-  }
+  },
+  // Add these to your styles object (after the existing styles)
+  enhancedConfirmationModal: {
+    backgroundColor: 'white',
+    borderRadius: '16px',
+    padding: '32px',
+    width: '500px',
+    maxWidth: '90%',
+    boxShadow: '0 20px 60px rgba(0,0,0,0.2)',
+    textAlign: 'center',
+    border: '1px solid #F1F5F9'
+  },
+  confirmationTitle: {
+    fontSize: '20px',
+    fontWeight: '700',
+    color: '#1e3a8a',
+    marginBottom: '16px'
+  },
+  confirmationText: {
+    fontSize: '16px',
+    color: '#374151',
+    marginBottom: '24px',
+    lineHeight: '1.5'
+  },
+  confirmationButtons: {
+    display: 'flex',
+    gap: '12px',
+    justifyContent: 'center'
+  },
+  attachmentSection: {
+    margin: '20px 0',
+    textAlign: 'left'
+  },
+  attachmentLabel: {
+    fontWeight: '600',
+    display: 'block',
+    marginBottom: '4px',
+    color: '#374151'
+  },
+  attachmentDescription: {
+    fontSize: '14px',
+    color: '#6b7280',
+    marginBottom: '16px'
+  },
+  fileUploadArea: {
+    border: '2px dashed #d1d5db',
+    borderRadius: '12px',
+    padding: '32px',
+    textAlign: 'center',
+    transition: 'all 0.3s ease',
+    cursor: 'pointer',
+    backgroundColor: '#fafafa',
+    minHeight: '120px',
+    display: 'flex',
+    flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: '8px',
+    '&:hover': {
+      borderColor: '#3b82f6',
+      backgroundColor: '#f0f9ff'
+    }
+  },
+  fileInput: {
+    display: 'none'
+  },
+  uploadText: {
+    fontSize: '16px',
+    color: '#374151',
+    fontWeight: '500',
+    margin: 0
+  },
+  fileTypes: {
+    fontSize: '14px',
+    color: '#6b7280',
+    margin: 0
+  },
+  filePreview: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: '#f8fafc',
+    padding: '16px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0'
+  },
+  fileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '12px'
+  },
+  fileDetails: {
+    display: 'flex',
+    flexDirection: 'column'
+  },
+  fileName: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#374151',
+    margin: 0
+  },
+  fileSize: {
+    fontSize: '12px',
+    color: '#6b7280',
+    margin: 0
+  },
+  removeFileButton: {
+    backgroundColor: '#fef2f2',
+    border: '1px solid #fecaca',
+    color: '#dc2626',
+    borderRadius: '8px',
+    padding: '8px',
+    cursor: 'pointer',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    transition: 'all 0.3s ease',
+    '&:hover': {
+      backgroundColor: '#fee2e2'
+    }
+  },
+  uploadingIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: '12px',
+    marginTop: '12px',
+    padding: '12px',
+    backgroundColor: '#f0f9ff',
+    borderRadius: '8px',
+    border: '1px solid #dbeafe'
+  },
+  uploadingText: {
+    fontSize: '14px',
+    color: '#1e40af',
+    fontWeight: '500'
+  },
 };
 
 // Add keyframes for spinner animation
@@ -544,6 +682,10 @@ const PermanentWithdraws = ({ refreshData }) => {
   const [showRejectConfirmation, setShowRejectConfirmation] = useState(false);
   const [actionInProgress, setActionInProgress] = useState(false);
   const [pendingApiCall, setPendingApiCall] = useState(null);
+
+    const [approvalAttachmentFile, setApprovalAttachmentFile] = useState(null);
+  const [approvalAttachmentUrl, setApprovalAttachmentUrl] = useState('');
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
 
 useEffect(() => {
   const fetchWithdrawals = async () => {
@@ -629,10 +771,12 @@ useEffect(() => {
     setShowRejectionModal(true);
   };
 
-  const confirmApprove = async () => {
-    setShowApproveConfirmation(false);
-    await processAction(selectedWithdrawal, 'approve');
-  };
+const confirmApprove = async (attachmentUrl = '') => {
+  setShowApproveConfirmation(false);
+  // Use the passed URL or fallback to state
+  const urlToUse = attachmentUrl || approvalAttachmentUrl;
+  await processAction(selectedWithdrawal, 'approve', '', urlToUse);
+};
 
   const handleReasonSelect = (reason) => {
     setSelectedReason(reason);
@@ -663,138 +807,206 @@ useEffect(() => {
     await processAction(selectedWithdrawal, 'reject', selectedReason === "Other" ? customReason : selectedReason);
   };
 
-  const processAction = async (withdrawal, action, rejectionReason = '') => {
-    // Defer DB writes and refresh to success modal OK
-    setActionInProgress(true);
-    setIsProcessing(true);
-    setCurrentAction(action);
-
-    try {
-      if (action === 'approve') {
-        setSuccessMessage('Membership withdrawal approved successfully!');
-
-        const approveData = {
-          ...withdrawal,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date())
-        };
-
-        // Local preview only; do not touch DB yet
-        setSelectedWithdrawal(prev => ({
-          ...prev,
-          dateApproved: approveData.dateApproved,
-          timeApproved: approveData.timeApproved,
-          status: 'approved'
-        }));
-
-        setPendingApiCall({
-          type: 'approve',
-          data: approveData
-        });
-      } else {
-        setSuccessMessage('Membership withdrawal rejected successfully!');
-
-        const rejectData = {
-          ...withdrawal,
-          dateRejected: formatDate(new Date()),
-          timeRejected: formatTime(new Date()),
-          rejectionReason
-        };
-
-        // Local preview only; do not touch DB yet
-        setSelectedWithdrawal(prev => ({
-          ...prev,
-          dateRejected: rejectData.dateRejected,
-          timeRejected: rejectData.timeRejected,
-          rejectionReason,
-          status: 'rejected'
-        }));
-
-        setPendingApiCall({
-          type: 'reject',
-          data: rejectData
-        });
-      }
-
-      setSuccessMessageModalVisible(true);
-    } catch (error) {
-      console.error('Error preparing action:', error);
-      setErrorMessage(error.message || 'An error occurred. Please try again.');
+  // Handle file selection
+const handleFileSelect = (e) => {
+  const file = e.target.files[0];
+  if (file) {
+    // Check file size (limit to 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMessage('File size must be less than 5MB');
       setErrorModalVisible(true);
-    } finally {
-      setIsProcessing(false);
-      setActionInProgress(false);
+      return;
     }
-  };
+    
+    // Check file type
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
+    if (!allowedTypes.includes(file.type)) {
+      setErrorMessage('Only JPG, PNG, and PDF files are allowed');
+      setErrorModalVisible(true);
+      return;
+    }
+    
+    setApprovalAttachmentFile(file);
+  }
+};
 
-  const processDatabaseApprove = async (withdrawal) => {
-    try {
-      const now = new Date();
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const status = 'approved';
+// Remove selected file
+const removeApprovalAttachment = () => {
+  setApprovalAttachmentFile(null);
+  setApprovalAttachmentUrl('');
+};
 
-      // Generate a new transaction ID for approved/transactions records
-      const originalTransactionId = withdrawal.transactionId || withdrawal.memberId;
-      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+// Upload file to Firebase Storage
+const uploadApprovalAttachment = async (file, memberId, transactionId) => {
+  try {
+    setAttachmentUploading(true);
+    
+    // Generate unique filename
+    const timestamp = new Date().getTime();
+    const fileExtension = file.name.split('.').pop();
+    const fileName = `membership_withdrawal_attachments/${memberId}_${transactionId}_${timestamp}.${fileExtension}`;
+    
+    // Create storage reference
+    const storage = getStorage();
+    const fileRef = storageRef(storage, fileName);
+    
+    // Upload file
+    const snapshot = await uploadBytes(fileRef, file);
+    
+    // Get download URL
+    const downloadURL = await getDownloadURL(snapshot.ref);
+    
+    setApprovalAttachmentUrl(downloadURL);
+    setAttachmentUploading(false);
+    
+    return downloadURL;
+  } catch (error) {
+    console.error('Error uploading approval attachment:', error);
+    setAttachmentUploading(false);
+    throw new Error('Failed to upload attachment: ' + error.message);
+  }
+};
 
-      // Database references
-      const approvedRef = database.ref(`MembershipWithdrawal/ApprovedWithdrawals/${withdrawal.memberId}/${newTransactionId}`);
-      const transactionRef = database.ref(`Transactions/MembershipWithdrawals/${withdrawal.memberId}/${newTransactionId}`);
-      const memberRef = database.ref(`Members/${withdrawal.memberId}`);
-      const pendingRef = database.ref(`MembershipWithdrawal/PendingWithdrawals/${withdrawal.memberId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      
-      // Fetch current funds and member data
-      const [fundsSnap, memberSnap] = await Promise.all([
-        fundsRef.once('value'),
-        memberRef.once('value')
-      ]);
-      
-      const currentFunds = parseFloat(fundsSnap.val()) || 0;
-      const memberData = memberSnap.val() || {};
-      const memberBalance = parseFloat(withdrawal.balance) || 0;
-      
-      // Calculate new funds and new member balance
-      const newFunds = currentFunds - memberBalance;
-      const newMemberBalance = 0; // Set balance to 0 since they're withdrawing
+// Replace the existing processAction function with this:
+const processAction = async (withdrawal, action, rejectionReason = '', attachmentUrl = '') => {
+  // Defer DB writes and refresh to success modal OK
+  setActionInProgress(true);
+  setIsProcessing(true);
+  setCurrentAction(action);
 
-      // Prepare approved withdrawal data
-      const approvedWithdrawal = { 
-        ...withdrawal, 
-        transactionId: newTransactionId,
-        originalTransactionId: originalTransactionId,
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        timestamp: now.getTime(),
-        status
+  try {
+    if (action === 'approve') {
+      setSuccessMessage('Membership withdrawal approved successfully!');
+
+      const approveData = {
+        ...withdrawal,
+        dateApproved: formatDate(new Date()),
+        timeApproved: formatTime(new Date()),
+        // Include attachment URL if exists
+        ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl })
       };
 
-      // Execute all database operations
-      await Promise.all([
-        approvedRef.set(approvedWithdrawal),
-        transactionRef.set(approvedWithdrawal),
-        fundsRef.set(newFunds),
-        memberRef.update({ 
-          status: 'inactive',
-          balance: newMemberBalance, 
-          investment: 0 
-        }),
-        pendingRef.remove() // Remove from pending after approval
-      ]);
-      
-      // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
-      const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
-      await fundsHistoryRef.set(newFunds);
+      // Local preview only; do not touch DB yet
+      setSelectedWithdrawal(prev => ({
+        ...prev,
+        dateApproved: approveData.dateApproved,
+        timeApproved: approveData.timeApproved,
+        status: 'approved',
+        // Include attachment URL in preview
+        ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl })
+      }));
 
-      return newTransactionId;
+      setPendingApiCall({
+        type: 'approve',
+        data: approveData,
+        attachmentUrl: attachmentUrl || ''  // Store attachment URL
+      });
+    } else {
+      setSuccessMessage('Membership withdrawal rejected successfully!');
 
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve membership withdrawal');
+      const rejectData = {
+        ...withdrawal,
+        dateRejected: formatDate(new Date()),
+        timeRejected: formatTime(new Date()),
+        rejectionReason
+      };
+
+      // Local preview only; do not touch DB yet
+      setSelectedWithdrawal(prev => ({
+        ...prev,
+        dateRejected: rejectData.dateRejected,
+        timeRejected: rejectData.timeRejected,
+        rejectionReason,
+        status: 'rejected'
+      }));
+
+      setPendingApiCall({
+        type: 'reject',
+        data: rejectData
+      });
     }
-  };
+
+    setSuccessMessageModalVisible(true);
+  } catch (error) {
+    console.error('Error preparing action:', error);
+    setErrorMessage(error.message || 'An error occurred. Please try again.');
+    setErrorModalVisible(true);
+  } finally {
+    setIsProcessing(false);
+    setActionInProgress(false);
+  }
+};
+// Update the processDatabaseApprove function to include proof of transaction:
+const processDatabaseApprove = async (withdrawal) => {
+  try {
+    const now = new Date();
+    const approvalDate = formatDate(now);
+    const approvalTime = formatTime(now);
+    const status = 'approved';
+
+    // Generate a new transaction ID for approved/transactions records
+    const originalTransactionId = withdrawal.transactionId || withdrawal.memberId;
+    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Database references
+    const approvedRef = database.ref(`MembershipWithdrawal/ApprovedWithdrawals/${withdrawal.memberId}/${newTransactionId}`);
+    const transactionRef = database.ref(`Transactions/MembershipWithdrawals/${withdrawal.memberId}/${newTransactionId}`);
+    const memberRef = database.ref(`Members/${withdrawal.memberId}`);
+    const pendingRef = database.ref(`MembershipWithdrawal/PendingWithdrawals/${withdrawal.memberId}`);
+    const fundsRef = database.ref('Settings/Funds');
+    
+    // Fetch current funds and member data
+    const [fundsSnap, memberSnap] = await Promise.all([
+      fundsRef.once('value'),
+      memberRef.once('value')
+    ]);
+    
+    const currentFunds = parseFloat(fundsSnap.val()) || 0;
+    const memberData = memberSnap.val() || {};
+    const memberBalance = parseFloat(withdrawal.balance) || 0;
+    
+    // Calculate new funds and new member balance
+    const newFunds = currentFunds - memberBalance;
+    const newMemberBalance = 0; // Set balance to 0 since they're withdrawing
+
+    // Prepare approved withdrawal data with proof of transaction
+    const approvedWithdrawal = { 
+      ...withdrawal, 
+      transactionId: newTransactionId,
+      originalTransactionId: originalTransactionId,
+      dateApproved: approvalDate,
+      timeApproved: approvalTime,
+      timestamp: now.getTime(),
+      status,
+      // Include proof of transaction if available
+      ...(withdrawal.proofOfTransactionUrl && { proofOfTransactionUrl: withdrawal.proofOfTransactionUrl })
+    };
+
+    // Execute all database operations
+    await Promise.all([
+      approvedRef.set(approvedWithdrawal),
+      transactionRef.set(approvedWithdrawal),
+      fundsRef.set(newFunds),
+      memberRef.update({ 
+        status: 'inactive',
+        balance: newMemberBalance, 
+        investment: 0 
+      }),
+      pendingRef.remove() // Remove from pending after approval
+    ]);
+    
+    // Log to FundsHistory for dashboard chart (keyed by YYYY-MM-DD)
+    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+    await fundsHistoryRef.set(newFunds);
+
+    return newTransactionId;
+
+  } catch (err) {
+    console.error('Approval DB error:', err);
+    throw new Error(err.message || 'Failed to approve membership withdrawal');
+  }
+};
 
   const processDatabaseReject = async (withdrawal, rejectionReason) => {
     try {
@@ -858,6 +1070,9 @@ const handleSuccessOk = async () => {
     console.error('Error calling API:', error);
   } finally {
     setPendingApiCall(null);
+        // Clear attachment state
+    setApprovalAttachmentFile(null);
+    setApprovalAttachmentUrl('');
   }
 
   // Close modal and clean state
@@ -989,6 +1204,7 @@ const handleSuccessOk = async () => {
             
             <div style={styles.modalContent}>
               <div style={styles.columnsContainer}>
+                
                 {/* Left Column - Member & Withdrawal Information */}
                 <div style={styles.column}>
                   <div style={styles.section}>
@@ -1120,6 +1336,41 @@ const handleSuccessOk = async () => {
                   )}
                 </div>
               </div>
+              {/* Move this OUTSIDE the columnsContainer */}
+{selectedWithdrawal.proofOfTransactionUrl && (
+  <div style={{
+    background: '#f0f9ff',
+    borderRadius: '8px',
+    padding: '1.5rem',
+    border: '1px solid #dbeafe',
+    marginTop: '1rem'
+  }}>
+    <h3 style={styles.sectionTitle}>
+      <FaReceipt />
+      Proof of Settlement
+    </h3>
+    <div style={styles.fieldGroup}>
+      <span style={styles.fieldLabel}>
+        <FaReceipt />
+        Proof Document:
+      </span>
+      <button 
+        style={{
+          ...styles.viewButton,
+          margin: 0,
+          padding: '0.25rem 0.5rem',
+          fontSize: '0.75rem',
+          background: '#3b82f6',
+          color: 'white',
+          border: 'none'
+        }}
+        onClick={() => window.open(selectedWithdrawal.proofOfTransactionUrl, '_blank')}
+      >
+        <FaEye /> View Proof
+      </button>
+    </div>
+  </div>
+)}
             </div>
 
             {selectedWithdrawal.status !== 'approved' && selectedWithdrawal.status !== 'rejected' && (
@@ -1152,38 +1403,125 @@ const handleSuccessOk = async () => {
         </div>
       )}
 
-      {/* Approve Confirmation Modal */}
-      {showApproveConfirmation && (
-        <div style={styles.modalOverlay}>
-          <div style={styles.modalCardSmall}>
-            <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-            <p style={styles.modalText}>Are you sure you want to approve this membership withdrawal?</p>
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.primaryButton,
-                  ...(actionInProgress ? styles.disabledButton : {})
-                }} 
-                onClick={confirmApprove}
-                disabled={actionInProgress}
-              >
-                {actionInProgress ? 'Processing...' : 'Yes'}
-              </button>
-              <button 
-                style={{
-                  ...styles.actionButton,
-                  ...styles.secondaryButton
-                }} 
-                onClick={() => setShowApproveConfirmation(false)}
-                disabled={actionInProgress}
-              >
-                No
-              </button>
-            </div>
+{/* Enhanced Approve Confirmation Modal */}
+{showApproveConfirmation && (
+  <div style={styles.modalOverlay}>
+    <div style={styles.enhancedConfirmationModal}>
+      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a', fontSize: '48px' }} />
+      <h3 style={styles.confirmationTitle}>Approve Membership Withdrawal</h3>
+      
+      {/* Attachment Section */}
+      <div style={styles.attachmentSection}>
+        <label style={styles.attachmentLabel}>Proof of Settlement:</label>
+        
+        {!approvalAttachmentFile ? (
+          <div 
+            style={styles.fileUploadArea}
+            onClick={() => document.getElementById('withdrawalAttachment').click()}
+          >
+            <FaPlus style={{ fontSize: '24px', color: '#6b7280', marginBottom: '12px' }} />
+            <p style={styles.uploadText}>Click to upload file</p>
+            <p style={styles.fileTypes}>Supported: JPG, PNG, PDF (Max 5MB)</p>
+            <input
+              id="withdrawalAttachment"
+              type="file"
+              style={styles.fileInput}
+              onChange={handleFileSelect}
+              accept="image/*,.pdf"
+            />
           </div>
-        </div>
-      )}
+        ) : (
+          <div style={styles.filePreview}>
+            <div style={styles.fileInfo}>
+              <FaFileContract style={{ fontSize: '24px', color: '#3b82f6' }} />
+              <div style={styles.fileDetails}>
+                <p style={styles.fileName}>{approvalAttachmentFile.name}</p>
+                <p style={styles.fileSize}>
+                  {(approvalAttachmentFile.size / 1024).toFixed(2)} KB
+                </p>
+              </div>
+            </div>
+            <button
+              style={styles.removeFileButton}
+              onClick={removeApprovalAttachment}
+              disabled={attachmentUploading}
+            >
+              <FaTimes />
+            </button>
+          </div>
+        )}
+        
+        {attachmentUploading && (
+          <div style={styles.uploadingIndicator}>
+            <div style={styles.spinner}></div>
+            <span style={styles.uploadingText}>Uploading file...</span>
+          </div>
+        )}
+      </div>
+      
+      <p style={styles.confirmationText}>
+        Are you sure you want to approve this membership withdrawal?
+        {approvalAttachmentFile && (
+          <span style={{ display: 'block', marginTop: '8px', color: '#059669', fontWeight: '600' }}>
+            ✅ Proof of settlement will be included in approval email
+          </span>
+        )}
+      </p>
+      
+      <div style={styles.confirmationButtons}>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.primaryButton,
+            ...(actionInProgress || attachmentUploading ? styles.disabledButton : {})
+          }} 
+          onClick={async () => {
+            // If file is attached, upload it first
+            if (approvalAttachmentFile) {
+              try {
+                setActionInProgress(true);
+                const downloadURL = await uploadApprovalAttachment(
+                  approvalAttachmentFile,
+                  selectedWithdrawal.memberId,
+                  selectedWithdrawal.transactionId || selectedWithdrawal.memberId
+                );
+                // Store the URL in state AND pass it directly to confirmApprove
+                setApprovalAttachmentUrl(downloadURL);
+                // Call confirmApprove with the URL directly
+                await confirmApprove(downloadURL);
+              } catch (error) {
+                setErrorMessage('Failed to upload attachment: ' + error.message);
+                setErrorModalVisible(true);
+                setActionInProgress(false);
+                return;
+              }
+            } else {
+              // No attachment, proceed normally
+              confirmApprove();
+            }
+          }}
+          disabled={actionInProgress || attachmentUploading}
+        >
+          {actionInProgress ? 'Processing...' : 
+           approvalAttachmentFile ? 'Approve with Attachment' : 'Approve'}
+        </button>
+        <button 
+          style={{
+            ...styles.actionButton,
+            ...styles.secondaryButton
+          }} 
+          onClick={() => {
+            setShowApproveConfirmation(false);
+            removeApprovalAttachment(); // Clear any selected file
+          }}
+          disabled={actionInProgress || attachmentUploading}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
       {/* Reject Confirmation Modal */}
       {showRejectConfirmation && (
