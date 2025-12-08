@@ -467,45 +467,90 @@ const Withdraw = () => {
 
   // ===================== FORM VALIDATION =====================
 
-  const isFormValid = () => {
-    const withdrawOpt = withdrawOption;
-    let accountsOk = false;
-
-    if (withdrawOpt === 'Cash') {
-      accountsOk = true;
-    } else if (withdrawOpt === 'Bank') {
-      accountsOk = accountName && accountNumber && bankType && 
-                   (bankType !== 'Others' || customBankName) && 
-                   isAccountNumberValid();
-    } else {
-      accountsOk = accountName && accountNumber && isAccountNumberValid();
+const isFormValid = () => {
+  const withdrawOpt = withdrawOption;
+  
+  // Cash withdrawals don't need account details
+  if (withdrawOpt === 'Cash') {
+    return !!withdrawAmount;
+  }
+  
+  // For GCash/Bank withdrawals
+  const hasQrCode = !!qrCodeImage;
+  
+  if (hasQrCode) {
+    // With QR code: Account Name and Number are OPTIONAL
+    // But if account number is provided, it must be valid
+    const accountNumberValid = !accountNumber || isAccountNumberValid();
+    
+    // For Bank, bank type is always required (even with QR code)
+    if (withdrawOpt === 'Bank') {
+      const bankTypeValid = bankType && (bankType !== 'Others' || customBankName);
+      return !!withdrawAmount && bankTypeValid && accountNumberValid;
     }
-
-    const basicFieldsValid = withdrawAmount && withdrawOpt && accountsOk;
-
-    return basicFieldsValid;
-  };
+    
+    return !!withdrawAmount && accountNumberValid;
+  } else {
+    // Without QR code: Account Name and Number are REQUIRED
+    const accountsValid = accountName && accountNumber && isAccountNumberValid();
+    
+    if (withdrawOpt === 'Bank') {
+      const bankTypeValid = bankType && (bankType !== 'Others' || customBankName);
+      return !!withdrawAmount && accountsValid && bankTypeValid;
+    }
+    
+    return !!withdrawAmount && accountsValid;
+  }
+};
 
   // Check if form is complete for submission
-  const validateForm = () => {
-    if (!isFormValid()) {
-      let message = 'All required fields must be filled';
+const validateForm = () => {
+  if (!isFormValid()) {
+    let message = 'Please fill in all required fields';
+    
+    // Handle different withdrawal types
+    if (withdrawOption !== 'Cash') {
+      const hasQrCode = !!qrCodeImage;
       
-      // Check account number validation
-      if (withdrawOption !== 'Cash' && !isAccountNumberValid()) {
-        if (withdrawOption === 'GCash') {
-          message = 'GCash account number must be exactly 11 digits';
-        } else if (withdrawOption === 'Bank') {
-          message = 'Bank account number must be between 8-16 digits';
+      if (hasQrCode) {
+        // With QR code: Account Name and Number are optional, but validate if provided
+        if (accountNumber && !isAccountNumberValid()) {
+          if (withdrawOption === 'GCash') {
+            message = 'GCash account number must be exactly 11 digits if provided';
+          } else if (withdrawOption === 'Bank') {
+            message = 'Bank account number must be between 8-16 digits if provided';
+          }
+        } else if (withdrawOption === 'Bank' && !bankType) {
+          message = 'Bank type is required';
+        } else if (withdrawOption === 'Bank' && bankType === 'Others' && !customBankName) {
+          message = 'Please specify the bank name';
+        } else {
+          message = 'Please fill in all required fields';
+        }
+      } else {
+        // Without QR code: Account Name and Number are REQUIRED
+        if (!accountName || !accountNumber) {
+          message = 'Account Name and Account Number are required when no QR code is uploaded';
+        } else if (!isAccountNumberValid()) {
+          if (withdrawOption === 'GCash') {
+            message = 'GCash account number must be exactly 11 digits';
+          } else if (withdrawOption === 'Bank') {
+            message = 'Bank account number must be between 8-16 digits';
+          }
+        } else if (withdrawOption === 'Bank' && !bankType) {
+          message = 'Bank type is required';
+        } else if (withdrawOption === 'Bank' && bankType === 'Others' && !customBankName) {
+          message = 'Please specify the bank name';
         }
       }
-      
-      setErrorMessage(message);
-      return false;
     }
+    
+    setErrorMessage(message);
+    return false;
+  }
 
-    return true;
-  };
+  return true;
+};
 
   // ===================== FIREBASE FUNCTIONS =====================
 
@@ -705,45 +750,45 @@ const Withdraw = () => {
     setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
   }, [withdrawOption, accountName, accountNumber, bankType, customBankName, withdrawAmount, balance]);
 
-  const handleSubmit = async () => {
-    if (!validateForm()) {
-      setAlertMessage(errorMessage);
+const handleSubmit = async () => {
+  if (!validateForm()) {
+    setAlertMessage(errorMessage);
+    setAlertType('error');
+    setAlertModalVisible(true);
+    return;
+  }
+
+  const amount = parseFloat(withdrawAmount);
+  if (isNaN(amount) || amount <= 0) {
+    setAlertMessage('Please enter a valid amount');
+    setAlertType('error');
+    setAlertModalVisible(true);
+    return;
+  }
+
+  // NEW VALIDATION: Check if balance after withdrawal is at least ₱5,000
+  const balanceAfterWithdrawal = balance - amount;
+  if (balanceAfterWithdrawal < 5000) {
+    setAlertMessage(`Withdrawal not allowed. Your balance after withdrawal would be ${formatCurrency(balanceAfterWithdrawal)}, which is below the minimum required balance of ₱5,000.`);
+    setAlertType('error');
+    setAlertModalVisible(true);
+    return;
+  }
+
+  // Check if user has any existing pending withdrawal application
+  if (memberId) {
+    const exists = await hasAnyPendingWithdrawal(memberId);
+    if (exists) {
+      setAlertMessage('You already have a pending withdrawal application. Please wait for it to be processed before submitting another.');
       setAlertType('error');
       setAlertModalVisible(true);
       return;
     }
+  }
 
-    const amount = parseFloat(withdrawAmount);
-    if (isNaN(amount) || amount <= 0) {
-      setAlertMessage('Please enter a valid amount');
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
-    }
-
-    // NEW VALIDATION: Check if balance after withdrawal is at least ₱5,000
-    const balanceAfterWithdrawal = balance - amount;
-    if (balanceAfterWithdrawal < 5000) {
-      setAlertMessage(`Withdrawal not allowed. Your balance after withdrawal would be ${formatCurrency(balanceAfterWithdrawal)}, which is below the minimum required balance of ₱5,000.`);
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
-    }
-
-    // Check if user has any existing pending withdrawal application
-    if (memberId) {
-      const exists = await hasAnyPendingWithdrawal(memberId);
-      if (exists) {
-        setAlertMessage('You already have a pending withdrawal application. Please wait for it to be processed before submitting another.');
-        setAlertType('error');
-        setAlertModalVisible(true);
-        return;
-      }
-    }
-
-    // Show confirmation modal
-    setConfirmModalVisible(true);
-  };
+  // Show confirmation modal
+  setConfirmModalVisible(true);
+};
 
   const formatCurrency = (amount) => {
     return `₱${parseFloat(amount).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
@@ -754,94 +799,98 @@ const Withdraw = () => {
   };
 
   // Main submission function with QR code
-  const submitWithdrawal = async () => {
-    setIsLoading(true);
-    setConfirmModalVisible(false);
+const submitWithdrawal = async () => {
+  setIsLoading(true);
+  setConfirmModalVisible(false);
 
-    try {
-      const transactionId = generateTransactionId();
-      const currentDate = new Date();
+  try {
+    const transactionId = generateTransactionId();
+    const currentDate = new Date();
 
-      // Upload QR code image if exists
-      let qrCodeUrl = null;
-      if (qrCodeImage) {
-        try {
-          console.log('Uploading QR code image...');
-          qrCodeUrl = await uploadImageToFirebase(qrCodeImage, 'withdraw_qr', memberId);
-          console.log('QR code uploaded successfully:', qrCodeUrl);
-        } catch (uploadError) {
-          console.error('Failed to upload QR code:', uploadError);
-          setAlertMessage('Failed to upload QR code. Please try again.');
-          setAlertType('error');
-          setAlertModalVisible(true);
-          setIsLoading(false);
-          return;
-        }
+    // Upload QR code image if exists
+    let qrCodeUrl = null;
+    if (qrCodeImage) {
+      try {
+        console.log('Uploading QR code image...');
+        qrCodeUrl = await uploadImageToFirebase(qrCodeImage, 'withdraw_qr', memberId);
+        console.log('QR code uploaded successfully:', qrCodeUrl);
+      } catch (uploadError) {
+        console.error('Failed to upload QR code:', uploadError);
+        setAlertMessage('Failed to upload QR code. Please try again.');
+        setAlertType('error');
+        setAlertModalVisible(true);
+        setIsLoading(false);
+        return;
       }
-
-      // Prepare withdrawal data with QR code URL
-      const withdrawalData = {
-        transactionId,
-        id: memberId,
-        email,
-        firstName,
-        lastName,
-        withdrawOption,
-        accountName,
-        accountNumber,
-        bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
-        amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
-        dateApplied: currentDate.toLocaleDateString('en-US', {
-          month: 'long',
-          day: 'numeric',
-          year: 'numeric',
-        }),
-        timeApplied: currentDate.toLocaleTimeString('en-US', {
-          hour: 'numeric',
-          minute: '2-digit',
-          hour12: true,
-        }),
-        timestamp: currentDate.getTime(),
-        status: 'pending',
-        qrCodeUrl: qrCodeUrl // Add QR code URL here
-      };
-
-      console.log('Saving withdrawal application:', withdrawalData);
-
-      // Save to Firebase
-      const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
-      await set(newWithdrawRef, withdrawalData);
-
-      // Also log to Transactions
-      const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
-      await set(txnRef, { ...withdrawalData, label: 'Withdrawal', type: 'Withdrawals' });
-
-      // Prepare API data for background processing
-      const apiData = {
-        email,
-        firstName,
-        lastName,
-        amount: parseFloat(withdrawAmount),
-        date: new Date().toISOString(),
-        qrCodeUrl: qrCodeUrl
-      };
-
-      setPendingApiData(apiData);
-      
-      // Show success message
-      setAlertMessage('Withdrawal application submitted successfully!');
-      setAlertType('success');
-      setAlertModalVisible(true);
-
-    } catch (error) {
-      console.error('Error during withdrawal submission:', error);
-      setAlertMessage('An unexpected error occurred. Please try again later.');
-      setAlertType('error');
-      setAlertModalVisible(true);
-    } finally {
-      setIsLoading(false);
     }
-  };
+
+    // Prepare withdrawal data with QR code URL
+    // Note: Account name and number may be empty if QR code is uploaded
+    const withdrawalData = {
+      transactionId,
+      id: memberId,
+      email,
+      firstName,
+      lastName,
+      withdrawOption,
+      accountName: accountName || (qrCodeImage ? '(Provided via QR code)' : ''),
+      accountNumber: accountNumber || (qrCodeImage ? '(Provided via QR code)' : ''),
+      bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
+      amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
+      dateApplied: currentDate.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric',
+      }),
+      timeApplied: currentDate.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      }),
+      timestamp: currentDate.getTime(),
+      status: 'pending',
+      qrCodeUrl: qrCodeUrl, // Add QR code URL here
+      hasQrCode: !!qrCodeImage // Flag to indicate if QR code was used
+    };
+
+    console.log('Saving withdrawal application:', withdrawalData);
+
+    // Save to Firebase
+    const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
+    await set(newWithdrawRef, withdrawalData);
+
+    // Also log to Transactions
+    const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
+    await set(txnRef, { ...withdrawalData, label: 'Withdrawal', type: 'Withdrawals' });
+
+    // Prepare API data for background processing
+    const apiData = {
+      email,
+      firstName,
+      lastName,
+      amount: parseFloat(withdrawAmount),
+      date: new Date().toISOString(),
+      qrCodeUrl: qrCodeUrl,
+      accountName: accountName,
+      accountNumber: accountNumber
+    };
+
+    setPendingApiData(apiData);
+    
+    // Show success message
+    setAlertMessage('Withdrawal application submitted successfully!');
+    setAlertType('success');
+    setAlertModalVisible(true);
+
+  } catch (error) {
+    console.error('Error during withdrawal submission:', error);
+    setAlertMessage('An unexpected error occurred. Please try again later.');
+    setAlertType('error');
+    setAlertModalVisible(true);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
   // Required field component
   const RequiredField = ({ children }) => (
@@ -885,123 +934,157 @@ const Withdraw = () => {
             </TouchableOpacity>
           </ModalSelector>
 
-          {withdrawOption !== 'Cash' && (
-            <>
-              <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
-              <TextInput
-                value={accountName}
-                onChangeText={setAccountName}
-                style={styles.input}
-                placeholder="Enter account name"
-              />
+{withdrawOption !== 'Cash' && (
+  <>
+    {/* Account Name Field */}
+    <Text style={styles.label}>
+      Account Name
+      {!qrCodeImage && <Text style={{color: 'red'}}>*</Text>}
+      <Text style={{fontSize: 12, color: '#666'}}>
+        {qrCodeImage ? ' (Optional with QR code)' : ''}
+      </Text>
+    </Text>
+    <TextInput
+      value={accountName}
+      onChangeText={setAccountName}
+      style={styles.input}
+      placeholder={
+        qrCodeImage 
+          ? "Enter account name (optional with QR code)" 
+          : "Enter account name"
+      }
+    />
 
-              <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
-              <TextInput
-                value={accountNumber}
-                onChangeText={handleAccountNumberChange}
-                style={styles.input}
-                keyboardType="numeric"
-                placeholder={
-                  withdrawOption === 'GCash' 
-                    ? 'Enter 11-digit GCash number' 
-                    : 'Enter 8-16 digit bank account number'
-                }
-                maxLength={withdrawOption === 'GCash' ? 11 : 16}
-              />
-              
-              {/* Account Number Validation Message */}
-              {accountNumber.length > 0 && (
-                <Text style={[
-                  styles.validationText,
-                  isAccountNumberValid() ? styles.validText : styles.invalidText
-                ]}>
-                  {getAccountNumberValidationMessage()}
-                </Text>
-              )}
+    {/* Account Number Field */}
+    <Text style={styles.label}>
+      Account Number
+      {!qrCodeImage && <Text style={{color: 'red'}}>*</Text>}
+      <Text style={{fontSize: 12, color: '#666'}}>
+        {qrCodeImage ? ' (Optional with QR code)' : ''}
+      </Text>
+    </Text>
+    <TextInput
+      value={accountNumber}
+      onChangeText={handleAccountNumberChange}
+      style={styles.input}
+      keyboardType="numeric"
+      placeholder={
+        withdrawOption === 'GCash' 
+          ? qrCodeImage 
+            ? 'Enter 11-digit GCash number (optional with QR code)' 
+            : 'Enter 11-digit GCash number'
+          : qrCodeImage 
+            ? 'Enter 8-16 digit bank account number (optional with QR code)' 
+            : 'Enter 8-16 digit bank account number'
+      }
+      maxLength={withdrawOption === 'GCash' ? 11 : 16}
+    />
+    
+    {/* Account Number Validation Message */}
+    {accountNumber.length > 0 && (
+      <Text style={[
+        styles.validationText,
+        isAccountNumberValid() ? styles.validText : styles.invalidText
+      ]}>
+        {getAccountNumberValidationMessage()}
+      </Text>
+    )}
 
-              {withdrawOption === 'Bank' && (
-                <>
-                  <Text style={styles.label}><RequiredField>Type of Bank</RequiredField></Text>
-                  <ModalSelector
-                    data={bankTypeOptions}
-                    initValue="Select Bank Type"
-                    onChange={(option) => {
-                      const key = option.key;
-                      setBankType(key);
-                      if (key !== 'Others') {
-                        setCustomBankName('');
-                      }
-                    }}
-                    style={styles.picker}
-                    modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
-                    overlayStyle={{ justifyContent: 'flex-end' }}
-                  >
-                    <TouchableOpacity style={styles.pickerContainer}>
-                      <Text style={styles.pickerText}>
-                        {bankType === 'Others' && customBankName ? `Others: ${customBankName}` : (bankType || 'Select Bank Type')}
-                      </Text>
-                      <MaterialIcons name="arrow-drop-down" size={24} color="black" />
-                    </TouchableOpacity>
-                  </ModalSelector>
+    {/* QR Code Upload Section */}
+    <View style={{ marginTop: 10, marginBottom: 15 }}>
+      <Text style={styles.label}>
+        <Text style={{ color: '#1E3A5F', fontSize: 16, fontWeight: '600' }}>
+          QR Code Upload
+        </Text>
+        <Text style={{ fontSize: 12, color: '#666' }}>
+          {withdrawOption === 'Bank' ? ' (Makes account details optional)' : ''}
+        </Text>
+      </Text>
+      
+      {/* Add helpful hint */}
+      <Text style={styles.qrHintText}>
+        {qrCodeImage 
+          ? 'QR code uploaded! Account details are now optional.' 
+          : 'Upload a QR code to make account details optional'}
+      </Text>
+      
+      {/* QR Code Image Preview */}
+      {qrCodeImage ? (
+        <View style={styles.qrCodeContainer}>
+          <Image source={getImageSource(qrCodeImage)} style={styles.qrCodeImage} />
+          <TouchableOpacity 
+            style={styles.removeQrButton}
+            onPress={removeQrCodeImage}
+          >
+            <MaterialIcons name="close" size={20} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.changeQrButton}
+            onPress={handleQrCodePress}
+          >
+            <Text style={styles.changeQrText}>Change QR Code</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity 
+          style={styles.qrUploadButton}
+          onPress={handleQrCodePress}
+        >
+          <View style={styles.qrIconContainer}>
+            <MaterialIcons name="qr-code-scanner" size={30} color="#1E3A5F" />
+            <Text style={styles.qrUploadText}>Upload QR Code</Text>
+            <Text style={styles.qrUploadSubText}>
+              {withdrawOption === 'Bank' 
+                ? 'Optional - Makes account details optional' 
+                : 'Optional - For easy reference'}
+            </Text>
+          </View>
+        </TouchableOpacity>
+      )}
+    </View>
 
-                  {bankType === 'Others' && (
-                    <View style={{ marginTop: 8 }}>
-                      <TextInput
-                        placeholder="Please specify the bank name"
-                        value={customBankName}
-                        onChangeText={setCustomBankName}
-                        style={styles.input}
-                      />
-                    </View>
-                  )}
-                </>
-              )}
-              
-              {/* QR Code Upload - Optional for GCash and Bank */}
-              {(withdrawOption === 'GCash' || withdrawOption === 'Bank') && (
-                <>
-                  <View style={{ marginTop: 10, marginBottom: 15 }}>
-                    <Text style={styles.label}>
-                      <Text style={{ color: '#666', fontSize: 14 }}>QR Code (Optional)</Text>
-                    </Text>
-                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
-                      Upload a QR code for easier fund transfer reference
-                    </Text>
-                    
-                    {/* QR Code Image Preview */}
-                    {qrCodeImage ? (
-                      <View style={styles.qrCodeContainer}>
-                        <Image source={getImageSource(qrCodeImage)} style={styles.qrCodeImage} />
-                        <TouchableOpacity 
-                          style={styles.removeQrButton}
-                          onPress={removeQrCodeImage}
-                        >
-                          <MaterialIcons name="close" size={20} color="white" />
-                        </TouchableOpacity>
-                        <TouchableOpacity 
-                          style={styles.changeQrButton}
-                          onPress={handleQrCodePress}
-                        >
-                          <Text style={styles.changeQrText}>Change QR Code</Text>
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity 
-                        style={styles.qrUploadButton}
-                        onPress={handleQrCodePress}
-                      >
-                        <View style={styles.qrIconContainer}>
-                          <MaterialIcons name="qr-code-scanner" size={30} color="#1E3A5F" />
-                          <Text style={styles.qrUploadText}>Upload QR Code</Text>
-                          <Text style={styles.qrUploadSubText}>Optional - For easy reference</Text>
-                        </View>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </>
-              )}
-            </>
-          )}
+    {/* For Bank withdrawals, bank type is still required */}
+    {withdrawOption === 'Bank' && (
+      <>
+        <Text style={styles.label}>
+          <RequiredField>Type of Bank</RequiredField>
+        </Text>
+        <ModalSelector
+          data={bankTypeOptions}
+          initValue="Select Bank Type"
+          onChange={(option) => {
+            const key = option.key;
+            setBankType(key);
+            if (key !== 'Others') {
+              setCustomBankName('');
+            }
+          }}
+          style={styles.picker}
+          modalStyle={{ justifyContent: 'flex-end', margin: 0 }}
+          overlayStyle={{ justifyContent: 'flex-end' }}
+        >
+          <TouchableOpacity style={styles.pickerContainer}>
+            <Text style={styles.pickerText}>
+              {bankType === 'Others' && customBankName ? `Others: ${customBankName}` : (bankType || 'Select Bank Type')}
+            </Text>
+            <MaterialIcons name="arrow-drop-down" size={24} color="black" />
+          </TouchableOpacity>
+        </ModalSelector>
+
+        {bankType === 'Others' && (
+          <View style={{ marginTop: 8 }}>
+            <TextInput
+              placeholder="Please specify the bank name"
+              value={customBankName}
+              onChangeText={setCustomBankName}
+              style={styles.input}
+            />
+          </View>
+        )}
+      </>
+    )}
+  </>
+)}
 
           <Text style={styles.label}><RequiredField>Withdraw Amount</RequiredField></Text>
           <TextInput
