@@ -617,53 +617,57 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: width * 0.05, // 5% of screen width
     backgroundColor: '#1E3A5F',
   },
   logo: {
-    width: 180,
-    height: 180,
+    width: width * 0.45, // 45% of screen width
+    height: width * 0.45, // Keep aspect ratio
     resizeMode: 'contain',
-    borderRadius: 100, 
+    borderRadius: width * 0.225, // Half of width for perfect circle
     overflow: 'hidden',
-    marginBottom: 40, 
+    marginBottom: height * 0.04, // 4% of screen height
   },
   biometricButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#4FE7AF',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
+    paddingVertical: height * 0.015,
+    paddingHorizontal: width * 0.05,
     borderRadius: 25,
-    marginVertical: 10,
-    width: '60%',
+    marginVertical: height * 0.01,
+    width: width * 0.6, // 60% of screen width
+    minHeight: height * 0.06, // Minimum height
   },
   biometricButtonText: {
     color: '#0C2C4A',
-    fontSize: 16,
+    fontSize: width * 0.04, // Responsive font size
     fontWeight: '700',
-    marginLeft: 8,
+    marginLeft: width * 0.02,
   },
   title: {
-    fontSize: 30,
+    fontSize: width * 0.08, // Responsive font size
     fontWeight: 'bold',
     color: 'white',
-    marginBottom: 10,
+    marginBottom: height * 0.01,
+    textAlign: 'center',
   },
   desc: {
-    fontSize: 13,
+    fontSize: width * 0.035, // Responsive font size
     color: 'white',
     textAlign: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 10,
+    paddingHorizontal: width * 0.05,
+    marginBottom: height * 0.03,
+    lineHeight: width * 0.045,
   },
   label: {
     alignSelf: 'flex-start',
-    marginLeft: 20,
-    fontSize: 16,
+    marginLeft: width * 0.05, // 5% of screen width
+    fontSize: width * 0.04, // Responsive font size
     color: 'white',
-    marginBottom: 5,
+    marginBottom: height * 0.005,
+    width: '90%', // Match input width
   },
   inputContainer: {
     flexDirection: 'row',
@@ -672,8 +676,9 @@ const styles = StyleSheet.create({
     borderColor: '#DCE6F3',
     borderRadius: 12,
     backgroundColor: '#F7FAFF',
-    marginBottom: 12,
+    marginBottom: height * 0.015,
     width: '90%',
+    minHeight: height * 0.06, // Minimum height for touch target
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -697,8 +702,9 @@ const styles = StyleSheet.create({
     borderColor: '#DCE6F3',
     borderRadius: 12,
     backgroundColor: '#F7FAFF',
-    marginBottom: 12,
+    marginBottom: height * 0.015,
     width: '90%',
+    minHeight: height * 0.06, // Minimum height for touch target
     ...Platform.select({
       ios: {
         shadowColor: '#000',
@@ -717,8 +723,8 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: height * 0.015,
+    fontSize: width * 0.04, // Responsive font size
     color: '#333',
     ...Platform.select({
       web: {
@@ -729,8 +735,8 @@ const styles = StyleSheet.create({
   },
   passwordInput: {
     flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
+    paddingVertical: height * 0.015,
+    fontSize: width * 0.04, // Responsive font size
     color: '#333',
     ...Platform.select({
       web: {
@@ -740,42 +746,52 @@ const styles = StyleSheet.create({
     }),
   },
   eyeIcon: {
-    paddingHorizontal: 10,
+    paddingHorizontal: width * 0.03,
+    minWidth: width * 0.08, // Minimum touch target size
+    minHeight: height * 0.05,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   envelopeIcon: {
-    paddingHorizontal: 7,
+    paddingHorizontal: width * 0.02,
+    marginLeft: width * 0.02,
   },
   lockIcon: {
-    paddingHorizontal: 10,
+    paddingHorizontal: width * 0.02,
+    marginLeft: width * 0.02,
   },
   loginButton: {
     backgroundColor: '#4FE7AF',
-    paddingVertical: 14,
-    paddingHorizontal: 22,
+    paddingVertical: height * 0.018,
+    paddingHorizontal: width * 0.05,
     borderRadius: 14,
-    width: '60%',
+    width: width * 0.6, // 60% of screen width
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: height * 0.01,
     elevation: 3,
+    minHeight: height * 0.06, // Minimum touch target size
+    justifyContent: 'center',
   },
   loginButtonText: {
     color: '#0C2C4A',
-    fontSize: 18,
+    fontSize: width * 0.045, // Responsive font size
     fontWeight: '700',
   },
   forgotPasswordButton: {
     alignSelf: 'flex-end',
-    marginEnd: 20,
-    marginBottom: 10,
+    marginEnd: width * 0.05,
+    marginBottom: height * 0.01,
+    paddingVertical: height * 0.005,
+    paddingHorizontal: width * 0.02,
   },
   forgotPasswordText: {
     color: 'white',
-    fontSize: 11,
-    marginBottom: 10,
+    fontSize: width * 0.032, // Responsive font size
+    marginBottom: height * 0.01,
   },
   promptText: {
-    marginVertical: 10,
-    fontSize: 16,
+    marginVertical: height * 0.01,
+    fontSize: width * 0.038, // Responsive font size
     color: 'white',
     textAlign: 'center',
   },
@@ -792,25 +808,30 @@ const styles = StyleSheet.create({
   },
   loadingBox: {
     backgroundColor: 'white',
-    padding: 30,
+    padding: width * 0.08, // Responsive padding
     borderRadius: 12,
     alignItems: 'center',
+    width: width * 0.7, // 70% of screen width
+    maxWidth: 300, // Maximum width for very large screens
   },
   loadingText: {
-    marginTop: 10,
-    fontSize: 16,
+    marginTop: height * 0.02,
+    fontSize: width * 0.04, // Responsive font size
     fontWeight: '500',
     color: '#2D5783',
+    textAlign: 'center',
   },
   registerRow: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
+    marginTop: height * 0.02,
+    flexWrap: 'wrap', // Allow wrapping on small screens
   },
   inlineRegisterText: {
     color: '#4FE7AF',
-    fontSize: 16,
+    fontSize: width * 0.038, // Responsive font size
     fontWeight: 'bold',
+    marginLeft: width * 0.01,
   },
 });
