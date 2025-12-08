@@ -442,9 +442,9 @@ const testFingerprint = async () => {
               <Text style={styles.sectionTitle}>About</Text>
               
               <View style={styles.aboutInfo}>
-                <Text style={styles.appName}>5KI Banking App</Text>
+                <Text style={styles.appName}>5Ki App</Text>
                 <Text style={styles.appVersion}>Version 1.0.0</Text>
-                <Text style={styles.appCopyright}>© 2025 5KI Banking. All rights reserved.</Text>
+                <Text style={styles.appCopyright}>© 2025 5Ki Financial Services. All rights reserved.</Text>
               </View>
             </View>
           </View>
