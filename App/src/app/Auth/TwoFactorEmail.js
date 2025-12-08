@@ -1,7 +1,16 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Image,
+  Dimensions 
+} from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { sendVerificationCode } from '../../api';
+
+const { width, height } = Dimensions.get('window');
 
 export default function TwoFactorEmail({ route, navigation }) {
   const { email, password, fromBiometric } = route.params;
@@ -42,7 +51,7 @@ export default function TwoFactorEmail({ route, navigation }) {
         onPress={() => navigation.goBack()}
         activeOpacity={0.7}
       >
-        <MaterialIcons name="arrow-back" size={28} color="#0F172A" />
+        <MaterialIcons name="arrow-back" size={width * 0.07} color="#0F172A" />
       </TouchableOpacity>
 
       <View style={styles.contentWrapper}>
@@ -50,7 +59,7 @@ export default function TwoFactorEmail({ route, navigation }) {
           <Image source={require('../../../assets/logo.png')} style={styles.logo} />
         </View>
 
-        <View style={{ marginBottom: 16 }}>
+        <View style={{ marginBottom: height * 0.02 }}>
           <Text style={styles.title}>Two-Factor Authentication</Text>
           <Text style={styles.subLabel}>We'll send a 6-digit code to your email</Text>
         </View>
@@ -60,7 +69,7 @@ export default function TwoFactorEmail({ route, navigation }) {
             <Text style={styles.emailText} numberOfLines={1} ellipsizeMode="tail">
               {email}
             </Text>
-            <MaterialIcons name="lock" size={20} color="#666" />
+            <MaterialIcons name="lock" size={width * 0.05} color="#666" />
           </View>
 
           <Text style={styles.instructions}>
@@ -84,44 +93,51 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-    padding: 16,
-    paddingBottom: 150,
+    paddingHorizontal: width * 0.04,
+    paddingVertical: height * 0.02,
+    paddingBottom: height * 0.15,
   },
   backButton: {
     alignSelf: 'flex-start',
-    marginBottom: 10,
-    marginTop: 20,
+    marginBottom: height * 0.01,
+    marginTop: height * 0.03,
+    padding: width * 0.02,
+    borderRadius: 8,
   },
   card: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
+    padding: width * 0.04,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 2,
+    width: '100%',
   },
   title: {
-    fontSize: 22,
+    fontSize: width * 0.06,
     fontWeight: '700',
     color: '#0F172A',
     textAlign: 'left',
+    marginBottom: height * 0.005,
   },
   subLabel: {
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: width * 0.035,
+    marginTop: height * 0.002,
     color: '#475569',
+    lineHeight: width * 0.045,
   },
   emailContainer: {
     width: '100%',
-    height: 55,
+    height: height * 0.065,
+    minHeight: 55,
     borderWidth: 1,
     borderColor: '#DDD',
     borderRadius: 8,
-    paddingHorizontal: 15,
+    paddingHorizontal: width * 0.04,
     backgroundColor: '#F8F8F8',
-    marginBottom: 25,
+    marginBottom: height * 0.03,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -133,51 +149,54 @@ const styles = StyleSheet.create({
   },
   emailText: {
     flex: 1,
-    fontSize: 16,
+    fontSize: width * 0.04,
     color: '#333',
-    marginRight: 10,
+    marginRight: width * 0.03,
   },
   instructions: {
     color: '#475569',
-    fontSize: 14,
-    marginBottom: 16,
+    fontSize: width * 0.037,
+    marginBottom: height * 0.02,
     textAlign: 'left',
-    lineHeight: 20,
+    lineHeight: width * 0.05,
     width: '100%',
   },
   primaryButton: {
     backgroundColor: '#1E3A5F',
-    paddingVertical: 14,
+    paddingVertical: height * 0.018,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
+    minHeight: height * 0.06,
+    justifyContent: 'center',
   },
   primaryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: width * 0.045,
     fontWeight: '700',
   },
   contentWrapper: {
     flex: 1,
     justifyContent: 'center',
+    alignItems: 'center',
   },
   logoWrapper: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: width * 0.3,
+    height: width * 0.3,
+    borderRadius: width * 0.15,
     borderWidth: 4,
     borderColor: '#1E3A5F',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 24,
+    marginBottom: height * 0.03,
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
   logo: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: width * 0.25,
+    height: width * 0.25,
+    borderRadius: width * 0.125,
     resizeMode: 'contain',
   },
 });
