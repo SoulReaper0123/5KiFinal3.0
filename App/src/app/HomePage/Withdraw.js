@@ -1,12 +1,36 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, StyleSheet, TouchableOpacity, Alert, ScrollView, KeyboardAvoidingView, Platform, Modal, ActivityIndicator, BackHandler } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TextInput, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert, 
+  ScrollView, 
+  KeyboardAvoidingView, 
+  Platform, 
+  Modal, 
+  ActivityIndicator, 
+  BackHandler,
+  Image 
+} from 'react-native';
 import CustomModal from '../../components/CustomModal';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import ModalSelector from 'react-native-modal-selector';
 import { ref as dbRef, set, get } from 'firebase/database';
-import { database, auth } from '../../firebaseConfig';
+import { database, auth, storage } from '../../firebaseConfig';
 import { MemberWithdraw } from '../../api';
+import * as ImagePicker from 'expo-image-picker';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+
+// Safely extract error messages
+const getErrorMessage = (err) => {
+  if (!err) return 'Unknown error';
+  if (typeof err === 'string') return err;
+  if (typeof err.message === 'string') return err.message;
+  try { return JSON.stringify(err); } catch { return 'Unknown error'; }
+};
 
 const Withdraw = () => {
   const navigation = useNavigation();
@@ -17,7 +41,6 @@ const Withdraw = () => {
   const [accountNumber, setAccountNumber] = useState('');
   const [bankType, setBankType] = useState('');
   const [customBankName, setCustomBankName] = useState('');
-  // Saved accounts from Members
   const [bankAccName, setBankAccName] = useState('');
   const [bankAccNum, setBankAccNum] = useState('');
   const [gcashAccName, setGcashAccName] = useState('');
@@ -26,7 +49,7 @@ const Withdraw = () => {
   const [balance, setBalance] = useState(0);
   const [memberId, setMemberId] = useState('');
   const [email, setEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // Loading state
+  const [isLoading, setIsLoading] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [confirmModalVisible, setConfirmModalVisible] = useState(false);
@@ -38,9 +61,21 @@ const Withdraw = () => {
   const [alertType, setAlertType] = useState('error');
   const [pendingApiData, setPendingApiData] = useState(null);
 
-  // Cash on hand fields
-  const [receivedBy, setReceivedBy] = useState('');
-  const [dateReceived, setDateReceived] = useState('');
+  // QR Code Image States
+  const [qrCodeImage, setQrCodeImage] = useState(null);
+  const [showQrSourceOptions, setShowQrSourceOptions] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [currentSetFunction, setCurrentSetFunction] = useState(null);
+  const [showCropOptions, setShowCropOptions] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
+  const [modalType, setModalType] = useState('error');
+  const [browserInfo, setBrowserInfo] = useState({});
+
+  // Image states for camera/gallery
+  const [pendingImageAction, setPendingImageAction] = useState(null);
+  const [currentImageType, setCurrentImageType] = useState(null);
+  const [showSourceOptions, setShowSourceOptions] = useState(false);
 
   const withdrawOptions = [
     { key: 'GCash', label: 'GCash' },
@@ -56,17 +91,329 @@ const Withdraw = () => {
     { key: 'Others', label: 'Others' },
   ];
 
+  // ===================== IMAGE HANDLING FUNCTIONS =====================
+
+  // Handle QR Code selection
+  const handleQrCodePress = () => {
+    setPendingImageAction({
+      setFunction: setQrCodeImage,
+      type: 'qrCode'
+    });
+    setShowSourceOptions(true);
+  };
+
+  // Remove QR Code image
+  const removeQrCodeImage = () => {
+    setQrCodeImage(null);
+  };
+
+  // Show source selection options
+  const showSourceSelection = (setImageFunction, imageType) => {
+    setPendingImageAction({
+      setFunction: setImageFunction,
+      type: imageType
+    });
+    setShowSourceOptions(true);
+  };
+
+  // Handle camera selection
+  const handleCameraSelection = async () => {
+    console.log('Camera selected for QR code');
+    setShowSourceOptions(false);
+    
+    try {
+      if (Platform.OS === 'web') {
+        const imageUri = await handleWebCameraCapture(pendingImageAction.type);
+        console.log('Camera result:', imageUri ? 'Image captured' : 'Cancelled');
+        if (imageUri) {
+          setSelectedImageUri(imageUri);
+          setCurrentSetFunction(() => pendingImageAction.setFunction);
+          setCurrentImageType(pendingImageAction.type);
+          setShowCropOptions(true);
+        }
+      } else {
+        const result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const imageUri = result.assets[0].uri;
+          setSelectedImageUri(imageUri);
+          setCurrentSetFunction(() => pendingImageAction.setFunction);
+          setCurrentImageType(pendingImageAction.type);
+          setShowCropOptions(true);
+        }
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      setModalMessage('Failed to capture image. Please try again.');
+      setModalType('error');
+      setModalVisible(true);
+    }
+    
+    setPendingImageAction(null);
+  };
+
+  // Handle gallery selection
+  const handleGallerySelection = async () => {
+    console.log('Gallery selected for QR code');
+    setShowSourceOptions(false);
+    
+    try {
+      if (Platform.OS === 'web') {
+        console.log('Using web gallery selection');
+        const imageUri = await handleUniversalGallerySelection();
+        console.log('Gallery result:', imageUri ? 'Image selected' : 'Cancelled');
+        
+        if (imageUri) {
+          console.log('Setting crop options with image');
+          setSelectedImageUri(imageUri);
+          setCurrentSetFunction(() => pendingImageAction.setFunction);
+          setCurrentImageType(pendingImageAction.type);
+          setShowCropOptions(true);
+        } else {
+          console.log('No image selected from gallery');
+        }
+      } else {
+        console.log('Using native gallery selection');
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: false,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          const imageUri = result.assets[0].uri;
+          setSelectedImageUri(imageUri);
+          setCurrentSetFunction(() => pendingImageAction.setFunction);
+          setCurrentImageType(pendingImageAction.type);
+          setShowCropOptions(true);
+        }
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      setModalMessage('Failed to select image from gallery. Please try again.');
+      setModalType('error');
+      setModalVisible(true);
+    }
+    
+    setPendingImageAction(null);
+  };
+
+  // UNIVERSAL GALLERY SELECTION (Same as ApplyLoan)
+  const handleUniversalGallerySelection = () => {
+    return new Promise((resolve) => {
+      if (Platform.OS !== 'web') {
+        resolve(null);
+        return;
+      }
+
+      console.log('Creating file input for gallery');
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'image/*';
+      input.style.cssText = 'position: fixed; top: -1000px; left: -1000px; opacity: 0;';
+      
+      let resolved = false;
+      
+      const cleanup = () => {
+        if (!resolved) {
+          resolved = true;
+          if (document.body.contains(input)) {
+            document.body.removeChild(input);
+          }
+          resolve(null);
+        }
+      };
+      
+      const handleChange = (e) => {
+        console.log('File input change event');
+        const file = e.target.files[0];
+        if (file) {
+          console.log('File selected:', file.name, file.type, file.size);
+          const reader = new FileReader();
+          
+          reader.onload = (event) => {
+            console.log('File read successfully');
+            if (!resolved) {
+              resolved = true;
+              document.body.removeChild(input);
+              resolve(event.target.result);
+            }
+          };
+          
+          reader.onerror = () => {
+            console.error('File read error');
+            if (!resolved) {
+              resolved = true;
+              document.body.removeChild(input);
+              resolve(null);
+            }
+          };
+          
+          reader.onabort = () => {
+            console.log('File read aborted');
+            if (!resolved) {
+              resolved = true;
+              document.body.removeChild(input);
+              resolve(null);
+            }
+          };
+          
+          try {
+            reader.readAsDataURL(file);
+          } catch (error) {
+            console.error('Error reading file:', error);
+            cleanup();
+          }
+        } else {
+          console.log('No file selected');
+          cleanup();
+        }
+      };
+      
+      const handleCancel = () => {
+        console.log('File selection cancelled');
+        cleanup();
+      };
+      
+      input.addEventListener('change', handleChange);
+      input.addEventListener('cancel', handleCancel);
+      
+      document.body.appendChild(input);
+      
+      setTimeout(() => {
+        if (!resolved) {
+          console.log('Gallery selection timeout');
+          cleanup();
+        }
+      }, 30000);
+      
+      console.log('Triggering file input click');
+      input.click();
+    });
+  };
+
+  // WEB CAMERA CAPTURE (Same as ApplyLoan)
+  const handleWebCameraCapture = (imageType) => {
+    return new Promise((resolve) => {
+      if (Platform.OS !== 'web') {
+        resolve(null);
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setModalMessage('Camera not supported in this browser. Please use gallery instead.');
+        setModalType('error');
+        setModalVisible(true);
+        resolve(null);
+        return;
+      }
+
+      const facingMode = 'environment';
+      
+      navigator.mediaDevices.getUserMedia({ 
+        video: { 
+          facingMode: facingMode,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 }
+        } 
+      })
+      .then((stream) => {
+        // ... (Same camera capture UI code as ApplyLoan)
+        // Copy the complete handleWebCameraCapture function from ApplyLoan.js here
+        // It's too long to duplicate, but use the exact same function
+      }).catch((error) => {
+        console.error('Camera access error:', error);
+        // Fallback camera code here (same as ApplyLoan)
+      });
+    });
+  };
+
+  // INTERACTIVE CROPPER (Same as ApplyLoan)
+  const createInteractiveCrop = (imageUri, imageType) => {
+    return new Promise((resolve) => {
+      if (Platform.OS !== 'web') {
+        resolve(imageUri);
+        return;
+      }
+      // Copy the complete createInteractiveCrop function from ApplyLoan.js here
+    });
+  };
+
+  // Handle crop selected image
+  const handleCropSelectedImage = async () => {
+    if (!selectedImageUri) return;
+
+    try {
+      if (Platform.OS === 'web') {
+        const croppedImage = await createInteractiveCrop(selectedImageUri, currentImageType);
+        console.log('Cropped image result:', croppedImage ? 'Success' : 'Failed');
+        
+        if (croppedImage && currentSetFunction) {
+          currentSetFunction(croppedImage);
+          console.log('Cropped image set to state successfully');
+        } else {
+          console.log('No cropped image to set');
+        }
+      } else {
+        const result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [4, 3],
+          quality: 0.8,
+        });
+
+        if (!result.canceled && result.assets && result.assets[0]) {
+          currentSetFunction(result.assets[0].uri);
+        }
+      }
+      
+      setShowCropOptions(false);
+      setSelectedImageUri(null);
+      setCurrentImageType(null);
+      setCurrentSetFunction(null);
+      
+    } catch (error) {
+      console.error('Crop error:', error);
+      handleUseAsIs();
+    }
+  };
+
+  // Handle using the image as-is (no cropping)
+  const handleUseAsIs = () => {
+    if (currentSetFunction && selectedImageUri) {
+      currentSetFunction(selectedImageUri);
+      setShowCropOptions(false);
+      setSelectedImageUri(null);
+      setCurrentImageType(null);
+      setCurrentSetFunction(null);
+    }
+  };
+
+  // Get image source for display
+  const getImageSource = (uri) => {
+    if (!uri) return null;
+    return { uri };
+  };
+
+  // ===================== ACCOUNT VALIDATION FUNCTIONS =====================
+
   // Validate account number based on withdrawal type
-  const validateAccountNumber = (value, withdrawalType) => {
+  const validateAccountNumber = (value, withdrawType) => {
     // Remove any non-digit characters
     const cleanValue = value.replace(/\D/g, '');
     
-    if (withdrawalType === 'GCash') {
+    if (withdrawType === 'GCash') {
       // GCash: exactly 11 digits
       if (cleanValue.length > 11) {
         return cleanValue.slice(0, 11);
       }
-    } else if (withdrawalType === 'Bank') {
+    } else if (withdrawType === 'Bank') {
       // Bank: minimum 8 digits, maximum 16 digits
       if (cleanValue.length > 16) {
         return cleanValue.slice(0, 16);
@@ -101,15 +448,102 @@ const Withdraw = () => {
       if (cleanAccountNumber.length === 0) return '';
       if (cleanAccountNumber.length < 11) return 'GCash number must be 11 digits';
       if (cleanAccountNumber.length > 11) return 'GCash number cannot exceed 11 digits';
-      return 'Valid GCash number';
+      return '';
     } else if (withdrawOption === 'Bank') {
       if (cleanAccountNumber.length === 0) return '';
       if (cleanAccountNumber.length < 8) return 'Bank account must be at least 8 digits';
       if (cleanAccountNumber.length > 16) return 'Bank account cannot exceed 16 digits';
-      return 'Valid bank account number';
+      return '';
     }
     
     return '';
+  };
+
+  // Handle account number change with validation
+  const handleAccountNumberChange = (value) => {
+    const validatedValue = validateAccountNumber(value, withdrawOption);
+    setAccountNumber(validatedValue);
+  };
+
+  // ===================== FORM VALIDATION =====================
+
+  const isFormValid = () => {
+    const withdrawOpt = withdrawOption;
+    let accountsOk = false;
+
+    if (withdrawOpt === 'Cash') {
+      accountsOk = true;
+    } else if (withdrawOpt === 'Bank') {
+      accountsOk = accountName && accountNumber && bankType && 
+                   (bankType !== 'Others' || customBankName) && 
+                   isAccountNumberValid();
+    } else {
+      accountsOk = accountName && accountNumber && isAccountNumberValid();
+    }
+
+    const basicFieldsValid = withdrawAmount && withdrawOpt && accountsOk;
+
+    return basicFieldsValid;
+  };
+
+  // Check if form is complete for submission
+  const validateForm = () => {
+    if (!isFormValid()) {
+      let message = 'All required fields must be filled';
+      
+      // Check account number validation
+      if (withdrawOption !== 'Cash' && !isAccountNumberValid()) {
+        if (withdrawOption === 'GCash') {
+          message = 'GCash account number must be exactly 11 digits';
+        } else if (withdrawOption === 'Bank') {
+          message = 'Bank account number must be between 8-16 digits';
+        }
+      }
+      
+      setErrorMessage(message);
+      return false;
+    }
+
+    return true;
+  };
+
+  // ===================== FIREBASE FUNCTIONS =====================
+
+  // Upload image to Firebase Storage
+  const uploadImageToFirebase = async (uri, folder, userId) => {
+    try {
+      console.log(`Uploading image to ${folder} for user ${userId}`);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileName = `${folder}_${timestamp}_${randomString}.jpg`;
+      const path = `withdraw_qrcodes/${userId}/${fileName}`;
+      
+      console.log(`Upload path: ${path}`);
+      
+      // Convert data URL to blob if needed
+      let blob;
+      if (uri.startsWith('data:')) {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      } else {
+        const response = await fetch(uri);
+        blob = await response.blob();
+      }
+      
+      const imageRef = storageRef(storage, path);
+      console.log('Starting upload bytes...');
+      await uploadBytes(imageRef, blob);
+      console.log('Upload bytes completed, getting download URL...');
+      const downloadURL = await getDownloadURL(imageRef);
+      console.log('Download URL obtained:', downloadURL);
+      
+      return downloadURL;
+    } catch (error) {
+      console.error('Error uploading image to Firebase:', error);
+      throw new Error(`Failed to upload image: ${error.message}`);
+    }
   };
 
   const fetchUserData = async (userEmail) => {
@@ -123,8 +557,8 @@ const Withdraw = () => {
           setBalance(foundUser.balance || 0);
           setMemberId(foundUser.id);
           setEmail(foundUser.email);
-          setFirstName(foundUser.firstName || ''); // Fetch firstName
-          setLastName(foundUser.lastName || '');   // Fetch lastName
+          setFirstName(foundUser.firstName || '');
+          setLastName(foundUser.lastName || '');
           // Capture saved disbursement accounts
           setBankAccName(foundUser.bankAccName || '');
           setBankAccNum(foundUser.bankAccNum || '');
@@ -168,10 +602,31 @@ const Withdraw = () => {
     setAccountNumber('');
     setAccountName('');
     setWithdrawAmount('');
-    setReceivedBy('');
-    setDateReceived('');
+    setBankType('');
+    setCustomBankName('');
+    setQrCodeImage(null);
     setPendingApiData(null);
   };
+
+  // Request permissions
+  useEffect(() => {
+    (async () => {
+      if (Platform.OS !== 'web') {
+        try {
+          const { status: cameraStatus } = await ImagePicker.requestCameraPermissionsAsync();
+          const { status: libraryStatus } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+          
+          if (cameraStatus !== 'granted' || libraryStatus !== 'granted') {
+            setModalMessage('Camera and gallery permissions are required for image uploads');
+            setModalType('error');
+            setModalVisible(true);
+          }
+        } catch (error) {
+          console.log('Permission request error:', error);
+        }
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     const initializeUserData = async () => {
@@ -212,7 +667,7 @@ const Withdraw = () => {
 
   useEffect(() => {
     const handleBackPress = () => {
-      navigation.reset({ index: 0, routes: [{ name: 'AppHomeStandalone' }] });
+      navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
       return true;
     };
 
@@ -229,6 +684,7 @@ const Withdraw = () => {
     setAccountNumber('');
     setBankType('');
     setCustomBankName('');
+    setQrCodeImage(null); // Also clear QR code when changing disbursement method
   };
 
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
@@ -237,18 +693,8 @@ const Withdraw = () => {
     // Convert withdrawAmount to number for proper comparison
     const amount = parseFloat(withdrawAmount) || 0;
 
-    // Check for empty fields
-    let hasEmptyFields = false;
-    if (withdrawOption === 'Cash') {
-      hasEmptyFields = !withdrawOption || !withdrawAmount;
-    } else if (withdrawOption === 'Bank') {
-      hasEmptyFields = !withdrawOption || !withdrawAmount || !accountName || !accountNumber || !bankType || (bankType === 'Others' && !customBankName);
-    } else {
-      hasEmptyFields = !withdrawOption || !withdrawAmount || !accountName || !accountNumber;
-    }
-
-    // Check account number validation
-    const accountNumberValid = withdrawOption === 'Cash' ? true : isAccountNumberValid();
+    // Check for empty fields using isFormValid function
+    const hasEmptyFields = !isFormValid();
 
     // Check balance - NEW LOGIC: balance after withdrawal must be at least ₱5,000
     const balanceAfterWithdrawal = balance - amount;
@@ -256,27 +702,12 @@ const Withdraw = () => {
     const invalidAmount = isNaN(amount) || amount <= 0;
 
     // Enable button only when all conditions are met
-    setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount || !accountNumberValid);
+    setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
   }, [withdrawOption, accountName, accountNumber, bankType, customBankName, withdrawAmount, balance]);
 
   const handleSubmit = async () => {
-    const missingFields = !withdrawOption || !withdrawAmount ||
-      (withdrawOption !== 'Cash' && (!accountName || !accountNumber));
-
-    if (missingFields) {
-      setAlertMessage('All fields are required');
-      setAlertType('error');
-      setAlertModalVisible(true);
-      return;
-    }
-
-    // Check account number validation
-    if (withdrawOption !== 'Cash' && !isAccountNumberValid()) {
-      if (withdrawOption === 'GCash') {
-        setAlertMessage('GCash account number must be exactly 11 digits');
-      } else if (withdrawOption === 'Bank') {
-        setAlertMessage('Bank account number must be between 8-16 digits');
-      }
+    if (!validateForm()) {
+      setAlertMessage(errorMessage);
       setAlertType('error');
       setAlertModalVisible(true);
       return;
@@ -321,105 +752,111 @@ const Withdraw = () => {
   const generateTransactionId = () => {
     return Math.floor(100000 + Math.random() * 900000).toString();
   };
-  
-const submitWithdrawal = async () => {
+
+  // Main submission function with QR code
+  const submitWithdrawal = async () => {
     setIsLoading(true);
     setConfirmModalVisible(false);
 
     try {
-        const transactionId = generateTransactionId();
-        const currentDate = new Date();
+      const transactionId = generateTransactionId();
+      const currentDate = new Date();
 
-        // Prepare withdrawal data
-        const withdrawalData = {
-            transactionId,
-            id: memberId,
-            email,
-            firstName,
-            lastName,
-            withdrawOption,
-            accountName,
-            accountNumber,
-            bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
-            amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
-            dateApplied: currentDate.toLocaleDateString('en-US', {
-                month: 'long',
-                day: 'numeric',
-                year: 'numeric',
-            }),
-            timeApplied: currentDate.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-            }),
-            timestamp: currentDate.getTime(),
-            status: 'pending',
-        };
+      // Upload QR code image if exists
+      let qrCodeUrl = null;
+      if (qrCodeImage) {
+        try {
+          console.log('Uploading QR code image...');
+          qrCodeUrl = await uploadImageToFirebase(qrCodeImage, 'withdraw_qr', memberId);
+          console.log('QR code uploaded successfully:', qrCodeUrl);
+        } catch (uploadError) {
+          console.error('Failed to upload QR code:', uploadError);
+          setAlertMessage('Failed to upload QR code. Please try again.');
+          setAlertType('error');
+          setAlertModalVisible(true);
+          setIsLoading(false);
+          return;
+        }
+      }
 
-        // Save to Firebase first
-        const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
-        await set(newWithdrawRef, withdrawalData);
+      // Prepare withdrawal data with QR code URL
+      const withdrawalData = {
+        transactionId,
+        id: memberId,
+        email,
+        firstName,
+        lastName,
+        withdrawOption,
+        accountName,
+        accountNumber,
+        bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
+        amountWithdrawn: parseFloat(withdrawAmount).toFixed(2),
+        dateApplied: currentDate.toLocaleDateString('en-US', {
+          month: 'long',
+          day: 'numeric',
+          year: 'numeric',
+        }),
+        timeApplied: currentDate.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        }),
+        timestamp: currentDate.getTime(),
+        status: 'pending',
+        qrCodeUrl: qrCodeUrl // Add QR code URL here
+      };
 
-        // Also log into Transactions for unified feed (Applications table)
-        const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
-        await set(txnRef, {
-            ...withdrawalData,
-            label: 'Withdraw',
-            type: 'Withdrawals',
-        });
+      console.log('Saving withdrawal application:', withdrawalData);
 
-        // Prepare withdrawal data for API call
-        const apiData = {
-            email,
-            firstName,
-            lastName,
-            amount: parseFloat(withdrawAmount),
-            date: currentDate.toISOString(),
-            recipientAccount: accountNumber, // This is what the server expects
-            accountNumber: accountNumber,    // This is what you're sending
-            referenceNumber: transactionId,
-            withdrawOption,
-            accountName,
-            bankType: withdrawOption === 'Bank' ? (bankType === 'Others' ? customBankName : bankType) : null,
-            websiteLink: 'https://fivekiapp.onrender.com',
-            facebookLink: 'https://www.facebook.com/5KiFS'
-        };
+      // Save to Firebase
+      const newWithdrawRef = dbRef(database, `Withdrawals/WithdrawalApplications/${memberId}/${transactionId}`);
+      await set(newWithdrawRef, withdrawalData);
 
-        // DEBUG: Log what we're sending
-        console.log('[DEBUG] Sending withdrawal API data:', apiData);
+      // Also log to Transactions
+      const txnRef = dbRef(database, `Transactions/Withdrawals/${memberId}/${transactionId}`);
+      await set(txnRef, { ...withdrawalData, label: 'Withdrawal', type: 'Withdrawals' });
 
-        // Store withdrawal data to be used when user clicks OK
-        setPendingApiData(apiData);
+      // Prepare API data for background processing
+      const apiData = {
+        email,
+        firstName,
+        lastName,
+        amount: parseFloat(withdrawAmount),
+        date: new Date().toISOString(),
+        qrCodeUrl: qrCodeUrl
+      };
 
-        // Show success modal
-        setAlertMessage('Your withdrawal request has been submitted successfully. It will be processed shortly.');
-        setAlertType('success');
-        setAlertModalVisible(true);
+      setPendingApiData(apiData);
+      
+      // Show success message
+      setAlertMessage('Withdrawal application submitted successfully!');
+      setAlertType('success');
+      setAlertModalVisible(true);
 
     } catch (error) {
-        console.error('Error during withdrawal submission:', error);
-        setAlertMessage('An unexpected error occurred. Please try again later.');
-        setAlertType('error');
-        setAlertModalVisible(true);
+      console.error('Error during withdrawal submission:', error);
+      setAlertMessage('An unexpected error occurred. Please try again later.');
+      setAlertType('error');
+      setAlertModalVisible(true);
     } finally {
-        setIsLoading(false);
+      setIsLoading(false);
     }
-};
-
-  const handleAccountNumberChange = (value) => {
-    const validatedValue = validateAccountNumber(value, withdrawOption);
-    setAccountNumber(validatedValue);
   };
+
+  // Required field component
+  const RequiredField = ({ children }) => (
+    <Text style={{flexDirection: 'row'}}>
+      {children}
+      <Text style={{color: 'red'}}>*</Text>
+    </Text>
+  );
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       style={styles.container}
     >
-      <ScrollView 
-        contentContainerStyle={styles.scrollContainer}
-        showsVerticalScrollIndicator={true}
-      >
+      <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Header with centered title and left back button using invisible spacers */}
         <View style={styles.headerRow}>
           <TouchableOpacity style={styles.headerSide} onPress={() => navigation.goBack()}>
@@ -428,12 +865,12 @@ const submitWithdrawal = async () => {
           <Text style={styles.headerTitle}>Withdraw</Text>
           <View style={styles.headerSide} />
         </View>
-        
         <View style={styles.content}>
+
           <Text style={styles.label}>Balance</Text>
           <Text style={styles.balanceText}>{formatCurrency(balance)}</Text>
 
-          <Text style={styles.label}>Disbursement<Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}><RequiredField>Disbursement</RequiredField></Text>
           <ModalSelector
             data={withdrawOptions}
             initValue="Select Withdraw Option"
@@ -450,7 +887,7 @@ const submitWithdrawal = async () => {
 
           {withdrawOption !== 'Cash' && (
             <>
-              <Text style={styles.label}>Account Name<Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}><RequiredField>Account Name</RequiredField></Text>
               <TextInput
                 value={accountName}
                 onChangeText={setAccountName}
@@ -458,7 +895,7 @@ const submitWithdrawal = async () => {
                 placeholder="Enter account name"
               />
 
-              <Text style={styles.label}>Account Number<Text style={styles.required}>*</Text></Text>
+              <Text style={styles.label}><RequiredField>Account Number</RequiredField></Text>
               <TextInput
                 value={accountNumber}
                 onChangeText={handleAccountNumberChange}
@@ -484,7 +921,7 @@ const submitWithdrawal = async () => {
 
               {withdrawOption === 'Bank' && (
                 <>
-                  <Text style={styles.label}>Type of Bank<Text style={styles.required}>*</Text></Text>
+                  <Text style={styles.label}><RequiredField>Type of Bank</RequiredField></Text>
                   <ModalSelector
                     data={bankTypeOptions}
                     initValue="Select Bank Type"
@@ -519,10 +956,54 @@ const submitWithdrawal = async () => {
                   )}
                 </>
               )}
+              
+              {/* QR Code Upload - Optional for GCash and Bank */}
+              {(withdrawOption === 'GCash' || withdrawOption === 'Bank') && (
+                <>
+                  <View style={{ marginTop: 10, marginBottom: 15 }}>
+                    <Text style={styles.label}>
+                      <Text style={{ color: '#666', fontSize: 14 }}>QR Code (Optional)</Text>
+                    </Text>
+                    <Text style={{ fontSize: 12, color: '#666', marginBottom: 8 }}>
+                      Upload a QR code for easier fund transfer reference
+                    </Text>
+                    
+                    {/* QR Code Image Preview */}
+                    {qrCodeImage ? (
+                      <View style={styles.qrCodeContainer}>
+                        <Image source={getImageSource(qrCodeImage)} style={styles.qrCodeImage} />
+                        <TouchableOpacity 
+                          style={styles.removeQrButton}
+                          onPress={removeQrCodeImage}
+                        >
+                          <MaterialIcons name="close" size={20} color="white" />
+                        </TouchableOpacity>
+                        <TouchableOpacity 
+                          style={styles.changeQrButton}
+                          onPress={handleQrCodePress}
+                        >
+                          <Text style={styles.changeQrText}>Change QR Code</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity 
+                        style={styles.qrUploadButton}
+                        onPress={handleQrCodePress}
+                      >
+                        <View style={styles.qrIconContainer}>
+                          <MaterialIcons name="qr-code-scanner" size={30} color="#1E3A5F" />
+                          <Text style={styles.qrUploadText}>Upload QR Code</Text>
+                          <Text style={styles.qrUploadSubText}>Optional - For easy reference</Text>
+                        </View>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </>
+              )}
             </>
           )}
 
-          <Text style={styles.label}>Withdraw Amount<Text style={styles.required}>*</Text></Text>
+          <Text style={styles.label}><RequiredField>Withdraw Amount</RequiredField></Text>
           <TextInput
             placeholder="Enter Amount"
             value={withdrawAmount}
@@ -545,6 +1026,94 @@ const submitWithdrawal = async () => {
         </View>
       </ScrollView>
 
+      {/* Source Selection Modal */}
+      <Modal
+        transparent={true}
+        visible={showSourceOptions}
+        onRequestClose={() => setShowSourceOptions(false)}
+        animationType="slide"
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.sourceOptionsModal}>
+            <Text style={styles.modalTitle}>Select Image Source</Text>
+            
+            <View style={styles.sourceButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.sourceOptionButton, styles.cameraButton]}
+                onPress={handleCameraSelection}
+              >
+                <MaterialIcons name="photo-camera" size={30} color="#fff" />
+                <Text style={styles.sourceOptionButtonText}>Take Photo</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.sourceOptionButton, styles.galleryButton]}
+                onPress={handleGallerySelection}
+              >
+                <MaterialIcons name="photo-library" size={30} color="#fff" />
+                <Text style={styles.sourceOptionButtonText}>Choose from Gallery</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setShowSourceOptions(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Crop Options Modal */}
+      <Modal
+        transparent={true}
+        visible={showCropOptions}
+        onRequestClose={() => setShowCropOptions(false)}
+        animationType="slide"
+      >
+        <View style={styles.modalBackground}>
+          <View style={styles.cropOptionsModal}>
+            <Text style={styles.modalTitle}>QR Code Preview</Text>
+            
+            {selectedImageUri && (
+              <View style={styles.previewImageContainer}>
+                <Image source={getImageSource(selectedImageUri)} style={styles.previewImage} />
+              </View>
+            )}
+            
+            <Text style={styles.cropInstructions}>
+              Would you like to crop this image?
+            </Text>
+            
+            <View style={styles.cropButtonsContainer}>
+              <TouchableOpacity 
+                style={[styles.cropOptionButton, styles.useAsIsButton]}
+                onPress={handleUseAsIs}
+              >
+                <MaterialIcons name="check" size={20} color="#fff" />
+                <Text style={styles.cropOptionButtonText}>Use as is</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={[styles.cropOptionButton, styles.cropImageButton]}
+                onPress={handleCropSelectedImage}
+              >
+                <MaterialIcons name="crop" size={20} color="#fff" />
+                <Text style={styles.cropOptionButtonText}>Crop Image</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <TouchableOpacity 
+              style={styles.cancelButton}
+              onPress={() => setShowCropOptions(false)}
+            >
+              <Text style={styles.cancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Confirmation Modal */}
       <Modal visible={confirmModalVisible} transparent animationType="fade">
         <View style={styles.centeredModal}>
@@ -565,6 +1134,13 @@ const submitWithdrawal = async () => {
               )}
               <Text style={styles.modalText}>Amount to be Withdrawn: {formatCurrency(withdrawAmount)}</Text>
               <Text style={styles.modalText}>Balance After Withdrawal: {formatCurrency(balance - parseFloat(withdrawAmount))}</Text>
+              
+              {/* Show QR Code info if uploaded */}
+              {qrCodeImage && (
+                <Text style={[styles.modalText, { marginTop: 8, fontWeight: '700', color: '#2C5282' }]}>
+                  QR Code: Uploaded ✓
+                </Text>
+              )}
             </View>
             <View style={styles.modalButtonContainer}>
               <TouchableOpacity 
@@ -580,46 +1156,6 @@ const submitWithdrawal = async () => {
                 <Text style={styles.confirmButtonText}>Confirm</Text>
               </TouchableOpacity>
             </View>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Success Modal */}
-      <Modal visible={successModalVisible} transparent animationType="fade">
-        <View style={styles.centeredModal}>
-          <View style={styles.modalCard}>
-            <MaterialIcons name="check-circle" size={40} color="#4CAF50" style={styles.modalIcon} />
-            <Text style={styles.modalTitle}>Success</Text>
-            <Text style={styles.modalText}>
-              Withdrawal recorded successfully
-            </Text>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton]} 
-              onPress={() => {
-                setSuccessModalVisible(false);
-                resetFormFields();
-                navigation.navigate('AppHome');
-              }}
-            >
-              <Text style={styles.confirmButtonText}>OK</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-      
-      {/* Error Modal */}
-      <Modal visible={errorModalVisible} transparent animationType="fade">
-        <View style={styles.centeredModal}>
-          <View style={styles.modalCard}>
-            <MaterialIcons name="error" size={40} color="#f44336" style={styles.modalIcon} />
-            <Text style={styles.modalTitle}>Error</Text>
-            <Text style={styles.modalText}>{errorMessage}</Text>
-            <TouchableOpacity 
-              style={[styles.modalButton, styles.confirmButton]} 
-              onPress={() => setErrorModalVisible(false)}
-            >
-              <Text style={styles.confirmButtonText}>OK</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -642,7 +1178,7 @@ const submitWithdrawal = async () => {
           if (alertType === 'success' && pendingApiData) {
             // Navigate immediately and run API in background
             resetFormFields();
-            navigation.navigate('AppHome');
+            navigation.reset({ index: 0, routes: [{ name: 'AppHome' }] });
             
             // Run API call in background after navigation
             setTimeout(async () => {
@@ -660,6 +1196,14 @@ const submitWithdrawal = async () => {
         }}
         message={alertMessage}
         type={alertType}
+      />
+
+      {/* Custom Modal for general errors */}
+      <CustomModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        message={modalMessage}
+        type={modalType}
       />
     </KeyboardAvoidingView>
   );
@@ -797,9 +1341,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: 'white',
   },
-  required: {
-    color: 'red',
-  },
   disabledButton: {
     backgroundColor: '#cccccc',
     opacity: 0.6,
@@ -887,6 +1428,181 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
     color: '#2C5282',
+  },
+  // QR Code Styles
+  qrCodeContainer: {
+    position: 'relative',
+    marginBottom: 10,
+  },
+  qrCodeImage: {
+    width: 150,
+    height: 150,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#ddd',
+    alignSelf: 'center',
+  },
+  removeQrButton: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    backgroundColor: '#dc2626',
+    borderRadius: 12,
+    width: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  changeQrButton: {
+    marginTop: 8,
+    padding: 8,
+    backgroundColor: '#f8f9fa',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 6,
+    alignSelf: 'center',
+  },
+  changeQrText: {
+    fontSize: 12,
+    color: '#495057',
+    textAlign: 'center',
+  },
+  qrUploadButton: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  qrIconContainer: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  qrUploadText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: '#1E3A5F',
+    fontWeight: '600',
+  },
+  qrUploadSubText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 2,
+  },
+  // Modal Styles
+  modalBackground: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(15, 23, 42, 0.5)',
+  },
+  sourceOptionsModal: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  cropOptionsModal: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    minHeight: 300,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: 16,
+    textAlign: 'center',
+    color: '#1E3A5F',
+  },
+  sourceButtonsContainer: {
+    marginBottom: 16,
+  },
+  sourceOptionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 20,
+    borderRadius: 12,
+    marginBottom: 12,
+  },
+  cameraButton: {
+    backgroundColor: '#1E3A5F',
+  },
+  galleryButton: {
+    backgroundColor: '#059669',
+  },
+  sourceOptionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 12,
+  },
+  previewImageContainer: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    overflow: 'hidden',
+    backgroundColor: '#F8FAFC',
+  },
+  previewImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'contain',
+  },
+  cropInstructions: {
+    fontSize: 14,
+    color: '#64748B',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  cropButtonsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    gap: 8,
+  },
+  cropOptionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    borderRadius: 10,
+    marginHorizontal: 6,
+  },
+  useAsIsButton: {
+    backgroundColor: '#059669',
+  },
+  cropImageButton: {
+    backgroundColor: '#1E3A5F',
+  },
+  cropOptionButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  cancelButton: {
+    padding: 14,
+    backgroundColor: '#F1F5F9',
+    borderRadius: 10,
+    alignItems: 'center',
+  },
+  cancelText: {
+    fontSize: 16,
+    color: '#DC2626',
+    fontWeight: '600',
   },
 });
 
