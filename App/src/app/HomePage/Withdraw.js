@@ -734,21 +734,21 @@ const validateForm = () => {
 
   const [isSubmitDisabled, setIsSubmitDisabled] = useState(true);
 
-  useEffect(() => {
-    // Convert withdrawAmount to number for proper comparison
-    const amount = parseFloat(withdrawAmount) || 0;
+useEffect(() => {
+  // Convert withdrawAmount to number for proper comparison
+  const amount = parseFloat(withdrawAmount) || 0;
 
-    // Check for empty fields using isFormValid function
-    const hasEmptyFields = !isFormValid();
+  // Check for empty fields using updated isFormValid function
+  const hasEmptyFields = !isFormValid();
 
-    // Check balance - NEW LOGIC: balance after withdrawal must be at least ₱5,000
-    const balanceAfterWithdrawal = balance - amount;
-    const insufficientBalance = balanceAfterWithdrawal < 5000;
-    const invalidAmount = isNaN(amount) || amount <= 0;
+  // Check balance - balance after withdrawal must be at least ₱5,000
+  const balanceAfterWithdrawal = balance - amount;
+  const insufficientBalance = balanceAfterWithdrawal < 5000;
+  const invalidAmount = isNaN(amount) || amount <= 0;
 
-    // Enable button only when all conditions are met
-    setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
-  }, [withdrawOption, accountName, accountNumber, bankType, customBankName, withdrawAmount, balance]);
+  // Enable button only when all conditions are met
+  setIsSubmitDisabled(hasEmptyFields || insufficientBalance || invalidAmount);
+}, [withdrawOption, accountName, accountNumber, bankType, customBankName, withdrawAmount, balance, qrCodeImage]);
 
 const handleSubmit = async () => {
   if (!validateForm()) {
@@ -1206,15 +1206,19 @@ const submitWithdrawal = async () => {
             <View style={styles.modalContent}>
               <Text style={styles.modalText}>Current Balance: {formatCurrency(balance)}</Text>
               <Text style={styles.modalText}>Withdraw Option: {withdrawOption}</Text>
-              {withdrawOption !== 'Cash' && (
-                <>
-                  <Text style={styles.modalText}>Account Name: {accountName}</Text>
-                  <Text style={styles.modalText}>Account Number: {accountNumber}</Text>
-                  {withdrawOption === 'Bank' && (
-                    <Text style={styles.modalText}>Bank Type: {bankType === 'Others' ? customBankName : bankType}</Text>
-                  )}
-                </>
-              )}
+{withdrawOption !== 'Cash' && (
+  <>
+    <Text style={styles.modalText}>
+      Account Name: {qrCodeImage && !accountName ? '(Provided via QR code)' : accountName}
+    </Text>
+    <Text style={styles.modalText}>
+      Account Number: {qrCodeImage && !accountNumber ? '(Provided via QR code)' : accountNumber}
+    </Text>
+    {withdrawOption === 'Bank' && (
+      <Text style={styles.modalText}>Bank Type: {bankType === 'Others' ? customBankName : bankType}</Text>
+    )}
+  </>
+)}
               <Text style={styles.modalText}>Amount to be Withdrawn: {formatCurrency(withdrawAmount)}</Text>
               <Text style={styles.modalText}>Balance After Withdrawal: {formatCurrency(balance - parseFloat(withdrawAmount))}</Text>
               
@@ -1517,6 +1521,18 @@ const styles = StyleSheet.create({
     position: 'relative',
     marginBottom: 10,
   },
+  qrHintText: {
+  fontSize: 12,
+  color: '#1E3A5F',
+  fontStyle: 'italic',
+  marginBottom: 8,
+  textAlign: 'center',
+  backgroundColor: '#F0F9FF',
+  padding: 6,
+  borderRadius: 6,
+  borderWidth: 1,
+  borderColor: '#BAE6FD',
+},
   qrCodeImage: {
     width: 150,
     height: 150,
