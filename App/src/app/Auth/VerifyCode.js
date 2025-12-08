@@ -10,12 +10,15 @@ import {
   Platform,
   ScrollView,
   Image,
+  Dimensions,
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import * as LocalAuthentication from 'expo-local-authentication';
 import * as SecureStore from 'expo-secure-store';
 import { useNavigation } from '@react-navigation/native';
 import { sendVerificationCode } from '../../api';
+
+const { width, height } = Dimensions.get('window');
 
 export default function VerifyCode({ route, navigation }) {
   const { email, password, verificationCode, fromBiometric } = route.params;
@@ -112,12 +115,12 @@ export default function VerifyCode({ route, navigation }) {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? height * 0.08 : 0}
     >
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
-          <MaterialIcons name="arrow-back" size={24} color="#0F172A" />
+          <MaterialIcons name="arrow-back" size={width * 0.065} color="#0F172A" />
         </TouchableOpacity>
       </View>
 
@@ -127,7 +130,7 @@ export default function VerifyCode({ route, navigation }) {
             <Image source={require('../../../assets/logo.png')} style={styles.logo} />
           </View>
 
-          <View style={{ marginBottom: 16 }}>
+          <View style={{ marginBottom: height * 0.02 }}>
             <Text style={styles.title}>Enter Verification Code</Text>
             <Text style={styles.subLabel}>We sent a 6-digit code to your email</Text>
           </View>
@@ -180,40 +183,41 @@ export default function VerifyCode({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: {
+  container: {
     flex: 1,
     backgroundColor: '#F8FAFC',
-    paddingHorizontal: 16,
-    paddingTop: 48,
-    paddingBottom: 48,
+    paddingHorizontal: width * 0.04,
+    paddingTop: height * 0.06,
+    paddingBottom: height * 0.06,
   },
-
   headerBack: {
     alignSelf: 'flex-start',
+    padding: width * 0.02,
   },
-
   scrollContent: {
     flexGrow: 1,
-    paddingVertical: 24,
+    paddingVertical: height * 0.03,
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 22,
+    fontSize: width * 0.06,
     fontWeight: '700',
     color: '#0F172A',
     textAlign: 'left',
     alignSelf: 'stretch',
   },
   subLabel: {
-    fontSize: 13,
-    marginTop: 2,
+    fontSize: width * 0.035,
+    marginTop: height * 0.002,
     color: '#475569',
     alignSelf: 'stretch',
+    lineHeight: width * 0.045,
   },
   card: {
     backgroundColor: 'white',
     borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    padding: width * 0.04,
+    marginBottom: height * 0.03,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
@@ -228,56 +232,60 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignSelf: 'stretch',
     width: '100%',
-    maxWidth: 360,
-    marginTop: 8,
-    marginBottom: 12,
-    gap: 8,
-    paddingHorizontal: 4,
+    marginTop: height * 0.01,
+    marginBottom: height * 0.015,
+    gap: width * 0.02,
   },
   codeInput: {
     flex: 1,
-    minWidth: 40,
-    maxWidth: 56,
-    height: 56,
+    minWidth: width * 0.1,
+    maxWidth: width * 0.14,
+    height: height * 0.07,
+    minHeight: 56,
     borderWidth: 1,
     borderColor: '#E2E8F0',
     borderRadius: 10,
     backgroundColor: '#F8FAFC',
     textAlign: 'center',
-    fontSize: 18,
+    fontSize: width * 0.05,
     color: '#0F172A',
   },
   countdownText: {
     textAlign: 'center',
     color: '#475569',
-    marginBottom: 12,
+    fontSize: width * 0.035,
+    marginBottom: height * 0.015,
   },
   primaryButton: {
     backgroundColor: '#1E3A5F',
-    paddingVertical: 14,
+    paddingVertical: height * 0.018,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
+    minHeight: height * 0.06,
+    justifyContent: 'center',
   },
   resendButton: {
-    marginTop: 12,
-    paddingVertical: 12,
+    marginTop: height * 0.015,
+    paddingVertical: height * 0.015,
     borderRadius: 10,
     alignItems: 'center',
     width: '100%',
     backgroundColor: '#0F172A',
+    minHeight: height * 0.055,
+    justifyContent: 'center',
   },
   disabledButton: {
     opacity: 0.6,
   },
   primaryButtonText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: width * 0.045,
     fontWeight: '700',
   },
   resendButtonText: {
     color: 'white',
-    fontSize: 15,
+    fontSize: width * 0.04,
     fontWeight: '600',
   },
   contentWrapper: {
@@ -285,26 +293,26 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     alignItems: 'flex-start',
     paddingHorizontal: 0,
-    paddingVertical: 65,
+    paddingVertical: height * 0.05,
     width: '100%',
   },
   logoWrapper: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
+    width: width * 0.3,
+    height: width * 0.3,
+    borderRadius: width * 0.15,
     borderWidth: 4,
     borderColor: '#1E3A5F',
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'center',
-    marginBottom: 24,
+    marginBottom: height * 0.03,
     backgroundColor: '#FFFFFF',
     overflow: 'hidden',
   },
   logo: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
+    width: width * 0.25,
+    height: width * 0.25,
+    borderRadius: width * 0.125,
     resizeMode: 'contain',
   },
 });
