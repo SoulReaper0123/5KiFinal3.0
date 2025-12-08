@@ -14,7 +14,7 @@ import {
   SafeAreaView,
   Image,
   Alert,
-  Platform
+  Platform,
 } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { MaterialIcons, FontAwesome, Entypo, Ionicons } from '@expo/vector-icons';
@@ -31,6 +31,8 @@ import Bot from './HomePage/Bot';
 import Inbox from './HomePage/Inbox';
 import LoanHistory from './HomePage/LoanHistory';
 import MarqueeData from './HomePage/MarqueeData';
+
+const { width, height } = Dimensions.get('window');
 
 const Tab = createBottomTabNavigator();
 
@@ -968,11 +970,11 @@ export default function AppHome() {
 
 const styles = StyleSheet.create({
   // Layout
-  container: {
-    flex: 1,
-    backgroundColor: '#fffff',
-    marginTop: 30,
-  },
+container: {
+  flex: 1,
+  backgroundColor: '#fffff',
+  marginTop: Platform.OS === 'ios' ? height * 0.04 : 0, // Responsive value
+},
   loaderContainer: {
     flex: 1,
     justifyContent: 'center',
