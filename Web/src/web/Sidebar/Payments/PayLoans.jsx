@@ -1244,61 +1244,58 @@ const fetchActiveLoans = async (memberId) => {
   }
 };
 
-  // Calculate penalty and total amount due
-  const calculatePenaltyAndTotal = (loan) => {
-    if (!loan) {
-      setPenaltyAmount(0);
-      setTotalAmountDue(0);
-      setOverdueDays(0);
-      return;
-    }
+const calculatePenaltyAndTotal = (loan) => {
+  if (!loan) {
+    setPenaltyAmount(0);
+    setTotalAmountDue(0);
+    setOverdueDays(0);
+    return;
+  }
 
-    try {
-      const currentDueDate = loan.dueDate || loan.nextDueDate;
-      const overdueDays = computeOverdueDays(currentDueDate);
-      setOverdueDays(overdueDays);
-      
-      const loanInterest = parseFloat(loan.interest) || 0;
-      const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
-      setPenaltyAmount(penalty);
-      
-      const monthlyPayment = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
-      const total = monthlyPayment + penalty;
-      setTotalAmountDue(total);
-    } catch (error) {
-      console.error('Error calculating penalty:', error);
-      setPenaltyAmount(0);
-      setTotalAmountDue(loan?.totalMonthlyPayment || loan?.monthlyPayment || 0);
-      setOverdueDays(0);
-    }
-  };
+  try {
+    const currentDueDate = loan.dueDate || loan.nextDueDate;
+    const overdueDays = computeOverdueDays(currentDueDate);
+    setOverdueDays(overdueDays);
+    
+    const loanInterest = parseFloat(loan.interest) || 0;
+    const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
+    setPenaltyAmount(Math.round(penalty * 100) / 100);
+    
+    const monthlyPayment = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
+    const total = monthlyPayment + penalty;
+    setTotalAmountDue(Math.round(total * 100) / 100);
+  } catch (error) {
+    console.error('Error calculating penalty:', error);
+    setPenaltyAmount(0);
+    setTotalAmountDue(loan?.totalMonthlyPayment || loan?.monthlyPayment || 0);
+    setOverdueDays(0);
+  }
+};
 
-  // Calculate penalty for loan details modal
-  const calculateLoanDetails = (loan) => {
-    if (!loan) {
-      return { penalty: 0, totalDue: 0, overdueDays: 0, isOverdue: false };
-    }
+const calculateLoanDetails = (loan) => {
+  if (!loan) {
+    return { penalty: 0, totalDue: 0, overdueDays: 0, isOverdue: false };
+  }
 
-    try {
-      const currentDueDate = loan.dueDate || loan.nextDueDate;
-      const overdueDays = computeOverdueDays(currentDueDate);
-      const loanInterest = parseFloat(loan.interest) || 0;
-      const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
-      const monthlyPayment = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
-      const total = monthlyPayment + penalty;
-      
-      return { 
-        penalty, 
-        totalDue: total, 
-        overdueDays, 
-        isOverdue: overdueDays > 0 
-      };
-    } catch (error) {
-      console.error('Error calculating loan details:', error);
-      return { penalty: 0, totalDue: loan?.totalMonthlyPayment || loan?.monthlyPayment || 0, overdueDays: 0, isOverdue: false };
-    }
-  };
-
+  try {
+    const currentDueDate = loan.dueDate || loan.nextDueDate;
+    const overdueDays = computeOverdueDays(currentDueDate);
+    const loanInterest = parseFloat(loan.interest) || 0;
+    const penalty = overdueDays > 0 ? loanInterest * (overdueDays / 30) : 0;
+    const monthlyPayment = parseFloat(loan.totalMonthlyPayment || loan.monthlyPayment || 0) || 0;
+    const total = monthlyPayment + penalty;
+    
+    return { 
+      penalty: Math.round(penalty * 100) / 100, 
+      totalDue: Math.round(total * 100) / 100, 
+      overdueDays, 
+      isOverdue: overdueDays > 0 
+    };
+  } catch (error) {
+    console.error('Error calculating loan details:', error);
+    return { penalty: 0, totalDue: loan?.totalMonthlyPayment || loan?.monthlyPayment || 0, overdueDays: 0, isOverdue: false };
+  }
+};
   // Format display date for loans
   const formatDisplayDate = (dateInput) => {
     try {
@@ -1376,7 +1373,6 @@ const fetchActiveLoans = async (memberId) => {
     }));
   };
 
-  // PAYMENT APPROVAL LOGIC (SAME AS PaymentApplications)
 const processDatabaseApprove = async (paymentData) => {
   try {
     const { memberId, amount, selectedLoanId } = paymentData;
@@ -1390,15 +1386,14 @@ const processDatabaseApprove = async (paymentData) => {
       throw new Error('Member not found in our records');
     }
 
-    // 2. Load Settings (Funds, Yields, Savings, Penalty)
+    // 2. Load Settings
     const fundsRef = database.ref('Settings/Funds');
     const yieldsRef = database.ref('Settings/Yields');
     const yieldsHistoryRef = database.ref('Settings/YieldsHistory');
     const savingsRef = database.ref('Settings/Savings');
-    const penaltyValueRef = database.ref('Settings/PenaltyValue');
+    const processingFeeRef = database.ref('Settings/ProcessingFee');
 
-    // 3. Find current loan (if any)
-    const memberLoansRef = database.ref(`Loans/CurrentLoans/${memberId}`);
+    // 3. Find current loan
     let currentLoanData = null;
     let currentLoanKey = null;
     let isLoanPayment = false;
@@ -1407,7 +1402,6 @@ const processDatabaseApprove = async (paymentData) => {
     let dueDateStr = '';
     let approvedLoanData = null;
 
-    // Use the selected loan ID
     if (selectedLoanId) {
       const specificLoanSnap = await database.ref(`Loans/CurrentLoans/${memberId}/${selectedLoanId}`).once('value');
       if (specificLoanSnap.exists()) {
@@ -1417,7 +1411,7 @@ const processDatabaseApprove = async (paymentData) => {
         loanAmount = parseFloat(currentLoanData.loanAmount) || 0;
         dueDateStr = currentLoanData.dueDate || currentLoanData.nextDueDate || '';
         
-        // Fetch the original interest from ApprovedLoans
+        // Fetch original loan breakdown from ApprovedLoans
         const approvedLoanRef = database.ref(`Loans/ApprovedLoans/${memberId}/${selectedLoanId}`);
         const approvedLoanSnap = await approvedLoanRef.once('value');
         if (approvedLoanSnap.exists()) {
@@ -1427,32 +1421,26 @@ const processDatabaseApprove = async (paymentData) => {
       }
     }
 
-    // Generate NEW transaction IDs for this payment
+    // Generate new transaction ID
     const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-    const originalTransactionId = newTransactionId;
 
     // 4. Fetch current values
-    const [fundsSnap, savingsSnap, penaltySnap] = await Promise.all([
+    const [fundsSnap, savingsSnap, yieldsSnap] = await Promise.all([
       fundsRef.once('value'),
       savingsRef.once('value'),
-      penaltyValueRef.once('value')
+      yieldsRef.once('value')
     ]);
 
     const paymentAmount = parseFloat(amount) || 0;
     const currentFunds = parseFloat(fundsSnap.val()) || 0;
     const currentSavings = parseFloat(savingsSnap.val()) || 0;
+    const currentYields = parseFloat(yieldsSnap.val()) || 0;
     const memberBalance = parseFloat(memberData.balance || 0);
     const memberInvestment = parseFloat(memberData.investment || 0);
-    const penaltyPerDay = parseFloat(penaltySnap.val()) || 0;
 
     // 5. Penalty calculation
-    const parseToStartOfDay = (d) => {
-      const dt = new Date(d);
-      return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
-    };
-
-    let overdueDays = 0;
     let penaltyDue = 0;
+    let overdueDays = 0;
     
     // Use penalty from form data if provided
     const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
@@ -1460,86 +1448,109 @@ const processDatabaseApprove = async (paymentData) => {
     if (penaltyFromApp > 0) {
       penaltyDue = Math.round((penaltyFromApp + Number.EPSILON) * 100) / 100;
     } else if (isLoanPayment && dueDateStr) {
+      const parseToStartOfDay = (d) => {
+        const dt = new Date(d);
+        return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+      };
+      
       const todayStart = parseToStartOfDay(new Date());
       const dueDateParsed = parseToStartOfDay(new Date(dueDateStr));
       
       if (!isNaN(dueDateParsed.getTime()) && todayStart > dueDateParsed) {
         const ms = todayStart.getTime() - dueDateParsed.getTime();
         overdueDays = Math.ceil(ms / (1000 * 60 * 60 * 24));
+        penaltyDue = Math.max(0, Math.round(((interestAmount * (overdueDays / 30)) + Number.EPSILON) * 100) / 100);
       }
-      
-      // Overdue penalty = monthly interest * (days_lapsed / 30)
-      const interestForPenalty = parseFloat(interestAmount) || 0;
-      penaltyDue = Math.max(0, Math.round(((interestForPenalty * (overdueDays / 30)) + Number.EPSILON) * 100) / 100);
     }
 
     // Include any previously accrued penalties
     const existingAccruedPenalty = parseFloat(currentLoanData?.penaltyAccrued) || 0;
     penaltyDue = Math.round(((penaltyDue + existingAccruedPenalty) + Number.EPSILON) * 100) / 100;
-
     const penaltyPaid = Math.min(paymentAmount, penaltyDue);
 
     // Amount left for interest/principal after penalty
     const remainingAfterPenalty = paymentAmount - penaltyPaid;
 
-    // 6. NEW: Calculate ExcessMonthlyPayment (same as PaymentApplications)
-    let currentTotalMonthlyPayment = 0;
-    let scheduledMonthlyPayment = 0;
-    let excessMonthlyPayment = 0;
-
-    if (isLoanPayment && currentLoanData) {
-      currentTotalMonthlyPayment = parseFloat(currentLoanData.totalMonthlyPayment) || 0;
-      scheduledMonthlyPayment = currentTotalMonthlyPayment + penaltyDue;
-      excessMonthlyPayment = Math.max(0, paymentAmount - scheduledMonthlyPayment);
-    }
-
-    // 7. Split remaining into interest then principal
+    // 6. Calculate interest and principal payment
     let interestPaid = 0;
     let principalPaid = 0;
     let excessPayment = 0;
-    let investmentIncrease = 0;
-    let balanceIncrease = 0;
+    let fundsAllocation = 0;
+    let memberBalanceAllocation = 0;
+    let memberInvestmentAllocation = 0;
 
     if (isLoanPayment && currentLoanData) {
+      // First pay interest (goes to Yields)
       interestPaid = Math.min(remainingAfterPenalty, interestAmount);
       const afterInterest = remainingAfterPenalty - interestPaid;
-      principalPaid = Math.min(afterInterest, loanAmount);
-
-      // Remaining beyond loan principal becomes excess
-      const remainingAfterPrincipal = afterInterest - principalPaid;
-      excessPayment = Math.max(0, remainingAfterPrincipal);
-
-      // NEW: Calculate how much principal goes to member balance (same as PaymentApplications)
-      const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
-      const principalToMember = principalPaid - borrowedFromSavings;
       
-      // ALLOCATION LOGIC: Excess goes to investment, balance, and funds
-      investmentIncrease = excessPayment;
-      balanceIncrease = principalToMember + excessPayment;
-
-      // Update loan records
-      const remainingLoan = loanAmount - principalPaid;
+      // Get total principal owed
+      const totalPrincipalOwed = parseFloat(currentLoanData.loanAmount) || 0;
+      const principalAlreadyPaid = parseFloat(currentLoanData.amountPaid || 0);
+      const remainingPrincipal = totalPrincipalOwed - principalAlreadyPaid;
       
-      const prevAmountPaid = parseFloat(currentLoanData?.amountPaid) || 0;
-      const amountPaidThisApproval = (interestPaid + principalPaid); 
+      // Then pay principal (up to remaining principal)
+      principalPaid = Math.min(afterInterest, remainingPrincipal);
+      
+      // Any remaining after paying full principal is excess
+      excessPayment = Math.max(0, afterInterest - principalPaid);
+      
+      // Calculate allocations based on original sources
+      if (principalPaid > 0) {
+        // Get original breakdown
+        const originalMemberContribution = parseFloat(approvedLoanData?.memberContribution) || 0;
+        const originalFundsContribution = parseFloat(approvedLoanData?.borrowedFromFunds) || totalPrincipalOwed;
+        
+        // IMPORTANT: ALL principal stays in Funds
+        fundsAllocation = principalPaid;
+        
+        // Member gets credit for their original contribution portion
+        if (originalMemberContribution > 0 && totalPrincipalOwed > 0) {
+          const memberProportion = originalMemberContribution / originalFundsContribution;
+          memberBalanceAllocation = Math.round((principalPaid * memberProportion) * 100) / 100;
+        }
+      }
+      
+      // EXCESS PAYMENT: Full excess added to BOTH member AND Funds
+      if (excessPayment > 0) {
+        // Excess goes to member (balance + investment)
+        memberBalanceAllocation += excessPayment;
+        memberInvestmentAllocation = excessPayment;
+        
+        // Excess ALSO stays in Funds
+        fundsAllocation += excessPayment;
+      }
+      
+      // Update loan record
+      const prevAmountPaid = parseFloat(currentLoanData?.amountPaid || 0);
+      const totalInterestForLoan = parseFloat(currentLoanData?.totalInterest || (interestAmount * (currentLoanData.term || 1)));
+      const amountPaidThisApproval = interestPaid + principalPaid;
       const newAmountPaid = prevAmountPaid + amountPaidThisApproval;
+      const newRemainingBalance = Math.max(0, (totalPrincipalOwed + totalInterestForLoan) - newAmountPaid);
 
-      if (remainingLoan <= 0) {
-        // Loan fully paid - archive it
+      if (newRemainingBalance <= 0.01) {
+        // Loan fully paid
         const nowPaid = new Date();
         const datePaid = formatDate(nowPaid);
         const timePaid = formatTime(nowPaid);
         const paidTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
 
         const paidRecord = {
-          ...(approvedLoanData || currentLoanData || {}),
+          ...(currentLoanData || {}),
           transactionId: paidTransactionId,
           originalTransactionId: currentLoanKey,
           status: 'paid',
           datePaid,
           timePaid,
           timestamp: nowPaid.getTime(),
-          loanAmount: Math.ceil(loanAmount * 100) / 100
+          loanAmount: totalPrincipalOwed,
+          memberCredit: memberBalanceAllocation,
+          fundsAllocation: fundsAllocation,
+          totalPayment: paymentAmount,
+          interestPaid: interestPaid,
+          principalPaid: principalPaid,
+          excessPayment: excessPayment,
+          penaltyPaid: penaltyPaid
         };
 
         // Write to PaidLoans
@@ -1550,111 +1561,100 @@ const processDatabaseApprove = async (paymentData) => {
           paidTxnRef.set(paidRecord)
         ]);
 
-        // Remove from CurrentLoans
+        // Remove from CurrentLoans and ApprovedLoans
         const memberLoanRef = database.ref(`Members/${memberId}/loans/${currentLoanKey}`);
         await Promise.all([
-          memberLoansRef.child(currentLoanKey).remove(),
-          memberLoanRef.remove()
+          database.ref(`Loans/CurrentLoans/${memberId}/${currentLoanKey}`).remove(),
+          memberLoanRef.remove(),
+          database.ref(`Loans/ApprovedLoans/${memberId}/${currentLoanKey}`).remove()
         ]);
 
-        // Remove from ApprovedLoans
-        try { 
-          await database.ref(`Loans/ApprovedLoans/${memberId}/${currentLoanKey}`).remove(); 
-        } catch (_) {}
-
       } else {
-        // Update existing loan
-        const paymentsMade = (currentLoanData.paymentsMade || 0) + 1;
-        
+        // Update loan with remaining balance
         const loanUpdates = {};
-        loanUpdates['loanAmount'] = Math.ceil(remainingLoan * 100) / 100;
-        loanUpdates['paymentsMade'] = paymentsMade;
+        loanUpdates['loanAmount'] = Math.ceil((remainingPrincipal - principalPaid) * 100) / 100;
         loanUpdates['amountPaid'] = newAmountPaid;
+        loanUpdates['remainingBalance'] = Math.round(newRemainingBalance * 100) / 100;
+        loanUpdates['paymentsMade'] = (currentLoanData.paymentsMade || 0) + 1;
         
-        // Also update mirrored copy under Members
         const memberLoanRef = database.ref(`Members/${memberId}/loans/${currentLoanKey}`);
         await Promise.all([
-          memberLoansRef.child(currentLoanKey).update(loanUpdates),
-          memberLoanRef.update(loanUpdates)
+          database.ref(`Loans/CurrentLoans/${memberId}/${currentLoanKey}`).update(loanUpdates),
+          memberLoanRef.update(loanUpdates),
+          database.ref(`Loans/ApprovedLoans/${memberId}/${currentLoanKey}`).update({
+            amountPaid: newAmountPaid,
+            remainingBalance: Math.round(newRemainingBalance * 100) / 100,
+            paymentsMade: (currentLoanData.paymentsMade || 0) + 1
+          })
         ]);
       }
     } else {
-      // Not a loan payment - treat as savings/investment
-      balanceIncrease = paymentAmount;
-      investmentIncrease = paymentAmount;
+      // Not a loan payment: All goes to member balance
+      memberBalanceAllocation = paymentAmount;
+      memberInvestmentAllocation = paymentAmount;
+      fundsAllocation = paymentAmount; // Also stays in Funds
     }
 
-    // 8. Update member balance and investment (FIXED - now includes principal)
-    const memberBalanceToSet = Math.ceil((memberBalance + balanceIncrease) * 100) / 100;
-    const memberInvestmentToSet = Math.ceil((memberInvestment + investmentIncrease) * 100) / 100;
-
+    // 7. Update Member Balance and Investment
+    const newMemberBalance = Math.ceil((memberBalance + memberBalanceAllocation) * 100) / 100;
+    const newMemberInvestment = Math.ceil((memberInvestment + memberInvestmentAllocation) * 100) / 100;
+    
     await memberRef.update({ 
-      balance: memberBalanceToSet,
-      investment: memberInvestmentToSet 
+      balance: newMemberBalance,
+      investment: newMemberInvestment
     });
 
-    // 9. Update Savings with penalty
-    const now = new Date();
-    const dateKey = now.toISOString().split('T')[0]; // YYYY-MM-DD
+    // 8. Update Funds
+    const newFundsAmount = Math.ceil((currentFunds + fundsAllocation) * 100) / 100;
+    await fundsRef.set(newFundsAmount);
 
+    // Record funds history
+    const now = new Date();
+    const dateKey = now.toISOString().split('T')[0];
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
+    await fundsHistoryRef.set(newFundsAmount);
+
+    // 9. Update Savings with penalty
     if (penaltyPaid > 0) {
       const newSavingsAmount = Math.ceil((currentSavings + penaltyPaid) * 100) / 100;
       await savingsRef.set(newSavingsAmount);
 
       // Update daily SavingsHistory
-      const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-      const currentDaySavingsSnap = await savingsHistoryRef.child(dateKey).once('value');
-      const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
+      const savingsDayRef = database.ref(`Settings/SavingsHistory/${dateKey}`);
+      const savingsDaySnap = await savingsDayRef.once('value');
+      const currentDaySavings = parseFloat(savingsDaySnap.val()) || 0;
       const newDaySavings = Math.ceil((currentDaySavings + penaltyPaid) * 100) / 100;
-      await savingsHistoryRef.update({ [dateKey]: newDaySavings });
+      await savingsDayRef.set(newDaySavings);
     }
 
     // 10. Update Yields with interest
     if (interestPaid > 0) {
-      const currentYieldsSnap = await yieldsRef.once('value');
-      const currentYields = parseFloat(currentYieldsSnap.val()) || 0;
       const newYieldsAmount = Math.ceil((currentYields + interestPaid) * 100) / 100;
       await yieldsRef.set(newYieldsAmount);
 
       // Update daily YieldsHistory
-      const currentDayYieldsSnap = await yieldsHistoryRef.child(dateKey).once('value');
-      const currentDayYields = parseFloat(currentDayYieldsSnap.val()) || 0;
+      const yieldsDayRef = database.ref(`Settings/YieldsHistory/${dateKey}`);
+      const yieldsDaySnap = await yieldsDayRef.once('value');
+      const currentDayYields = parseFloat(yieldsDaySnap.val()) || 0;
       const newDayYields = Math.ceil((currentDayYields + interestPaid) * 100) / 100;
-      const yieldsHistoryUpdate = {};
-      yieldsHistoryUpdate[dateKey] = newDayYields;
-      await yieldsHistoryRef.update(yieldsHistoryUpdate);
+      await yieldsDayRef.set(newDayYields);
     }
 
-    // 11. Update Funds
-    const borrowedFromSavings = parseFloat(approvedLoanData?.borrowedFromSavings) || 0;
-    const principalToFunds = principalPaid - borrowedFromSavings;
-    const fundsIncrease = principalToFunds + excessPayment;
-    
-    if (fundsIncrease > 0) {
-      const newFundsAmount = Math.ceil((currentFunds + fundsIncrease) * 100) / 100;
-      await fundsRef.set(newFundsAmount);
-      
-      // Log to FundsHistory
-      const fundsHistoryRef = database.ref(`Settings/FundsHistory/${dateKey}`);
-      await fundsHistoryRef.set(newFundsAmount);
-    }
-
-    // 12. Create approved payment record (UPDATED with excessMonthlyPayment)
+    // 11. Create approved payment record
     const approvedRef = database.ref(`Payments/ApprovedPayments/${memberId}/${newTransactionId}`);
     const transactionRef = database.ref(`Transactions/Payments/${memberId}/${newTransactionId}`);
 
     const approvedData = {
-      // Basic payment info
+      // Basic info
       id: memberId,
       transactionId: newTransactionId,
-      originalTransactionId: originalTransactionId,
-      firstName: paymentData.firstName,
-      lastName: paymentData.lastName,
-      email: paymentData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName,
+      email: formData.email,
       amountToBePaid: paymentAmount,
-      paymentOption: paymentData.paymentOption,
-      accountName: paymentData.accountName,
-      accountNumber: paymentData.accountNumber,
+      paymentOption: formData.paymentOption,
+      accountName: formData.accountName,
+      accountNumber: formData.accountNumber,
       proofOfPaymentUrl: paymentData.proofOfPaymentUrl || '',
       
       // Approval info
@@ -1664,20 +1664,23 @@ const processDatabaseApprove = async (paymentData) => {
       timestamp: now.getTime(),
       status: 'approved',
       
-      // Payment breakdown (UPDATED)
-      penaltyPerDay,
-      overdueDays,
-      penaltyDue,
+      // Payment breakdown
       penaltyPaid,
-      interestScheduled: interestAmount,
       interestPaid,
       principalPaid,
       excessPayment,
-      excessMonthlyPayment, // NEW: Added this field
-      investmentIncrease,
-      balanceIncrease,
+      fundsAllocation,
+      memberBalanceAllocation,
+      memberInvestmentAllocation,
       isLoanPayment,
-      appliedToLoan: currentLoanKey
+      appliedToLoan: currentLoanKey,
+      
+      // Final balances for record
+      finalMemberBalance: newMemberBalance,
+      finalMemberInvestment: newMemberInvestment,
+      finalFundsBalance: newFundsAmount,
+      finalSavingsBalance: Math.ceil((currentSavings + penaltyPaid) * 100) / 100,
+      finalYieldsBalance: Math.ceil((currentYields + interestPaid) * 100) / 100
     };
 
     await approvedRef.set(approvedData);
@@ -1798,6 +1801,25 @@ const handleSuccessOk = async () => {
   setIsProcessing(false);
 };
 
+const validatePaymentAmount = () => {
+  if (!currentLoan) return true; // No loan selected
+  
+  const monthlyDue = parseFloat(currentLoan.totalMonthlyPayment || currentLoan.monthlyPayment || 0) || 0;
+  const paymentAmount = parseFloat(formData.amount) || 0;
+  const penalty = penaltyAmount || 0;
+  const totalDue = monthlyDue + penalty;
+  
+  // Check if payment is sufficient (at least the interest portion)
+  const interestPortion = parseFloat(currentLoan.interest) || 0;
+  
+  if (paymentAmount < interestPortion) {
+    setErrorMessage(`Minimum payment must be at least ${formatCurrency(interestPortion)} to cover interest`);
+    setErrorModalVisible(true);
+    return false;
+  }
+  
+  return true;
+};
 // 1. Handle Approve Click - Show Confirmation
 const handleApproveClick = () => {
   if (!validateFields()) return;
@@ -1806,11 +1828,17 @@ const handleApproveClick = () => {
 
 const confirmApprove = async () => {
   setShowApproveConfirmation(false);
-  setIsProcessing(true); // Use only one loading state
+  setIsProcessing(true);
   setCurrentAction('approve');
 
   try {
-    // Prepare payment data (but don't save to database yet)
+    // Validate payment amount
+    if (!validatePaymentAmount()) {
+      setIsProcessing(false);
+      return;
+    }
+
+    // Prepare payment data
     const paymentData = {
       memberId: formData.memberId,
       email: formData.email,
@@ -1824,7 +1852,8 @@ const confirmApprove = async () => {
       ...(penaltyAmount > 0 && { 
         penalty: penaltyAmount,
         overdueDays: overdueDays 
-      })
+      }),
+      proofOfPaymentUrl: proofOfPaymentFile ? 'direct_upload' : '' // Handle file upload if needed
     };
 
     // Store the data for later processing
@@ -1833,7 +1862,6 @@ const confirmApprove = async () => {
       data: paymentData
     });
 
-    // Show success message
     setSuccessMessage('Payment added and approved successfully!');
     setSuccessMessageModalVisible(true);
 
@@ -1841,8 +1869,7 @@ const confirmApprove = async () => {
     console.error('Error preparing approval:', error);
     setErrorMessage(error.message || 'An error occurred. Please try again.');
     setErrorModalVisible(true);
-  } finally {
-    setIsProcessing(false); // Use only one loading state
+    setIsProcessing(false);
   }
 };
 
