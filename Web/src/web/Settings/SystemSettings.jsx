@@ -104,6 +104,21 @@ const SystemSettings = () => {
   const [tempAboutContent, setTempAboutContent] = useState({ title: '', content: '' });
   const [tempContactContent, setTempContactContent] = useState({ title: '', content: '' });
 
+// Add these near your other state variables
+const [fundsDepositModalVisible, setFundsDepositModalVisible] = useState(false);
+const [fundsDepositAmount, setFundsDepositAmount] = useState('');
+const [proofOfFundsDepositFile, setProofOfFundsDepositFile] = useState(null);
+
+const [fundsWithdrawModalVisible, setFundsWithdrawModalVisible] = useState(false);
+const [fundsWithdrawAmount, setFundsWithdrawAmount] = useState('');
+const [proofOfFundsWithdrawFile, setProofOfFundsWithdrawFile] = useState(null);
+
+const [fundsToSavingsModalVisible, setFundsToSavingsModalVisible] = useState(false);
+const [fundsToSavingsAmount, setFundsToSavingsAmount] = useState('');
+
+const [savingsToFundsModalVisible, setSavingsToFundsModalVisible] = useState(false);
+const [savingsToFundsAmount, setSavingsToFundsAmount] = useState('');
+
   // Validation states
   const [dividendValidation, setDividendValidation] = useState({
     distributionValid: true,
@@ -719,66 +734,6 @@ const confirmDeleteTermFromWizard = () => {
     setShowCalendar(false);
   };
 
-  const handleFundsAction = (action) => {
-    setFundsActionModal(action);
-    setActionAmount('');
-  };
-
-  const confirmFundsAction = () => {
-    const amount = parseFloat(actionAmount);
-    if (isNaN(amount) || amount <= 0) {
-      showMessage('Error', 'Please enter a valid positive amount', true);
-      return;
-    }
-
-    if (fundsActionModal === 'add' && amount > parseFloat(settings.Savings)) {
-      showMessage('Error', 'Not enough savings to transfer', true);
-      return;
-    }
-
-    if (fundsActionModal === 'withdraw' && amount > parseFloat(settings.Funds)) {
-      showMessage('Error', 'Not enough funds to withdraw', true);
-      return;
-    }
-
-    let newFunds = parseFloat(settings.Funds);
-    let newSavings = parseFloat(settings.Savings);
-
-    switch (fundsActionModal) {
-      case 'add':
-        newFunds += amount;
-        newSavings -= amount;
-        break;
-      case 'withdraw':
-        newFunds -= amount;
-        newSavings += amount;
-        break;
-      default:
-        break;
-    }
-
-    setSettings({
-      ...settings,
-      Funds: newFunds.toFixed(2),
-      Savings: newSavings.toFixed(2)
-    });
-
-    setFundsActionModal(null);
-    setActionAmount('');
-    showSuccessMessage(`Funds ${fundsActionModal === 'add' ? 'added' : 'withdrawn'} successfully!`);
-  };
-
-  const handleFundsActionWithConfirmation = () => {
-    const actionText = fundsActionModal === 'add' ? 'transfer from savings to funds' : 'withdraw from funds to savings';
-    showConfirmModal(
-      `Are you sure you want to ${actionText}?`,
-      confirmFundsAction,
-      () => {
-        setFundsActionModal(null);
-      }
-    );
-  };
-
   const handleAddSavings = () => {
     setSavingsDepositModalVisible(true);
     setSavingsDepositAmount('');
@@ -798,10 +753,6 @@ const confirmDeleteTermFromWizard = () => {
     }
   };
 
-  // New function to handle savings deposit with proof
-// In your SystemSettings component, update the handleSavingsDeposit and handleSavingsWithdraw functions:
-
-// Updated handleSavingsDeposit function in SystemSettings:
 const handleSavingsDeposit = async () => {
   if (!savingsDepositAmount || parseFloat(savingsDepositAmount) <= 0) {
     showMessage('Error', 'Please enter a valid amount greater than 0', true);
@@ -891,7 +842,6 @@ const handleSavingsDeposit = async () => {
   }
 };
 
-// Updated handleSavingsWithdraw function in SystemSettings:
 const handleSavingsWithdraw = async () => {
   if (!savingsWithdrawAmount || parseFloat(savingsWithdrawAmount) <= 0) {
     showMessage('Error', 'Please enter a valid amount greater than 0', true);
@@ -923,23 +873,25 @@ const handleSavingsWithdraw = async () => {
     const withdrawDate = formatDate(now);
     const withdrawTime = formatTime(now);
 
-    // Get admin info
+    // Get admin info - FIXED: Added missing variables
     const adminId = localStorage.getItem('adminId');
     const adminRole = localStorage.getItem('userRole') || 'admin';
     const adminName = adminData?.firstName || 'Admin';
+    const adminNameLast = adminData?.lastName || 'Admin'; // ADDED THIS LINE
+    const adminEmail = adminData?.email || 'admin@system.com'; // ADDED THIS LINE
 
-    // Create withdrawal record - USING CORRECT VARIABLE NAMES
+    // Create withdrawal record - FIXED VARIABLE NAMES
     const withdrawData = {
       transactionId,
-      amountWithdrawn: amount, // This matches ApprovedWithdraws
-      proofOfWithdrawalUrl: proofOfWithdrawalUrl, // This matches ApprovedWithdraws
+      amountWithdrawn: amount,
+      proofOfWithdrawalUrl: proofOfWithdrawalUrl,
       dateApplied: withdrawDate,
       timeApplied: withdrawTime,
       dateApproved: withdrawDate,
       timeApproved: withdrawTime,
       timestamp: now.getTime(),
       status: 'approved',
-      withdrawOption: 'Bank', // This matches ApprovedWithdraws
+      withdrawOption: 'Bank',
       accountName: settings.Accounts.Bank.accountName || 'Admin Account',
       accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
       processedBy: adminName,
@@ -948,12 +900,11 @@ const handleSavingsWithdraw = async () => {
       type: 'savings_withdrawal',
       note: 'Savings withdrawal processed by admin',
       // Add fields that ApprovedWithdraws expects
-      id: adminId, // Use 'admin' as ID for system withdrawals
+      id: adminId,
       firstName: adminName,
       lastName: adminNameLast,
       email: adminEmail,
       bankName: settings.Accounts.Bank.accountName || 'Admin Bank',
-      // Add any other fields your ApprovedWithdraws component expects
     };
 
     // Save to approved withdrawals
@@ -984,6 +935,240 @@ const handleSavingsWithdraw = async () => {
   } finally {
     setActionInProgress(false);
   }
+};
+
+const handleFundsDeposit = async () => {
+  if (!fundsDepositAmount || parseFloat(fundsDepositAmount) <= 0) {
+    showMessage('Error', 'Please enter a valid amount greater than 0', true);
+    return;
+  }
+
+  if (!proofOfFundsDepositFile) {
+    showMessage('Error', 'Please upload proof of deposit', true);
+    return;
+  }
+
+  try {
+    setActionInProgress(true);
+
+    // Upload proof of deposit to Firebase Storage
+    const proofOfDepositUrl = await uploadFileToStorage(proofOfFundsDepositFile, 'funds_deposits');
+
+    // Generate transaction ID
+    const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    const now = new Date();
+    const depositDate = formatDate(now);
+    const depositTime = formatTime(now);
+    const amount = parseFloat(fundsDepositAmount);
+
+    // Get admin info
+    const adminRole = localStorage.getItem('userRole') || 'admin';
+    const adminName = adminData?.firstName || 'Admin';
+    const adminNameLast = adminData?.lastName || 'Admin'; // Fixed: Added this line
+    const adminEmail = adminData?.email || 'admin@system.com'; // Fixed: Added this line
+    const adminId = adminData?.id || 'Admin';
+
+    // Create deposit record
+    const depositData = {
+      transactionId,
+      amountToBeDeposited: amount,
+      proofOfDepositUrl: proofOfDepositUrl,
+      dateApplied: depositDate,
+      timeApplied: depositTime,
+      dateApproved: depositDate,
+      timeApproved: depositTime,
+      timestamp: now.getTime(),
+      status: 'approved',
+      depositOption: 'Bank',
+      accountName: settings.Accounts.Bank.accountName || 'Admin Account',
+      accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
+      processedBy: adminName,
+      processedByRole: adminRole,
+      processedById: adminId,
+      type: 'funds_deposit',
+      note: 'Funds deposit added by admin',
+      // Add fields that ApprovedDeposits expects
+      id: adminId, 
+      firstName: adminName,
+      lastName: adminNameLast,
+      email: adminEmail
+    };
+
+    // Save to approved deposits
+    const approvedRef = ref(db, `Deposits/ApprovedDeposits/admin/funds_${transactionId}`);
+    await set(approvedRef, depositData);
+
+    // Update funds amount
+    const currentFunds = parseFloat(settings.Funds || 0);
+    const newFundsTotal = currentFunds + amount;
+    
+    await update(ref(db, 'Settings'), {
+      Funds: parseFloat(newFundsTotal.toFixed(2))
+    });
+
+    // Update local state
+    setSettings(prev => ({ 
+      ...prev, 
+      Funds: newFundsTotal.toString() 
+    }));
+
+    setFundsDepositModalVisible(false);
+    setFundsDepositAmount('');
+    setProofOfFundsDepositFile(null);
+    
+    showSuccessMessage(`₱${formatPesoAmount(amount)} added to funds successfully!`);
+  } catch (error) {
+    console.error('Error adding funds deposit:', error);
+    showMessage('Error', 'Failed to add funds deposit: ' + error.message, true);
+  } finally {
+    setActionInProgress(false);
+  }
+};
+
+const handleFundsWithdraw = async () => {
+  if (!fundsWithdrawAmount || parseFloat(fundsWithdrawAmount) <= 0) {
+    showMessage('Error', 'Please enter a valid amount greater than 0', true);
+    return;
+  }
+
+  if (!proofOfFundsWithdrawFile) {
+    showMessage('Error', 'Please upload proof of withdrawal', true);
+    return;
+  }
+
+  const amount = parseFloat(fundsWithdrawAmount);
+  const currentFunds = parseFloat(settings.Funds || 0);
+
+  if (amount > currentFunds) {
+    showMessage('Error', 'Insufficient funds balance', true);
+    return;
+  }
+
+  try {
+    setActionInProgress(true);
+
+    // Upload proof of withdrawal to Firebase Storage
+    const proofOfWithdrawalUrl = await uploadFileToStorage(proofOfFundsWithdrawFile, 'funds_withdrawals');
+
+    // Generate transaction ID
+    const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    const now = new Date();
+    const withdrawDate = formatDate(now);
+    const withdrawTime = formatTime(now);
+
+    // Get admin info
+    const adminId = localStorage.getItem('adminId');
+    const adminRole = localStorage.getItem('userRole') || 'admin';
+    const adminName = adminData?.firstName || 'Admin';
+    const adminNameLast = adminData?.lastName || 'Admin'; // Fixed: Added this line
+    const adminEmail = adminData?.email || 'admin@system.com'; // Fixed: Added this line
+
+    // Create withdrawal record
+    const withdrawData = {
+      transactionId,
+      amountWithdrawn: amount,
+      proofOfWithdrawalUrl: proofOfWithdrawalUrl,
+      dateApplied: withdrawDate,
+      timeApplied: withdrawTime,
+      dateApproved: withdrawDate,
+      timeApproved: withdrawTime,
+      timestamp: now.getTime(),
+      status: 'approved',
+      withdrawOption: 'Bank',
+      accountName: settings.Accounts.Bank.accountName || 'Admin Account',
+      accountNumber: settings.Accounts.Bank.accountNumber || 'N/A',
+      processedBy: adminName,
+      processedByRole: adminRole,
+      processedById: adminId,
+      type: 'funds_withdrawal',
+      note: 'Funds withdrawal processed by admin',
+      // Add fields that ApprovedWithdraws expects
+      id: adminId,
+      firstName: adminName,
+      lastName: adminNameLast,
+      email: adminEmail,
+      bankName: settings.Accounts.Bank.accountName || 'Admin Bank',
+    };
+
+    // Save to approved withdrawals
+    const approvedRef = ref(db, `Withdrawals/ApprovedWithdrawals/admin/funds_${transactionId}`);
+    await set(approvedRef, withdrawData);
+
+    // Update funds amount
+    const newFundsTotal = currentFunds - amount;
+    
+    await update(ref(db, 'Settings'), {
+      Funds: parseFloat(newFundsTotal.toFixed(2))
+    });
+
+    // Update local state
+    setSettings(prev => ({ 
+      ...prev, 
+      Funds: newFundsTotal.toString() 
+    }));
+
+    setFundsWithdrawModalVisible(false);
+    setFundsWithdrawAmount('');
+    setProofOfFundsWithdrawFile(null);
+    
+    showSuccessMessage(`₱${formatPesoAmount(amount)} withdrawn from funds successfully!`);
+  } catch (error) {
+    console.error('Error processing funds withdrawal:', error);
+    showMessage('Error', 'Failed to process funds withdrawal: ' + error.message, true);
+  } finally {
+    setActionInProgress(false);
+  }
+};
+
+
+const handleFundsDepositWithConfirmation = () => {
+  if (!fundsDepositAmount || parseFloat(fundsDepositAmount) <= 0) {
+    showMessage('Error', 'Please enter a valid amount greater than 0', true);
+    return;
+  }
+
+  if (!proofOfFundsDepositFile) {
+    showMessage('Error', 'Please upload proof of deposit', true);
+    return;
+  }
+
+  showConfirmModal(
+    `Are you sure you want to add ₱${formatPesoAmount(fundsDepositAmount)} to funds?`,
+    handleFundsDeposit,
+    () => {
+      // Cancel callback
+      console.log('Funds deposit cancelled');
+    }
+  );
+};
+
+const handleFundsWithdrawWithConfirmation = () => {
+  if (!fundsWithdrawAmount || parseFloat(fundsWithdrawAmount) <= 0) {
+    showMessage('Error', 'Please enter a valid amount greater than 0', true);
+    return;
+  }
+
+  if (!proofOfFundsWithdrawFile) {
+    showMessage('Error', 'Please upload proof of withdrawal', true);
+    return;
+  }
+
+  const amount = parseFloat(fundsWithdrawAmount);
+  const currentFunds = parseFloat(settings.Funds || 0);
+
+  if (amount > currentFunds) {
+    showMessage('Error', 'Insufficient funds balance', true);
+    return;
+  }
+
+  showConfirmModal(
+    `Are you sure you want to withdraw ₱${formatPesoAmount(amount)} from funds?`,
+    handleFundsWithdraw,
+    () => {
+      // Cancel callback
+      console.log('Funds withdrawal cancelled');
+    }
+  );
 };
 
   const handleAddSavingsWithConfirmation = () => {
@@ -1033,6 +1218,11 @@ const handleSavingsWithdraw = async () => {
       }
     );
   };
+
+  
+
+  
+
 
   if (loading) return (
     <div style={styles.loadingContainer}>
@@ -1099,138 +1289,184 @@ const handleSavingsWithdraw = async () => {
         {/* Enhanced General Settings Section */}
         {activeSection === 'general' && (
           <div style={styles.section}>
-            {/* Financial Settings Card */}
-            <div style={styles.card}>
-              <div style={styles.cardHeader}>
-                <div style={styles.cardTitle}>
-                  <FaMoneyBillWave style={styles.cardIcon} />
-                  <h3 style={styles.cardTitleText}>Financial Configuration</h3>
-                </div>
-                {!editGeneralSettings ? (
-                  <button style={styles.headerIconBtn} title="Edit Financial Settings" onClick={() => setEditGeneralSettings(true)}>
-                    <FaEdit />
-                  </button>
-                ) : (
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
-                      title="Save Financial Settings"
-                      onClick={async () => {
-                        try {
-                          setActionInProgress(true);
-                          
-                          const updateData = {
-                            RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 0).toFixed(2))
-                          };
-                          
-                          await update(ref(db, 'Settings'), updateData);
-                          
-                          setSavedSettingsSnapshot(prev => ({ 
-                            ...(prev || {}), 
-                            RegistrationMinimumFee: settings.RegistrationMinimumFee
-                          }));
-                          
-                          setEditGeneralSettings(false);
-                          showSuccessMessage('Financial settings updated successfully!');
-                        } catch (e) {
-                          showMessage('Error', e.message || 'Failed to save financial settings', true);
-                        } finally {
-                          setActionInProgress(false);
-                        }
-                      }}
-                    >
-                      <FaSave />
-                    </button>
-                    <button
-                      style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
-                      title="Cancel"
-                      onClick={() => {
-                        setSettings(prev => ({
-                          ...prev,
-                          RegistrationMinimumFee: savedSettingsSnapshot?.RegistrationMinimumFee ?? prev.RegistrationMinimumFee,
-                        }));
-                        setEditGeneralSettings(false);
-                      }}
-                    >
-                      <FaTimes />
-                    </button>
-                  </div>
-                )}
-              </div>
 
-              <div style={styles.cardContent}>
-                {/* Minimum Registration Fee */}
-                <div style={styles.inputRow}>
-                  <label style={styles.label}>
-                    <span style={styles.labelText}>Minimum Registration Fee</span>
-                    <span style={styles.labelDescription}>Initial deposit required for new members</span>
-                  </label>
-                  {!editGeneralSettings ? (
-                    <div style={styles.amountDisplay}>
-                      <span style={styles.amountSymbol}>₱</span>
-                      <span style={styles.amountValue}>{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
-                    </div>
-                  ) : (
-                    <div style={styles.amountInputContainer}>
-                      <span style={styles.amountSymbol}>₱</span>
-                      <input
-                        style={styles.amountInput}
-                        value={settings.RegistrationMinimumFee}
-                        onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
-                        type="text"
-                        placeholder="0.00"
-                      />
-                    </div>
-                  )}
-                </div>
-                
-                {/* Available Funds */}
-                <div style={styles.inputRow}>
-                  <label style={styles.label}>
-                    <span style={styles.labelText}>Available Funds</span>
-                    <span style={styles.labelDescription}>Total funds available for lending</span>
-                  </label>
-                  <div style={styles.amountDisplay}>
-                    <span style={styles.amountSymbol}>₱</span>
-                    <span style={styles.amountValue}>{formatPesoAmount(settings.Funds)}</span>
-                  </div>
-                </div>
+{/* Financial Settings Card */}
+<div style={styles.card}>
+  <div style={styles.cardHeader}>
+    <div style={styles.cardTitle}>
+      <FaMoneyBillWave style={styles.cardIcon} />
+      <h3 style={styles.cardTitleText}>Financial Configuration</h3>
+    </div>
+    {!editGeneralSettings ? (
+      <button style={styles.headerIconBtn} title="Edit Financial Settings" onClick={() => setEditGeneralSettings(true)}>
+        <FaEdit />
+      </button>
+    ) : (
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          style={{ ...styles.headerIconBtn, backgroundColor: '#10b981', color: '#fff' }}
+          title="Save Financial Settings"
+          onClick={async () => {
+            try {
+              setActionInProgress(true);
+              
+              const updateData = {
+                RegistrationMinimumFee: parseFloat(parseFloat(settings.RegistrationMinimumFee || 0).toFixed(2))
+              };
+              
+              await update(ref(db, 'Settings'), updateData);
+              
+              setSavedSettingsSnapshot(prev => ({ 
+                ...(prev || {}), 
+                RegistrationMinimumFee: settings.RegistrationMinimumFee
+              }));
+              
+              setEditGeneralSettings(false);
+              showSuccessMessage('Financial settings updated successfully!');
+            } catch (e) {
+              showMessage('Error', e.message || 'Failed to save financial settings', true);
+            } finally {
+              setActionInProgress(false);
+            }
+          }}
+        >
+          <FaSave />
+        </button>
+        <button
+          style={{ ...styles.headerIconBtn, backgroundColor: '#ef4444', color: '#fff' }}
+          title="Cancel"
+          onClick={() => {
+            setSettings(prev => ({
+              ...prev,
+              RegistrationMinimumFee: savedSettingsSnapshot?.RegistrationMinimumFee ?? prev.RegistrationMinimumFee,
+            }));
+            setEditGeneralSettings(false);
+          }}
+        >
+          <FaTimes />
+        </button>
+      </div>
+    )}
+  </div>
 
-                {/* Savings */}
-                <div style={styles.inputRow}>
-                  <label style={styles.label}>
-                    <span style={styles.labelText}>Current Savings</span>
-                    <span style={styles.labelDescription}>Total savings pool</span>
-                  </label>
-                  <div style={styles.amountDisplay}>
-                    <span style={styles.amountSymbol}>₱</span>
-                    <span style={styles.amountValue}>{formatPesoAmount(settings.Savings)}</span>
-                  </div>
-                </div>
+  <div style={styles.cardContent}>
+    {/* Minimum Registration Fee */}
+    <div style={styles.inputRow}>
+      <label style={styles.label}>
+        <span style={styles.labelText}>Minimum Registration Fee</span>
+        <span style={styles.labelDescription}>Initial deposit required for new members</span>
+      </label>
+      {!editGeneralSettings ? (
+        <div style={styles.amountDisplay}>
+          <span style={styles.amountSymbol}>₱</span>
+          <span style={styles.amountValue}>{formatPesoAmount(settings.RegistrationMinimumFee)}</span>
+        </div>
+      ) : (
+        <div style={styles.amountInputContainer}>
+          <span style={styles.amountSymbol}>₱</span>
+          <input
+            style={styles.amountInput}
+            value={settings.RegistrationMinimumFee}
+            onChange={(e) => handleInputChange('RegistrationMinimumFee', e.target.value)}
+            type="text"
+            placeholder="0.00"
+          />
+        </div>
+      )}
+    </div>
+    
+    {/* Available Funds */}
+    <div style={styles.inputRow}>
+      <label style={styles.label}>
+        <span style={styles.labelText}>Available Funds</span>
+        <span style={styles.labelDescription}>Total funds available for lending</span>
+      </label>
+      <div style={styles.amountDisplay}>
+        <span style={styles.amountSymbol}>₱</span>
+        <span style={styles.amountValue}>{formatPesoAmount(settings.Funds)}</span>
+      </div>
+    </div>
 
-                {/* Add to Savings and Withdraw from Savings Buttons */}
-                {editGeneralSettings && (
-                  <div style={styles.actionButtonContainer}>
-                    <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
-                      <button
-                        style={styles.primaryButton}
-                        onClick={handleAddSavings}
-                      >
-                        <FaPlus />
-                        Add to Savings with Proof
-                      </button>
-                      <button
-                        style={{ ...styles.primaryButton, backgroundColor: '#ef4444' }}
-                        onClick={handleWithdrawSavings}
-                      >
-                        <FaExchangeAlt />
-                        Withdraw from Savings
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+    {/* Savings */}
+    <div style={styles.inputRow}>
+      <label style={styles.label}>
+        <span style={styles.labelText}>Current Savings</span>
+        <span style={styles.labelDescription}>Total savings pool</span>
+      </label>
+      <div style={styles.amountDisplay}>
+        <span style={styles.amountSymbol}>₱</span>
+        <span style={styles.amountValue}>{formatPesoAmount(settings.Savings)}</span>
+      </div>
+    </div>
+
+{/* Action Buttons Section - Only 4 Operations */}
+{editGeneralSettings && (
+  <div style={styles.actionButtonContainer}>
+    {/* Funds Operations */}
+    <div style={{ marginBottom: 20 }}>
+      <h4 style={{ fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
+        Funds Operations
+      </h4>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button
+          style={styles.primaryButton}
+          onClick={() => {
+            setFundsDepositModalVisible(true);
+            setFundsDepositAmount('');
+            setProofOfFundsDepositFile(null);
+          }}
+        >
+          <FaPlus />
+          Add to Funds
+        </button>
+        <button
+          style={{ ...styles.primaryButton, backgroundColor: '#ef4444' }}
+          onClick={() => {
+            setFundsWithdrawModalVisible(true);
+            setFundsWithdrawAmount('');
+            setProofOfFundsWithdrawFile(null);
+          }}
+        >
+          <FaExchangeAlt />
+          Withdraw from Funds
+        </button>
+      </div>
+    </div>
+    
+    {/* Savings Operations */}
+    <div>
+      <h4 style={{ fontSize: 16, fontWeight: 600, color: '#374151', marginBottom: 12 }}>
+        Savings Operations
+      </h4>
+      <div style={{ display: 'flex', gap: '12px', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <button
+          style={styles.primaryButton}
+          onClick={() => {
+            setSavingsDepositModalVisible(true);
+            setSavingsDepositAmount('');
+            setProofOfDepositFile(null);
+          }}
+        >
+          <FaPlus />
+          Add to Savings
+        </button>
+        <button
+          style={{ ...styles.primaryButton, backgroundColor: '#ef4444' }}
+          onClick={() => {
+            setSavingsWithdrawModalVisible(true);
+            setSavingsWithdrawAmount('');
+            setProofOfWithdrawFile(null);
+          }}
+        >
+          <FaExchangeAlt />
+          Withdraw from Savings
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+  </div>
+</div>
 
             {/* Accounts Section */}
             <div style={styles.card}>
@@ -2208,6 +2444,214 @@ const handleSavingsWithdraw = async () => {
         </div>
       )}
 
+{/* Funds Deposit Modal */}
+{fundsDepositModalVisible && (
+  <div style={styles.centeredModal}>
+    <div style={{...styles.enhancedModal, maxWidth: '500px'}}>
+      <h3 style={styles.enhancedModalTitle}>Add to Funds</h3>
+      
+      {/* Amount Input */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+          Deposit Amount
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16, fontWeight: 'bold', color: '#059669' }}>₱</span>
+          <input
+            style={styles.enhancedModalInput}
+            value={fundsDepositAmount}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setFundsDepositAmount(value);
+              }
+            }}
+            type="text"
+            placeholder="0.00"
+            autoFocus
+          />
+        </div>
+        {fundsDepositAmount && parseFloat(fundsDepositAmount) > 0 && (
+          <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px' }}>
+            Current: ₱{formatPesoAmount(settings.Funds)} → New total: ₱{formatPesoAmount((parseFloat(settings.Funds || 0) + parseFloat(fundsDepositAmount)).toFixed(2))}
+          </div>
+        )}
+      </div>
+
+      {/* Proof of Deposit Upload */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+          Proof of Deposit
+        </label>
+        <div 
+          style={{
+            ...styles.fileUploadSection,
+            border: proofOfFundsDepositFile ? '2px solid #10b981' : '2px dashed #d1d5db',
+            backgroundColor: proofOfFundsDepositFile ? '#f0fdf4' : '#fafafa'
+          }}
+          onClick={() => document.getElementById('proofOfFundsDeposit').click()}
+        >
+          <input
+            id="proofOfFundsDeposit"
+            style={styles.fileInput}
+            type="file"
+            onChange={(e) => handleFileChange(e, setProofOfFundsDepositFile)}
+            accept="image/*,.pdf"
+          />
+          {proofOfFundsDepositFile ? (
+            <>
+              <FaCheckCircle style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
+              <p style={styles.fileUploadText}>File selected: {proofOfFundsDepositFile.name}</p>
+              <p style={styles.fileName}>Click to change file</p>
+            </>
+          ) : (
+            <>
+              <FaPlus style={{ fontSize: 24, color: '#6b7280', marginBottom: 8 }} />
+              <p style={styles.fileUploadText}>Click to upload proof of deposit</p>
+              <p style={styles.fileName}>Supported formats: JPG, PNG, PDF</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Admin Info */}
+      <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#f0f7ff', borderRadius: '8px', border: '1px solid #dbeafe' }}>
+        <p style={{ fontSize: 14, color: '#1e40af', margin: 0, fontWeight: '500' }}>
+          Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
+        </p>
+      </div>
+
+      <div style={styles.enhancedModalButtons}>
+        <button
+          style={{
+            ...styles.enhancedModalBtnPrimary,
+            backgroundColor: (!fundsDepositAmount || parseFloat(fundsDepositAmount) <= 0 || !proofOfFundsDepositFile) ? '#9ca3af' : '#10b981',
+            cursor: (!fundsDepositAmount || parseFloat(fundsDepositAmount) <= 0 || !proofOfFundsDepositFile) ? 'not-allowed' : 'pointer'
+          }}
+          onClick={handleFundsDepositWithConfirmation}
+          disabled={!fundsDepositAmount || parseFloat(fundsDepositAmount) <= 0 || !proofOfFundsDepositFile || actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Add to Funds'}
+        </button>
+        <button
+          style={styles.enhancedModalBtnSecondary}
+          onClick={() => {
+            setFundsDepositAmount('');
+            setProofOfFundsDepositFile(null);
+            setFundsDepositModalVisible(false);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
+{/* Funds Withdrawal Modal */}
+{fundsWithdrawModalVisible && (
+  <div style={styles.centeredModal}>
+    <div style={{...styles.enhancedModal, maxWidth: '500px'}}>
+      <h3 style={styles.enhancedModalTitle}>Withdraw from Funds</h3>
+      
+      {/* Amount Input */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+          Withdrawal Amount
+        </label>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 16, fontWeight: 'bold', color: '#ef4444' }}>₱</span>
+          <input
+            style={styles.enhancedModalInput}
+            value={fundsWithdrawAmount}
+            onChange={(e) => {
+              const value = e.target.value;
+              if (value === '' || /^\d*\.?\d*$/.test(value)) {
+                setFundsWithdrawAmount(value);
+              }
+            }}
+            type="text"
+            placeholder="0.00"
+            autoFocus
+          />
+        </div>
+        {fundsWithdrawAmount && parseFloat(fundsWithdrawAmount) > 0 && (
+          <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center', padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px' }}>
+            Current: ₱{formatPesoAmount(settings.Funds)} → New total: ₱{formatPesoAmount((parseFloat(settings.Funds || 0) - parseFloat(fundsWithdrawAmount)).toFixed(2))}
+          </div>
+        )}
+      </div>
+
+      {/* Proof of Withdrawal Upload */}
+      <div style={{ marginBottom: 20 }}>
+        <label style={{ fontWeight: 600, display: 'block', marginBottom: 8, color: '#374151' }}>
+          Proof of Withdrawal
+        </label>
+        <div 
+          style={{
+            ...styles.fileUploadSection,
+            border: proofOfFundsWithdrawFile ? '2px solid #10b981' : '2px dashed #d1d5db',
+            backgroundColor: proofOfFundsWithdrawFile ? '#f0fdf4' : '#fafafa'
+          }}
+          onClick={() => document.getElementById('proofOfFundsWithdraw').click()}
+        >
+          <input
+            id="proofOfFundsWithdraw"
+            style={styles.fileInput}
+            type="file"
+            onChange={(e) => handleFileChange(e, setProofOfFundsWithdrawFile)}
+            accept="image/*,.pdf"
+          />
+          {proofOfFundsWithdrawFile ? (
+            <>
+              <FaCheckCircle style={{ fontSize: 24, color: '#10b981', marginBottom: 8 }} />
+              <p style={styles.fileUploadText}>File selected: {proofOfFundsWithdrawFile.name}</p>
+              <p style={styles.fileName}>Click to change file</p>
+            </>
+          ) : (
+            <>
+              <FaPlus style={{ fontSize: 24, color: '#6b7280', marginBottom: 8 }} />
+              <p style={styles.fileUploadText}>Click to upload proof of withdrawal</p>
+              <p style={styles.fileName}>Supported formats: JPG, PNG, PDF</p>
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Admin Info */}
+      <div style={{ marginBottom: 20, padding: '12px', backgroundColor: '#fef2f2', borderRadius: '8px'}}>
+        <p style={{ fontSize: 14, color: '#dc2626', margin: 0, fontWeight: '500' }}>
+          Processed by: {adminData?.firstName || 'Admin'} ({localStorage.getItem('userRole') || 'admin'})
+        </p>
+      </div>
+
+      <div style={styles.enhancedModalButtons}>
+        <button
+          style={{
+            ...styles.enhancedModalBtnPrimary,
+            backgroundColor: (!fundsWithdrawAmount || parseFloat(fundsWithdrawAmount) <= 0 || !proofOfFundsWithdrawFile) ? '#9ca3af' : '#ef4444',
+            cursor: (!fundsWithdrawAmount || parseFloat(fundsWithdrawAmount) <= 0 || !proofOfFundsWithdrawFile) ? 'not-allowed' : 'pointer'
+          }}
+          onClick={handleFundsWithdrawWithConfirmation}
+          disabled={!fundsWithdrawAmount || parseFloat(fundsWithdrawAmount) <= 0 || !proofOfFundsWithdrawFile || actionInProgress}
+        >
+          {actionInProgress ? 'Processing...' : 'Withdraw from Funds'}
+        </button>
+        <button
+          style={styles.enhancedModalBtnSecondary}
+          onClick={() => {
+            setFundsWithdrawAmount('');
+            setProofOfFundsWithdrawFile(null);
+            setFundsWithdrawModalVisible(false);
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  </div>
+)}
+
       {/* Savings Withdrawal Modal */}
       {savingsWithdrawModalVisible && (
         <div style={styles.centeredModal}>
@@ -2358,65 +2802,6 @@ const handleSavingsWithdraw = async () => {
     />
   </div>
 )}
-
-{addLoanTypeModalVisible && (
-  <div style={styles.confirmationModal}> {/* CHANGED HERE */}
-    <ConfirmModal
-      visible={addLoanTypeModalVisible}
-      message={`Add "${newLoanType}" as a new loan type?`}
-      confirmLabel="Yes"
-      cancelLabel="No"
-      iconColor="#3B82F6"
-      onConfirm={confirmAddLoanType}
-      onCancel={() => setAddLoanTypeModalVisible(false)}
-    />
-  </div>
-)}
-{addModalVisible && (
-  <div style={styles.confirmationModal}> {/* CHANGED HERE */}
-    <ConfirmModal
-      visible={addModalVisible}
-      message={`Add ${newTerm} months at ${newRate}% interest?`}
-      confirmLabel="Yes"
-      cancelLabel="No"
-      iconColor="#3B82F6"
-      onConfirm={confirmAddTerm}
-      onCancel={() => setAddModalVisible(false)}
-    />
-  </div>
-)}
-
-      {/* Funds Action Modal */}
-      {fundsActionModal && (
-        <div style={styles.centeredModal}>
-          <div style={styles.smallModalCard}>
-            <FiAlertCircle style={styles.confirmIcon} />
-            <p style={styles.modalText}>
-              {fundsActionModal === 'add' ? 'Add to Funds' : 'Withdraw to Savings'}
-            </p>
-            <p style={styles.modalText}>
-              {fundsActionModal === 'add' ? 
-                `Available Savings: ₱${formatPesoAmount(settings.Savings)}` : 
-                `Available Funds: ₱${formatPesoAmount(settings.Funds)}`}
-            </p>
-            <input
-              style={styles.modalInput}
-              value={actionAmount}
-              onChange={(e) => setActionAmount(e.target.value)}
-              type="number"
-              placeholder="Amount"
-              min="0"
-              step="0.01"
-            />
-            <div style={styles.bottomButtons}>
-              <button style={styles.confirmBtn} onClick={handleFundsActionWithConfirmation}>
-                {fundsActionModal === 'add' ? 'Transfer' : 'Withdraw'}
-              </button>
-              <button style={styles.cancelBtn} onClick={() => setFundsActionModal(null)}>Cancel</button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Enhanced Add Loan Type Wizard Modal */}
       {addLoanTypeWizardVisible && (
