@@ -652,34 +652,6 @@ viewButton: {
       backgroundColor: '#1e40af'
     }
   },
-  savingsConfirmModal: {
-    width: '400px',
-    backgroundColor: 'white',
-    borderRadius: '12px',
-    padding: '2rem',
-    boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)',
-    textAlign: 'center',
-    border: '1px solid #F1F5F9'
-  },
-  savingsInfoBox: {
-    backgroundColor: '#fff3cd',
-    border: '1px solid #ffeaa7',
-    borderRadius: '8px',
-    padding: '15px',
-    marginBottom: '15px',
-    textAlign: 'left'
-  },
-  savingsInfoTitle: {
-    fontSize: '14px',
-    color: '#856404',
-    fontWeight: '600',
-    marginBottom: '10px'
-  },
-  savingsInfoText: {
-    fontSize: '13px',
-    color: '#856404',
-    lineHeight: '1.5'
-  },
   enhancedConfirmationModal: {
   backgroundColor: 'white',
   borderRadius: '16px',
@@ -1010,9 +982,6 @@ const ApplyLoans = ({
   const [memberBalance, setMemberBalance] = useState(null);
   const [memberInvestment, setMemberInvestment] = useState(null);
   const [existingLoanInfo, setExistingLoanInfo] = useState({ hasExisting: false, outstanding: 0 });
-  const [showSavingsConfirmModal, setShowSavingsConfirmModal] = useState(false);
-  const [savingsShortfall, setSavingsShortfall] = useState({ needed: 0, available: 0, remaining: 0 });
-  const [pendingLoanForSavings, setPendingLoanForSavings] = useState(null);
 
 // Add these to your existing state declarations
 const [approvalAttachmentFile, setApprovalAttachmentFile] = useState(null);
@@ -1200,50 +1169,6 @@ const confirmApprove = async (attachmentUrl = '') => {
     await processAction(selectedLoan, 'reject', selectedReason === "Other" ? customReason : selectedReason);
   };
 
-const handleSavingsConfirm = async () => {
-  if (!pendingLoanForSavings) return;
-
-  setShowSavingsConfirmModal(false);
-
-  setSuccessMessage('Loan approved successfully using savings!');
-
-  const approveData = {
-    ...pendingLoanForSavings,
-    dateApproved: formatDate(new Date()),
-    timeApproved: formatTime(new Date()),
-    // Ensure attachment URL is included
-    ...(approvalAttachmentUrl && { proofOfTransactionUrl: approvalAttachmentUrl })
-  };
-
-  setSelectedLoan(prev => ({
-    ...prev,
-    dateApproved: approveData.dateApproved,
-    timeApproved: approveData.timeApproved,
-    status: 'approved',
-    ...(approvalAttachmentUrl && { proofOfTransactionUrl: approvalAttachmentUrl })
-  }));
-
-  // CORRECTED: Include attachmentUrl in pendingApiCall
-  setPendingApiCall({
-    type: 'approve_with_savings',
-    data: approveData,
-    savingsAmount: savingsShortfall.needed,
-    deductBalance: savingsShortfall.deductFromBalance,
-    deductFunds: savingsShortfall.deductFromFunds,
-    attachmentUrl: approvalAttachmentUrl || ''  // This is important!
-  });
-
-  setSuccessMessageModalVisible(true);
-  setJustCompletedAction(true);
-  setPendingLoanForSavings(null);
-  setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
-};
-  const handleSavingsCancel = () => {
-    setShowSavingsConfirmModal(false);
-    setPendingLoanForSavings(null);
-    setSavingsShortfall({ needed: 0, available: 0, remaining: 0, memberBalance: undefined, loanAmount: undefined });
-  };
-
 const processAction = async (loan, action, rejectionReason = '', attachmentUrl = '') => {
   // Show loading immediately
   setActionInProgress(true);
@@ -1251,101 +1176,69 @@ const processAction = async (loan, action, rejectionReason = '', attachmentUrl =
   setCurrentAction(action);
 
   try {
-    // For approve, check balance, funds, and savings shortfall early
     if (action === 'approve') {
       const { id, loanAmount } = loan;
       const requestedAmount = parseFloat(loanAmount);
 
-      // Fetch fresh member data
-      const memberSnap = await database.ref(`Members/${id}`).once('value');
-      const memberBalance = parseFloat(memberSnap.child('balance').val()) || 0;
-      const memberInvestment = parseFloat(memberSnap.child('investment').val()) || 0;
-
-      // Fetch current funds
+      // 1. Fetch current funds
       const fundsSnap = await database.ref('Settings/Funds').once('value');
       const currentFunds = parseFloat(fundsSnap.val()) || 0;
 
-      // Fetch available savings
-      const savingsSnap = await database.ref('Settings/Savings').once('value');
-      const currentSavings = parseFloat(savingsSnap.val()) || 0;
+      // 2. Fetch member balance
+      const memberSnap = await database.ref(`Members/${id}`).once('value');
+      const memberBalance = parseFloat(memberSnap.child('balance').val()) || 0;
 
-      // Fetch processing fee
-      const processingFeeSnap = await database.ref('Settings/ProcessingFee').once('value');
-      const processingFee = parseFloat(processingFeeSnap.val()) || 0;
+      // CORRECTED: Member pays what they can, funds covers the rest
+      const memberContribution = Math.min(memberBalance, requestedAmount);
+      const fundsContribution = Math.max(0, requestedAmount - memberContribution);
 
-      const isWithinInvestment = requestedAmount <= memberInvestment;
-      let deductBalance, deductFunds, shortfall;
-
-      if (isWithinInvestment) {
-        // Loan ≤ Investment: Use balance + funds only
-        deductBalance = Math.min(requestedAmount, memberBalance);
-        deductFunds = Math.min(requestedAmount, currentFunds);
-        shortfall = 0;
-
-        if (deductBalance + deductFunds < requestedAmount) {
-          throw new Error('Insufficient member balance and funds to cover the loan amount.');
-        }
-
-        // No shortfall, proceed to success
-        setSuccessMessage('Loan approved successfully!');
-
-        const approveData = {
-          ...loan,
-          dateApproved: formatDate(new Date()),
-          timeApproved: formatTime(new Date()),
-            ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl }) 
-        };
-
-        setSelectedLoan(prev => ({
-          ...prev,
-          dateApproved: approveData.dateApproved,
-          timeApproved: approveData.timeApproved,
-          status: 'approved',
-            ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl }) 
-        }));
-
-        setPendingApiCall({
-          type: 'approve',
-          data: approveData,
-          deductBalance,
-          deductFunds,
-          savingsAmount: 0,
-          attachmentUrl: attachmentUrl || '' 
-        });
-
-        // Show success modal immediately (database operations deferred to OK button)
-        setSuccessMessageModalVisible(true);
-      } else {
-        // CORRECTED LOGIC: For loans exceeding investment
-        // Use full investment amount from balance AND funds, savings for excess
-        deductBalance = Math.min(memberInvestment, memberBalance); // ₱5,000
-        deductFunds = Math.min(memberInvestment, currentFunds);    // ₱5,000
-        
-        // Calculate shortfall correctly - only the amount exceeding investment
-        shortfall = Math.max(0, requestedAmount - memberInvestment); // ₱100
-
-        if (shortfall > currentSavings) {
-          throw new Error(`Insufficient savings to cover shortfall. Needed: ${formatCurrency(shortfall)}, Available: ${formatCurrency(currentSavings)}`);
-        }
-
-        // Show savings confirmation modal for shortfall if loan > investment
-        setSavingsShortfall({
-          needed: shortfall,
-          available: currentSavings,
-          remaining: currentSavings - shortfall + processingFee,
-          processingFee: processingFee,
-          deductFromBalance: deductBalance,
-          deductFromFunds: deductFunds,
-          loanAmount: requestedAmount
-        });
-        setPendingLoanForSavings(loan);
-        setShowSavingsConfirmModal(true);
-        setIsProcessing(false);
-        setActionInProgress(false);
-        return;
+      // Check if funds can cover their share
+      if (fundsContribution > currentFunds) {
+        throw new Error(`Cannot approve loan. Insufficient funds. Funds needed: ${formatCurrency(fundsContribution)}, Available funds: ${formatCurrency(currentFunds)}`);
       }
+
+      console.log('📊 DEBUG: Loan approval breakdown:', {
+        loanAmount: formatCurrency(requestedAmount),
+        memberBalanceBefore: formatCurrency(memberBalance),
+        memberContribution: formatCurrency(memberContribution),
+        memberBalanceAfter: formatCurrency(memberBalance - memberContribution),
+        fundsBefore: formatCurrency(currentFunds),
+        fundsContribution: formatCurrency(fundsContribution),
+        fundsAfter: formatCurrency(currentFunds - fundsContribution)
+      });
+
+      // Proceed with approval
+      setSuccessMessage('Loan approved successfully!');
+
+      const approveData = {
+        ...loan,
+        dateApproved: formatDate(new Date()),
+        timeApproved: formatTime(new Date()),
+        ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl })
+      };
+
+      setSelectedLoan(prev => ({
+        ...prev,
+        dateApproved: approveData.dateApproved,
+        timeApproved: approveData.timeApproved,
+        status: 'approved',
+        ...(attachmentUrl && { proofOfTransactionUrl: attachmentUrl })
+      }));
+
+      // Store the breakdown for payment processing
+      setPendingApiCall({
+        type: 'approve',
+        data: approveData,
+        deductBalance: memberContribution,  // From member balance
+        deductFunds: fundsContribution,     // From funds (only funds portion)
+        savingsAmount: 0,
+        attachmentUrl: attachmentUrl || ''
+      });
+
+      // Show success modal
+      setSuccessMessageModalVisible(true);
     } else {
-      // Reject logic remains the same
+      // Reject logic (unchanged)
       setSuccessMessage('Loan rejected successfully!');
 
       const rejectData = {
@@ -1368,7 +1261,6 @@ const processAction = async (loan, action, rejectionReason = '', attachmentUrl =
         data: rejectData
       });
 
-      // Show success modal immediately (database operations deferred to OK button)
       setSuccessMessageModalVisible(true);
     }
   } catch (error) {
@@ -1376,7 +1268,6 @@ const processAction = async (loan, action, rejectionReason = '', attachmentUrl =
     setErrorMessage(error.message || 'An error occurred. Please try again.');
     setErrorModalVisible(true);
   } finally {
-    // Hide loading
     setIsProcessing(false);
     setActionInProgress(false);
   }
@@ -1384,227 +1275,145 @@ const processAction = async (loan, action, rejectionReason = '', attachmentUrl =
 
 const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsAmount, attachmentUrl = '') => {
   try {
-
-      console.log('🚀 DEBUG: Starting database approval');
-    console.log('📎 DEBUG: Received attachmentUrl:', attachmentUrl);
-    console.log('📎 DEBUG: attachmentUrl type:', typeof attachmentUrl);
-    console.log('📎 DEBUG: attachmentUrl exists:', !!attachmentUrl);
-    console.log('📎 DEBUG: attachmentUrl value:', attachmentUrl);
+    console.log('🚀 DEBUG: Starting database approval for loan application');
+    console.log('📎 DEBUG: Attachment URL:', attachmentUrl || 'No attachment');
     
     const { id, transactionId, term, loanAmount } = loan;
 
-      const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
-      const memberBalanceRef = database.ref(`Members/${id}/balance`);
-
-      const [loanSnap, memberBalanceSnap] = await Promise.all([
-        loanRef.once('value'),
-        memberBalanceRef.once('value')
-      ]);
-
-      if (!loanSnap.exists()) {
-        throw new Error('Loan data not found.');
-      }
-
-      const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
-      const requestedAmount = parseFloat(loanAmount);
-
-      const originalTransactionId = transactionId;
-      const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-      const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
-      const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
-      const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
-      const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
-      const fundsRef = database.ref('Settings/Funds');
-      const loanData = loanSnap.val();
-
-      const loanTypeKey = String(loanData.loanType || '').trim();
-      const termKeyRaw = String(loanData.term ?? '').trim();
-      const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
-      const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
-      const processingFeeRef = database.ref('Settings/ProcessingFee');
-
-      const [fundsSnap, feeSnap] = await Promise.all([
-        fundsRef.once('value'),
-        processingFeeRef.once('value'),
-      ]);
-
-      let interestRateRaw = null;
-      for (const tKey of termKeys) {
-        const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
-        const val = snap.val();
-        if (val !== null && val !== undefined && val !== '') {
-          interestRateRaw = val;
-          break;
-        }
-      }
-      if (interestRateRaw === null) {
-        throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
-      }
-
-      const interestRatePercentage = parseFloat(interestRateRaw);
-      const interestRateDecimal = interestRatePercentage / 100;
-      const amount = parseFloat(loanData.loanAmount);
-      const termMonths = parseInt(loanData.term);
-      const currentFunds = parseFloat(fundsSnap.val());
-      const processingFee = parseFloat(feeSnap.val());
-
-      const interestPerTerm = amount * interestRateDecimal;
-      const totalInterest = interestPerTerm * termMonths;
-      const totalTermPayment = amount + totalInterest;
-      const totalMonthlyPayment = totalTermPayment / termMonths;
-      const monthlyPrincipal = amount / termMonths;
-      const releaseAmount = amount - processingFee;
-
-      const now = new Date();
-      const dueDate = new Date(now);
-      dueDate.setDate(now.getDate() + 30);
-
-      const approvalDate = formatDate(now);
-      const approvalTime = formatTime(now);
-      const formattedDueDate = formatDate(dueDate);
-
-      const approvedData = {
-        ...loanData,
-        transactionId: newTransactionId,
-        originalTransactionId: originalTransactionId,
-        interestRate: interestRatePercentage,
-        interest: Math.round(interestPerTerm * 100) / 100,
-        totalInterest: Math.round(totalInterest * 100) / 100,
-        monthlyPayment: Math.round(monthlyPrincipal * 100) / 100,
-        totalMonthlyPayment: Math.round(totalMonthlyPayment * 100) / 100,
-        totalTermPayment: Math.round(totalTermPayment * 100) / 100,
-        releaseAmount: Math.round(releaseAmount * 100) / 100,
-        processingFee: processingFee,
-        dateApproved: approvalDate,
-        timeApproved: approvalTime,
-        timestamp: now.getTime(),
-        dueDate: formattedDueDate,
-        status: 'approved',
-        paymentsMade: 0,
-        amountPaid: 0,
-        remainingBalance: Math.round(totalTermPayment * 100) / 100,
-        borrowedFromSavings: Math.round(savingsAmount * 100) / 100,
-        proofOfTransactionUrl: attachmentUrl || null
-      };
-
-      await approvedRef.set(approvedData);
-      await transactionRef.set(approvedData);
-      await currentLoanRef.set(approvedData);
-      await memberLoanRef.set(approvedData);
-
-    // Deduct from member balance
-    const balanceToDeduct = deductBalance;
-    const newMemberBalance = Math.max(0, Math.ceil((memberBalance - balanceToDeduct) * 100) / 100);
-    await memberBalanceRef.set(newMemberBalance);
-
-    // Deduct from funds
-    const fundsToDeduct = deductFunds;
-    const newFundsAmount = currentFunds - fundsToDeduct;
-    await fundsRef.set(newFundsAmount);
-
-    const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
-    await fundsHistoryRef.set(newFundsAmount);
-
-    const dateKey = now.toISOString().split('T')[0];
-    const savingsRef = database.ref('Settings/Savings');
-    const savingsHistoryRef = database.ref('Settings/SavingsHistory');
-
-    const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
-      savingsRef.once('value'),
-      savingsHistoryRef.child(dateKey).once('value')
-    ]);
-
-    const currentSavings = parseFloat(savingsSnap.val()) || 0;
-    const savingsChange = -savingsAmount + processingFee;
-    const newSavingsAmount = Math.ceil((currentSavings + savingsChange) * 100) / 100;
-    await savingsRef.set(newSavingsAmount);
-
-    const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-    const newDaySavings = Math.ceil((currentDaySavings + savingsChange) * 100) / 100;
-    await savingsHistoryRef.child(dateKey).set(newDaySavings);
-
-    console.log(`Member balance deducted: ${formatCurrency(balanceToDeduct)}, funds deducted: ${formatCurrency(fundsToDeduct)}, savings change: ${formatCurrency(savingsChange)}, savingsAmount: ${savingsAmount}`);
-
-      await loanRef.remove();
-
-    } catch (err) {
-      console.error('Approval DB error:', err);
-      throw new Error(err.message || 'Failed to approve loan');
-    }
-  };
-
-
-
-// CORRECTED: Function to handle approval with savings deduction
-const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBalance, deductFunds, attachmentUrl = '') => {
-  try {
-    const { id, transactionId, term, loanAmount } = loan;
-
+    // Database references
     const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
     const memberBalanceRef = database.ref(`Members/${id}/balance`);
+    const memberInvestmentRef = database.ref(`Members/${id}/investment`);
+    const memberRef = database.ref(`Members/${id}`);
 
-    const [loanSnap, memberBalanceSnap] = await Promise.all([
+    // Fetch all data in parallel
+    const [loanSnap, memberBalanceSnap, memberInvestmentSnap, memberSnap] = await Promise.all([
       loanRef.once('value'),
-      memberBalanceRef.once('value')
+      memberBalanceRef.once('value'),
+      memberInvestmentRef.once('value'),
+      memberRef.once('value')
     ]);
 
+    // Validate loan data exists
     if (!loanSnap.exists()) {
-      throw new Error('Loan data not found.');
+      throw new Error('Loan application data not found in database.');
     }
 
-    const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
-    const requestedAmount = parseFloat(loanAmount);
+    if (!memberSnap.exists()) {
+      throw new Error('Member data not found in database.');
+    }
 
-    const originalTransactionId = transactionId;
+    // Get values
+    const loanData = loanSnap.val();
+    const memberData = memberSnap.val();
+    const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
+    const memberInvestment = parseFloat(memberInvestmentSnap.val()) || 0;
+    const requestedAmount = parseFloat(loanAmount || loanData.loanAmount) || 0;
+
+    console.log('📊 DEBUG: Loan approval initial values:', {
+      memberId: id,
+      memberName: `${memberData.firstName || ''} ${memberData.lastName || ''}`,
+      memberBalance: formatCurrency(memberBalance),
+      memberInvestment: formatCurrency(memberInvestment),
+      loanAmount: formatCurrency(requestedAmount)
+    });
+
+    // Calculate how much came from member vs the total from Funds
+    // Member contributes up to their balance, remainder comes from Funds
+    const memberContribution = Math.min(memberBalance, requestedAmount);
+    const fundsContribution = requestedAmount; // ENTIRE loan amount comes from Funds
+    
+    // Update member's personal balance (can go to 0, not negative)
+    const newMemberBalance = Math.max(0, Math.ceil((memberBalance - memberContribution) * 100) / 100);
+    
+    // Member investment REMAINS UNCHANGED during loan approval
+    const newMemberInvestment = memberInvestment;
+
+    console.log('🧮 DEBUG: Loan breakdown calculation:', {
+      totalLoan: formatCurrency(requestedAmount),
+      memberContribution: formatCurrency(memberContribution),
+      fundsContribution: formatCurrency(fundsContribution),
+      memberBalanceBefore: formatCurrency(memberBalance),
+      memberBalanceAfter: formatCurrency(newMemberBalance),
+      fundsContributionFromMember: formatCurrency(memberContribution),
+      fundsContributionFromOthers: formatCurrency(fundsContribution - memberContribution)
+    });
+
+    // Generate new transaction IDs
+    const originalTransactionId = transactionId || loanData.transactionId;
     const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
 
+    // Database references for new records
     const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
     const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
     const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
     const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
     const fundsRef = database.ref('Settings/Funds');
-    const loanData = loanSnap.val();
+    const processingFeeRef = database.ref('Settings/ProcessingFee');
 
+    // Get loan type and term for interest rate
     const loanTypeKey = String(loanData.loanType || '').trim();
     const termKeyRaw = String(loanData.term ?? '').trim();
     const termKeyInt = termKeyRaw ? String(parseInt(termKeyRaw, 10)) : '';
     const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
-    const processingFeeRef = database.ref('Settings/ProcessingFee');
 
+    // Fetch Funds, Processing Fee, and interest rate in parallel
     const [fundsSnap, feeSnap] = await Promise.all([
       fundsRef.once('value'),
       processingFeeRef.once('value'),
     ]);
 
+    // Find interest rate for this loan type and term
     let interestRateRaw = null;
     for (const tKey of termKeys) {
-      const snap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
-      const val = snap.val();
+      const interestSnap = await database.ref(`Settings/LoanTypes/${loanTypeKey}/${tKey}`).once('value');
+      const val = interestSnap.val();
       if (val !== null && val !== undefined && val !== '') {
         interestRateRaw = val;
         break;
       }
     }
+    
+    // If still not found, check old interest rate structure
     if (interestRateRaw === null) {
-      throw new Error(`Missing interest rate for type "${loanData.loanType}" and term ${termKeys[0] || loanData.term} months. Please set it in Settings > Loan & Dividend > Types of Loans.`);
+      for (const tKey of termKeys) {
+        const fallbackSnap = await database.ref(`Settings/InterestRate/${tKey}`).once('value');
+        const fallbackVal = fallbackSnap.val();
+        if (fallbackVal !== null && fallbackVal !== undefined && fallbackVal !== '') {
+          interestRateRaw = fallbackVal;
+          break;
+        }
+      }
     }
 
+    if (interestRateRaw === null) {
+      throw new Error(`Missing interest rate for loan type "${loanTypeKey}" and term ${termKeys[0] || loanData.term} months. Please configure it in Settings.`);
+    }
+
+    // Calculate all financial values
     const interestRatePercentage = parseFloat(interestRateRaw);
     const interestRateDecimal = interestRatePercentage / 100;
-    const amount = parseFloat(loanData.loanAmount);
-    const termMonths = parseInt(loanData.term);
-    const currentFunds = parseFloat(fundsSnap.val());
-    const processingFee = parseFloat(feeSnap.val());
+    const amount = parseFloat(loanData.loanAmount || requestedAmount);
+    const termMonths = parseInt(loanData.term) || 1;
+    const currentFunds = parseFloat(fundsSnap.val()) || 0;
+    const processingFee = parseFloat(feeSnap.val()) || 0;
 
     const interestPerTerm = amount * interestRateDecimal;
     const totalInterest = interestPerTerm * termMonths;
     const totalTermPayment = amount + totalInterest;
     const totalMonthlyPayment = totalTermPayment / termMonths;
     const monthlyPrincipal = amount / termMonths;
-    const releaseAmount = amount - processingFee;
+    const releaseAmount = Math.max(0, amount - processingFee);
 
+    // Validate funds availability
+    if (amount > currentFunds) {
+      throw new Error(`Cannot approve loan. Insufficient funds in cooperative. Loan amount: ${formatCurrency(amount)}, Available funds: ${formatCurrency(currentFunds)}`);
+    }
+
+    // Calculate new funds amount
+    const newFundsAmount = Math.max(0, Math.ceil((currentFunds - amount) * 100) / 100);
+
+    // Date calculations
     const now = new Date();
     const dueDate = new Date(now);
     dueDate.setDate(now.getDate() + 30);
@@ -1613,10 +1422,29 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBala
     const approvalTime = formatTime(now);
     const formattedDueDate = formatDate(dueDate);
 
+    console.log('💰 DEBUG: Financial calculations:', {
+      interestRate: `${interestRatePercentage}%`,
+      interestPerTerm: formatCurrency(interestPerTerm),
+      totalInterest: formatCurrency(totalInterest),
+      totalTermPayment: formatCurrency(totalTermPayment),
+      monthlyPayment: formatCurrency(totalMonthlyPayment),
+      processingFee: formatCurrency(processingFee),
+      releaseAmount: formatCurrency(releaseAmount),
+      dueDate: formattedDueDate,
+      fundsBefore: formatCurrency(currentFunds),
+      fundsAfter: formatCurrency(newFundsAmount)
+    });
+
+    // Prepare approved loan data with all tracking information
     const approvedData = {
+      // Original loan data
       ...loanData,
+      
+      // Transaction IDs
       transactionId: newTransactionId,
       originalTransactionId: originalTransactionId,
+      
+      // Financial calculations
       interestRate: interestRatePercentage,
       interest: Math.round(interestPerTerm * 100) / 100,
       totalInterest: Math.round(totalInterest * 100) / 100,
@@ -1625,43 +1453,78 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBala
       totalTermPayment: Math.round(totalTermPayment * 100) / 100,
       releaseAmount: Math.round(releaseAmount * 100) / 100,
       processingFee: processingFee,
+      
+      // Dates and status
       dateApproved: approvalDate,
       timeApproved: approvalTime,
       timestamp: now.getTime(),
       dueDate: formattedDueDate,
       status: 'approved',
+      
+      // Payment tracking
       paymentsMade: 0,
       amountPaid: 0,
       remainingBalance: Math.round(totalTermPayment * 100) / 100,
-      borrowedFromSavings: Math.round(savingsAmount * 100) / 100,
-      proofOfTransactionUrl: attachmentUrl || null 
+      
+      // CRITICAL: Store the source breakdown for repayment tracking
+      memberContribution: Math.round(memberContribution * 100) / 100,  // From member's personal balance
+      borrowedFromFunds: Math.round(amount * 100) / 100,              // ENTIRE loan from Funds
+      originalLoanSources: {
+        member: Math.round(memberContribution * 100) / 100,          // What member contributed
+        funds: Math.round(amount * 100) / 100,                       // What Funds provided (total)
+        fundsFromOthers: Math.round((amount - memberContribution) * 100) / 100  // From other members
+      },
+      
+      // Attachment if provided
+      proofOfTransactionUrl: attachmentUrl || null,
+      
+      // Member information
+      id: id,
+      email: loanData.email || memberData.email,
+      firstName: loanData.firstName || memberData.firstName,
+      lastName: loanData.lastName || memberData.lastName
     };
 
+    console.log('📝 DEBUG: Prepared approved loan data:', approvedData);
+
+    // === START DATABASE TRANSACTIONS ===
+
+    // 1. Create approved loan record
+    console.log('💾 Step 1: Creating approved loan record...');
     await approvedRef.set(approvedData);
+    
+    // 2. Create transaction record
+    console.log('💾 Step 2: Creating transaction record...');
     await transactionRef.set(approvedData);
+    
+    // 3. Create current loan record
+    console.log('💾 Step 3: Creating current loan record...');
     await currentLoanRef.set(approvedData);
+    
+    // 4. Create member loan record
+    console.log('💾 Step 4: Creating member loan record...');
     await memberLoanRef.set(approvedData);
 
-    // CORRECTED: Use the pre-calculated deductBalance and deductFunds values
-    const balanceToDeduct = deductBalance; // ₱5,000 (from processAction)
-    const fundsToDeduct = deductFunds;     // ₱5,000 (from processAction)
-
-    // Deduct from member balance
-    const newMemberBalance = Math.max(0, Math.ceil((memberBalance - balanceToDeduct) * 100) / 100);
+    // 5. Update member's personal balance (deduct their contribution)
+    console.log('💾 Step 5: Updating member balance...');
     await memberBalanceRef.set(newMemberBalance);
+    // Note: Investment remains unchanged
 
-    // CORRECTED: Deduct from funds using the pre-calculated value
-    const newFundsAmount = Math.max(0, currentFunds - fundsToDeduct);
+    // 6. Update Funds (deduct ENTIRE loan amount)
+    console.log('💾 Step 6: Updating Funds...');
     await fundsRef.set(newFundsAmount);
 
-    const timestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
-    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${timestamp}`);
+    // 7. Record funds history
+    console.log('💾 Step 7: Recording funds history...');
+    const fundsTimestamp = now.toISOString().replace(/[.#$[\]]/g, '_');
+    const fundsHistoryRef = database.ref(`Settings/FundsHistory/${fundsTimestamp}`);
     await fundsHistoryRef.set(newFundsAmount);
 
-    // CORRECTED: Handle savings properly
-    const dateKey = now.toISOString().split('T')[0];
+    // 8. Add processing fee to Savings
+    console.log('💾 Step 8: Adding processing fee to Savings...');
     const savingsRef = database.ref('Settings/Savings');
     const savingsHistoryRef = database.ref('Settings/SavingsHistory');
+    const dateKey = now.toISOString().split('T')[0];
 
     const [savingsSnap, currentDaySavingsSnap] = await Promise.all([
       savingsRef.once('value'),
@@ -1669,24 +1532,56 @@ const processDatabaseApproveWithSavings = async (loan, savingsAmount, deductBala
     ]);
 
     const currentSavings = parseFloat(savingsSnap.val()) || 0;
-    // CORRECTED: Savings change = processing fee (income) - savingsAmount (expense)
-    const savingsChange = processingFee - savingsAmount;
-    const newSavingsAmount = Math.max(0, Math.ceil((currentSavings + savingsChange) * 100) / 100);
+    const newSavingsAmount = Math.ceil((currentSavings + processingFee) * 100) / 100;
     await savingsRef.set(newSavingsAmount);
 
+    // 9. Update daily SavingsHistory
+    console.log('💾 Step 9: Updating Savings history...');
     const currentDaySavings = parseFloat(currentDaySavingsSnap.val()) || 0;
-    const newDaySavings = Math.max(0, Math.ceil((currentDaySavings + savingsChange) * 100) / 100);
+    const newDaySavings = Math.ceil((currentDaySavings + processingFee) * 100) / 100;
     await savingsHistoryRef.child(dateKey).set(newDaySavings);
 
-    console.log(`CORRECTED WITH SAVINGS - Member balance deducted: ${formatCurrency(balanceToDeduct)}, funds deducted: ${formatCurrency(fundsToDeduct)}, savings change: ${formatCurrency(savingsChange)} (processing fee: +${formatCurrency(processingFee)}, savings used: -${formatCurrency(savingsAmount)})`);
+    // 10. Record loan-specific savings entry
+    console.log('💾 Step 10: Recording loan processing fee...');
+    const loanSavingsHistoryRef = database.ref(`Settings/SavingsHistory/Loans/${newTransactionId}`);
+    await loanSavingsHistoryRef.set({
+      amount: processingFee,
+      date: dateKey,
+      loanId: newTransactionId,
+      memberId: id,
+      memberName: `${memberData.firstName || ''} ${memberData.lastName || ''}`,
+      type: 'processing_fee'
+    });
 
+    // 11. Remove the original loan application
+    console.log('💾 Step 11: Removing loan application...');
     await loanRef.remove();
 
+    console.log(`✅ DEBUG: Loan approval completed successfully!`);
+    console.log('📊 FINAL SUMMARY:');
+    console.log(`   Member: ${memberData.firstName || ''} ${memberData.lastName || ''}`);
+    console.log(`   Loan Amount: ${formatCurrency(amount)}`);
+    console.log(`   Member contribution: ${formatCurrency(memberContribution)}`);
+    console.log(`   Funds contribution: ${formatCurrency(amount)}`);
+    console.log(`   New member balance: ${formatCurrency(newMemberBalance)}`);
+    console.log(`   New Funds amount: ${formatCurrency(newFundsAmount)}`);
+    console.log(`   Processing fee added to Savings: ${formatCurrency(processingFee)}`);
+    console.log(`   Loan source breakdown stored for repayment tracking`);
+    console.log(`   Loan ID: ${newTransactionId}`);
+
+    return { success: true, transactionId: newTransactionId, approvedData };
+
   } catch (err) {
-    console.error('Approval with savings DB error:', err);
-    throw new Error(err.message || 'Failed to approve loan with savings');
+    console.error('❌ CRITICAL ERROR in loan approval:', {
+      error: err.message,
+      stack: err.stack,
+      loanData: loan,
+      memberId: loan?.id
+    });
+    throw new Error(`Failed to approve loan: ${err.message}`);
   }
 };
+
 
   const processDatabaseReject = async (loan, rejectionReason) => {
     try {
@@ -1886,22 +1781,14 @@ const handleSuccessOk = async () => {
         pendingApiCall.deductBalance, 
         pendingApiCall.deductFunds, 
         pendingApiCall.savingsAmount,
-        pendingApiCall.attachmentUrl || ''  // Make sure this is passed
-      );
-      callApiApprove(pendingApiCall.data, pendingApiCall.attachmentUrl || '');
-    } else if (pendingApiCall.type === 'approve_with_savings') {
-      await processDatabaseApproveWithSavings(
-        pendingApiCall.data, 
-        pendingApiCall.savingsAmount,
-        pendingApiCall.deductBalance, 
-        pendingApiCall.deductFunds,
-        pendingApiCall.attachmentUrl || ''  // Make sure this is passed
+        pendingApiCall.attachmentUrl || ''
       );
       callApiApprove(pendingApiCall.data, pendingApiCall.attachmentUrl || '');
     } else if (pendingApiCall.type === 'reject') {
       await processDatabaseReject(pendingApiCall.data, pendingApiCall.data.rejectionReason);
       callApiReject(pendingApiCall.data);
     }
+    // REMOVED: 'approve_with_savings' case
   } catch (error) {
     console.error('Error processing DB or API call:', error);
     setErrorMessage(error.message || 'An error occurred during final processing.');
@@ -2572,54 +2459,6 @@ const hasDocuments = (loan) => {
   </div>
 )}
 
-{/* Savings Confirmation Modal */}
-{showSavingsConfirmModal && (
-  <div style={styles.modalOverlay}>
-    <div style={styles.savingsConfirmModal}>
-      <FaExclamationCircle style={{ ...styles.confirmIcon, color: '#1e3a8a' }} />
-      <div style={styles.modalTitle}>
-        Insufficient Funds - Use Savings?
-      </div>
-      <div style={styles.savingsInfoBox}>
-        <div style={styles.savingsInfoTitle}>Loan Approval Breakdown:</div>
-        <div style={styles.savingsInfoText}>
-          • Loan Amount: <strong>{formatCurrency(savingsShortfall.loanAmount)}</strong><br/>
-          • Deduct from Member Balance: <strong>{formatCurrency(savingsShortfall.deductFromBalance)}</strong><br/>
-          • Deduct from Funds: <strong>{formatCurrency(savingsShortfall.deductFromFunds)}</strong><br/>
-          • Deduct from Savings: <strong>{formatCurrency(savingsShortfall.needed)}</strong><br/>
-          • Processing Fee Added to Savings: <strong>{formatCurrency(savingsShortfall.processingFee)}</strong><br/>
-          • Savings After Approval: <strong>{formatCurrency(savingsShortfall.remaining)}</strong>
-        </div>
-      </div>
-      <p style={styles.modalText}>
-        The loan amount exceeds available balance and funds. Would you like to use <strong>{formatCurrency(savingsShortfall.needed)}</strong> from savings to cover the shortfall? Note that the processing fee of <strong>{formatCurrency(savingsShortfall.processingFee)}</strong> will be added to savings.
-      </p>
-      <div style={{ display: 'flex', gap: '10px' }}>
-        <button
-          style={{
-            ...styles.actionButton,
-            ...styles.approveButton,
-            ...(actionInProgress ? styles.disabledButton : {})
-          }}
-          onClick={handleSavingsConfirm}
-          disabled={actionInProgress}
-        >
-          {actionInProgress ? 'Processing...' : 'Yes, Use Savings'}
-        </button>
-        <button
-          style={{
-            ...styles.actionButton,
-            ...styles.rejectButton
-          }}
-          onClick={handleSavingsCancel}
-          disabled={actionInProgress}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  </div>
-)}
 
       {/* Image Viewer */}
       {imageViewerVisible && (
