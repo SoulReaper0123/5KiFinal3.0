@@ -149,6 +149,50 @@ const removeQrCodeImage = () => {
     { key: 'Other', label: 'Other' },
   ];
 
+  // FIXED: Upload multiple images to Firebase Storage
+const uploadMultipleImages = async (images, folder, userId) => {
+  try {
+    console.log(`Uploading ${images.length} images to ${folder} folder`);
+    
+    const uploadPromises = images.map(async (imageUri, index) => {
+      console.log(`Uploading image ${index + 1} of ${images.length}`);
+      
+      // Generate unique filename
+      const timestamp = Date.now();
+      const randomString = Math.random().toString(36).substring(2, 15);
+      const fileName = `${folder}_${timestamp}_${index}_${randomString}.jpg`;
+      const path = `loan_collaterals/${userId}/${fileName}`;
+      
+      console.log(`Upload path for image ${index + 1}: ${path}`);
+      
+      // Convert data URL to blob if needed
+      let blob;
+      if (imageUri.startsWith('data:')) {
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+      } else {
+        const response = await fetch(imageUri);
+        blob = await response.blob();
+      }
+      
+      const imageRef = storageRef(storage, path);
+      await uploadBytes(imageRef, blob);
+      const downloadURL = await getDownloadURL(imageRef);
+      console.log(`Image ${index + 1} uploaded successfully`);
+      
+      return downloadURL;
+    });
+    
+    const uploadedUrls = await Promise.all(uploadPromises);
+    console.log(`All ${images.length} images uploaded successfully`);
+    
+    return uploadedUrls;
+  } catch (error) {
+    console.error('Error uploading multiple images:', error);
+    throw new Error(`Failed to upload images: ${error.message}`);
+  }
+};
+
   // FIXED: Upload image to Firebase Storage with retry logic
   const uploadImageToFirebase = async (uri, folder, userId) => {
     try {
@@ -1949,12 +1993,6 @@ const submitLoanApplication = async () => {
 
     const loanAmountNum = Number(loanAmount) || 0;
     const userBalance = Number(balance) || 0;
-
-    if (userBalance <= 0) {
-      setErrorMessage('You have no available balance to support a new loan.');
-      setErrorModalVisible(true);
-      return;
-    }
 
     if (loanAmountNum > userBalance) {
       if (!isCollateralValid()) {
