@@ -1283,14 +1283,12 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
     // Database references
     const loanRef = database.ref(`Loans/LoanApplications/${id}/${transactionId}`);
     const memberBalanceRef = database.ref(`Members/${id}/balance`);
-    const memberInvestmentRef = database.ref(`Members/${id}/investment`);
     const memberRef = database.ref(`Members/${id}`);
 
     // Fetch all data in parallel
-    const [loanSnap, memberBalanceSnap, memberInvestmentSnap, memberSnap] = await Promise.all([
+    const [loanSnap, memberBalanceSnap, memberSnap] = await Promise.all([
       loanRef.once('value'),
       memberBalanceRef.once('value'),
-      memberInvestmentRef.once('value'),
       memberRef.once('value')
     ]);
 
@@ -1306,50 +1304,24 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
     // Get values
     const loanData = loanSnap.val();
     const memberData = memberSnap.val();
-    const memberBalance = parseFloat(memberBalanceSnap.val()) || 0;
-    const memberInvestment = parseFloat(memberInvestmentSnap.val()) || 0;
+    const currentMemberBalance = parseFloat(memberBalanceSnap.val()) || 0;
     const requestedAmount = parseFloat(loanAmount || loanData.loanAmount) || 0;
 
     console.log('📊 DEBUG: Loan approval initial values:', {
       memberId: id,
       memberName: `${memberData.firstName || ''} ${memberData.lastName || ''}`,
-      memberBalance: formatCurrency(memberBalance),
-      memberInvestment: formatCurrency(memberInvestment),
+      currentMemberBalance: formatCurrency(currentMemberBalance),
       loanAmount: formatCurrency(requestedAmount)
     });
 
-    // Calculate how much came from member vs the total from Funds
-    // Member contributes up to their balance, remainder comes from Funds
-    const memberContribution = Math.min(memberBalance, requestedAmount);
-    const fundsContribution = requestedAmount; // ENTIRE loan amount comes from Funds
+    // DIRECT DEDUCTION: Reduce member balance by loan amount
+    const newMemberBalance = Math.round((currentMemberBalance - requestedAmount) * 100) / 100;
     
-    // Update member's personal balance (can go to 0, not negative)
-    const newMemberBalance = Math.max(0, Math.ceil((memberBalance - memberContribution) * 100) / 100);
-    
-    // Member investment REMAINS UNCHANGED during loan approval
-    const newMemberInvestment = memberInvestment;
-
-    console.log('🧮 DEBUG: Loan breakdown calculation:', {
-      totalLoan: formatCurrency(requestedAmount),
-      memberContribution: formatCurrency(memberContribution),
-      fundsContribution: formatCurrency(fundsContribution),
-      memberBalanceBefore: formatCurrency(memberBalance),
-      memberBalanceAfter: formatCurrency(newMemberBalance),
-      fundsContributionFromMember: formatCurrency(memberContribution),
-      fundsContributionFromOthers: formatCurrency(fundsContribution - memberContribution)
+    console.log('🧮 DEBUG: Direct deduction calculation:', {
+      oldMemberBalance: formatCurrency(currentMemberBalance),
+      deduction: formatCurrency(requestedAmount),
+      newMemberBalance: formatCurrency(newMemberBalance)
     });
-
-    // Generate new transaction IDs
-    const originalTransactionId = transactionId || loanData.transactionId;
-    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
-
-    // Database references for new records
-    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
-    const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
-    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
-    const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
-    const fundsRef = database.ref('Settings/Funds');
-    const processingFeeRef = database.ref('Settings/ProcessingFee');
 
     // Get loan type and term for interest rate
     const loanTypeKey = String(loanData.loanType || '').trim();
@@ -1358,6 +1330,9 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
     const termKeys = Array.from(new Set([termKeyRaw, termKeyInt])).filter(Boolean);
 
     // Fetch Funds, Processing Fee, and interest rate in parallel
+    const fundsRef = database.ref('Settings/Funds');
+    const processingFeeRef = database.ref('Settings/ProcessingFee');
+    
     const [fundsSnap, feeSnap] = await Promise.all([
       fundsRef.once('value'),
       processingFeeRef.once('value'),
@@ -1410,7 +1385,7 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
       throw new Error(`Cannot approve loan. Insufficient funds in cooperative. Loan amount: ${formatCurrency(amount)}, Available funds: ${formatCurrency(currentFunds)}`);
     }
 
-    // Calculate new funds amount
+    // Calculate new funds amount (deduct FULL loan amount)
     const newFundsAmount = Math.max(0, Math.ceil((currentFunds - amount) * 100) / 100);
 
     // Date calculations
@@ -1435,7 +1410,18 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
       fundsAfter: formatCurrency(newFundsAmount)
     });
 
-    // Prepare approved loan data with all tracking information
+    // Generate new transaction IDs
+    const originalTransactionId = transactionId || loanData.transactionId;
+    const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Database references for new records
+    const approvedRef = database.ref(`Loans/ApprovedLoans/${id}/${newTransactionId}`);
+    const transactionRef = database.ref(`Transactions/Loans/${id}/${newTransactionId}`);
+    const currentLoanRef = database.ref(`Loans/CurrentLoans/${id}/${newTransactionId}`);
+    const memberLoanRef = database.ref(`Members/${id}/loans/${newTransactionId}`);
+  
+
+    // Prepare approved loan data - SIMPLIFIED
     const approvedData = {
       // Original loan data
       ...loanData,
@@ -1465,15 +1451,11 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
       paymentsMade: 0,
       amountPaid: 0,
       remainingBalance: Math.round(totalTermPayment * 100) / 100,
+      loanAmount: amount,
       
-      // CRITICAL: Store the source breakdown for repayment tracking
-      memberContribution: Math.round(memberContribution * 100) / 100,  // From member's personal balance
-      borrowedFromFunds: Math.round(amount * 100) / 100,              // ENTIRE loan from Funds
-      originalLoanSources: {
-        member: Math.round(memberContribution * 100) / 100,          // What member contributed
-        funds: Math.round(amount * 100) / 100,                       // What Funds provided (total)
-        fundsFromOthers: Math.round((amount - memberContribution) * 100) / 100  // From other members
-      },
+      // SIMPLIFIED: No contribution tracking
+      totalOwed: Math.round(totalTermPayment * 100) / 100,
+      originalLoanAmount: amount,
       
       // Attachment if provided
       proofOfTransactionUrl: attachmentUrl || null,
@@ -1505,12 +1487,11 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
     console.log('💾 Step 4: Creating member loan record...');
     await memberLoanRef.set(approvedData);
 
-    // 5. Update member's personal balance (deduct their contribution)
-    console.log('💾 Step 5: Updating member balance...');
+    // 5. Update member's balance (DIRECT DEDUCTION)
+    console.log('💾 Step 5: Updating member balance (direct deduction)...');
     await memberBalanceRef.set(newMemberBalance);
-    // Note: Investment remains unchanged
 
-    // 6. Update Funds (deduct ENTIRE loan amount)
+    // 6. Update Funds (deduct FULL loan amount)
     console.log('💾 Step 6: Updating Funds...');
     await fundsRef.set(newFundsAmount);
 
@@ -1561,12 +1542,10 @@ const processDatabaseApprove = async (loan, deductBalance, deductFunds, savingsA
     console.log('📊 FINAL SUMMARY:');
     console.log(`   Member: ${memberData.firstName || ''} ${memberData.lastName || ''}`);
     console.log(`   Loan Amount: ${formatCurrency(amount)}`);
-    console.log(`   Member contribution: ${formatCurrency(memberContribution)}`);
-    console.log(`   Funds contribution: ${formatCurrency(amount)}`);
+    console.log(`   Member balance deducted: ${formatCurrency(amount)}`);
     console.log(`   New member balance: ${formatCurrency(newMemberBalance)}`);
     console.log(`   New Funds amount: ${formatCurrency(newFundsAmount)}`);
     console.log(`   Processing fee added to Savings: ${formatCurrency(processingFee)}`);
-    console.log(`   Loan source breakdown stored for repayment tracking`);
     console.log(`   Loan ID: ${newTransactionId}`);
 
     return { success: true, transactionId: newTransactionId, approvedData };
