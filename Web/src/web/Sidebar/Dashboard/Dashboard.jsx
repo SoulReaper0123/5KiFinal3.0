@@ -498,89 +498,24 @@ const Dashboard = () => {
         const role = (member?.role || '').toLowerCase();
         const isAdmin = role === 'admin' || role === 'coadmin';
         
-        let totalInvestment = 0;
+        let totalInvestment = parseFloat(member.investment) || 0;
 
-        if (isAdvancedView) {
-          const advancedData = memberInvestmentData[memberId];
-          totalInvestment = advancedData ? (parseFloat(advancedData.investment) || 0) : (parseFloat(member.investment) || 0);
-          
-          if (dividendsTransactionsData[memberId]) {
-            Object.values(dividendsTransactionsData[memberId]).forEach(dividend => {
-              if (dividend.status === 'distributed') {
-                totalInvestment += parseFloat(dividend.amount) || 0;
-              }
-            });
-          }
-        } else {
-            try {
-              const regsSnapForInvestment = await database.ref(`Transactions/Registrations/${memberId}`).once('value');
-              if (regsSnapForInvestment.exists()) {
-                Object.values(regsSnapForInvestment.val()).forEach(reg => {
-                  const d = parseTransactionDate(reg.dateApproved || reg.date);
-                  if (d && d.getFullYear() === parseInt(targetYear)) {
-                    const amt = parseFloat(reg.amount) || 0;
-                    totalInvestment += amt;
-                  }
-                });
-              }
-            } catch (e) {
-              console.error(`Error computing registration part of investment for member ${memberId}:`, e);
-            }
-            
-            try {
-              const depsSnapForInvestment = await database.ref(`Transactions/Deposits/${memberId}`).once('value');
-              if (depsSnapForInvestment.exists()) {
-                Object.values(depsSnapForInvestment.val()).forEach(dep => {
-                  const d = parseTransactionDate(dep.dateApproved || dep.dateAdded || dep.date);
-                  if (d && d.getFullYear() === parseInt(targetYear)) {
-                    const status = (dep.status || '').toLowerCase();
-                    if (!status || status === 'approved' || status === 'completed') {
-                      const amt = parseFloat(dep.amountToBeDeposited || dep.amount) || 0;
-                      totalInvestment += amt;
-                    }
-                  }
-                });
-              }
-            } catch (e) {
-              console.error(`Error computing deposit part of investment for member ${memberId}:`, e);
-            }
-
-            try {
-              const withdrawalsSnap = await database.ref(`Transactions/Withdrawals/${memberId}`).once('value');
-              if (withdrawalsSnap.exists()) {
-                Object.values(withdrawalsSnap.val()).forEach(withdrawal => {
-                  const d = parseTransactionDate(withdrawal.dateApproved || withdrawal.date);
-                  if (d && d.getFullYear() === parseInt(targetYear)) {
-                    const status = (withdrawal.status || '').toLowerCase();
-                    if (status === 'approved' || status === 'distributed') {
-                      const amt = parseFloat(withdrawal.amountWithdrawn || withdrawal.amount) || 0;
-                      totalInvestment -= amt;
-                    }
-                  }
-                });
-              }
-            } catch (e) {
-              console.error(`Error computing withdrawal part of investment for member ${memberId}:`, e);
-            }
-          }
-
-        if (isAdmin && totalInvestment <= 0) {
-          console.log(`🚫 Skipping admin/coadmin with zero investment: ${memberId}`, {
-            investment: totalInvestment,
-            role: role
-          });
-          return null;
+       if (isAdvancedView) {
+        const advancedData = memberInvestmentData[memberId];
+        if (advancedData && advancedData.investment) {
+          totalInvestment = parseFloat(advancedData.investment);
         }
+      }
 
-        console.log(`✅ Processing member for dividends: ${memberId}`, {
-          name: `${member.firstName} ${member.lastName}`,
-          role: role,
-          status: status,
+      // Skip admin/coadmin with zero investment
+      if (isAdmin && totalInvestment <= 0) {
+        console.log(`🚫 Skipping admin/coadmin with zero investment: ${memberId}`, {
           investment: totalInvestment,
-          isAdmin: isAdmin,
-          meetsCriteria: !isAdmin || (isAdmin && totalInvestment > 0)
+          role: role
         });
-
+        return null;
+      }
+      
         const memberTransactions = allTransactions[memberId] || [];
         const monthlyDividends = Array(12).fill(0);
         const monthlyTransactions = Array(12).fill(null).map(() => []);
@@ -1859,7 +1794,7 @@ const Dashboard = () => {
           >
             <div style={styles.cardTitle}>
               <FaPiggyBank style={styles.cardIcon} />
-              <h3 style={styles.cardTitleText}>5KI Earnings</h3>
+              <h3 style={styles.cardTitleText}>5KI Operating Budgets</h3>
             </div>
             <div style={styles.secondaryMetricValue}>₱{formatCurrency(fundsData.fiveKISavings)}</div>
             <div style={styles.secondaryMetricDescription}>Organization savings</div>
