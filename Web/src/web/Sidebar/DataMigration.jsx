@@ -97,12 +97,48 @@ const generateRandomPassword = () => {
   return pwd;
 };
 
+// Update the formatDate function at the top (around line 50)
 const formatDate = (date) => {
+  // If date is already in the correct string format, return it
+  if (typeof date === 'string' && date.includes(',')) {
+    return date;
+  }
+  
+  // If it's a string that needs parsing
+  if (typeof date === 'string') {
+    try {
+      date = new Date(date);
+      // Handle Firebase timestamp
+      if (date.toString() === 'Invalid Date') {
+        const timestamp = parseInt(date);
+        if (!isNaN(timestamp)) {
+          date = new Date(timestamp);
+        } else {
+          // Try parsing as ISO string
+          date = new Date(date.replace(/(\d{4})-(\d{2})-(\d{2})/, '$1/$2/$3'));
+        }
+      }
+    } catch (e) {
+      console.warn('Error parsing date:', date, e);
+      date = new Date();
+    }
+  }
+  
+  // If it's not a valid date object, create new one
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    date = new Date();
+  }
+  
   const options = { year: 'numeric', month: 'long', day: 'numeric' };
   return date.toLocaleDateString('en-US', options);
 };
 
+// Also update formatTime for consistency
 const formatTime = (date) => {
+  if (!date || !(date instanceof Date) || isNaN(date.getTime())) {
+    date = new Date();
+  }
+  
   const hours = date.getHours().toString().padStart(2, '0');
   const minutes = date.getMinutes().toString().padStart(2, '0');
   return `${hours}:${minutes}`;
@@ -1183,7 +1219,6 @@ const checkIdChangeImpact = async (memberId, newId) => {
   }
 };
 
-// Function to move data from old ID to new ID
 const moveMemberData = async (oldId, newId, memberData) => {
   try {
     setUpdatingInProgress(true);
@@ -1213,6 +1248,16 @@ const moveMemberData = async (oldId, newId, memberData) => {
         Object.keys(loansData).forEach(loanId => {
           updates[`${loanId}/id`] = parseInt(newId);
           updates[`${loanId}/memberId`] = parseInt(newId);
+          // Also update email if it was changed
+          if (memberData.email) {
+            updates[`${loanId}/email`] = memberData.email;
+          }
+          if (memberData.firstName) {
+            updates[`${loanId}/firstName`] = memberData.firstName;
+          }
+          if (memberData.lastName) {
+            updates[`${loanId}/lastName`] = memberData.lastName;
+          }
         });
         
         if (Object.keys(updates).length > 0) {
@@ -1243,6 +1288,16 @@ const moveMemberData = async (oldId, newId, memberData) => {
         Object.keys(paymentsData).forEach(paymentId => {
           updates[`${paymentId}/id`] = parseInt(newId);
           updates[`${paymentId}/memberId`] = parseInt(newId);
+          // Also update email if it was changed
+          if (memberData.email) {
+            updates[`${paymentId}/email`] = memberData.email;
+          }
+          if (memberData.firstName) {
+            updates[`${paymentId}/firstName`] = memberData.firstName;
+          }
+          if (memberData.lastName) {
+            updates[`${paymentId}/lastName`] = memberData.lastName;
+          }
         });
         
         if (Object.keys(updates).length > 0) {
@@ -1272,6 +1327,10 @@ const moveMemberData = async (oldId, newId, memberData) => {
         const updates = {};
         Object.keys(transactionsData).forEach(transactionId => {
           updates[`${transactionId}/memberId`] = parseInt(newId);
+          // Also update email if it was changed
+          if (memberData.email) {
+            updates[`${transactionId}/email`] = memberData.email;
+          }
         });
         
         if (Object.keys(updates).length > 0) {
@@ -1283,49 +1342,47 @@ const moveMemberData = async (oldId, newId, memberData) => {
       }
     }
     
-    // Step 5: Update role collections if applicable
- setUpdateProgress({ current: ++currentStep, total: totalSteps, message: 'Updating role collections...' });
-const role = memberData.role || 'member';
+    // Step 5: Update role collections
+    setUpdateProgress({ current: ++currentStep, total: totalSteps, message: 'Updating role collections...' });
+    const role = memberData.role || 'member';
 
-if (role === 'admin') {
-  const adminRef = database.ref(`Users/Admin/${oldId}`);
-  const adminSnapshot = await adminRef.once('value');
-  if (adminSnapshot.exists()) {
-    const adminData = adminSnapshot.val();
-    adminData.id = parseInt(newId);
-    // Also update UID if it was changed during email update
-    if (memberData.authUid) {
-      adminData.uid = memberData.authUid;
+    if (role === 'admin') {
+      const adminRef = database.ref(`Users/Admin/${oldId}`);
+      const adminSnapshot = await adminRef.once('value');
+      if (adminSnapshot.exists()) {
+        const adminData = adminSnapshot.val();
+        adminData.id = parseInt(newId);
+        adminData.email = memberData.email;
+        adminData.firstName = memberData.firstName;
+        adminData.lastName = memberData.lastName;
+        if (memberData.authUid) {
+          adminData.uid = memberData.authUid;
+        }
+        await database.ref(`Users/Admin/${newId}`).set(adminData);
+        await adminRef.remove();
+      }
+    } else if (role === 'coadmin') {
+      const coadminRef = database.ref(`Users/CoAdmin/${oldId}`);
+      const coadminSnapshot = await coadminRef.once('value');
+      if (coadminSnapshot.exists()) {
+        const coadminData = coadminSnapshot.val();
+        coadminData.id = parseInt(newId);
+        coadminData.email = memberData.email;
+        coadminData.firstName = memberData.firstName;
+        coadminData.lastName = memberData.lastName;
+        if (memberData.authUid) {
+          coadminData.uid = memberData.authUid;
+        }
+        await database.ref(`Users/CoAdmin/${newId}`).set(coadminData);
+        await coadminRef.remove();
+      }
     }
-    if (memberData.email) {
-      adminData.email = memberData.email;
-    }
-    await database.ref(`Users/Admin/${newId}`).set(adminData);
-    await adminRef.remove();
-  }
-} else if (role === 'coadmin') {
-  const coadminRef = database.ref(`Users/CoAdmin/${oldId}`);
-  const coadminSnapshot = await coadminRef.once('value');
-  if (coadminSnapshot.exists()) {
-    const coadminData = coadminSnapshot.val();
-    coadminData.id = parseInt(newId);
-    // Also update UID if it was changed during email update
-    if (memberData.authUid) {
-      coadminData.uid = memberData.authUid;
-    }
-    if (memberData.email) {
-      coadminData.email = memberData.email;
-    }
-    await database.ref(`Users/CoAdmin/${newId}`).set(coadminData);
-    await coadminRef.remove();
-  }
-}
     
     // Step 6: Remove old member record
     setUpdateProgress({ current: ++currentStep, total: totalSteps, message: 'Removing old records...' });
     await database.ref(`Members/${oldId}`).remove();
     
-    // Step 7: Update local state
+    // Step 7: Finalize
     setUpdateProgress({ current: ++currentStep, total: totalSteps, message: 'Finalizing...' });
     
     return { success: true, newId: parseInt(newId) };
@@ -1430,7 +1487,9 @@ const emptyPaymentTransaction = {
   penaltyPaid: 0,
   interestPaid: 0,
   principalPaid: 0,
-  excessPayment: 0
+  excessPayment: 0,
+  manualMode: false,
+  manuallySet: false 
 };
 
   // Create style element and append to head
@@ -1638,22 +1697,26 @@ const updateLoanField = (loanId, field, value) => {
       }
       
       // Calculate due date when dateApproved changes
-      if (field === 'dateApproved') {
-        const approvalDate = new Date(value || new Date());
-        const paymentsMade = parseInt(updatedLoan.paymentsMade) || 0;
-        const termMonths = parseInt(updatedLoan.term) || 0;
-        const remainingMonths = Math.max(0, termMonths - paymentsMade);
-        
-        if (remainingMonths > 0) {
-          const dueDate = new Date(approvalDate);
-          dueDate.setMonth(dueDate.getMonth() + paymentsMade + 1);
-          updatedLoan.dueDate = formatDate(dueDate); // Use formatDate() for consistency
-        } else if (parseFloat(updatedLoan.outstandingBalance) <= 0) {
-          updatedLoan.dueDate = 'Paid';
-        } else {
-          updatedLoan.dueDate = '';
-        }
-      }
+if (field === 'dateApproved') {
+  const normalizedDate = normalizeDate(value);
+  updatedLoan.dateApproved = normalizedDate;
+  
+  // Recalculate due date
+  const approvalDate = parseDateString(normalizedDate);
+  const paymentsMade = parseInt(updatedLoan.paymentsMade) || 0;
+  const termMonths = parseInt(updatedLoan.term) || 0;
+  const remainingMonths = Math.max(0, termMonths - paymentsMade);
+  
+  if (remainingMonths > 0) {
+    const dueDate = new Date(approvalDate);
+    dueDate.setMonth(dueDate.getMonth() + paymentsMade + 1);
+    updatedLoan.dueDate = formatDate(dueDate);
+  } else if (parseFloat(updatedLoan.outstandingBalance) <= 0) {
+    updatedLoan.dueDate = 'Paid';
+  } else {
+    updatedLoan.dueDate = '';
+  }
+}
       
       // Perform full calculation when loan amount, term, or interest rate changes
       if (['loanAmount', 'term', 'interestRate'].includes(field)) {
@@ -2420,46 +2483,116 @@ const generateTransactionId = (prefix) => {
   return `${prefix}-${timestamp}-${random}`;
 };
 
-// Update an existing loan
 const updateExistingLoan = async (memberId, loanData) => {
   try {
     const now = new Date();
+    
+    // Parse values
+    const outstandingBalance = parseFloat(loanData.outstandingBalance) || 0;
+    const isFullyPaid = outstandingBalance <= 0.01;
+    const loanStatus = isFullyPaid ? 'paid' : (loanData.status || 'active');
+    
+    // Parse dateApproved
+    let dateApproved = loanData.dateApproved;
+    let timeApproved = loanData.timeApproved;
+    
+    if (loanData.dateApproved && typeof loanData.dateApproved === 'string') {
+      if (loanData.dateApproved.includes('T')) {
+        // ISO format
+        const dateObj = new Date(loanData.dateApproved);
+        dateApproved = formatDate(dateObj);
+        timeApproved = formatTime(dateObj);
+      } else if (loanData.dateApproved.includes('-')) {
+        // YYYY-MM-DD format
+        const [year, month, day] = loanData.dateApproved.split('-');
+        const dateObj = new Date(year, month - 1, day);
+        dateApproved = formatDate(dateObj);
+        timeApproved = formatTime(dateObj);
+      }
+    }
     
     // Prepare updated loan data
     const updatedLoan = {
       loanType: loanData.loanType,
       term: parseInt(loanData.term) || 0,
       loanAmount: parseFloat(loanData.loanAmount) || 0,
-      outstandingBalance: parseFloat(loanData.outstandingBalance) || 0,
-      remainingBalance: parseFloat(loanData.outstandingBalance) || 0,
+      outstandingBalance: outstandingBalance,
+      remainingBalance: outstandingBalance,
       paymentsMade: parseInt(loanData.paymentsMade) || 0,
       monthsRemaining: parseInt(loanData.monthsRemaining) || 0,
-      status: loanData.status || 'active',
+      status: loanStatus,
+      dateApproved: dateApproved,
+      timeApproved: timeApproved || formatTime(new Date()),
       dateModified: formatDate(now),
       timeModified: formatTime(now),
       disbursement: loanData.disbursement || 'Cash',
       accountName: loanData.accountName || '',
       accountNumber: loanData.accountNumber || '',
-      bankType: loanData.bankType || ''
+      bankType: loanData.bankType || '',
+      email: formData.email,
+      firstName: formData.firstName,
+      lastName: formData.lastName
     };
     
-    // Update in all locations
-    const collections = ['ApprovedLoans', 'CurrentLoans'];
-    
-    for (const collection of collections) {
-      const ref = database.ref(`Loans/${collection}/${memberId}/${loanData.transactionId}`);
-      await ref.update(updatedLoan);
+    // Update due date based on status
+    if (isFullyPaid) {
+      updatedLoan.dueDate = 'Paid';
+    } else if (loanData.dueDate) {
+      updatedLoan.dueDate = loanData.dueDate;
     }
     
-    // Update in Transactions
-    await database.ref(`Transactions/Loans/${memberId}/${loanData.transactionId}`).update(updatedLoan);
+    // Update in all appropriate locations based on status
+    if (loanStatus === 'paid') {
+      // Remove from CurrentLoans
+      await database.ref(`Loans/CurrentLoans/${memberId}/${loanData.transactionId}`).remove();
+      
+      // Update ApprovedLoans
+      await database.ref(`Loans/ApprovedLoans/${memberId}/${loanData.transactionId}`).update(updatedLoan);
+      
+      // Save to PaidLoans
+      await database.ref(`Loans/PaidLoans/${memberId}/${loanData.transactionId}`).set({
+        ...updatedLoan,
+        dateCompleted: formatDate(now),
+        timeCompleted: formatTime(now)
+      });
+      
+      // Remove from Member's loans (since it's paid)
+      await database.ref(`Members/${memberId}/loans/${loanData.transactionId}`).remove();
+      
+      // Update Transactions
+      await database.ref(`Transactions/PaidLoans/${memberId}/${loanData.transactionId}`).set({
+        ...updatedLoan,
+        label: 'Paid Loan',
+        type: 'PaidLoans',
+        dateCompleted: formatDate(now),
+        timeCompleted: formatTime(now)
+      });
+      
+      console.log(`Loan ${loanData.transactionId} marked as paid, removed from member's total loans`);
+      
+    } else {
+      // Active loan - update CurrentLoans
+      await database.ref(`Loans/CurrentLoans/${memberId}/${loanData.transactionId}`).update(updatedLoan);
+      
+      // Update ApprovedLoans
+      await database.ref(`Loans/ApprovedLoans/${memberId}/${loanData.transactionId}`).update(updatedLoan);
+      
+      // Update Member's loan record (keep in total)
+      await database.ref(`Members/${memberId}/loans/${loanData.transactionId}`).update(updatedLoan);
+      
+      // Update Transactions
+      await database.ref(`Transactions/Loans/${memberId}/${loanData.transactionId}`).update(updatedLoan);
+      
+      console.log(`Updated active loan ${loanData.transactionId}, kept in member's total loans`);
+    }
     
-    // Update in Member record
-    await database.ref(`Members/${memberId}/loans/${loanData.transactionId}`).update(updatedLoan);
+    console.log(`Updated loan ${loanData.transactionId} with status: ${loanStatus}`);
     
-    console.log(`Updated existing loan ${loanData.transactionId}`);
-    
-    return true;
+    return {
+      success: true,
+      transactionId: loanData.transactionId,
+      isPaid: loanStatus === 'paid'
+    };
   } catch (error) {
     console.error('Error updating existing loan:', error);
     throw error;
@@ -2837,6 +2970,66 @@ const openViewModal = async (member) => {
   }
 };
 
+// Add this helper function near other helper functions
+const normalizeDate = (dateString) => {
+  if (!dateString) return '';
+  
+  try {
+    // If it's already in YYYY-MM-DD format, return as is
+    if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+      return dateString;
+    }
+    
+    // Try to parse various date formats
+    let date;
+    
+    if (typeof dateString === 'string') {
+      // Handle "May 5, 2025" format
+      if (dateString.includes(',')) {
+        date = new Date(dateString);
+      } 
+      // Handle Firebase timestamp
+      else if (/^\d+$/.test(dateString)) {
+        date = new Date(parseInt(dateString));
+      }
+      // Try ISO string
+      else {
+        date = new Date(dateString);
+      }
+    } else if (dateString && typeof dateString === 'object' && dateString.toDate) {
+      // Handle Firebase Timestamp
+      date = dateString.toDate();
+    } else if (dateString instanceof Date) {
+      date = dateString;
+    }
+    
+    // If we have a valid date, format as YYYY-MM-DD
+    if (date && !isNaN(date.getTime())) {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+    
+    return '';
+  } catch (error) {
+    console.error('Error normalizing date:', dateString, error);
+    return '';
+  }
+};
+
+// Also add this function if you need to parse date strings
+const parseDateString = (dateString) => {
+  if (!dateString) return new Date();
+  
+  if (typeof dateString === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateString)) {
+    const [year, month, day] = dateString.split('-');
+    return new Date(year, month - 1, day);
+  }
+  
+  return new Date(dateString);
+};
+
 const openEditModal = async (member) => {
   try {
     setEditingMember(member);
@@ -2849,7 +3042,7 @@ const openEditModal = async (member) => {
       firstName: member.firstName || '',
       middleName: member.middleName || '',
       lastName: member.lastName || '',
-      dateOfBirth: member.dateOfBirth || '',
+      dateOfBirth: normalizeDate(member.dateOfBirth),
       placeOfBirth: member.placeOfBirth || '',
       address: member.address || '',
       governmentId: member.governmentId || '',
@@ -2874,8 +3067,17 @@ const openEditModal = async (member) => {
         const loansData = loansSnap.val() || {};
         
         if (loansData && typeof loansData === 'object') {
-          const loansArray = Object.values(loansData);
-          allLoans = [...allLoans, ...loansArray];
+          // Add the original transaction ID from the database
+          Object.keys(loansData).forEach(transactionId => {
+            const loan = loansData[transactionId];
+            if (loan) {
+              allLoans.push({
+                ...loan,
+                originalTransactionId: transactionId, // Keep the original ID
+                collection: collection
+              });
+            }
+          });
         }
       } catch (error) {
         console.log(`No loans found in ${collection}:`, error);
@@ -2888,8 +3090,16 @@ const openEditModal = async (member) => {
       const memberLoansData = memberLoansSnap.val() || {};
       
       if (memberLoansData && typeof memberLoansData === 'object') {
-        const memberLoansArray = Object.values(memberLoansData);
-        allLoans = [...allLoans, ...memberLoansArray];
+        Object.keys(memberLoansData).forEach(transactionId => {
+          const loan = memberLoansData[transactionId];
+          if (loan && !allLoans.find(l => l.originalTransactionId === transactionId)) {
+            allLoans.push({
+              ...loan,
+              originalTransactionId: transactionId,
+              collection: 'MemberLoans'
+            });
+          }
+        });
       }
     } catch (error) {
       console.log('No loans in member record:', error);
@@ -2897,17 +3107,21 @@ const openEditModal = async (member) => {
 
     // Remove duplicates by transactionId
     const uniqueLoans = [];
-    const seenIds = new Set();
+    const seenLoanIds = new Set();
     
     allLoans.forEach(loan => {
-      if (loan.transactionId && !seenIds.has(loan.transactionId)) {
-        seenIds.add(loan.transactionId);
+      const transactionId = loan.originalTransactionId || loan.transactionId;
+      if (transactionId && !seenLoanIds.has(transactionId)) {
+        seenLoanIds.add(transactionId);
         uniqueLoans.push(loan);
       }
     });
 
-    // Transform loan data to match our format
+    // Transform loan data to match our format - PRESERVE TRANSACTION ID
     const formattedLoans = uniqueLoans.map((loan, index) => {
+      // Use the original transaction ID if it exists
+      const transactionId = loan.originalTransactionId || loan.transactionId || `LOAN-${Date.now()}-${index}`;
+      
       // Parse numeric values
       const originalLoanAmount = parseFloat(loan.loanAmount) || 0;
       const termMonths = parseInt(loan.term) || 0;
@@ -2932,13 +3146,14 @@ const openEditModal = async (member) => {
 
       // Calculate due date
       const baseDate = loan.dateApproved || loan.dateApplied || new Date();
-      const approvalDate = new Date(baseDate);
+      const approvalDate = parseDateString(baseDate);
       const dueDate = new Date(approvalDate);
       dueDate.setMonth(dueDate.getMonth() + monthsRemaining);
 
       return {
-        id: loan.transactionId || `loan-${Date.now()}-${index}`,
-        transactionId: loan.transactionId || `LOAN-${Date.now()}-${index}`,
+        id: `${transactionId}-${Date.now()}`, // Unique React key
+        transactionId: transactionId, // PRESERVED from database
+        originalTransactionId: transactionId, // Keep reference to original
         loanType: loan.loanType || '',
         loanAmount: originalLoanAmount.toString(),
         term: termMonths.toString(),
@@ -2946,9 +3161,7 @@ const openEditModal = async (member) => {
         paymentsMade: paymentsMade.toString(),
         monthsRemaining: monthsRemaining.toString(),
         status: loan.status || 'active',
-        dateApproved: loan.dateApproved ? 
-                      (typeof loan.dateApproved === 'string' ? loan.dateApproved.split(' ')[0] : loan.dateApproved) : 
-                      new Date().toISOString().split('T')[0],
+        dateApproved: normalizeDate(loan.dateApproved || loan.dateApplied),
         interestRate: interestRate.toString(),
         interestRateDecimal: interestRateDecimal,
         interestPerTerm: interestPerTerm,
@@ -2965,19 +3178,14 @@ const openEditModal = async (member) => {
         amountPaid: (principalPaid + interestPaid),
         processingFee: parseFloat(loan.processingFee) || 0,
         releaseAmount: parseFloat(loan.releaseAmount) || 0,
-        dueDate: loan.dueDate || formatDate(dueDate)
+        dueDate: loan.dueDate || formatDate(dueDate),
+        isExisting: true // Flag to indicate this is an existing loan
       };
     });
     
     setExistingLoans(formattedLoans);
 
-    // Update available terms if we have loans
-    if (formattedLoans.length > 0 && formattedLoans[0].loanType) {
-      const { loanTypes } = await fetchLoanSettings();
-      updateAvailableTerms(formattedLoans[0].loanType, loanTypes);
-    }
-    
-    // Load existing payment transactions
+    // Load existing payment transactions - PRESERVE TRANSACTION IDS
     const paymentCollections = ['ApprovedPayments', 'PendingPayments'];
     let allPayments = [];
     
@@ -2987,8 +3195,16 @@ const openEditModal = async (member) => {
         const paymentsData = paymentsSnap.val() || {};
         
         if (paymentsData && typeof paymentsData === 'object') {
-          const paymentsArray = Object.values(paymentsData);
-          allPayments = [...allPayments, ...paymentsArray];
+          Object.keys(paymentsData).forEach(transactionId => {
+            const payment = paymentsData[transactionId];
+            if (payment) {
+              allPayments.push({
+                ...payment,
+                originalTransactionId: transactionId,
+                collection: collection
+              });
+            }
+          });
         }
       } catch (error) {
         console.log(`No payments found in ${collection}:`, error);
@@ -3001,8 +3217,16 @@ const openEditModal = async (member) => {
       const transactionsData = transactionsPaymentsSnap.val() || {};
       
       if (transactionsData && typeof transactionsData === 'object') {
-        const transactionsArray = Object.values(transactionsData);
-        allPayments = [...allPayments, ...transactionsArray];
+        Object.keys(transactionsData).forEach(transactionId => {
+          const payment = transactionsData[transactionId];
+          if (payment && !allPayments.find(p => p.originalTransactionId === transactionId)) {
+            allPayments.push({
+              ...payment,
+              originalTransactionId: transactionId,
+              collection: 'Transactions'
+            });
+          }
+        });
       }
     } catch (error) {
       console.log('No payments in transactions:', error);
@@ -3013,37 +3237,49 @@ const openEditModal = async (member) => {
     const seenPaymentIds = new Set();
     
     allPayments.forEach(payment => {
-      if (payment.transactionId && !seenPaymentIds.has(payment.transactionId)) {
-        seenPaymentIds.add(payment.transactionId);
+      const transactionId = payment.originalTransactionId || payment.transactionId;
+      if (transactionId && !seenPaymentIds.has(transactionId)) {
+        seenPaymentIds.add(transactionId);
         uniquePayments.push(payment);
       }
     });
 
     const formattedPayments = uniquePayments.map((payment, index) => {
-      // Parse date
-      let paymentDate = new Date().toISOString().split('T')[0];
-      let paymentTime = formatTime(new Date());
+      // Use the original transaction ID if it exists
+      const transactionId = payment.originalTransactionId || payment.transactionId || `PAY-${Date.now()}-${index}`;
       
-      if (payment.dateApplied) {
-        const dateParts = payment.dateApplied.split(' at ');
-        if (dateParts.length === 2) {
-          paymentDate = dateParts[0];
-          paymentTime = dateParts[1];
-        } else if (payment.dateApplied.includes('T')) {
-          paymentDate = payment.dateApplied.split('T')[0];
+      // Parse payment date
+      let paymentDate = '';
+      let paymentTime = '';
+      
+      if (payment.dateApplied && typeof payment.dateApplied === 'string') {
+        const dateAppliedParts = payment.dateApplied.split(' at ');
+        if (dateAppliedParts.length === 2) {
+          paymentDate = dateAppliedParts[0];
+          paymentTime = dateAppliedParts[1];
         }
-      } else if (payment.dateApproved) {
+      }
+      
+      if (!paymentDate && payment.dateApproved) {
         paymentDate = payment.dateApproved;
       }
+      
+      if (!paymentTime && payment.timeApproved) {
+        paymentTime = payment.timeApproved;
+      }
+      
+      // Parse payment date to ensure proper format
+      const parsedDate = paymentDate ? normalizeDate(paymentDate) : normalizeDate(new Date());
 
       return {
-        id: payment.transactionId || `payment-${Date.now()}-${index}`,
-        transactionId: payment.transactionId,
-        loanTransactionId: payment.selectedLoanId || '',
-        paymentDate: paymentDate,
+        id: `${transactionId}-${Date.now()}`, // Unique React key
+        transactionId: transactionId, // PRESERVED from database
+        originalTransactionId: transactionId, // Keep reference to original
+        loanTransactionId: payment.selectedLoanId || payment.loanTransactionId || '',
+        paymentDate: parsedDate,
         paymentTime: paymentTime,
         paymentAmount: String(payment.amountToBePaid || payment.paymentAmount || 0),
-        paymentMethod: payment.paymentOption || 'Cash',
+        paymentMethod: payment.paymentOption || payment.paymentMethod || 'Cash',
         accountName: payment.accountName || '',
         accountNumber: payment.accountNumber || '',
         bankType: payment.bankType || '',
@@ -3052,7 +3288,8 @@ const openEditModal = async (member) => {
         penaltyPaid: parseFloat(payment.penaltyPaid || payment.penalty || 0),
         interestPaid: parseFloat(payment.interestPaid || 0),
         principalPaid: parseFloat(payment.principalPaid || 0),
-        excessPayment: parseFloat(payment.excessPayment || 0)
+        excessPayment: parseFloat(payment.excessPayment || 0),
+        isExisting: true // Flag to indicate this is an existing payment
       };
     });
     
@@ -3120,6 +3357,8 @@ const handleEmailUpdate = async (oldEmail, newEmail, memberId, memberData, formD
     const newUserCredential = await createUserWithEmailAndPassword(auth, newEmail, newPassword);
     const newUid = newUserCredential.user.uid;
     
+    console.log(`Created new Firebase user: ${newEmail} (UID: ${newUid})`);
+    
     // STEP 1: Update member record with new email and UID
     await database.ref(`Members/${memberId}`).update({
       email: newEmail,
@@ -3128,25 +3367,36 @@ const handleEmailUpdate = async (oldEmail, newEmail, memberId, memberData, formD
       timeModified: formatTime(new Date())
     });
     
-    // STEP 2: Update role-specific collection if admin/coadmin
-    if (memberData.role === 'admin') {
+    // STEP 2: Update ALL records with new email
+    await updateAllRecordsWithNewEmail(
+      memberId,
+      oldEmail,
+      newEmail,
+      formData.firstName,
+      formData.lastName
+    );
+    
+    // STEP 3: Update role-specific collection if admin/coadmin
+    const userRole = memberData.role || 'member';
+    if (userRole === 'admin') {
       await database.ref(`Users/Admin/${memberId}`).update({
         email: newEmail,
         uid: newUid,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         dateModified: formatDate(new Date()),
         timeModified: formatTime(new Date())
       });
-    } else if (memberData.role === 'coadmin') {
+    } else if (userRole === 'coadmin') {
       await database.ref(`Users/CoAdmin/${memberId}`).update({
         email: newEmail,
         uid: newUid,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
         dateModified: formatDate(new Date()),
         timeModified: formatTime(new Date())
       });
     }
-    
-    // STEP 3: Update all other records with new email
-    await updateAllRecordsWithNewEmail(memberId, oldEmail, newEmail, formData.firstName, formData.lastName);
     
     // STEP 4: Mark old user for cleanup
     await markOldUserForDeletion(memberData.authUid, oldEmail, memberId);
@@ -3160,9 +3410,9 @@ const handleEmailUpdate = async (oldEmail, newEmail, memberId, memberData, formD
       password: newPassword,
       memberId: memberId,
       dateAdded: memberData.dateAdded,
-      role: memberData.role || 'member',
-      roleDisplay: memberData.role === 'admin' ? 'Administrator' : 
-                  memberData.role === 'coadmin' ? 'Co-Admin' : 'Member',
+      role: userRole,
+      roleDisplay: userRole === 'admin' ? 'Administrator' : 
+                  userRole === 'coadmin' ? 'Co-Admin' : 'Member',
       isEmailUpdate: true
     });
     
@@ -3180,7 +3430,6 @@ const handleEmailUpdate = async (oldEmail, newEmail, memberId, memberData, formD
   }
 };
 
-// Add this helper function
 const markOldUserForDeletion = async (oldUid, oldEmail, memberId) => {
   try {
     // Store old user info for cleanup (can be processed by Cloud Function later)
@@ -3226,8 +3475,7 @@ const updateMemberReferences = async (memberId, newUid, newEmail, formData) => {
   }
 };
 
-
-
+// Add this function near other helper functions
 const checkEmailInAdminCollections = async (email, memberId) => {
   try {
     // Get all admin and coadmin users
@@ -3536,7 +3784,7 @@ const updateEmailInCollection = async (collectionPath, newEmail, firstName, last
   }
 };
 
-// FIXED: Function to update all related records with new email
+// Add this function near other helper functions (around line 2600)
 const updateAllRecordsWithNewEmail = async (memberId, oldEmail, newEmail, firstName, lastName) => {
   try {
     console.log(`Updating all records for member ${memberId} from ${oldEmail} to ${newEmail}`);
@@ -3548,28 +3796,25 @@ const updateAllRecordsWithNewEmail = async (memberId, oldEmail, newEmail, firstN
       lastName: lastName
     });
     
-    // 2. Update loans in member's record
-    await updateRecordsInPath(`Members/${memberId}/loans`, newEmail, firstName, lastName);
-    
-    // 3. Update in all loan collections
+    // 2. Update in all loan collections
     const loanCollections = ['ApprovedLoans', 'CurrentLoans', 'PaidLoans', 'RejectedLoans'];
     for (const collection of loanCollections) {
       await updateRecordsInPath(`Loans/${collection}/${memberId}`, newEmail, firstName, lastName);
     }
     
-    // 4. Update in all payment collections
+    // 3. Update in all payment collections
     const paymentCollections = ['ApprovedPayments', 'PendingPayments', 'RejectedPayments'];
     for (const collection of paymentCollections) {
       await updateRecordsInPath(`Payments/${collection}/${memberId}`, newEmail, firstName, lastName);
     }
     
-    // 5. Update in all transaction collections
+    // 4. Update in all transaction collections
     const transactionCollections = ['Loans', 'Payments', 'Registrations', 'Migrations', 'Withdrawals', 'Deposits'];
     for (const collection of transactionCollections) {
       await updateRecordsInPath(`Transactions/${collection}/${memberId}`, newEmail, firstName, lastName);
     }
     
-    // 6. Update in Admin/CoAdmin collections if applicable
+    // 5. Update in Admin/CoAdmin collections if applicable
     const userRole = formData.userRole || 'member';
     if (userRole === 'admin') {
       await database.ref(`Users/Admin/${memberId}`).update({
@@ -3594,13 +3839,14 @@ const updateAllRecordsWithNewEmail = async (memberId, oldEmail, newEmail, firstN
   }
 };
 
-// Helper function to update records in a specific path
+// Add this helper function
 const updateRecordsInPath = async (path, newEmail, firstName, lastName) => {
   try {
     const ref = database.ref(path);
     const snapshot = await ref.once('value');
     
     if (!snapshot.exists()) {
+      console.log(`No records found at ${path}`);
       return false;
     }
     
@@ -3613,7 +3859,7 @@ const updateRecordsInPath = async (path, newEmail, firstName, lastName) => {
         const record = data[key];
         
         if (record && typeof record === 'object') {
-          // Update email field (could be 'email', 'memberEmail', 'emailAddress')
+          // Update ALL possible email fields
           if (record.email !== undefined) {
             updates[`${key}/email`] = newEmail;
           }
@@ -3649,6 +3895,8 @@ const updateRecordsInPath = async (path, newEmail, firstName, lastName) => {
     if (Object.keys(updates).length > 0) {
       await ref.update(updates);
       console.log(`Updated ${Object.keys(updates).length / 3} records in ${path}`);
+    } else {
+      console.log(`No email/name fields found to update in ${path}`);
     }
     
     return true;
@@ -3657,6 +3905,7 @@ const updateRecordsInPath = async (path, newEmail, firstName, lastName) => {
     return false;
   }
 };
+
   const handleInputChange = (name, value) => {
     setFormData(prev => ({
       ...prev,
@@ -3978,74 +4227,253 @@ const createMemberRegistrationTransaction = async (memberId, memberData) => {
   }
 };
 
-const migrateLoansAndPayments = async (memberId) => {
+const transactionIdExists = async (transactionId, memberId) => {
   try {
-    console.log(`Starting migration for member ${memberId}`);
+    if (!transactionId) return false;
     
-    let totalLoansAmount = 0;
-    let totalProcessingFees = 0;
-    let totalInterestForYields = 0;
+    // Check in multiple collections for loans
+    const loanCollections = [
+      `Loans/ApprovedLoans/${memberId}/${transactionId}`,
+      `Loans/CurrentLoans/${memberId}/${transactionId}`,
+      `Loans/PaidLoans/${memberId}/${transactionId}`
+    ];
     
-    // STEP 1: CREATE ALL LOANS
-    const loanResults = [];
-    
-    for (const loan of existingLoans) {
-      if (loan.loanType && loan.loanAmount && loan.term) {
-        console.log(`Creating loan: ${loan.loanType} - ${loan.loanAmount}`);
-        
-        const loanResult = await createLoanRecord(memberId, loan);
-        loanResults.push(loanResult);
-        
-        totalLoansAmount += parseFloat(loan.loanAmount);
-        totalProcessingFees += parseFloat(loanResult.calculations.processingFee || 0);
+    for (const path of loanCollections) {
+      const ref = database.ref(path);
+      const snapshot = await ref.once('value');
+      if (snapshot.exists()) {
+        console.log(`Transaction ID ${transactionId} found in ${path}`);
+        return true;
       }
     }
     
-    // STEP 2: ADD PROCESSING FEES TO SYSTEM SAVINGS
-    if (totalProcessingFees > 0) {
-      const savingsRef = database.ref('Settings/Savings');
-      const currentSavings = parseFloat((await savingsRef.once('value')).val()) || 0;
-      const newSavings = currentSavings + totalProcessingFees;
-      
-      await savingsRef.set(Math.round(newSavings * 100) / 100);
+    // Check in payment collections
+    const paymentCollections = [
+      `Payments/ApprovedPayments/${memberId}/${transactionId}`,
+      `Payments/PendingPayments/${memberId}/${transactionId}`
+    ];
+    
+    for (const path of paymentCollections) {
+      const ref = database.ref(path);
+      const snapshot = await ref.once('value');
+      if (snapshot.exists()) {
+        console.log(`Transaction ID ${transactionId} found in ${path}`);
+        return true;
+      }
     }
     
-    // STEP 3: CREATE PAYMENTS
-    for (const payment of paymentTransactions) {
-      if (payment.loanTransactionId && payment.paymentAmount) {
-        console.log(`Processing payment for loan ${payment.loanTransactionId}: ${payment.paymentAmount}`);
+    // Check in transaction collections
+    const transactionCollections = [
+      `Transactions/Loans/${memberId}/${transactionId}`,
+      `Transactions/Payments/${memberId}/${transactionId}`,
+      `Transactions/PaidLoans/${memberId}/${transactionId}`
+    ];
+    
+    for (const path of transactionCollections) {
+      const ref = database.ref(path);
+      const snapshot = await ref.once('value');
+      if (snapshot.exists()) {
+        console.log(`Transaction ID ${transactionId} found in ${path}`);
+        return true;
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error('Error checking transaction ID:', error);
+    return false;
+  }
+};
+
+const migrateLoansAndPayments = async (memberId, isFromEdit = false) => {
+  try {
+    console.log(`Starting migration for member ${memberId} (edit mode: ${isFromEdit})`);
+    
+    let totalLoansAmount = 0;
+    let totalInterestForYields = 0;
+    
+    // Track what we need to update
+    const loanResults = {
+      updated: [],
+      created: [],
+      paidLoans: [] // Track paid loans separately
+    };
+    
+    // STEP 1: PROCESS ALL LOANS
+    for (const loan of existingLoans) {
+      if (!loan.loanType || !loan.loanAmount || !loan.term) continue;
+      
+      // Check if this is an existing loan (has isExisting flag or originalTransactionId)
+      const isExistingLoan = (loan.isExisting === true || loan.originalTransactionId) && isFromEdit;
+      
+      if (isExistingLoan) {
+        console.log(`Updating existing loan: ${loan.transactionId || loan.originalTransactionId}`);
+        // UPDATE existing loan - use the original transaction ID
+        const transactionId = loan.originalTransactionId || loan.transactionId;
         
-        const linkedLoan = existingLoans.find(loan => 
-          loan.transactionId === payment.loanTransactionId
-        );
+        // Check if loan actually exists in database
+        const loanExists = await transactionIdExists(transactionId, memberId);
         
-        if (linkedLoan) {
-          // Create payment record
-          const paymentResult = await createPaymentRecord(memberId, payment, linkedLoan);
+        if (loanExists) {
+          const updatedLoan = await updateExistingLoan(memberId, {
+            ...loan,
+            transactionId: transactionId // Use preserved ID
+          });
+          loanResults.updated.push({
+            transactionId,
+            success: true,
+            isPaid: loan.status === 'paid' // Track if it's paid
+          });
           
-          // CRITICAL FIX: Sync CurrentLoans after payment
-          await syncCurrentLoansWithApprovedLoans(memberId, payment.loanTransactionId);
+          // Only add to total if NOT paid
+          if (loan.status !== 'paid') {
+            totalLoansAmount += parseFloat(loan.loanAmount);
+            console.log(`Added existing active loan ${transactionId} to total: ${formatCurrency(loan.loanAmount)}`);
+          } else {
+            console.log(`Skipped paid loan ${transactionId} from total`);
+            loanResults.paidLoans.push(transactionId);
+          }
+        } else {
+          // If doesn't exist, create as new
+          console.log(`Loan ${transactionId} not found, creating as new`);
+          const loanResult = await createLoanRecord(memberId, loan, false);
           
-          totalInterestForYields += parseFloat(paymentResult.allocation.interestPaid) || 0;
+          // Only add to total if NOT paid
+          if (loanResult.loanRecord.status !== 'paid') {
+            totalLoansAmount += parseFloat(loan.loanAmount);
+            console.log(`Added new active loan ${loanResult.transactionId} to total: ${formatCurrency(loan.loanAmount)}`);
+            loanResults.created.push({
+              transactionId: loanResult.transactionId,
+              success: true,
+              status: 'active'
+            });
+          } else {
+            console.log(`Skipped new paid loan ${loanResult.transactionId} from total`);
+            loanResults.paidLoans.push(loanResult.transactionId);
+          }
+        }
+      } else {
+        // CREATE new loan
+        console.log(`Creating new loan for member ${memberId}`);
+        const loanResult = await createLoanRecord(memberId, loan, false);
+        
+        // Only add to total if NOT paid
+        if (loanResult.loanRecord.status !== 'paid') {
+          totalLoansAmount += parseFloat(loan.loanAmount);
+          console.log(`Added new active loan ${loanResult.transactionId} to total: ${formatCurrency(loan.loanAmount)}`);
+          
+          if (loanResult.loanRecord.status === 'paid') {
+            loanResults.created.push({
+              transactionId: loanResult.transactionId,
+              success: true,
+              status: 'paid'
+            });
+          } else {
+            loanResults.created.push({
+              transactionId: loanResult.transactionId,
+              success: true,
+              status: 'active'
+            });
+          }
+        } else {
+          console.log(`Skipped new paid loan ${loanResult.transactionId} from total`);
+          loanResults.paidLoans.push(loanResult.transactionId);
         }
       }
     }
     
-    // STEP 4: ADD ACCUMULATED INTEREST TO YIELDS
+    // STEP 2: PROCESS PAYMENTS
+    const paymentResults = {
+      updated: [],
+      created: []
+    };
+    
+    for (const payment of paymentTransactions) {
+      if (!payment.loanTransactionId || !payment.paymentAmount) continue;
+      
+      const isExistingPayment = (payment.isExisting === true || payment.originalTransactionId) && isFromEdit;
+      const linkedLoan = existingLoans.find(loan => 
+        loan.transactionId === payment.loanTransactionId || 
+        loan.originalTransactionId === payment.loanTransactionId
+      );
+      
+      if (!linkedLoan) {
+        console.warn(`Payment references non-existent loan: ${payment.loanTransactionId}`);
+        continue;
+      }
+      
+      if (isExistingPayment) {
+        console.log(`Updating existing payment: ${payment.transactionId || payment.originalTransactionId}`);
+        // UPDATE existing payment - use the original transaction ID
+        const transactionId = payment.originalTransactionId || payment.transactionId;
+        
+        // Check if payment actually exists in database
+        const paymentExists = await transactionIdExists(transactionId, memberId);
+        
+        if (paymentExists) {
+          const updatedPayment = await updateExistingPayment(memberId, {
+            ...payment,
+            transactionId: transactionId // Use preserved ID
+          });
+          paymentResults.updated.push({
+            transactionId,
+            success: true
+          });
+          
+          // Add to interest tracking
+          const interestPaid = parseFloat(payment.interestPaid) || 0;
+          totalInterestForYields += interestPaid;
+        } else {
+          // If doesn't exist, create as new
+          console.log(`Payment ${transactionId} not found, creating as new`);
+          const paymentResult = await createPaymentRecord(memberId, payment, linkedLoan, false);
+          paymentResults.created.push({
+            transactionId: paymentResult.transactionId,
+            success: true
+          });
+          
+          // Add to interest tracking
+          const interestPaid = parseFloat(paymentResult.allocation.interestPaid) || 0;
+          totalInterestForYields += interestPaid;
+        }
+      } else {
+        // CREATE new payment
+        console.log(`Creating new payment for loan ${payment.loanTransactionId}`);
+        const paymentResult = await createPaymentRecord(memberId, payment, linkedLoan, false);
+        paymentResults.created.push({
+          transactionId: paymentResult.transactionId,
+          success: true
+        });
+        
+        // Add to interest tracking
+        const interestPaid = parseFloat(paymentResult.allocation.interestPaid) || 0;
+        totalInterestForYields += interestPaid;
+      }
+    }
+    
+    // STEP 3: Update member's total loans amount (ONLY non-paid loans)
+    if (totalLoansAmount > 0) {
+      await database.ref(`Members/${memberId}/loans`).set(Math.round(totalLoansAmount * 100) / 100);
+      console.log(`Updated member ${memberId} total loans (active only): ${formatCurrency(totalLoansAmount)}`);
+    } else {
+      // If no active loans, set to 0
+      await database.ref(`Members/${memberId}/loans`).set(0);
+      console.log(`Member ${memberId} has no active loans, total set to 0`);
+    }
+    
+    // Add interest to yields if any
     if (totalInterestForYields > 0) {
       await addInterestToYields(totalInterestForYields);
     }
     
-    // STEP 5: Update member's total loans amount
-    if (totalLoansAmount > 0) {
-      await database.ref(`Members/${memberId}/loans`).set(Math.round(totalLoansAmount * 100) / 100);
-    }
-    
     return {
       success: true,
-      loansCreated: loanResults.length,
+      loansUpdated: loanResults.updated.length,
+      loansCreated: loanResults.created.length,
+      paidLoans: loanResults.paidLoans.length,
+      paymentsUpdated: paymentResults.updated.length,
+      paymentsCreated: paymentResults.created.length,
       totalLoansAmount,
-      totalProcessingFees,
       totalInterestForYields
     };
     
@@ -4146,9 +4574,16 @@ const syncCurrentLoansWithApprovedLoans = async (memberId, loanTransactionId) =>
   }
 };
 
-const createLoanRecord = async (memberId, loanData) => {
+const createLoanRecord = async (memberId, loanData, isFromEdit = false) => {
   try {
     const now = new Date();
+    
+    // Use existing transaction ID if available (for edit mode)
+    const transactionId = isFromEdit && loanData.transactionId && (loanData.transactionId.startsWith('LOAN-') || /^\d{6}$/.test(loanData.transactionId))
+      ? loanData.transactionId 
+      : Math.floor(100000 + Math.random() * 900000).toString();
+    
+    console.log(`Creating/Updating loan with ID: ${transactionId} (isFromEdit: ${isFromEdit})`);
     
     // Parse all values
     const originalLoanAmount = parseFloat(loanData.loanAmount) || 0;
@@ -4156,9 +4591,12 @@ const createLoanRecord = async (memberId, loanData) => {
     const interestRatePercentage = parseFloat(loanData.interestRate) || 0;
     const interestRateDecimal = interestRatePercentage / 100;
     const paymentsMade = parseInt(loanData.paymentsMade) || 0;
-    const processingFee = parseFloat(loanData.processingFee) || 
-                         parseFloat(formData.processingFee) || 
-                         parseFloat(processingFee) || 0;
+    const processingFeeValue = parseFloat(processingFee) || 0;
+    
+    // Determine loan status based on outstanding balance
+    const outstandingBalance = parseFloat(loanData.outstandingBalance) || 0;
+    const isFullyPaid = outstandingBalance <= 0.01;
+    const loanStatus = isFullyPaid ? 'paid' : (loanData.status || 'active');
     
     // --- CALCULATIONS ---
     const interestPerTerm = Math.round(originalLoanAmount * interestRateDecimal * 100) / 100;
@@ -4166,10 +4604,7 @@ const createLoanRecord = async (memberId, loanData) => {
     const totalTermPayment = Math.round((originalLoanAmount + totalInterest) * 100) / 100;
     const monthlyPrincipal = Math.round(originalLoanAmount / termMonths * 100) / 100;
     const totalMonthlyPayment = Math.round(totalTermPayment / termMonths * 100) / 100;
-    const releaseAmount = Math.max(0, Math.round((originalLoanAmount - processingFee) * 100) / 100);
-    
-    // Use manual outstanding balance from form
-    const outstandingBalance = parseFloat(loanData.outstandingBalance) || totalTermPayment;
+    const releaseAmount = Math.max(0, Math.round((originalLoanAmount - processingFeeValue) * 100) / 100);
     
     // Calculate amount paid correctly
     const amountPaid = totalTermPayment - outstandingBalance;
@@ -4186,51 +4621,48 @@ const createLoanRecord = async (memberId, loanData) => {
     // Calculate remaining months
     const remainingMonths = Math.max(0, termMonths - paymentsMade);
     
-    // CRITICAL FIX: dueDate format should match dateApproved format
-    let dueDate = 'N/A';
-    const approvalDate = new Date(loanData.dateApproved || now);
+    // CRITICAL: Handle dateApproved properly
+    let dateApproved;
+    let timeApproved;
     
-    if (remainingMonths <= 0) {
-      dueDate = 'Paid';
-    } else if (paymentsMade > 0) {
-      // Payments have been made
-      const paymentsForThisLoan = paymentTransactions.filter(payment => 
-        payment.loanTransactionId === loanData.transactionId
-      );
-      
-      if (paymentsForThisLoan.length > 0) {
-        const sortedPayments = paymentsForThisLoan.sort((a, b) => 
-          new Date(b.paymentDate) - new Date(a.paymentDate)
-        );
-        
-        const lastPaymentDate = new Date(sortedPayments[0].paymentDate);
-        const nextDueDate = new Date(lastPaymentDate);
-        nextDueDate.setMonth(nextDueDate.getMonth() + 1);
-        
-        // FIX: Use same format as dateApproved (May 5, 2025)
-        dueDate = formatDate(nextDueDate);
+    if (loanData.dateApproved && typeof loanData.dateApproved === 'string') {
+      // If dateApproved is provided, parse it
+      if (loanData.dateApproved.includes('T')) {
+        // ISO format
+        const approvalDate = new Date(loanData.dateApproved);
+        dateApproved = formatDate(approvalDate);
+        timeApproved = formatTime(approvalDate);
+      } else if (loanData.dateApproved.includes('-')) {
+        // YYYY-MM-DD format
+        const [year, month, day] = loanData.dateApproved.split('-');
+        const approvalDate = new Date(year, month - 1, day);
+        dateApproved = formatDate(approvalDate);
+        timeApproved = formatTime(approvalDate);
       } else {
-        const nextDueDate = new Date(approvalDate);
-        nextDueDate.setMonth(nextDueDate.getMonth() + paymentsMade);
-        
-        // FIX: Use same format as dateApproved
-        dueDate = formatDate(nextDueDate);
+        // Already in correct format or custom format
+        dateApproved = loanData.dateApproved;
+        timeApproved = loanData.timeApproved || formatTime(new Date());
       }
     } else {
-      const firstDueDate = new Date(approvalDate);
-      firstDueDate.setMonth(firstDueDate.getMonth() + 1);
-      
-      // FIX: Use same format as dateApproved
-      dueDate = formatDate(firstDueDate);
+      // Use current date/time
+      dateApproved = formatDate(now);
+      timeApproved = formatTime(now);
     }
     
-    // Generate transaction ID
-    const transactionId = loanData.transactionId || 
-                         Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Format dates consistently
-    const formattedApprovalDate = loanData.dateApproved ? 
-                                 new Date(loanData.dateApproved) : now;
+    // Calculate due date based on approval date
+    let dueDate = 'N/A';
+    if (!isFullyPaid && remainingMonths > 0) {
+      const approvalDateObj = new Date(dateApproved);
+      if (isNaN(approvalDateObj.getTime())) {
+        // If dateApproved is not a valid date, use current date
+        approvalDateObj = new Date();
+      }
+      const nextDueDate = new Date(approvalDateObj);
+      nextDueDate.setMonth(nextDueDate.getMonth() + 1);
+      dueDate = formatDate(nextDueDate);
+    } else if (isFullyPaid) {
+      dueDate = 'Paid';
+    }
     
     // --- PREPARE LOAN RECORD ---
     const loanRecord = {
@@ -4257,7 +4689,7 @@ const createLoanRecord = async (memberId, loanData) => {
       totalTermPayment: Math.round(totalTermPayment * 100) / 100,
       
       // Processing Fee
-      processingFee: Math.round(processingFee * 100) / 100,
+      processingFee: Math.round(processingFeeValue * 100) / 100,
       releaseAmount: Math.round(releaseAmount * 100) / 100,
       
       // Current State
@@ -4270,12 +4702,12 @@ const createLoanRecord = async (memberId, loanData) => {
       principalPaid: Math.round(principalPaidSoFar * 100) / 100,
       
       // Dates - ALL CONSISTENT FORMAT
-      dateApplied: `${formatDate(formattedApprovalDate)} at ${formatTime(formattedApprovalDate)}`,
-      dateApproved: formatDate(formattedApprovalDate),
-      timeApproved: formatTime(formattedApprovalDate),
-      timestamp: formattedApprovalDate.getTime(),
+      dateApplied: `${dateApproved} at ${timeApproved}`,
+      dateApproved: dateApproved,
+      timeApproved: timeApproved,
+      timestamp: now.getTime(),
       
-      // FIX: dueDate uses same format as dateApproved
+      // Due Date
       dueDate: dueDate,
       
       // Disbursement Information
@@ -4285,65 +4717,82 @@ const createLoanRecord = async (memberId, loanData) => {
       bankType: loanData.bankType || '',
       
       // Status
-      status: 'approved',
+      status: loanStatus,
       
       // Migration Flag
       isMigration: true,
-      isExistingLoan: true
+      isExistingLoan: isFromEdit
     };
     
     // Add completion date if fully paid
-    if (outstandingBalance <= 0) {
+    if (isFullyPaid) {
       loanRecord.status = 'paid';
       loanRecord.dateCompleted = formatDate(now);
       loanRecord.timeCompleted = formatTime(now);
       loanRecord.dueDate = 'Paid';
     }
     
-    // --- SAVE TO DATABASE ---
+    // --- SAVE TO DATABASE BASED ON STATUS ---
     
-    // 1. Save to ApprovedLoans
+    // 1. Always save to ApprovedLoans (historical record)
     await database.ref(`Loans/ApprovedLoans/${memberId}/${transactionId}`).set(loanRecord);
     
-    // 2. Save to CurrentLoans if not fully paid
-    if (loanRecord.status === 'approved' && outstandingBalance > 0) {
-      await database.ref(`Loans/CurrentLoans/${memberId}/${transactionId}`).set(loanRecord);
-    } else if (loanRecord.status === 'paid') {
+    // 2. Save based on status
+    if (loanRecord.status === 'paid') {
+      // Save to PaidLoans only - DO NOT add to member's total loans
       await database.ref(`Loans/PaidLoans/${memberId}/${transactionId}`).set(loanRecord);
+      
+      // Also save to Transactions for record keeping
+      await database.ref(`Transactions/PaidLoans/${memberId}/${transactionId}`).set({
+        ...loanRecord,
+        label: 'Paid Loan',
+        type: 'PaidLoans'
+      });
+      
+      // DO NOT save to Member's loans if it's paid
+      console.log(`Loan ${transactionId} is paid, NOT adding to member's total loans`);
+    } else {
+      // Active loan - save to CurrentLoans
+      await database.ref(`Loans/CurrentLoans/${memberId}/${transactionId}`).set(loanRecord);
+      
+      // Also save to Transactions
+      await database.ref(`Transactions/Loans/${memberId}/${transactionId}`).set({
+        ...loanRecord,
+        label: 'Loan',
+        type: 'Loans'
+      });
+      
+      // Save to Member's loans only if it's NOT paid
+      await database.ref(`Members/${memberId}/loans/${transactionId}`).set(loanRecord);
     }
     
-    // 3. Save to Transactions
-    await database.ref(`Transactions/Loans/${memberId}/${transactionId}`).set({
-      ...loanRecord,
-      label: 'Loan',
-      type: 'Loans'
-    });
-    
-    // 4. Save to Member's loans
-    await database.ref(`Members/${memberId}/loans/${transactionId}`).set(loanRecord);
-    
-    console.log(`Created loan record ${transactionId}:`);
+    console.log(`${isFromEdit ? 'Updated' : 'Created'} loan record ${transactionId}:`);
+    console.log('- Status:', loanRecord.status);
     console.log('- dateApproved:', loanRecord.dateApproved);
     console.log('- dueDate:', loanRecord.dueDate);
+    console.log('- Saved to:', loanRecord.status === 'paid' ? 'PaidLoans (not in total)' : 'CurrentLoans (in total)');
     
     return {
       transactionId,
       loanRecord,
+      isPaid: loanRecord.status === 'paid',
+      shouldAddToTotal: loanRecord.status !== 'paid', // Flag for total calculation
       calculations: {
         originalLoanAmount,
-        processingFee,
+        processingFee: processingFeeValue,
         releaseAmount,
         totalTermPayment,
         totalMonthlyPayment,
         interestPerTerm,
         totalInterest,
         dueDate
-      }
+      },
+      isExisting: isFromEdit
     };
     
   } catch (error) {
-    console.error('Error creating loan record:', error);
-    throw new Error(`Failed to create loan record: ${error.message}`);
+    console.error('Error creating/updating loan record:', error);
+    throw new Error(`Failed to create/update loan record: ${error.message}`);
   }
 };
 
@@ -4594,11 +5043,16 @@ const updateCurrentLoanAfterPayment = async (memberId, loanTransactionId, paymen
   }
 };
 
-
-const createPaymentRecord = async (memberId, paymentData, linkedLoan) => {
+const createPaymentRecord = async (memberId, paymentData, linkedLoan, isFromEdit = false) => {
   try {
     const now = new Date();
-    const transactionId = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Use existing transaction ID if available (for edit mode)
+    const transactionId = isFromEdit && paymentData.transactionId && (paymentData.transactionId.startsWith('PAY-') || /^\d{6}$/.test(paymentData.transactionId))
+      ? paymentData.transactionId 
+      : Math.floor(100000 + Math.random() * 900000).toString();
+    
+    console.log(`Creating/Updating payment with ID: ${transactionId} (isFromEdit: ${isFromEdit})`);
     
     // Parse payment amounts
     const paymentAmount = parseFloat(paymentData.paymentAmount) || 0;
@@ -4622,21 +5076,52 @@ const createPaymentRecord = async (memberId, paymentData, linkedLoan) => {
     }
     
     // Parse payment date
-    let paymentDate = new Date(paymentData.paymentDate || now);
-    let paymentTime = paymentData.paymentTime || formatTime(now);
+    let paymentDate;
+    let paymentTime;
     
-    // Update the linked loan's due date - with correct format
-    if (linkedLoan && linkedLoan.transactionId) {
+    if (paymentData.paymentDate && typeof paymentData.paymentDate === 'string') {
+      // Handle different date formats
+      if (paymentData.paymentDate.includes('T')) {
+        // ISO format
+        const dateObj = new Date(paymentData.paymentDate);
+        paymentDate = formatDate(dateObj);
+        paymentTime = paymentData.paymentTime || formatTime(dateObj);
+      } else if (paymentData.paymentDate.includes('-')) {
+        // YYYY-MM-DD format
+        const [year, month, day] = paymentData.paymentDate.split('-');
+        const dateObj = new Date(year, month - 1, day);
+        paymentDate = formatDate(dateObj);
+        paymentTime = paymentData.paymentTime || formatTime(dateObj);
+      } else {
+        // Already in correct format or custom format
+        paymentDate = paymentData.paymentDate;
+        paymentTime = paymentData.paymentTime || formatTime(now);
+      }
+    } else {
+      // Use current date/time
+      paymentDate = formatDate(now);
+      paymentTime = paymentData.paymentTime || formatTime(now);
+    }
+    
+    // Update the linked loan's due date if it's active
+    if (linkedLoan && linkedLoan.transactionId && linkedLoan.status !== 'paid') {
       // Calculate new due date for the loan
       const nextDueDate = new Date(paymentDate);
       nextDueDate.setMonth(nextDueDate.getMonth() + 1);
       
-      // FIX: Use formatDate() for dueDate
-      await database.ref(`Loans/CurrentLoans/${memberId}/${linkedLoan.transactionId}`).update({
-        dueDate: formatDate(nextDueDate), // FIXED: Use formatDate()
-        lastPaymentDate: formatDate(paymentDate),
-        lastPaymentTime: paymentTime
-      });
+      // Update CurrentLoans if it exists
+      const currentLoanRef = database.ref(`Loans/CurrentLoans/${memberId}/${linkedLoan.transactionId}`);
+      const currentLoanSnap = await currentLoanRef.once('value');
+      
+      if (currentLoanSnap.exists()) {
+        await currentLoanRef.update({
+          dueDate: formatDate(nextDueDate),
+          lastPaymentDate: paymentDate,
+          lastPaymentTime: paymentTime,
+          dateModified: formatDate(now),
+          timeModified: formatTime(now)
+        });
+      }
     }
     
     // Prepare payment record
@@ -4666,17 +5151,17 @@ const createPaymentRecord = async (memberId, paymentData, linkedLoan) => {
       selectedLoanId: paymentData.loanTransactionId,
       
       // Dates - All consistent format
-      dateApplied: `${formatDate(paymentDate)} at ${paymentTime}`,
-      dateApproved: formatDate(paymentDate),
+      dateApplied: `${paymentDate} at ${paymentTime}`,
+      dateApproved: paymentDate,
       timeApproved: paymentTime,
-      timestamp: paymentDate.getTime(),
+      timestamp: now.getTime(),
       
       // Status
       status: 'approved',
       
       // Migration Flags
       isMigration: true,
-      isExistingPayment: true
+      isExistingPayment: isFromEdit
     };
     
     // --- SAVE TO DATABASE ---
@@ -4691,6 +5176,50 @@ const createPaymentRecord = async (memberId, paymentData, linkedLoan) => {
       type: 'Payments'
     });
     
+    // 3. If this payment makes a loan fully paid, move it to PaidLoans
+    if (linkedLoan && linkedLoan.transactionId) {
+      const loanRef = database.ref(`Loans/CurrentLoans/${memberId}/${linkedLoan.transactionId}`);
+      const loanSnap = await loanRef.once('value');
+      
+      if (loanSnap.exists()) {
+        const currentLoan = loanSnap.val();
+        const newOutstanding = Math.max(0, (parseFloat(currentLoan.outstandingBalance) || 0) - principalPaid);
+        
+        if (newOutstanding <= 0.01) {
+          // Loan is fully paid
+          const paidLoanData = {
+            ...currentLoan,
+            status: 'paid',
+            outstandingBalance: 0,
+            remainingBalance: 0,
+            amountPaid: (parseFloat(currentLoan.amountPaid) || 0) + paymentAmount,
+            dateCompleted: paymentDate,
+            timeCompleted: paymentTime,
+            dueDate: 'Paid'
+          };
+          
+          // Move to PaidLoans
+          await database.ref(`Loans/PaidLoans/${memberId}/${linkedLoan.transactionId}`).set(paidLoanData);
+          
+          // Remove from CurrentLoans
+          await loanRef.remove();
+          
+          // Update ApprovedLoans
+          await database.ref(`Loans/ApprovedLoans/${memberId}/${linkedLoan.transactionId}`).update({
+            status: 'paid',
+            outstandingBalance: 0,
+            remainingBalance: 0,
+            amountPaid: (parseFloat(currentLoan.amountPaid) || 0) + paymentAmount,
+            dateCompleted: paymentDate,
+            timeCompleted: paymentTime,
+            dueDate: 'Paid'
+          });
+          
+          console.log(`Loan ${linkedLoan.transactionId} marked as paid due to payment`);
+        }
+      }
+    }
+    
     return {
       transactionId,
       paymentRecord,
@@ -4699,12 +5228,13 @@ const createPaymentRecord = async (memberId, paymentData, linkedLoan) => {
         interestPaid,
         principalPaid,
         excessPayment
-      }
+      },
+      isExisting: isFromEdit
     };
     
   } catch (error) {
-    console.error('Error creating payment record:', error);
-    throw new Error(`Failed to create payment record: ${error.message}`);
+    console.error('Error creating/updating payment record:', error);
+    throw new Error(`Failed to create/update payment record: ${error.message}`);
   }
 };
 const submitEditMember = async (skipEmailConfirmation = false) => {
@@ -4765,7 +5295,8 @@ const submitEditMember = async (skipEmailConfirmation = false) => {
         email: formData.email,
         firstName: formData.firstName,
         lastName: formData.lastName,
-        isEmailChanged: formData.email !== editingMember.email
+        isEmailChanged: formData.email !== editingMember.email,
+        role: formData.userRole || 'member'
       });
       setIdChangeModalVisible(true);
       return;
@@ -4811,6 +5342,7 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
     
     // STEP 1: Handle email update if changed
     if (isEmailChanged) {
+      console.log(`Email changed from ${editingMember.email} to ${formData.email}`);
       emailUpdateResult = await handleEmailUpdate(
         editingMember.email,
         formData.email,
@@ -4851,31 +5383,46 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
     // STEP 3: Update member record
     await database.ref(`Members/${newMemberId}`).update(updates);
     
-    // STEP 4: If email changed, update all records
-    if (isEmailChanged) {
-      await updateAllRecordsWithNewEmail(
-        newMemberId,
-        editingMember.email,
-        formData.email,
-        formData.firstName,
-        formData.lastName
+    // STEP 4: If ID changed, move data from old ID to new ID
+    if (isIdChanged) {
+      // Get current member data
+      const memberRef = database.ref(`Members/${memberId}`);
+      const memberSnap = await memberRef.once('value');
+      const currentData = memberSnap.val();
+      
+      // Prepare updated member data with new ID
+      const updatedMemberData = {
+        ...currentData,
+        ...updates,
+        id: newMemberId
+      };
+      
+      // Move all data from old ID to new ID
+      const moveResult = await moveMemberData(
+        memberId, 
+        newMemberId, 
+        updatedMemberData
       );
+      
+      if (!moveResult.success) {
+        throw new Error('Failed to move member data to new ID');
+      }
     }
     
-    // STEP 5: Update role-specific collections
-    const userRole = formData.userRole || 'member';
+    // STEP 5: Update role collections if role changed
     const oldRole = editingMember.role || 'member';
+    const newRole = formData.userRole || 'member';
     
-    if (userRole !== oldRole || isEmailChanged) {
-      // Remove from old role collection if role changed or email changed
+    if (newRole !== oldRole || isEmailChanged) {
+      // Remove from old role collection
       if (oldRole === 'admin') {
-        await database.ref(`Users/Admin/${editingMember.id}`).remove();
+        await database.ref(`Users/Admin/${isIdChanged ? memberId : newMemberId}`).remove();
       } else if (oldRole === 'coadmin') {
-        await database.ref(`Users/CoAdmin/${editingMember.id}`).remove();
+        await database.ref(`Users/CoAdmin/${isIdChanged ? memberId : newMemberId}`).remove();
       }
       
       // Add to new role collection
-      if (userRole === 'admin') {
+      if (newRole === 'admin') {
         await database.ref(`Users/Admin/${newMemberId}`).set({
           id: newMemberId,
           uid: newUid,
@@ -4884,10 +5431,12 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
           lastName: formData.lastName,
           phoneNumber: formData.phoneNumber,
           role: 'admin',
+          dateAdded: editingMember.dateAdded,
+          timeAdded: editingMember.timeAdded,
           dateModified: formatDate(now),
           timeModified: formatTime(now)
         });
-      } else if (userRole === 'coadmin') {
+      } else if (newRole === 'coadmin') {
         await database.ref(`Users/CoAdmin/${newMemberId}`).set({
           id: newMemberId,
           uid: newUid,
@@ -4896,6 +5445,8 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
           lastName: formData.lastName,
           phoneNumber: formData.phoneNumber,
           role: 'coadmin',
+          dateAdded: editingMember.dateAdded,
+          timeAdded: editingMember.timeAdded,
           dateModified: formatDate(now),
           timeModified: formatTime(now)
         });
@@ -4903,7 +5454,9 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
     }
     
     // STEP 6: Handle loans and payments
-    await updateLoansAndPayments(newMemberId);
+    if (existingLoans.length > 0 || paymentTransactions.length > 0) {
+      await migrateLoansAndPayments(newMemberId, true);
+    }
     
     // STEP 7: Upload new images if provided
     if (validIdFrontFile) {
@@ -4918,8 +5471,8 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
     
     // STEP 8: Prepare success message
     let successMsg = 'Member updated successfully!';
-    let roleDisplay = userRole === 'admin' ? 'Administrator' : 
-                     userRole === 'coadmin' ? 'Co-Admin' : 'Member';
+    let roleDisplay = newRole === 'admin' ? 'Administrator' : 
+                     newRole === 'coadmin' ? 'Co-Admin' : 'Member';
     
     if (isEmailChanged && emailUpdateResult?.password) {
       successMsg = `${roleDisplay} updated successfully! New login credentials have been sent to ${formData.email}`;
@@ -4933,17 +5486,22 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
         password: emailUpdateResult.password,
         memberId: newMemberId,
         dateAdded: editingMember.dateAdded,
-        role: userRole,
+        role: newRole,
         isEmailUpdate: true,
         roleDisplay: roleDisplay
       });
-    } else if (userRole !== oldRole) {
-      successMsg = `${roleDisplay} updated successfully! Role changed from ${oldRole} to ${userRole}.`;
+    } else if (newRole !== oldRole) {
+      successMsg = `${roleDisplay} updated successfully! Role changed from ${oldRole} to ${newRole}.`;
     }
     
     // Add loan/payment update info
     if (existingLoans.length > 0 || paymentTransactions.length > 0) {
       successMsg += ` Loans and payments have been updated.`;
+    }
+    
+    // Add ID change info
+    if (isIdChanged) {
+      successMsg += ` Member ID changed from #${memberId} to #${newMemberId}`;
     }
     
     setSuccessMessage(successMsg);
@@ -4962,7 +5520,6 @@ const processMemberUpdate = async (memberId, isIdChanged = false) => {
     setIsProcessing(false);
   }
 };
-
 const handleIdChange = async () => {
   if (!idChangeInfo || !editingMember) {
     setErrorMessage('Cannot change ID: Member information is missing.');
@@ -4989,21 +5546,28 @@ const handleIdChange = async () => {
       email: idChangeInfo.email || currentData.email,
       firstName: idChangeInfo.firstName || currentData.firstName,
       lastName: idChangeInfo.lastName || currentData.lastName,
+      role: idChangeInfo.role || currentData.role || 'member',
       dateModified: formatDate(new Date()),
       timeModified: formatTime(new Date())
     };
     
     // Update email if it was also changed
     if (idChangeInfo.isEmailChanged) {
+      console.log(`Email also changing from ${editingMember.email} to ${idChangeInfo.email}`);
+      
       const emailUpdateResult = await handleEmailUpdate(
         editingMember.email,
         idChangeInfo.email,
         idChangeInfo.newId,
         currentData,
-        formData
+        {
+          firstName: idChangeInfo.firstName,
+          lastName: idChangeInfo.lastName,
+          userRole: idChangeInfo.role
+        }
       );
       
-      if (emailUpdateResult.newUid) {
+      if (emailUpdateResult?.newUid) {
         updatedMemberData.authUid = emailUpdateResult.newUid;
       }
     }
@@ -5016,7 +5580,13 @@ const handleIdChange = async () => {
     );
     
     if (moveResult.success) {
-      setSuccessMessage(`Member ID successfully changed from #${idChangeInfo.oldId} to #${idChangeInfo.newId}`);
+      let successMsg = `Member ID successfully changed from #${idChangeInfo.oldId} to #${idChangeInfo.newId}`;
+      
+      if (idChangeInfo.isEmailChanged) {
+        successMsg += ` and email updated to ${idChangeInfo.email}`;
+      }
+      
+      setSuccessMessage(successMsg);
       setSuccessModalVisible(true);
       
       // Close modals and refresh
@@ -5024,6 +5594,8 @@ const handleIdChange = async () => {
       setIdChangeInfo(null);
       closeModals();
       await fetchMembers();
+    } else {
+      throw new Error('Failed to move member data');
     }
     
   } catch (error) {
@@ -5576,7 +6148,7 @@ const renderAddEditModal = (mode) => (
     onChange={(e) => {
       // Only allow numbers and one decimal point
       const value = e.target.value;
-      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      const regex = /^-?\d*\.?\d*$/;
       if (value === '' || regex.test(value)) {
         handleInputChange('balance', value);
       }
@@ -5598,7 +6170,7 @@ const renderAddEditModal = (mode) => (
     onChange={(e) => {
       // Only allow numbers and one decimal point
       const value = e.target.value;
-      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      const regex = /^-?\d*\.?\d*$/;
       if (value === '' || regex.test(value)) {
         handleInputChange('investment', value);
       }
@@ -5825,7 +6397,7 @@ const renderAddEditModal = (mode) => (
     onChange={(e) => {
       // Only allow numbers and one decimal point - SAME AS DEPOSITS COMPONENT
       const value = e.target.value;
-      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      const regex = /^-?\d*\.?\d*$/;
       if (value === '' || regex.test(value)) {
         updateLoanField(loan.id, 'loanAmount', value);
       }
@@ -5865,7 +6437,7 @@ const renderAddEditModal = (mode) => (
     onChange={(e) => {
       // FIX: Direct validation for outstanding balance
       const value = e.target.value;
-      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      const regex = /^-?\d*\.?\d*$/;
       if (value === '' || regex.test(value)) {
         setExistingLoans(prev => prev.map(l => {
           if (l.id === loan.id) {
@@ -6179,7 +6751,7 @@ const renderAddEditModal = (mode) => (
     onChange={(e) => {
       // Only allow numbers and one decimal point
       const value = e.target.value;
-      const regex = /^(\d+\.?\d*|\.\d+)$/;
+      const regex = /^-?\d*\.?\d*$/;
       if (value === '' || regex.test(value)) {
         updatePaymentTransactionField(payment.id, 'paymentAmount', value);
         
