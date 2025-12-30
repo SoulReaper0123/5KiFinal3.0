@@ -881,12 +881,10 @@ const processAction = async (payment, action, rejectionReason = '') => {
 
 const processDatabaseApprove = async (payment) => {
   try {
-    console.log('🚀 DEBUG: Starting payment approval process');
     
     const { id, transactionId, amountToBePaid } = payment;
 
     // 1. Verify member details
-    console.log('🔍 Step 1: Verifying member details...');
     const memberRef = database.ref(`Members/${id}`);
     const memberSnap = await memberRef.once('value');
     const memberData = memberSnap.val();
@@ -895,14 +893,7 @@ const processDatabaseApprove = async (payment) => {
       throw new Error('Member data not found in database.');
     }
 
-    console.log('✅ Member verified:', {
-      memberId: id,
-      name: `${memberData.firstName} ${memberData.lastName}`,
-      email: memberData.email
-    });
-
     // 2. Load Settings
-    console.log('🔍 Step 2: Loading system settings...');
     const fundsRef = database.ref('Settings/Funds');
     const yieldsRef = database.ref('Settings/Yields');
     const yieldsHistoryRef = database.ref('Settings/YieldsHistory');
@@ -910,7 +901,6 @@ const processDatabaseApprove = async (payment) => {
     const savingsHistoryRef = database.ref('Settings/SavingsHistory');
 
     // 3. Find current loan for this member
-    console.log('🔍 Step 3: Finding current loan...');
     const memberLoansRef = database.ref(`Loans/CurrentLoans/${id}`);
     let currentLoanData = null;
     let currentLoanKey = null;
@@ -919,19 +909,17 @@ const processDatabaseApprove = async (payment) => {
     // Try preferred loan ID first (from payment)
     const preferredLoanKey = payment.selectedLoanId;
     if (preferredLoanKey) {
-      console.log(`🔍 Looking for specific loan: ${preferredLoanKey}`);
       const specificLoanSnap = await database.ref(`Loans/CurrentLoans/${id}/${preferredLoanKey}`).once('value');
       if (specificLoanSnap.exists()) {
         currentLoanData = specificLoanSnap.val();
         currentLoanKey = preferredLoanKey;
         isLoanPayment = true;
-        console.log(`✅ Found specific loan: ${currentLoanKey}`);
+
       }
     }
 
     // Fallback: find first active loan
     if (!currentLoanData) {
-      console.log('🔍 Searching for any active loan...');
       const memberLoansSnap = await memberLoansRef.once('value');
       if (memberLoansSnap.exists()) {
         memberLoansSnap.forEach((loanSnap) => {
@@ -941,18 +929,10 @@ const processDatabaseApprove = async (payment) => {
             isLoanPayment = true;
           }
         });
-        if (currentLoanData) {
-          console.log(`✅ Found loan: ${currentLoanKey}`);
-        }
       }
     }
 
-    if (!currentLoanData) {
-      console.log('⚠️ No current loan found - treating as non-loan payment');
-    }
-
     // Generate new transaction ID for approved payment
-    console.log('🔢 Step 4: Generating transaction IDs...');
     const originalTransactionId = transactionId;
     const newTransactionId = Math.floor(100000 + Math.random() * 900000).toString();
 
@@ -962,7 +942,6 @@ const processDatabaseApprove = async (payment) => {
     const transactionRef = database.ref(`Transactions/Payments/${id}/${newTransactionId}`);
 
     // 4. Fetch current values
-    console.log('🔍 Step 5: Fetching current financial values...');
     const [paymentSnap, fundsSnap, savingsSnap, yieldsSnap] = await Promise.all([
       paymentRef.once('value'),
       fundsRef.once('value'),
@@ -982,37 +961,21 @@ const processDatabaseApprove = async (payment) => {
     const memberBalance = parseFloat(memberData.balance || 0);
     const memberInvestment = parseFloat(memberData.investment || 0);
 
-    console.log('📊 Current financial state:', {
-      paymentAmount: formatCurrency(paymentAmount),
-      memberBalance: formatCurrency(memberBalance),
-      memberInvestment: formatCurrency(memberInvestment),
-      currentFunds: formatCurrency(currentFunds),
-      currentSavings: formatCurrency(currentSavings),
-      currentYields: formatCurrency(currentYields),
-      hasLoan: isLoanPayment
-    });
-
     // 5. Calculate penalty (goes to Savings)
-    console.log('🧮 Step 6: Calculating penalty...');
-    let penaltyDue = 0;
+
+    let penaltyDue = 0; 
     const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
     
     if (penaltyFromApp > 0) {
-      penaltyDue = Math.round((penaltyFromApp + Number.EPSILON) * 100) / 100;
-      console.log(`   Penalty from application: ${formatCurrency(penaltyDue)}`);
+      penaltyDue = penaltyFromApp; 
     }
 
-    penaltyDue = Math.round((penaltyDue + Number.EPSILON) * 100) / 100;
     const penaltyPaid = Math.min(paymentAmount, penaltyDue);
-
-    console.log(`📊 Penalty calculation complete: ${formatCurrency(penaltyPaid)} to be paid`);
 
     // Amount left after penalty
     const remainingAfterPenalty = paymentAmount - penaltyPaid;
-    console.log(`   Amount after penalty: ${formatCurrency(remainingAfterPenalty)}`);
 
     // 6. Calculate payment allocation
-    console.log('🧮 Step 7: Calculating payment allocation...');
     let interestPaid = 0;
     let principalPaid = 0;
     let excessPayment = 0;
@@ -1020,63 +983,37 @@ const processDatabaseApprove = async (payment) => {
     let fundsAllocation = 0;
     
     if (isLoanPayment && currentLoanData) {
-      console.log('   Processing as LOAN PAYMENT');
       
       // Get loan details
       const totalTermPayment = parseFloat(currentLoanData.totalTermPayment) || 0;
       const amountPaid = parseFloat(currentLoanData.amountPaid || 0);
       const remainingLoanBalance = totalTermPayment - amountPaid;
       const interestAmount = parseFloat(currentLoanData.interest) || 0;
-      
-      console.log(`   Loan details:`, {
-        totalOwed: formatCurrency(totalTermPayment),
-        alreadyPaid: formatCurrency(amountPaid),
-        remaining: formatCurrency(remainingLoanBalance),
-        monthlyInterest: formatCurrency(interestAmount)
-      });
-
+  
       // First pay interest (goes to Yields)
       interestPaid = Math.min(remainingAfterPenalty, interestAmount);
       const afterInterest = remainingAfterPenalty - interestPaid;
-      
-      console.log(`   Interest to pay: ${formatCurrency(interestPaid)}`);
-      console.log(`   Amount after interest: ${formatCurrency(afterInterest)}`);
 
       // Then pay principal
       principalPaid = Math.min(afterInterest, remainingLoanBalance - interestPaid);
       excessPayment = Math.max(0, afterInterest - principalPaid);
-      
-      console.log(`   Principal to pay: ${formatCurrency(principalPaid)}`);
-      console.log(`   Excess payment: ${formatCurrency(excessPayment)}`);
 
       // ALLOCATION:
       // 1. Principal goes to member balance
       memberBalanceAllocation = principalPaid;
+      fundsAllocation = principalPaid;  
       
       // 2. Excess goes to BOTH member balance AND funds
       if (excessPayment > 0) {
         memberBalanceAllocation += excessPayment; // Excess to member balance
-        fundsAllocation = excessPayment;          // Excess to funds
-        console.log(`   Excess to member balance: ${formatCurrency(excessPayment)}`);
-        console.log(`   Excess to Funds: ${formatCurrency(excessPayment)}`);
+        fundsAllocation += excessPayment;          // Excess to funds
       }
-      
-      console.log(`   Total to member balance: ${formatCurrency(memberBalanceAllocation)}`);
-      console.log(`   Total to Funds: ${formatCurrency(fundsAllocation)}`);
-      
+         
       // Update loan record
       const newAmountPaid = amountPaid + interestPaid + principalPaid;
       const newRemainingBalance = Math.max(0, remainingLoanBalance - (interestPaid + principalPaid));
 
-      console.log('📊 Loan update calculation:', {
-        prevAmountPaid: formatCurrency(amountPaid),
-        amountPaidThisTime: formatCurrency(interestPaid + principalPaid),
-        newAmountPaid: formatCurrency(newAmountPaid),
-        newRemainingBalance: formatCurrency(newRemainingBalance)
-      });
-
       if (newRemainingBalance <= 0.01) { // Allow small rounding errors
-        console.log('🏁 Loan fully paid! Marking as paid...');
         
         // Loan fully paid - mark as paid
         const nowPaid = new Date();
@@ -1111,14 +1048,11 @@ const processDatabaseApprove = async (payment) => {
           database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).remove()
         ]);
 
-        console.log('✅ Loan marked as paid and moved to PaidLoans');
-
       } else {
-        console.log('📝 Updating loan with remaining balance...');
         // Update loan with remaining balance
         const loanUpdates = {};
         loanUpdates['amountPaid'] = newAmountPaid;
-        loanUpdates['remainingBalance'] = Math.round(newRemainingBalance * 100) / 100;
+        loanUpdates['remainingBalance'] = newRemainingBalance;
         loanUpdates['paymentsMade'] = (currentLoanData.paymentsMade || 0) + 1;
         
         const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
@@ -1127,29 +1061,22 @@ const processDatabaseApprove = async (payment) => {
           memberLoanRef.update(loanUpdates),
           database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).update({
             amountPaid: newAmountPaid,
-            remainingBalance: Math.round(newRemainingBalance * 100) / 100,
+            remainingBalance: newRemainingBalance,
             paymentsMade: (currentLoanData.paymentsMade || 0) + 1
           })
         ]);
         
-        console.log('✅ Loan updated with new balance');
+  
       }
     } else {
-      console.log('💳 Processing as NON-LOAN PAYMENT');
       // Non-loan payment: All goes to member balance
       memberBalanceAllocation = paymentAmount;
-      console.log(`   All payment to member balance: ${formatCurrency(memberBalanceAllocation)}`);
+
     }
 
     // 7. Update Member Balance
-    console.log('👤 Step 8: Updating member balance...');
-    const newMemberBalance = Math.ceil((memberBalance + memberBalanceAllocation) * 100) / 100;
+    const newMemberBalance = memberBalance + memberBalanceAllocation;
     
-    console.log('📊 Member update:', {
-      oldBalance: formatCurrency(memberBalance),
-      addedToBalance: formatCurrency(memberBalanceAllocation),
-      newBalance: formatCurrency(newMemberBalance)
-    });
     
     await memberRef.update({ 
       balance: newMemberBalance
@@ -1157,14 +1084,8 @@ const processDatabaseApprove = async (payment) => {
     });
 
     // 8. Update Funds (excess payment goes to Funds)
-    console.log('🏦 Step 9: Updating Funds with excess...');
-    const newFundsAmount = Math.ceil((currentFunds + fundsAllocation) * 100) / 100;
-    
-    console.log('📊 Funds update:', {
-      oldFunds: formatCurrency(currentFunds),
-      addedFromExcess: formatCurrency(fundsAllocation),
-      newFunds: formatCurrency(newFundsAmount)
-    });
+    const newFundsAmount = currentFunds + fundsAllocation;
+
     
     await fundsRef.set(newFundsAmount);
 
@@ -1176,38 +1097,34 @@ const processDatabaseApprove = async (payment) => {
 
     // 9. Update Savings with penalty
     if (penaltyPaid > 0) {
-      console.log('💰 Step 10: Adding penalty to Savings...');
-      const newSavingsAmount = Math.ceil((currentSavings + penaltyPaid) * 100) / 100;
+     
+     const newSavingsAmount = currentSavings + penaltyPaid;
       await savingsRef.set(newSavingsAmount);
 
       // Update daily SavingsHistory
       const savingsDayRef = database.ref(`Settings/SavingsHistory/${dateKey}`);
       const savingsDaySnap = await savingsDayRef.once('value');
       const currentDaySavings = parseFloat(savingsDaySnap.val()) || 0;
-      const newDaySavings = Math.ceil((currentDaySavings + penaltyPaid) * 100) / 100;
+      const newDaySavings = currentDaySavings + penaltyPaid;
       await savingsDayRef.set(newDaySavings);
-      
-      console.log(`✅ Penalty ${formatCurrency(penaltyPaid)} added to Savings`);
+    
     }
 
     // 10. Update Yields with interest
     if (interestPaid > 0) {
-      console.log('📈 Step 11: Adding interest to Yields...');
-      const newYieldsAmount = Math.ceil((currentYields + interestPaid) * 100) / 100;
+      const newYieldsAmount = currentYields + interestPaid;
       await yieldsRef.set(newYieldsAmount);
 
       // Update daily YieldsHistory
       const yieldsDayRef = database.ref(`Settings/YieldsHistory/${dateKey}`);
       const yieldsDaySnap = await yieldsDayRef.once('value');
       const currentDayYields = parseFloat(yieldsDaySnap.val()) || 0;
-      const newDayYields = Math.ceil((currentDayYields + interestPaid) * 100) / 100;
+      const newDayYields = currentDayYields + interestPaid;
       await yieldsDayRef.set(newDayYields);
       
-      console.log(`✅ Interest ${formatCurrency(interestPaid)} added to Yields`);
     }
 
     // 11. Write approved payment record
-    console.log('📝 Step 12: Creating approved payment record...');
     const approvedData = {
       ...paymentData,
       transactionId: newTransactionId,
@@ -1233,8 +1150,8 @@ const processDatabaseApprove = async (payment) => {
       // Final balances
       finalMemberBalance: newMemberBalance,
       finalFundsBalance: newFundsAmount,
-      finalSavingsBalance: Math.ceil((currentSavings + penaltyPaid) * 100) / 100,
-      finalYieldsBalance: Math.ceil((currentYields + interestPaid) * 100) / 100,
+      finalSavingsBalance: currentSavings + penaltyPaid,
+      finalYieldsBalance: currentYields + interestPaid,
       
       // Member info
       id: id,
@@ -1246,26 +1163,6 @@ const processDatabaseApprove = async (payment) => {
     await approvedRef.set(approvedData);
     await transactionRef.set(approvedData);
     await paymentRef.remove();
-
-    console.log('✅ Payment approval completed successfully!');
-    console.log('='.repeat(60));
-    console.log('📊 FINAL PAYMENT ALLOCATION SUMMARY:');
-    console.log('='.repeat(60));
-    console.log(`💰 Payment Amount: ${formatCurrency(paymentAmount)}`);
-    console.log(`   ├── Penalty to Savings: ${formatCurrency(penaltyPaid)}`);
-    console.log(`   ├── Interest to Yields: ${formatCurrency(interestPaid)}`);
-    console.log(`   ├── Principal to Member Balance: ${formatCurrency(principalPaid)}`);
-    if (excessPayment > 0) {
-      console.log(`   └── Excess to BOTH:`);
-      console.log(`       ├── Member Balance: ${formatCurrency(excessPayment)}`);
-      console.log(`       └── Funds: ${formatCurrency(excessPayment)}`);
-    }
-    console.log('');
-    console.log(`👤 Member Balance: ${formatCurrency(memberBalance)} → ${formatCurrency(newMemberBalance)}`);
-    console.log(`🏦 Funds: ${formatCurrency(currentFunds)} → ${formatCurrency(newFundsAmount)}`);
-    console.log(`💰 Savings: ${formatCurrency(currentSavings)} → ${formatCurrency(currentSavings + penaltyPaid)}`);
-    console.log(`📈 Yields: ${formatCurrency(currentYields)} → ${formatCurrency(currentYields + interestPaid)}`);
-    console.log('='.repeat(60));
 
     return { success: true, transactionId: newTransactionId, approvedData };
 
