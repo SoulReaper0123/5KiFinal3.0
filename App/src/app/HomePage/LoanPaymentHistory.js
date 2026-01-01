@@ -180,7 +180,7 @@ export default function LoanPaymentHistory() {
 
     // Extract loan details - SIMPLIFIED for your database structure
     const amountValue = parseCurrencyValue(
-      loanData.amount ||           // Direct amount field
+      loanData.loanAmount ||           // Direct amount field
       loan.amount                  // Fallback
     );
 
