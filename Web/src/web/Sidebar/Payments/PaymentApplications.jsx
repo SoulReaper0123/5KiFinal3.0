@@ -881,7 +881,6 @@ const processAction = async (payment, action, rejectionReason = '') => {
 
 const processDatabaseApprove = async (payment) => {
   try {
-    
     const { id, transactionId, amountToBePaid } = payment;
 
     // 1. Verify member details
@@ -914,7 +913,6 @@ const processDatabaseApprove = async (payment) => {
         currentLoanData = specificLoanSnap.val();
         currentLoanKey = preferredLoanKey;
         isLoanPayment = true;
-
       }
     }
 
@@ -931,6 +929,44 @@ const processDatabaseApprove = async (payment) => {
         });
       }
     }
+
+    // Function to add one month to a date - handles format like "May 5, 2025"
+    const addOneMonth = (dateString) => {
+      if (!dateString) return null;
+      
+      console.log('Processing dueDate:', dateString);
+      
+      // Parse date in format like "May 5, 2025"
+      const date = new Date(dateString);
+      
+      // Check if date is valid
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date format:', dateString);
+        return null;
+      }
+      
+      // Add one month
+      const newDate = new Date(date);
+      newDate.setMonth(newDate.getMonth() + 1);
+      
+      // Handle month-end edge cases (e.g., Jan 31 → Feb 28/29)
+      if (newDate.getDate() !== date.getDate()) {
+        // If day doesn't exist in next month (like Jan 31 → Feb), use last day of month
+        newDate.setDate(0);
+      }
+      
+      // Format back to the same format: "Month Day, Year"
+      const monthNames = [
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+      ];
+      
+      const year = newDate.getFullYear();
+      const month = monthNames[newDate.getMonth()];
+      const day = newDate.getDate();
+      
+      return `${month} ${day}, ${year}`;
+    };
 
     // Generate new transaction ID for approved payment
     const originalTransactionId = transactionId;
@@ -962,12 +998,11 @@ const processDatabaseApprove = async (payment) => {
     const memberInvestment = parseFloat(memberData.investment || 0);
 
     // 5. Calculate penalty (goes to Savings)
-
-    let penaltyDue = 0; 
+    let penaltyDue = 0;
     const penaltyFromApp = parseFloat(paymentData?.penalty) || 0;
     
     if (penaltyFromApp > 0) {
-      penaltyDue = penaltyFromApp; 
+      penaltyDue = penaltyFromApp;
     }
 
     const penaltyPaid = Math.min(paymentAmount, penaltyDue);
@@ -982,14 +1017,15 @@ const processDatabaseApprove = async (payment) => {
     let memberBalanceAllocation = 0;
     let fundsAllocation = 0;
     
+    let newDueDate = null;
+    
     if (isLoanPayment && currentLoanData) {
-      
       // Get loan details
       const totalTermPayment = parseFloat(currentLoanData.totalTermPayment) || 0;
       const amountPaid = parseFloat(currentLoanData.amountPaid || 0);
       const remainingLoanBalance = totalTermPayment - amountPaid;
       const interestAmount = parseFloat(currentLoanData.interest) || 0;
-  
+
       // First pay interest (goes to Yields)
       interestPaid = Math.min(remainingAfterPenalty, interestAmount);
       const afterInterest = remainingAfterPenalty - interestPaid;
@@ -1001,20 +1037,26 @@ const processDatabaseApprove = async (payment) => {
       // ALLOCATION:
       // 1. Principal goes to member balance
       memberBalanceAllocation = principalPaid;
-      fundsAllocation = principalPaid;  
+      fundsAllocation = principalPaid;
       
       // 2. Excess goes to BOTH member balance AND funds
       if (excessPayment > 0) {
         memberBalanceAllocation += excessPayment; // Excess to member balance
-        fundsAllocation += excessPayment;          // Excess to funds
+        fundsAllocation += excessPayment;         // Excess to funds
       }
          
       // Update loan record
       const newAmountPaid = amountPaid + interestPaid + principalPaid;
       const newRemainingBalance = Math.max(0, remainingLoanBalance - (interestPaid + principalPaid));
+      
+      // Calculate new due date (add one month) - only if dueDate exists
+      if (currentLoanData.dueDate) {
+        console.log('Original dueDate:', currentLoanData.dueDate);
+        newDueDate = addOneMonth(currentLoanData.dueDate);
+        console.log('New dueDate:', newDueDate);
+      }
 
       if (newRemainingBalance <= 0.01) { // Allow small rounding errors
-        
         // Loan fully paid - mark as paid
         const nowPaid = new Date();
         const datePaid = formatDate(nowPaid);
@@ -1049,34 +1091,37 @@ const processDatabaseApprove = async (payment) => {
         ]);
 
       } else {
-        // Update loan with remaining balance
-        const loanUpdates = {};
-        loanUpdates['amountPaid'] = newAmountPaid;
-        loanUpdates['remainingBalance'] = newRemainingBalance;
-        loanUpdates['paymentsMade'] = (currentLoanData.paymentsMade || 0) + 1;
+        // Update loan with remaining balance and new due date
+        const loanUpdates = {
+          'amountPaid': newAmountPaid,
+          'remainingBalance': newRemainingBalance,
+          'paymentsMade': (currentLoanData.paymentsMade || 0) + 1
+        };
+        
+        // Only update dueDate if it exists and was successfully calculated
+        if (newDueDate) {
+          loanUpdates['dueDate'] = newDueDate;
+          console.log('Updating dueDate to:', newDueDate);
+        } else if (currentLoanData.dueDate) {
+          // If newDueDate couldn't be calculated but original exists, keep original
+          loanUpdates['dueDate'] = currentLoanData.dueDate;
+          console.log('Keeping original dueDate:', currentLoanData.dueDate);
+        }
         
         const memberLoanRef = database.ref(`Members/${id}/loans/${currentLoanKey}`);
         await Promise.all([
           memberLoansRef.child(currentLoanKey).update(loanUpdates),
           memberLoanRef.update(loanUpdates),
-          database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).update({
-            amountPaid: newAmountPaid,
-            remainingBalance: newRemainingBalance,
-            paymentsMade: (currentLoanData.paymentsMade || 0) + 1
-          })
+          database.ref(`Loans/ApprovedLoans/${id}/${currentLoanKey}`).update(loanUpdates)
         ]);
-        
-  
       }
     } else {
       // Non-loan payment: All goes to member balance
       memberBalanceAllocation = paymentAmount;
-
     }
 
     // 7. Update Member Balance
     const newMemberBalance = memberBalance + memberBalanceAllocation;
-    
     
     await memberRef.update({ 
       balance: newMemberBalance
@@ -1085,7 +1130,6 @@ const processDatabaseApprove = async (payment) => {
 
     // 8. Update Funds (excess payment goes to Funds)
     const newFundsAmount = currentFunds + fundsAllocation;
-
     
     await fundsRef.set(newFundsAmount);
 
@@ -1097,8 +1141,7 @@ const processDatabaseApprove = async (payment) => {
 
     // 9. Update Savings with penalty
     if (penaltyPaid > 0) {
-     
-     const newSavingsAmount = currentSavings + penaltyPaid;
+      const newSavingsAmount = currentSavings + penaltyPaid;
       await savingsRef.set(newSavingsAmount);
 
       // Update daily SavingsHistory
@@ -1107,7 +1150,6 @@ const processDatabaseApprove = async (payment) => {
       const currentDaySavings = parseFloat(savingsDaySnap.val()) || 0;
       const newDaySavings = currentDaySavings + penaltyPaid;
       await savingsDayRef.set(newDaySavings);
-    
     }
 
     // 10. Update Yields with interest
@@ -1121,7 +1163,6 @@ const processDatabaseApprove = async (payment) => {
       const currentDayYields = parseFloat(yieldsDaySnap.val()) || 0;
       const newDayYields = currentDayYields + interestPaid;
       await yieldsDayRef.set(newDayYields);
-      
     }
 
     // 11. Write approved payment record
@@ -1147,6 +1188,10 @@ const processDatabaseApprove = async (payment) => {
       isLoanPayment,
       appliedToLoan: currentLoanKey,
       
+      // Due date update info
+      originalDueDate: currentLoanData?.dueDate || null,
+      newDueDate: newDueDate,
+      
       // Final balances
       finalMemberBalance: newMemberBalance,
       finalFundsBalance: newFundsAmount,
@@ -1163,6 +1208,12 @@ const processDatabaseApprove = async (payment) => {
     await approvedRef.set(approvedData);
     await transactionRef.set(approvedData);
     await paymentRef.remove();
+
+    console.log('Payment approved successfully:', {
+      transactionId: newTransactionId,
+      memberId: id,
+      newDueDate: newDueDate
+    });
 
     return { success: true, transactionId: newTransactionId, approvedData };
 
