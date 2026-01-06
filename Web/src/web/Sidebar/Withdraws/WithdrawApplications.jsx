@@ -1404,6 +1404,13 @@ const handleSuccessOk = async () => {
                       <span style={styles.fieldValue}>{selectedWithdraw.transactionId || 'N/A'}</span>
                     </div>
                     <div style={styles.fieldGroup}>
+      <span style={styles.fieldLabel}>
+        <FaBuilding />
+       Disbursement Option:
+      </span>
+      <span style={styles.fieldValue}>{selectedWithdraw.withdrawOption || 'N/A'}</span>
+    </div>
+                    <div style={styles.fieldGroup}>
                       <span style={styles.fieldLabel}>
                         <FaMoneyBillWave />
                         Amount:
